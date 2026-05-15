@@ -1,0 +1,22 @@
+รันโปรเจกต์:
+
+npm install
+npm run dev
+
+เช็ก build:
+
+npm run build
+
+เทสกับไฟล์ DOIT ที่วางข้างนอกโฟลเดอร์นี้:
+
+npm run check:doit
+
+ฟังก์ชันครบใน V2.1:
+- ภาครวม
+- รายบุคคล/PS
+- ร้าน
+- SKU
+- TOD รายละเอียด
+- ถอดบิล
+- ตรวจผิดปกติ
+- Export CSV

@@ -1,0 +1,35 @@
+Solomon DOIT App V2.1 Complete - Build/Test Result
+
+Commands run:
+1) npm install --no-audit --no-fund
+2) npm run build
+3) npm run check:doit
+
+Build result:
+- TypeScript check passed: tsc --noEmit
+- Vite production build passed
+- dist/ generated
+- Warning only: JS chunk larger than 500 kB because xlsx/jszip parser is bundled. Not a build error.
+
+DOIT real file test:
+File: Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx
+Rows parsed: 46,477
+Qty PCS total: 223,641
+Amount total: 4,827,339.09
+Stores: 5,273
+People/PS: 28
+SKUs: 553
+Invoices: 7,368
+SO Types: INVC
+Amount source: TotInvc
+
+Scope:
+- Dashboard overall
+- Person/PS summary
+- Store summary
+- SKU summary
+- TOD details
+- Bill by store
+- Filters/drill-down
+- Anomaly check
+- CSV export

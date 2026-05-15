@@ -1,0 +1,9 @@
+solomon-doit-appV2
+V2.1 Complete Tested
+
+Run:
+npm install
+npm run dev
+
+Build:
+npm run build
