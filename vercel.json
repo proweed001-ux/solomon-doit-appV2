@@ -1,6 +1,6 @@
 {
-  "buildCommand": "pnpm run build",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "installCommand": "corepack enable && pnpm install --no-frozen-lockfile",
+  "installCommand": "npm ci --include=dev --no-audit --no-fund",
   "framework": "vite"
 }
