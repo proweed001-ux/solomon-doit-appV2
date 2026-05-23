@@ -117,11 +117,15 @@ export function buildBillLines(rows: ParsedRow[]): BillLine[] {
 
   for (const row of rows) {
     if (row.qtyPcs <= 0 && row.correctAmount <= 0) continue;
-    const key = `${row.store}||${row.sku}`;
+    const receiverKey = `${row.customerId || 'no-customer'}||${row.store}`;
+    const receiverLabel = row.customerId ? `${row.customerId} | ${row.store}` : row.store;
+    const key = `${receiverKey}||${row.sku}`;
     const old = map.get(key);
 
     if (!old) {
       map.set(key, {
+        receiverKey,
+        receiverLabel,
         store: row.store,
         customerId: row.customerId,
         sku: row.sku,
@@ -153,7 +157,7 @@ export function buildBillLines(rows: ParsedRow[]): BillLine[] {
   }
 
   return [...map.values()].sort((a, b) => {
-    const s = a.store.localeCompare(b.store, 'th');
+    const s = a.receiverLabel.localeCompare(b.receiverLabel, 'th');
     if (s !== 0) return s;
     return a.sku.localeCompare(b.sku, 'th');
   });
