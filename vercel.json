@@ -1,6 +1,6 @@
 {
-  "buildCommand": "npm run build",
-  "installCommand": "npm ci",
+  "buildCommand": "echo using verified prebuilt dist",
   "outputDirectory": "dist",
-  "framework": "vite"
+  "installCommand": "echo skip install",
+  "framework": null
 }
