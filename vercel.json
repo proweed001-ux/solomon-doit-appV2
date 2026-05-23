@@ -1,6 +1,5 @@
 {
-  "buildCommand": "echo using prebuilt dist",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "installCommand": "echo skip install",
-  "framework": null
+  "framework": "vite"
 }
