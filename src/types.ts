@@ -43,6 +43,8 @@ export type ParsedRow = {
 };
 
 export type BillLine = {
+  receiverKey: string;
+  receiverLabel: string;
   store: string;
   customerId: string;
   sku: string;
