@@ -126,7 +126,7 @@ export function buildBillLines(rows: ParsedRow[]): BillLine[] {
       map.set(key, {
         receiverKey,
         receiverLabel,
-        store: row.store,
+        store: receiverLabel,
         customerId: row.customerId,
         sku: row.sku,
         skuCode: row.skuCode,
