@@ -5,13 +5,13 @@
   "type": "module",
   "packageManager": "npm@10.9.4",
   "engines": {
-    "node": "24.x"
+    "node": "20.x"
   },
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host=0.0.0.0 --port=3000",
-    "clean": "rm -rf dist",
+    "clean": "rimraf dist",
     "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\""
   },
   "dependencies": {
