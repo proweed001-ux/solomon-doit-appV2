@@ -26,6 +26,22 @@ function cleanSelect(){
   if(!el)return;
   [...el.options].forEach(o=>{const c=cleanPs(o.textContent||o.value);if(c){o.textContent=c;o.value=c}});
 }
+function restoreNativePsSelect(){
+  const el=document.querySelector('#psSelect');
+  if(!el)return;
+  document.querySelector('#psPickBtn286')?.remove();
+  document.querySelector('#psPickBtn285')?.remove();
+  document.querySelector('.psOverlay286')?.remove();
+  document.querySelector('.psOverlay285')?.remove();
+  el.style.position='';
+  el.style.left='';
+  el.style.width='100%';
+  el.style.height='42px';
+  el.style.opacity='';
+  el.style.pointerEvents='';
+  el.style.display='';
+  el.hidden=false;
+}
 function forceCenteredDate(){
   if(document.querySelector('#forceCenterDate285'))return;
   const st=document.createElement('style');
@@ -33,13 +49,6 @@ function forceCenteredDate(){
   st.textContent='.dateOverlay{align-items:center!important;justify-content:center!important;padding:18px!important}.dateSheet{width:min(92vw,720px)!important;max-height:86vh!important;border-radius:18px!important;box-shadow:0 22px 80px rgba(0,0,0,.38)!important}@media(max-width:520px){.dateOverlay{padding:10px!important}.dateSheet{width:96vw!important;max-height:88vh!important}.dateGrid{grid-template-columns:repeat(2,1fr)!important}}';
   document.head.appendChild(st);
 }
-function loadPsPicker(){
-  if(document.querySelector('script[data-ps-picker="286"]'))return;
-  const s=document.createElement('script');
-  s.src='/assets/ps-picker-modal-v286.js?v=286';
-  s.dataset.psPicker='286';
-  document.head.appendChild(s);
-}
-function boot(){patch();cleanSelect();forceCenteredDate();loadPsPicker();let n=0;const tick=()=>{patch();cleanSelect();forceCenteredDate();loadPsPicker();if(++n<30)setTimeout(tick,300)};setTimeout(tick,300)}
+function boot(){patch();cleanSelect();restoreNativePsSelect();forceCenteredDate();let n=0;const tick=()=>{patch();cleanSelect();restoreNativePsSelect();forceCenteredDate();if(++n<30)setTimeout(tick,300)};setTimeout(tick,300)}
 document.addEventListener('DOMContentLoaded',boot);if(document.readyState!=='loading')boot();
 })();
