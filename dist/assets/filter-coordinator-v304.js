@@ -1,0 +1,26 @@
+(()=>{'use strict';
+const T=v=>String(v??'').trim();
+const $=s=>document.querySelector(s);
+let rawPayload=null,rawRows=[],rawMeta={},loading=false,patched=false;
+function rowsOf(p){return p?.rows||p||[]}
+function clone(p,rows){return Array.isArray(p)?rows:{...(p||{}),rows}}
+function cleanPs(v){const parts=T(v).split(/\s+/).filter(Boolean);if(!parts.length)return'';if(parts.length===2&&parts[0]===parts[1])return parts[0];const out=[];parts.forEach(x=>{if(!out.includes(x))out.push(x)});return out.join(' ')}
+function allDates(){return[...new Set(rawRows.map(r=>T(r.date)).filter(Boolean))].sort()}
+function dateList(){return[...new Set((window.DOIT_SELECTED_DATES||[]).map(T).filter(Boolean))].sort()}
+function psList(){return[...new Set((window.DOIT_SELECTED_PS_LIST||[]).map(cleanPs).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'th'))}
+function dateOk(r,ds){return !ds.length||ds.includes(T(r.date))}
+function psOk(r,ps){return !ps.length||ps.includes(cleanPs(r.ps))}
+function scopedRows(){const ds=dateList(),ps=psList();return rawRows.filter(r=>dateOk(r,ds)&&psOk(r,ps))}
+function remember(payload,meta){const arr=rowsOf(payload);if(Array.isArray(arr)&&arr.length&&(!rawRows.length||arr.length>=rawRows.length||!loading)){rawPayload=payload;rawRows=arr;rawMeta=meta||{};window.__doitRawRows304=rawRows;window.__doitAllRows=rawRows;window.DOIT_ALL_DATES=allDates();window.DOIT_AVAILABLE_DATES=window.DOIT_ALL_DATES}}
+function syncGlobals(){window.__doitAllRows=rawRows;window.DOIT_ALL_DATES=allDates();window.DOIT_AVAILABLE_DATES=window.DOIT_ALL_DATES;window.DOIT_SELECTED_DATES=dateList();window.DOIT_SELECTED_DATE_KEY=window.DOIT_SELECTED_DATES.join(',');window.DOIT_SELECTED_PS_LIST=psList();window.DOIT_SELECTED_PS_KEY=window.DOIT_SELECTED_PS_LIST.join('||')}
+function thai(s){const p=T(s).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:s}
+function updatePreview(){const p=$('#datePreview'),ds=dateList();if(p){if(!ds.length)p.textContent='ทุกวัน';else if(ds.length===1)p.textContent=thai(ds[0]);else p.textContent=`เลือก ${ds.length} วัน: ${thai(ds[0])} - ${thai(ds[ds.length-1])}`}}
+function updateStoreOptions(){const el=$('#storeSelect');if(!el||!rawRows.length)return;const cur=T(el.value);const stores=[...new Set(scopedRows().map(r=>T(r.store)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'th'));el.innerHTML='<option value="">เลือกร้านจริง</option>'+stores.map(x=>`<option value="${x.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${x.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</option>`).join('');if(cur&&stores.includes(cur))el.value=cur}
+function scopeBadge(){let b=$('#scopeDebug304');if(!b){b=document.createElement('div');b.id='scopeDebug304';b.style.cssText='margin:8px 0;padding:8px 10px;border:1px solid #bae6fd;background:#f0f9ff;color:#075985;border-radius:10px;font-size:12px;font-weight:900;line-height:1.45';const host=document.querySelector('.dateCardFilters')||document.querySelector('.filters')||document.querySelector('.card');host?.appendChild(b)}const ds=dateList(),ps=psList(),rec=T($('#storeSelect')?.value);if(b)b.textContent=`Scope: วันที่ ${ds.length?ds.map(thai).join(', '):'ทุกวัน'} | PS ${ps.length?ps.join(', '):'ทั้งหมด'} | ร้านส่ง ${rec||'-'} | rows ${scopedRows().length.toLocaleString('th-TH')}/${rawRows.length.toLocaleString('th-TH')}`}
+function afterRender(){syncGlobals();updatePreview();updateStoreOptions();scopeBadge()}
+function patchApp(){const app=window.DOIT_JSON_APP;if(!app||app.__filterCoordinator304)return false;const oldLoad=app.load.bind(app);app.load=(payload,m={})=>{remember(payload,m);syncGlobals();const next=rawRows.length?clone(rawPayload||payload,scopedRows()):payload;const res=oldLoad(next,m);setTimeout(afterRender,0);setTimeout(afterRender,120);setTimeout(afterRender,450);return res};app.rerender=()=>{if(!rawPayload)return;loading=true;try{app.load(rawPayload,rawMeta)}finally{loading=false}};app.__filterCoordinator304=true;patched=true;return true}
+function resetAllFilters(){window.DOIT_SELECTED_DATES=[];window.DOIT_SELECTED_DATE_KEY='';window.DOIT_SELECTED_PS_LIST=[];window.DOIT_SELECTED_PS_KEY='';const s=$('#startDate'),e=$('#endDate'),q=$('#q'),ps=$('#psSelect'),brand=$('#brandSelect'),type=$('#typeSelect'),store=$('#storeSelect');if(s)s.value='';if(e)e.value='';if(q)q.value='';if(ps)ps.value='';if(brand)brand.value='';if(type)type.value='';if(store)store.value='';const pb=$('#psTickBtn289');if(pb)pb.textContent='PS: ทั้งหมด ▼';document.dispatchEvent(new CustomEvent('doit:selectedDatesChanged',{detail:{dates:[],all:true,reset:true}}));setTimeout(()=>window.DOIT_JSON_APP?.rerender?.(),0)}
+function bind(){if(document.__filterCoord304)return;document.__filterCoord304=true;document.addEventListener('click',e=>{if(e.target?.id==='clearFilter'){e.preventDefault();e.stopImmediatePropagation();resetAllFilters()}},true);document.addEventListener('doit:selectedDatesChanged',()=>setTimeout(()=>{syncGlobals();window.DOIT_JSON_APP?.rerender?.();afterRender()},0));document.addEventListener('change',e=>{if(e.target?.id==='storeSelect')setTimeout(afterRender,0)},true)}
+function boot(){patchApp();bind();afterRender();let n=0;const tick=()=>{patchApp();bind();afterRender();if(++n<40)setTimeout(tick,300)};setTimeout(tick,300)}
+document.addEventListener('DOMContentLoaded',boot);if(document.readyState!=='loading')boot();
+})();
