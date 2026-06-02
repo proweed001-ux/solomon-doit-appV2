@@ -1,23 +1,12 @@
 (()=>{'use strict';
 const APP_VERSION='Solomon DOIT Pro V2.9.2';
+function addScript(src,attr){try{if(attr&&document.querySelector('script['+attr+']'))return;if(document.querySelector('script[src*="'+src.split('?')[0].split('/').pop()+'"]'))return;const s=document.createElement('script');s.src=src;if(attr)s.setAttribute(attr,'1');(document.body||document.documentElement).appendChild(s)}catch(e){}}
 function loadAppCoordinator(){
   try{
-    if(!document.querySelector('script[data-app-coordinator-v290],script[src*="app-coordinator-v290.js"]')){
-      const s=document.createElement('script');
-      s.src='/assets/app-coordinator-v290.js?v=292';
-      s.dataset.appCoordinatorV290='1';
-      (document.body||document.documentElement).appendChild(s);
-    }
-    if(!document.querySelector('script[src*="remaining-coordinator-v291.js"]')){
-      const r=document.createElement('script');
-      r.src='/assets/remaining-coordinator-v291.js?v=292';
-      (document.body||document.documentElement).appendChild(r);
-    }
-    if(!document.querySelector('script[src*="ps-scope-fix-v292.js"]')){
-      const p=document.createElement('script');
-      p.src='/assets/ps-scope-fix-v292.js?v=292';
-      (document.body||document.documentElement).appendChild(p);
-    }
+    if(!document.querySelector('script[data-app-coordinator-v290],script[src*="app-coordinator-v290.js"]'))addScript('/assets/app-coordinator-v290.js?v=292','data-app-coordinator-v290');
+    if(!document.querySelector('script[src*="remaining-coordinator-v291.js"]'))addScript('/assets/remaining-coordinator-v291.js?v=292','data-remaining-coordinator-v291');
+    if(!document.querySelector('script[src*="ps-scope-fix-v292.js"]'))addScript('/assets/ps-scope-fix-v292.js?v=292','data-ps-scope-fix-v292');
+    if(!document.querySelector('script[src*="print-store-name-edit-v296.js"]'))addScript('/assets/print-store-name-edit-v296.js?v=296','data-print-store-name-edit-v296');
   }catch(e){}
 }
 function lockVersion(){
