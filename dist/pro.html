@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-store">
-<title>Solomon DOIT Pro V2.9.0</title>
+<title>Solomon DOIT Pro V2.9.1</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<header class="topbar"><a class="back" href="/">← กลับหน้าแรก</a><div class="title">Solomon DOIT Pro V2.9.0</div><button class="help" id="helpBtn">ⓘ วิธีใช้งาน</button></header>
+<header class="topbar"><a class="back" href="/">← กลับหน้าแรก</a><div class="title">Solomon DOIT Pro V2.9.1</div><button class="help" id="helpBtn">ⓘ วิธีใช้งาน</button></header>
 <main class="wrap">
 <section id="upload"><div class="topGrid"><div class="card"><h3>☁ อัปโหลดไฟล์ DOIT</h3><div class="uploadRow"><button id="choose" class="fileBtn">เลือกไฟล์</button><span id="fileLabel" class="fileName">ยังไม่ได้เลือกไฟล์</span><span class="check">✓</span><input id="file" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden></div><div id="msg" class="mobileHint">พร้อมใช้งาน</div></div><div class="card"><h3>เลือกวันที่</h3><div class="dateBox"><span id="datePreview">รออัปโหลดไฟล์</span><span>⌘</span></div></div></div></section>
 <section id="work"><div class="tabs"><button class="tab on" id="modePick">ถอดของ Pro</button><button class="tab" id="distTab">กระจายสินค้า</button><button class="tab" id="shipTab">ใบส่งร้านจริง</button><button class="tab" id="doneTab">จัดแล้ว</button><button class="tab" id="rawTab">รายการดิบ</button></div><section class="card filters"><h3>ตัวกรองข้อมูล</h3><div class="filterGrid"><div class="field"><label>ช่วงวันที่</label><div class="range"><input id="startDate" type="date"><span class="dash">-</span><input id="endDate" type="date"></div></div><div class="field"><label>PS</label><select id="psSelect"></select></div><div class="field"><label>ร้านจริงที่จะใส่ออเดอร์</label><select id="storeSelect"></select></div><div class="field"><label>แบรนด์</label><select id="brandSelect"></select></div><div class="field"><label>ประเภทสินค้า</label><select id="typeSelect"></select></div><div class="field"><label>ค้นหา</label><input id="q" placeholder="SKU / ร้าน / บิล"></div></div><div class="searchLine"><div class="mobileHint">เลือก PS/วันที่ → เลือกร้านจริง → รายการสินค้าเป็นบิลปกติ ไม่รวม Telesale</div><div class="btnPair"><button id="clearFilter" class="clear">× ล้างตัวกรอง</button><button id="searchBtn" class="searchBtn">🔍 ค้นหา</button></div></div></section>
@@ -21,23 +21,24 @@
 <section class="card tableCard"><div class="tableTop"><div><h3>รายการถอดของ</h3><small id="tableCount">แสดง 0 รายการ</small></div><button class="outline" id="displayBtn">ปรับจำนวนแสดง</button></div><div class="tableWrap"><table class="tbl" id="table"><thead><tr><th>#</th><th>แบรนด์/ไซซ์</th><th>SKU</th><th>สินค้า</th><th>จำนวนออเดอร์รวม</th><th>จำนวนส่งร้านนี้</th><th>ของใส่เพิ่ม</th><th>ของดึงออก</th><th>คงเหลือรวม</th><th>ยอด</th></tr></thead><tbody><tr><td colspan="10" class="empty">อัปโหลดไฟล์ DOIT เพื่อแสดงรายการถอดของ</td></tr></tbody></table></div><div class="pagination" id="pager"><button class="page on">1</button></div></section>
 <div class="bottomBar"><div class="leftBtns"><button id="undo" class="undo">↶ Undo</button><button id="redo" class="undo">Redo</button><button id="resetDone" class="reset">✚ รีเซ็ตจัดแล้ว</button></div><button id="autosaveBtn" class="autosave">✓ บันทึกอัตโนมัติ</button></div></section>
 </main>
-<script src="/assets/doit-pro-v257.js?v=290"></script>
-<script src="/assets/layout-lock-v258.js?v=290"></script>
-<script src="/assets/telesale-drawer-v262.js?v=290"></script>
-<script src="/assets/upload-progress-v260.js?v=290"></script>
-<script src="/assets/date-check-v262.js?v=290"></script>
-<script src="/assets/pro-cloud-loader-v265.js?v=290"></script>
-<script src="/assets/print-export-fix-v267.js?v=290"></script>
-<script src="/assets/remaining-summary-v276.js?v=290"></script>
-<script src="/assets/mobile-table-ui-v280.js?v=290"></script>
-<script data-close-owner-v306="1" src="/assets/close-owner-v306.js?v=290"></script>
-<script src="/assets/critical-fixes-v282.js?v=290"></script>
-<script src="/assets/ps-label-fix-v285.js?v=290"></script>
-<script src="/assets/field-logic-fixes-v295.js?v=290"></script>
-<script src="/assets/date-scope-fix-v300.js?v=290"></script>
-<script src="/assets/filter-coordinator-v304.js?v=290"></script>
-<script data-app-coordinator-v290="1" src="/assets/app-coordinator-v290.js?v=290"></script>
-<script src="/assets/version-lock-v299.js?v=290"></script>
-<footer>Solomon DOIT Pro V2.9.0</footer>
+<script src="/assets/doit-pro-v257.js?v=291"></script>
+<script src="/assets/layout-lock-v258.js?v=291"></script>
+<script src="/assets/telesale-drawer-v262.js?v=291"></script>
+<script src="/assets/upload-progress-v260.js?v=291"></script>
+<script src="/assets/date-check-v262.js?v=291"></script>
+<script src="/assets/pro-cloud-loader-v265.js?v=291"></script>
+<script src="/assets/print-export-fix-v267.js?v=291"></script>
+<script src="/assets/remaining-summary-v276.js?v=291"></script>
+<script src="/assets/mobile-table-ui-v280.js?v=291"></script>
+<script data-close-owner-v306="1" src="/assets/close-owner-v306.js?v=291"></script>
+<script src="/assets/critical-fixes-v282.js?v=291"></script>
+<script src="/assets/ps-label-fix-v285.js?v=291"></script>
+<script src="/assets/field-logic-fixes-v295.js?v=291"></script>
+<script src="/assets/date-scope-fix-v300.js?v=291"></script>
+<script src="/assets/filter-coordinator-v304.js?v=291"></script>
+<script data-app-coordinator-v290="1" src="/assets/app-coordinator-v290.js?v=291"></script>
+<script src="/assets/remaining-coordinator-v291.js?v=291"></script>
+<script src="/assets/version-lock-v299.js?v=291"></script>
+<footer>Solomon DOIT Pro V2.9.1</footer>
 </body>
 </html>
