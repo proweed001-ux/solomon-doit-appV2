@@ -1,0 +1,3 @@
+Stable rollback baseline confirmed by user.
+Deployment source target: feaab3b2f80476fbf6406f1184688158cf0cfa9b
+Purpose: trigger Vercel production deployment without changing app logic.
