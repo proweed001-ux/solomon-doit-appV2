@@ -1,27 +1,8 @@
 (()=>{'use strict';
-const T=v=>String(v??'').trim();
-const $=s=>document.querySelector(s);
-let rawPayload=null,rawMeta={},rawRows=[],draft=null,lastCommitted=[];
-function rowsOf(p){return p?.rows||p||[]}
-function cleanPs(v){const parts=T(v).split(/\s+/).filter(Boolean);if(!parts.length)return'';if(parts.length===2&&parts[0]===parts[1])return parts[0];const out=[];parts.forEach(x=>{if(!out.includes(x))out.push(x)});return out.join(' ')}
-function sortList(a){return[...new Set((a||[]).map(cleanPs).filter(Boolean))].sort((x,y)=>x.localeCompare(y,'th'))}
-function selected(){const live=sortList(window.DOIT_SELECTED_PS_LIST||[]);return live.length?live:sortList(lastCommitted)}
-function buttonValue(btn){return cleanPs(btn?.dataset?.v||btn?.textContent||'')}
-function visibleValues(){return sortList([...document.querySelectorAll('.psItem289')].map(buttonValue))}
-function allValues(){const rows=Array.isArray(window.__doitAllRows)?window.__doitAllRows:rawRows;const fromRows=Array.isArray(rows)?rows.map(r=>cleanPs(r.ps)).filter(Boolean):[];const fromOpt=$('#psSelect')?[...$('#psSelect').options].map(o=>cleanPs(o.value||o.textContent)).filter(Boolean):[];const fromDom=visibleValues();return sortList([...fromRows,...fromOpt,...fromDom])}
-function ensureDraft(){if(!draft)draft=new Set(selected());return draft}
-function drawLabel(list){const final=sortList(list);const b=$('#psTickBtn289');if(b)b.textContent=final.length?`PS: ${final.length===1?final[0]:final.length+' คน'} ▼`:'PS: ทั้งหมด ▼';const c=$('#psCount289');if(c)c.textContent=final.length?`เลือกอยู่ ${final.length} คน: ${final.join(', ')}`:'เลือกอยู่: ทั้งหมด';const el=$('#psSelect');if(el)el.value=final.length===1?final[0]:''}
-function publish(list,mark=true){const final=sortList(list);if(mark)lastCommitted=final;window.DOIT_SELECTED_PS_LIST=final;window.DOIT_SELECTED_PS_KEY=final.join('||');drawLabel(final);window.DOIT_APP_SCOPE={...(window.DOIT_APP_SCOPE||{}),ps:final,psKey:window.DOIT_SELECTED_PS_KEY};return final}
-function paint(){const d=ensureDraft();document.querySelectorAll('.psItem289').forEach(btn=>{const v=buttonValue(btn),on=d.has(v);btn.classList.toggle('on',on);const i=btn.querySelector('i');if(i)i.textContent=on?'✓':''});drawLabel([...d])}
-function openSync(){draft=new Set(selected());setTimeout(paint,30);setTimeout(paint,120)}
-function toggle(btn){const v=buttonValue(btn);if(!v)return;const d=ensureDraft();if(d.has(v))d.delete(v);else d.add(v);paint()}
-let timer=0;
-function rerender(reason){clearTimeout(timer);timer=setTimeout(()=>{const ps=publish(selected(),false);document.dispatchEvent(new CustomEvent('doit:psChanged',{detail:{ps,psKey:window.DOIT_SELECTED_PS_KEY,reason}}));try{if(rawPayload)window.DOIT_JSON_APP?.load?.(rawPayload,rawMeta);else window.DOIT_JSON_APP?.rerender?.()}catch(e){console.warn('[ps-scope-owner] rerender failed',e)}setTimeout(()=>drawLabel(selected()),120);setTimeout(()=>drawLabel(selected()),500)},80)}
-function commit(reason){const final=publish(draft?[...draft]:selected(),true);draft=null;document.querySelector('.psOverlay289')?.classList.remove('on');rerender(reason||'ok');setTimeout(()=>drawLabel(final),150);setTimeout(()=>drawLabel(final),650);return final}
-function clear(){draft=new Set();lastCommitted=[];publish([],true);paint();document.querySelector('.psOverlay289')?.classList.remove('on');rerender('clear')}
-function selectAll(){draft=new Set(allValues());paint()}
-function patchLoad(){const app=window.DOIT_JSON_APP;if(!app||app.__psScopeOwner295)return false;const old=app.load.bind(app);app.load=(payload,m={})=>{const arr=rowsOf(payload);if(Array.isArray(arr)&&arr.length&&arr.length>=rawRows.length){rawPayload=payload;rawMeta=m||{};rawRows=arr;window.__doitPsRawRows295=arr}const res=old(payload,m);setTimeout(()=>drawLabel(selected()),0);setTimeout(()=>drawLabel(selected()),220);return res};app.__psScopeOwner295=true;return true}
-function bind(){if(document.__psScopeOwner295)return;document.__psScopeOwner295=true;document.addEventListener('click',e=>{const open=e.target?.closest?.('#psTickBtn289');const item=e.target?.closest?.('.psItem289');const ok=e.target?.closest?.('.psOk289');const cancel=e.target?.closest?.('.psClose289');const clearBtn=e.target?.closest?.('.psClear289');const allBtn=e.target?.closest?.('.psAll289');if(open){setTimeout(openSync,40);return}if(item){e.preventDefault();e.stopImmediatePropagation();toggle(item);return}if(ok){e.preventDefault();e.stopImmediatePropagation();commit('ok');return}if(clearBtn){e.preventDefault();e.stopImmediatePropagation();clear();return}if(allBtn){e.preventDefault();e.stopImmediatePropagation();selectAll();return}if(cancel){draft=null;drawLabel(selected());return}},true);document.addEventListener('input',e=>{if(e.target?.id==='psSearch289')setTimeout(paint,50)},true);document.addEventListener('change',e=>{if(e.target?.id==='psSelect'){const v=cleanPs(e.target.value);if(v)publish([v],true);else publish(selected(),false);rerender('legacy-select')}},true)}
-function boot(){patchLoad();bind();publish(selected(),false);let n=0;const tick=()=>{patchLoad();bind();if(!document.querySelector('.psOverlay289.on'))drawLabel(selected());if(++n<10)setTimeout(tick,700)};setTimeout(tick,300)}
-document.addEventListener('DOMContentLoaded',boot);if(document.readyState!=='loading')boot();
+// Clean runtime v310 keeps PS filtering in multi-ps-clean-bridge-v310.js.
+// This file remains as a compatibility stub because production-ui-parity-v310 may load it for UI parity.
+function cleanPs(v){const parts=String(v??'').trim().split(/\s+/).filter(Boolean);if(parts.length===2&&parts[0]===parts[1])return parts[0];const out=[];parts.forEach(x=>{if(!out.includes(x))out.push(x)});return out.join(' ')}
+function publish(){const list=[...new Set((window.DOIT_SELECTED_PS_LIST||[]).map(cleanPs).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'th'));window.DOIT_SELECTED_PS_LIST=list;window.DOIT_SELECTED_PS_KEY=list.join('||');window.DOIT_APP_SCOPE={...(window.DOIT_APP_SCOPE||{}),ps:list,psKey:window.DOIT_SELECTED_PS_KEY};const b=document.querySelector('#psTickBtn289');if(b)b.textContent=list.length?`PS: ${list.length===1?list[0]:list.length+' คน'} ▼`:'PS: ทั้งหมด ▼'}
+function boot(){publish();document.addEventListener('doit:psChanged',publish);document.addEventListener('doit:psPopupOpened',publish)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
