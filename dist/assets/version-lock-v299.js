@@ -1,15 +1,19 @@
 (()=>{'use strict';
 const APP_VERSION='Solomon DOIT Pro V2.9.2';
 function addScript(src,attr){try{if(attr&&document.querySelector('script['+attr+']'))return;if(document.querySelector('script[src*="'+src.split('?')[0].split('/').pop()+'"]'))return;const s=document.createElement('script');s.src=src;if(attr)s.setAttribute(attr,'1');(document.body||document.documentElement).appendChild(s)}catch(e){}}
-function loadAppCoordinator(){
-  try{
-    if(!document.querySelector('script[data-app-coordinator-v290],script[src*="app-coordinator-v290.js"]'))addScript('/assets/app-coordinator-v290.js?v=292','data-app-coordinator-v290');
-    if(!document.querySelector('script[src*="remaining-coordinator-v291.js"]'))addScript('/assets/remaining-coordinator-v291.js?v=292','data-remaining-coordinator-v291');
-    if(!document.querySelector('script[src*="ps-scope-fix-v292.js"]'))addScript('/assets/ps-scope-fix-v292.js?v=292','data-ps-scope-fix-v292');
-    if(!document.querySelector('script[src*="print-store-name-edit-v296.js"]'))addScript('/assets/print-store-name-edit-v296.js?v=296','data-print-store-name-edit-v296');
-    if(!document.querySelector('script[src*="order-store-filter-v297.js"]'))addScript('/assets/order-store-filter-v297.js?v=297','data-order-store-filter-v297');
-  }catch(e){}
+function loadHotfixes(){
+  addScript('/assets/scope-helper-v308.js?v=308','data-scope-helper-v308');
+  addScript('/assets/print-export-fix-v308.js?v=308','data-print-export-fix-v308');
+  addScript('/assets/field-logic-fixes-v308.js?v=308','data-field-logic-fixes-v308');
+  addScript('/assets/search-debounce-v308.js?v=308','data-search-debounce-v308');
 }
+function loadAppCoordinator(){try{
+  loadHotfixes();
+  if(!document.querySelector('script[data-app-coordinator-v290],script[src*="app-coordinator-v290.js"]'))addScript('/assets/app-coordinator-v290.js?v=292','data-app-coordinator-v290');
+  if(!document.querySelector('script[src*="remaining-coordinator-v291.js"]'))addScript('/assets/remaining-coordinator-v291.js?v=292','data-remaining-coordinator-v291');
+  if(!document.querySelector('script[src*="ps-scope-fix-v292.js"]'))addScript('/assets/ps-scope-fix-v292.js?v=292','data-ps-scope-fix-v292');
+  if(!document.querySelector('script[src*="print-store-name-edit-v296.js"]'))addScript('/assets/print-store-name-edit-v296.js?v=296','data-print-store-name-edit-v296');
+}catch(e){}}
 function lockVersion(){
   try{document.title=APP_VERSION}catch(e){}
   try{const t=document.querySelector('.title');if(t)t.textContent=APP_VERSION}catch(e){}
