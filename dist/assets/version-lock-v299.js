@@ -13,6 +13,7 @@ function loadAppCoordinator(){try{
   if(!document.querySelector('script[src*="remaining-coordinator-v291.js"]'))addScript('/assets/remaining-coordinator-v291.js?v=292','data-remaining-coordinator-v291');
   if(!document.querySelector('script[src*="ps-scope-fix-v292.js"]'))addScript('/assets/ps-scope-fix-v292.js?v=292','data-ps-scope-fix-v292');
   if(!document.querySelector('script[src*="print-store-name-edit-v296.js"]'))addScript('/assets/print-store-name-edit-v296.js?v=296','data-print-store-name-edit-v296');
+  if(!document.querySelector('script[src*="order-store-filter-v297.js"]'))addScript('/assets/order-store-filter-v297.js?v=297','data-order-store-filter-v297');
 }catch(e){}}
 function lockVersion(){
   try{document.title=APP_VERSION}catch(e){}
