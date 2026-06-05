@@ -6,8 +6,8 @@ function loadHotfixes(){
   addScript('/assets/print-export-fix-v308.js?v=308','data-print-export-fix-v308');
   addScript('/assets/field-logic-fixes-v308.js?v=308','data-field-logic-fixes-v308');
   addScript('/assets/search-debounce-v308.js?v=308','data-search-debounce-v308');
-  addScript('/assets/insert-product-v315.js?v=315','data-insert-product-v315');
-  addScript('/assets/telesale-count-fix-v312.js?v=312','data-telesale-count-fix-v312');
+  addScript('/assets/insert-product-v316.js?v=316','data-insert-product-v316');
+  addScript('/assets/telesale-count-fix-v316.js?v=316','data-telesale-count-fix-v316');
 }
 function loadAppCoordinator(){try{
   loadHotfixes();
