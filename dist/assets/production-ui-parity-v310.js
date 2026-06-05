@@ -5,7 +5,7 @@ function css(){if($('#uiParity310Css'))return;const st=document.createElement('s
 function note(){const f=document.querySelector('.filters');if(!f||$('.recv-note'))return;const n=document.createElement('div');n.className='recv-note';n.innerHTML='ช่องร้านนี้คือ <b>ร้านจริงที่จะใส่ออเดอร์/ออกบิล</b><small>เลือกแล้วรายการสินค้ายังเป็นของรวมจาก PS/วันที่ทั้งหมด ไม่ใช่กรองเฉพาะสินค้าที่คีย์ในร้านนั้น</small>';const grid=f.querySelector('.filterGrid');f.insertBefore(n,grid||f.firstChild)}
 function cleanText(){const m=$('#msg');if(m)m.textContent=(m.textContent||'').replace(/\s*·\s*runtime v310/gi,'');const c=$('#tableCount');if(c)c.textContent=(c.textContent||'').replace(/^runtime v310:\s*/i,'')}
 function actionClass(){const p=$('#prepPrint');if(p){p.classList.add('prepBtn');p.classList.remove('outline')}}
-function psUi(){add('/assets/ps-label-fix-v285.js?v=310','psLabel310');add('/assets/ps-scope-fix-v292.js?v=310','psScope310')}
+function psUi(){add('/assets/ps-label-fix-v285.js?v=310','psLabel310');add('/assets/ps-clean-controller-v310.js?v=310','psCleanController310')}
 function run(){css();note();cleanText();actionClass();psUi();try{document.title='Solomon DOIT Pro V2.9.2'}catch{}const t=$('.title');if(t)t.textContent='Solomon DOIT Pro V2.9.2';const foot=document.querySelector('footer');if(foot)foot.textContent='Solomon DOIT Pro V2.9.2'}
 function boot(){run();let n=0;const tick=()=>{run();if(++n<20)setTimeout(tick,250)};setTimeout(tick,100);try{new MutationObserver(run).observe(document.body,{childList:true,subtree:true,characterData:true})}catch{}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
