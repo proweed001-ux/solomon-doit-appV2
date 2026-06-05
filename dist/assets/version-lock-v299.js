@@ -1,7 +1,7 @@
 (()=>{'use strict';
 const APP_VERSION='Solomon DOIT Pro V2.9.2';
 function addScript(src,attr){try{if(attr&&document.querySelector('script['+attr+']'))return;if(document.querySelector('script[src*="'+src.split('?')[0].split('/').pop()+'"]'))return;const s=document.createElement('script');s.src=src;if(attr)s.setAttribute(attr,'1');(document.body||document.documentElement).appendChild(s)}catch(e){}}
-function loadHotfixes(){
+function loadModules(){
   addScript('/assets/scope-helper-v308.js?v=308','data-scope-helper-v308');
   addScript('/assets/print-export-fix-v308.js?v=308','data-print-export-fix-v308');
   addScript('/assets/field-logic-fixes-v308.js?v=308','data-field-logic-fixes-v308');
@@ -9,7 +9,7 @@ function loadHotfixes(){
   addScript('/assets/insert-product-v309.js?v=309','data-insert-product-v309');
 }
 function loadAppCoordinator(){try{
-  loadHotfixes();
+  loadModules();
   if(!document.querySelector('script[data-app-coordinator-v290],script[src*="app-coordinator-v290.js"]'))addScript('/assets/app-coordinator-v290.js?v=292','data-app-coordinator-v290');
   if(!document.querySelector('script[src*="remaining-coordinator-v291.js"]'))addScript('/assets/remaining-coordinator-v291.js?v=292','data-remaining-coordinator-v291');
   if(!document.querySelector('script[src*="ps-scope-fix-v292.js"]'))addScript('/assets/ps-scope-fix-v292.js?v=292','data-ps-scope-fix-v292');
@@ -26,4 +26,7 @@ function lockVersion(){
 lockVersion();
 document.addEventListener('DOMContentLoaded',lockVersion,{once:true});
 window.addEventListener('load',lockVersion,{once:true});
+setTimeout(lockVersion,300);
+setTimeout(lockVersion,900);
+setTimeout(lockVersion,1800);
 })();
