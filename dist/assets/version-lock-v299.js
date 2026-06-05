@@ -6,7 +6,7 @@ function loadHotfixes(){
   addScript('/assets/print-export-fix-v308.js?v=308','data-print-export-fix-v308');
   addScript('/assets/field-logic-fixes-v308.js?v=308','data-field-logic-fixes-v308');
   addScript('/assets/search-debounce-v308.js?v=308','data-search-debounce-v308');
-  addScript('/assets/insert-product-v314.js?v=314','data-insert-product-v314');
+  addScript('/assets/insert-product-v315.js?v=315','data-insert-product-v315');
   addScript('/assets/telesale-count-fix-v312.js?v=312','data-telesale-count-fix-v312');
 }
 function loadAppCoordinator(){try{
@@ -27,4 +27,8 @@ function lockVersion(){
 lockVersion();
 document.addEventListener('DOMContentLoaded',lockVersion,{once:true});
 window.addEventListener('load',lockVersion,{once:true});
+setTimeout(lockVersion,300);
+setTimeout(lockVersion,900);
+setTimeout(lockVersion,1800);
+setTimeout(lockVersion,3500);
 })();
