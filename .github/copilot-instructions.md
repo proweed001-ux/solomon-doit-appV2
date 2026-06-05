@@ -1,66 +1,75 @@
-# Solomon DOIT App V2.1 coding instructions
+# Solomon DOIT Pro coding instructions
 
-This project is a real sales-reporting web app for DOIT files. Prioritize correctness, simple changes, and mobile usability.
+โปรเจกต์นี้ให้ยึดหน้า Production จริงเป็นหลักก่อนทุกอย่าง
 
-## Stack
-- React
-- TypeScript
-- Vite
-- XLSX
-- JSZip
-- lucide-react
+## Source of Truth
 
-## Project purpose
-The app reads DOIT / Excel / CSV files, parses pivotCache first when available, falls back to worksheets, summarizes sales, supports dashboard, drill-down, bill extraction, issue checking, and CSV export.
+ตัวจริงที่ผู้ใช้ใช้งานอยู่คือ:
 
-## Do not add extra complexity unless explicitly requested
-- Do not add test files, spec files, mock data, fixtures, or unit tests.
-- Do not add Vitest, Jest, Playwright, Cypress, or other test frameworks.
-- Do not add new dependencies unless required and clearly explained.
-- Do not refactor the whole project when a small targeted fix is enough.
-- Do not create new package.json scripts unless necessary.
-- Do not change sales formulas without explaining the effect on totals.
-- Do not guess unsupported fields.
-
-## File responsibilities
-- src/lib/parser.ts: file parsing, field mapping, row normalization.
-- src/lib/pricing.ts: quantity, amount, unit price, numeric safety.
-- src/lib/analytics.ts: filters, aggregation, export, bill lines.
-- src/types.ts: shared TypeScript types.
-- src/App.tsx: UI and user interactions.
-
-Keep heavy parsing, pricing, and aggregation logic out of App.tsx when possible.
-
-## Data rules
-- Main quantity field: ShipQtyPCS.
-- Amount should follow parser-supported sources such as TotInvc, InvoiceAmt, LineAmtBeforeDisc, Correct Amount, Amount, and Amt.
-- Prevent NaN in quantity and amount calculations.
-- Be careful with duplicated invoice header values versus line-level values.
-- If a change can affect total sales, state the risk clearly.
-
-## Preferred validation
-Use practical checks with real DOIT files instead of adding automated tests by default.
-
-Useful commands:
-
-```bash
-npm run build
+```text
+https://solomon-doit-app-v2.vercel.app/pro.html?v=257
 ```
 
-```bash
-npm run dev
+โครงสร้างตัวจริงใน repo คือ:
+
+```text
+dist/pro.html
+dist/assets/*.js ที่ dist/pro.html เรียกใช้
 ```
 
-```bash
-npm run check:doit
+ห้ามถือว่า `src/App.tsx` หรือ React/Vite เป็นตัวหลัก เว้นแต่ผู้ใช้สั่งให้ย้ายระบบใหม่อย่างชัดเจน
+
+## ห้ามทำโดยไม่ได้รับอนุญาต
+
+- ห้ามลบ `dist/pro.html`
+- ห้ามลบไฟล์ใน `dist/assets/` ที่ `dist/pro.html` เรียกใช้
+- ห้ามเปลี่ยนหน้าตา production โดยไม่สั่ง
+- ห้ามเปลี่ยนสูตรยอดขายโดยไม่อธิบายผลกระทบ
+- ห้ามสร้าง test, spec, mock, fixture หรือ testing framework เพิ่มเอง
+- ห้าม refactor ใหญ่ถ้าแก้เฉพาะจุดได้
+- ห้ามย้ายระบบจาก static `dist/pro.html` ไป React/Vite เอง
+- ห้ามแก้ `main` โดยตรงถ้าเป็นงานเสี่ยง
+
+## ทางเข้าแอปหลัก
+
+ให้ถือว่าเส้นทางหลักคือ:
+
+```text
+/ -> /pro.html?v=257
+/pro.html?v=257 -> dist/pro.html
 ```
 
-Check that upload, totals, filters, bill extraction, export CSV, and mobile layout still work.
+ลิงก์ทดลองทุกลิงก์ต้องเปิดแล้วหน้าตาเหมือน production จริงก่อน จึงถือว่าผ่าน
+
+## วิธีแก้ที่ถูกต้อง
+
+ถ้าต้องแก้ UI หรือ logic:
+
+1. แก้ในสำเนาทดลองก่อน
+2. รักษาหน้าตาเดิมของ `pro.html`
+3. รักษาไฟล์ asset ที่ถูกเรียกใช้
+4. ตรวจว่า `/pro.html?v=257` ยังเปิดได้
+5. ตรวจ upload, filter, totals, bill extraction, export CSV
+6. ห้าม merge เข้า main จนกว่าผู้ใช้ยืนยัน
+
+## Validation
+
+ตรวจแบบใช้งานจริงมากกว่า unit test:
+
+- เปิด `/pro.html?v=257`
+- Upload ไฟล์ DOIT จริง
+- เช็กยอดรวม
+- เช็กจำนวนชิ้น
+- เช็ก filter PS / ร้าน / แบรนด์ / ประเภทสินค้า
+- เช็กถอดของ Pro
+- เช็กใบส่งร้านจริง
+- เช็ก Export CSV
+- เช็กบนมือถือ
 
 ## Response style
-- Reply in Thai unless the user asks otherwise.
-- Explain in simple terms.
-- Always say which file is being changed.
-- Provide copy-ready code blocks for commands and code.
-- Prefer complete replacement code when the user asks for a full file.
-- Do not answer with theory when a practical fix is possible.
+
+- ตอบภาษาไทยเป็นหลัก
+- บอกไฟล์ที่แก้ชัดเจน
+- ใช้ภาษาง่าย
+- คำสั่งหรือโค้ดที่ต้อง copy ต้องอยู่ใน code block
+- ถ้าพบว่าคำขอจะทำให้ production พัง ให้แย้งทันที
