@@ -1,5 +1,5 @@
 (()=>{'use strict';
-const APP_VERSION='Solomon DOIT Pro V2.9.0';
+const APP_VERSION='Solomon DOIT Pro V2.9.2';
 const T=v=>String(v??'').trim();
 let rawRows=[],patched=false;
 const $=s=>document.querySelector(s);
