@@ -8,6 +8,7 @@ function loadHotfixes(){
   addScript('/assets/search-debounce-v308.js?v=308','data-search-debounce-v308');
   addScript('/assets/insert-product-v316.js?v=316','data-insert-product-v316');
   addScript('/assets/telesale-count-fix-v316.js?v=316','data-telesale-count-fix-v316');
+  addScript('/assets/print-safety-v317.js?v=317','data-print-safety-v317');
 }
 function loadAppCoordinator(){try{
   loadHotfixes();
