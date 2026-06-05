@@ -1,5 +1,5 @@
 {
-  "installCommand": "npm install --include=dev --no-audit --no-fund",
+  "installCommand": "npm install --global npm@10.8.2 && npm install --include=dev --no-audit --no-fund",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
