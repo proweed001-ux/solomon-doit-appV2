@@ -6,7 +6,7 @@ function loadHotfixes(){
   addScript('/assets/print-export-fix-v308.js?v=308','data-print-export-fix-v308');
   addScript('/assets/field-logic-fixes-v308.js?v=308','data-field-logic-fixes-v308');
   addScript('/assets/search-debounce-v308.js?v=308','data-search-debounce-v308');
-  addScript('/assets/insert-product-v309.js?v=309','data-insert-product-v309');
+  addScript('/assets/insert-product-v313.js?v=313','data-insert-product-v313');
   addScript('/assets/telesale-count-fix-v312.js?v=312','data-telesale-count-fix-v312');
 }
 function loadAppCoordinator(){try{
