@@ -6,7 +6,7 @@ function loadHotfixes(){
   addScript('/assets/print-export-fix-v308.js?v=308','data-print-export-fix-v308');
   addScript('/assets/field-logic-fixes-v308.js?v=308','data-field-logic-fixes-v308');
   addScript('/assets/search-debounce-v308.js?v=308','data-search-debounce-v308');
-  addScript('/assets/insert-product-v316.js?v=316','data-insert-product-v316');
+  addScript('/assets/insert-product-v318.js?v=318','data-insert-product-v318');
   addScript('/assets/telesale-count-fix-v316.js?v=316','data-telesale-count-fix-v316');
   addScript('/assets/print-safety-v317.js?v=317','data-print-safety-v317');
 }
