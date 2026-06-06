@@ -12,7 +12,7 @@ function dateScope(next={}){let dates=uniq(next.dates||next.dateList||next.date_
 function currentCtx(next={}){return{start:T(next.start||$('#startDate')?.value),end:T(next.end||$('#endDate')?.value),ps:cleanPs(next.ps||$('#psSelect')?.value),psList:psScope(next),dates:dateScope(next)}}
 function sameCtx(a,b){return a.start===b.start&&a.end===b.end&&a.ps===b.ps&&a.psList.join('|')===b.psList.join('|')&&a.dates.join('|')===b.dates.join('|')}
 function setContext(next={}){const n=currentCtx(next);if(sameCtx(n,ctx))return;ctx=n;dirty=true;billCache=null}
-function realTele(r){const tele=T(r.tele),ps=T(r.ps);if(!tele)return false;const kt=K(tele),kp=K(ps);if(kt&&kp&&(kt===kp||kp.includes(kt)||kt.includes(kp)))return false;return !!(r.isTele||tele)}
+function realTele(r){const tele=T(r.tele),ps=T(r.ps);if(!tele)return false;const kt=K(tele),kp=K(ps);if(kt&&kp&&kt===kp)return false;return !!(r.isTele||tele)}
 function dateOk(r){if(ctx.dates.length)return ctx.dates.includes(T(r.date));if(ctx.start&&r.date<ctx.start)return false;if(ctx.end&&r.date>ctx.end)return false;return true}
 function psOk(r){return !ctx.psList.length||ctx.psList.includes(cleanPs(r.ps))}
 function inScope(r){return realTele(r)&&dateOk(r)&&psOk(r)}
@@ -26,8 +26,8 @@ function render(){ensureUI();const body=$('#teleBody');if(!body)return;const dat
 function open(){setContext();render();$('#teleShade')?.classList.add('on');$('#teleDrawer')?.classList.add('on')}
 function close(){$('#teleShade')?.classList.remove('on');$('#teleDrawer')?.classList.remove('on')}
 function loadRows(data,context){ensureUI();if(context)setContext(context);else setContext();if(data===source){setBtn();if($('#teleDrawer')?.classList.contains('on'))render();return}source=data;rows=(data||[]).map(r=>({date:T(r.date),inv:T(r.inv),store:T(r.store)||'ไม่ระบุร้าน',tele:T(r.tele),ps:T(r.ps),isTele:!!r.isTele,code:T(r.code),sku:T(r.sku),qty:N(r.qty),unit:N(r.unit),amt:N(r.amt)}));dirty=true;billCache=null;setBtn();if($('#teleDrawer')?.classList.contains('on'))render()}
-function refresh(){setContext();setBtn();if($('#teleDrawer')?.classList.contains('on'))render()}
+function refresh(){setContext();dirty=true;billCache=null;setBtn();if($('#teleDrawer')?.classList.contains('on'))render()}
 function boot(){ensureUI();setBtn();['startDate','endDate','psSelect'].forEach(id=>{const el=$('#'+id);if(el&&!el.dataset.tele262ctx){el.dataset.tele262ctx='1';el.addEventListener('change',refresh)}});document.addEventListener('doit:psChanged',refresh);document.addEventListener('doit:selectedDatesChanged',refresh);document.addEventListener('doit:scopeRendered',refresh);const file=$('#file');if(file&&!file.dataset.tele262Bound){file.dataset.tele262Bound='1';file.addEventListener('change',()=>{source=null;rows=[];dirty=true;billCache=null;setBtn()})}bound=true}
-window.DOIT_TELESALE_DRAWER={version:'v262-scope-debug',loadRows,setContext,open,close,render,refresh};
+window.DOIT_TELESALE_DRAWER={version:'v262-scope-v310',loadRows,setContext,open,close,render,refresh,health:()=>({rows:rows.length,ctx,count:buildBills().count,bills:buildBills().bills.length})};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();setTimeout(()=>{if(!bound)boot();else ensureUI()},500);
 })();
