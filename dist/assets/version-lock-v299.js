@@ -4,6 +4,7 @@ function addScript(src,attr){try{if(attr&&document.querySelector('script['+attr+
 function forceScript(src,attr){try{if(attr&&document.querySelector('script['+attr+']'))return;const s=document.createElement('script');s.src=src;if(attr)s.setAttribute(attr,'1');(document.body||document.documentElement).appendChild(s)}catch(e){}}
 function loadHotfixes(){
   addScript('/assets/scope-helper-v308.js?v=308','data-scope-helper-v308');
+  forceScript('/assets/pro-stability-v311.js?v=312','data-pro-stability-v312');
   forceScript('/assets/pro-cloud-loader-v265.js?v=310','data-pro-cloud-loader-v310');
   forceScript('/assets/telesale-drawer-v262.js?v=310','data-telesale-drawer-v310');
   forceScript('/assets/telesale-force-refresh-v310.js?v=311','data-telesale-force-refresh-v311');
@@ -12,7 +13,7 @@ function loadHotfixes(){
   forceScript('/assets/field-logic-fixes-v308.js?v=310','data-field-logic-fixes-v308-v310');
   addScript('/assets/search-debounce-v308.js?v=308','data-search-debounce-v308');
   forceScript('/assets/insert-product-v309.js?v=310','data-insert-product-v309-v310');
-  forceScript('/assets/pro-stability-v311.js?v=311','data-pro-stability-v311');
+  setTimeout(()=>forceScript('/assets/pro-stability-v311.js?v=312','data-pro-stability-v312-late'),700);
 }
 function loadAppCoordinator(){try{
   loadHotfixes();
