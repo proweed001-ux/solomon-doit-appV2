@@ -9,20 +9,20 @@ function patch(){
     st.id='ayaSeaWaveTitleCss';
     st.textContent=`
       @keyframes ayaSeaWaveMove{
-        0%{background-position:0% 52%;transform:translateY(0) skewX(-2deg) scale(1);filter:drop-shadow(0 3px 0 #002b36) drop-shadow(0 0 7px #00eaff)}
-        12%{background-position:16% 46%;transform:translateY(-2px) skewX(1deg) scale(1.012);filter:drop-shadow(0 3px 0 #002b36) drop-shadow(0 0 10px #30f7ff)}
-        25%{background-position:32% 60%;transform:translateY(2px) skewX(2deg) scale(1.018);filter:drop-shadow(0 3px 0 #002b36) drop-shadow(0 0 12px #40ffdc)}
-        38%{background-position:50% 42%;transform:translateY(-3px) skewX(-1deg) scale(1.014);filter:drop-shadow(0 3px 0 #002b36) drop-shadow(0 0 13px #7dd3fc)}
-        50%{background-position:66% 58%;transform:translateY(2px) skewX(1.5deg) scale(1.02);filter:drop-shadow(0 3px 0 #002b36) drop-shadow(0 0 14px #22d3ee)}
-        63%{background-position:82% 44%;transform:translateY(-2px) skewX(-1.5deg) scale(1.016);filter:drop-shadow(0 3px 0 #002b36) drop-shadow(0 0 13px #a7f3d0)}
-        75%{background-position:100% 62%;transform:translateY(3px) skewX(2deg) scale(1.012);filter:drop-shadow(0 3px 0 #002b36) drop-shadow(0 0 11px #67e8f9)}
-        88%{background-position:56% 48%;transform:translateY(-1px) skewX(-2deg) scale(1.018);filter:drop-shadow(0 3px 0 #002b36) drop-shadow(0 0 10px #38bdf8)}
-        100%{background-position:0% 52%;transform:translateY(0) skewX(-2deg) scale(1);filter:drop-shadow(0 3px 0 #002b36) drop-shadow(0 0 7px #00eaff)}
+        0%{transform:translateY(0) skewX(-2deg) scale(1);filter:drop-shadow(0 3px 0 #003344) drop-shadow(0 0 7px rgba(255,255,255,.85))}
+        12%{transform:translateY(-2px) skewX(1deg) scale(1.012);filter:drop-shadow(0 3px 0 #003344) drop-shadow(0 0 10px rgba(255,255,255,.95))}
+        25%{transform:translateY(2px) skewX(2deg) scale(1.018);filter:drop-shadow(0 3px 0 #003344) drop-shadow(0 0 12px rgba(255,255,255,.9))}
+        38%{transform:translateY(-3px) skewX(-1deg) scale(1.014);filter:drop-shadow(0 3px 0 #003344) drop-shadow(0 0 13px rgba(255,255,255,1))}
+        50%{transform:translateY(2px) skewX(1.5deg) scale(1.02);filter:drop-shadow(0 3px 0 #003344) drop-shadow(0 0 14px rgba(255,255,255,.9))}
+        63%{transform:translateY(-2px) skewX(-1.5deg) scale(1.016);filter:drop-shadow(0 3px 0 #003344) drop-shadow(0 0 13px rgba(255,255,255,.95))}
+        75%{transform:translateY(3px) skewX(2deg) scale(1.012);filter:drop-shadow(0 3px 0 #003344) drop-shadow(0 0 11px rgba(255,255,255,.88))}
+        88%{transform:translateY(-1px) skewX(-2deg) scale(1.018);filter:drop-shadow(0 3px 0 #003344) drop-shadow(0 0 10px rgba(255,255,255,.95))}
+        100%{transform:translateY(0) skewX(-2deg) scale(1);filter:drop-shadow(0 3px 0 #003344) drop-shadow(0 0 7px rgba(255,255,255,.85))}
       }
-      @keyframes ayaWaveSheen{
-        0%{background-position:0% 50%}
-        50%{background-position:100% 50%}
-        100%{background-position:0% 50%}
+      @keyframes ayaWhiteShine{
+        0%{opacity:.45;left:-35%}
+        50%{opacity:.95;left:45%}
+        100%{opacity:.45;left:115%}
       }
       .ayaBrandTitle{
         position:relative!important;
@@ -33,31 +33,39 @@ function patch(){
         letter-spacing:.35px!important;
         line-height:1.05!important;
         color:#fff!important;
-        -webkit-text-fill-color:transparent!important;
-        background:
-          radial-gradient(circle at 20% 30%,#ffffff 0 7%,transparent 13%),
-          linear-gradient(100deg,#e0ffff 0%,#00e5ff 14%,#00ffa6 27%,#0ea5e9 41%,#2563eb 55%,#22d3ee 69%,#a7f3d0 82%,#ffffff 100%)!important;
-        background-size:260% 260%,420% 420%!important;
-        -webkit-background-clip:text!important;
-        background-clip:text!important;
-        -webkit-text-stroke:.85px rgba(0,25,44,.72)!important;
-        text-shadow:0 2px 0 rgba(0,24,38,.9),0 5px 14px rgba(0,229,255,.55),0 0 22px rgba(45,212,191,.35)!important;
-        animation:ayaSeaWaveMove 3.8s ease-in-out infinite,ayaWaveSheen 5.4s linear infinite!important;
+        -webkit-text-fill-color:#fff!important;
+        background:none!important;
+        -webkit-background-clip:initial!important;
+        background-clip:initial!important;
+        -webkit-text-stroke:.85px rgba(0,22,40,.86)!important;
+        text-shadow:0 2px 0 rgba(0,24,38,.95),0 0 12px rgba(255,255,255,.85),0 0 22px rgba(125,211,252,.45)!important;
+        animation:ayaSeaWaveMove 3.8s ease-in-out infinite!important;
         white-space:nowrap!important;
         transform-origin:center!important;
+        overflow:hidden!important;
+      }
+      .ayaBrandTitle::before{
+        content:'';
+        position:absolute;
+        top:-25%;bottom:-25%;width:28%;left:-35%;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,.95),transparent);
+        transform:skewX(-18deg);
+        mix-blend-mode:screen;
+        animation:ayaWhiteShine 4.4s ease-in-out infinite;
+        pointer-events:none;
       }
       .ayaBrandTitle::after{
         content:'';
         position:absolute;
         left:2%;right:2%;bottom:-5px;height:4px;
         border-radius:999px;
-        background:linear-gradient(90deg,transparent,#67e8f9,#fff,#22d3ee,transparent);
-        opacity:.85;
-        filter:blur(.3px) drop-shadow(0 0 7px #22d3ee);
-        animation:ayaWaveSheen 3.8s linear infinite;
+        background:linear-gradient(90deg,transparent,#ffffff,#bae6fd,#ffffff,transparent);
+        opacity:.9;
+        filter:blur(.3px) drop-shadow(0 0 7px #ffffff);
+        animation:ayaSeaWaveMove 3.8s ease-in-out infinite;
       }
       .topbar{overflow:hidden!important;background:linear-gradient(90deg,#022c22,#075985,#064e3b)!important}
-      @media(max-width:720px){.ayaBrandTitle{font-size:16.8px!important;letter-spacing:.05px!important;-webkit-text-stroke:.6px rgba(0,25,44,.8)!important}.ayaBrandTitle::after{bottom:-4px;height:3px}}
+      @media(max-width:720px){.ayaBrandTitle{font-size:16.8px!important;letter-spacing:.05px!important;-webkit-text-stroke:.6px rgba(0,25,44,.9)!important}.ayaBrandTitle::after{bottom:-4px;height:3px}}
     `;
     document.head.appendChild(st);
   }
