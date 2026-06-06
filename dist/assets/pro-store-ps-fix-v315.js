@@ -1,0 +1,16 @@
+(()=>{'use strict';
+const T=v=>String(v??'').trim();
+function cleanPs(v){const p=T(v).split(/\s+/).filter(Boolean);if(!p.length)return'';if(p.length===2&&p[0]===p[1])return p[0];const out=[];p.forEach(x=>{if(!out.includes(x))out.push(x)});return out.join(' ')}
+function esc(s){return T(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function rows(){const c=[window.__doitStableRows311,window.__doitRawRows304,window.__doitRawRows290,window.__doitPsRawRows295,window.__doitAllRows];for(const r of c){if(Array.isArray(r)&&r.length)return r}return[]}
+function psList(){const g=(window.DOIT_SELECTED_PS_LIST||[]).map(cleanPs).filter(Boolean);if(g.length)return [...new Set(g)];const v=cleanPs(document.querySelector('#psSelect')?.value);return v?[v]:[]}
+function dateList(){return [...new Set((window.DOIT_SELECTED_DATES||[]).map(T).filter(Boolean))]}
+function dateOk(r,ds,start,end){const d=T(r.date||r.raw?.date||r.raw?.InvcDate||r.raw?.InvoiceDate||r.raw?.Invoice_Date);if(ds.length)return ds.includes(d);if(start&&d<start)return false;if(end&&d>end)return false;return true}
+function psOk(r,ps){if(!ps.length)return true;return ps.includes(cleanPs(r.ps||r.personKey||r.salespersonId||r.salespersonName||r.raw?.SalespersonID||r.raw?.SO_SalespersonID||r.raw?.Salesperson_Name))}
+function storeOf(r){return T(r.store||r.customerName||r.storeName||r.raw?.['Customer Name']||r.raw?.CustomerName||r.raw?.ShipName||r.raw?.Store||r.raw?.StoreName||r.raw?.ShipToName)}
+function updateStoreOptions(){const el=document.querySelector('#storeSelect');const rs=rows();if(!el||!rs.length)return false;const cur=T(el.value),ps=psList(),ds=dateList(),start=T(document.querySelector('#startDate')?.value),end=T(document.querySelector('#endDate')?.value);const stores=[...new Set(rs.filter(r=>dateOk(r,ds,start,end)&&psOk(r,ps)).map(storeOf).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'th'));if(!stores.length)return false;el.innerHTML='<option value="">เลือกร้านจริง</option>'+stores.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(cur&&stores.includes(cur))el.value=cur;return true}
+function syncPsFromSelect(){const el=document.querySelector('#psSelect');const v=cleanPs(el?.value);if(v){window.DOIT_SELECTED_PS_LIST=[v];window.DOIT_SELECTED_PS_KEY=v}}
+function boot(){updateStoreOptions();document.addEventListener('change',e=>{if(e.target?.id==='psSelect'){syncPsFromSelect();setTimeout(updateStoreOptions,0);setTimeout(updateStoreOptions,200)}if(['startDate','endDate'].includes(e.target?.id))setTimeout(updateStoreOptions,100)},true);['doit:scopeRendered','doit:psChanged','doit:selectedDatesChanged'].forEach(ev=>document.addEventListener(ev,()=>setTimeout(updateStoreOptions,80)));let n=0;const tick=()=>{updateStoreOptions();if(++n<30)setTimeout(tick,500)};setTimeout(tick,200)}
+window.DOIT_STORE_PS_FIX={version:'v315',update:updateStoreOptions,health:()=>({rows:rows().length,ps:psList(),updated:updateStoreOptions()})};
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
