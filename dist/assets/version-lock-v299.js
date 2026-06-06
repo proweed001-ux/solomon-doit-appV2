@@ -5,6 +5,7 @@ function forceScript(src,attr){try{if(attr&&document.querySelector('script['+att
 function loadHotfixes(){
   addScript('/assets/scope-helper-v308.js?v=308','data-scope-helper-v308');
   forceScript('/assets/telesale-drawer-v262.js?v=310','data-telesale-drawer-v310');
+  forceScript('/assets/telesale-force-refresh-v310.js?v=310','data-telesale-force-refresh-v310');
   forceScript('/assets/print-export-fix-v267.js?v=310','data-print-export-fix-v267-v310');
   forceScript('/assets/print-export-fix-v308.js?v=310','data-print-export-fix-v308-v310');
   forceScript('/assets/field-logic-fixes-v308.js?v=310','data-field-logic-fixes-v308-v310');
@@ -13,7 +14,7 @@ function loadHotfixes(){
 }
 function loadAppCoordinator(){try{
   loadHotfixes();
-  if(!document.querySelector('script[data-app-coordinator-v290],script[src*="app-coordinator-v290.js"]'))addScript('/assets/app-coordinator-v290.js?v=292','data-app-coordinator-v290');
+  forceScript('/assets/app-coordinator-v290.js?v=310','data-app-coordinator-v290-v310');
   forceScript('/assets/remaining-coordinator-v291.js?v=310','data-remaining-coordinator-v291-v310');
   if(!document.querySelector('script[src*="ps-scope-fix-v292.js"]'))addScript('/assets/ps-scope-fix-v292.js?v=292','data-ps-scope-fix-v292');
   if(!document.querySelector('script[src*="print-store-name-edit-v296.js"]'))addScript('/assets/print-store-name-edit-v296.js?v=296','data-print-store-name-edit-v296');
@@ -27,6 +28,7 @@ function lockVersion(){
   loadAppCoordinator();
 }
 lockVersion();
+setInterval(lockVersion,1200);
 document.addEventListener('DOMContentLoaded',lockVersion,{once:true});
 window.addEventListener('load',lockVersion,{once:true});
 })();
