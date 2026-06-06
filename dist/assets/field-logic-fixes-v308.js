@@ -8,7 +8,7 @@ function psList(){const a=(window.DOIT_SELECTED_PS_LIST||[]).map(cleanPs).filter
 function psOk(r){const a=psList();return !a.length||a.includes(cleanPs(r.ps))}
 function filters(){return{start:T($('#startDate')?.value),end:T($('#endDate')?.value),ps:T($('#psSelect')?.value),receiver:T($('#storeSelect')?.value),brand:T($('#brandSelect')?.value),type:T($('#typeSelect')?.value),q:T($('#q')?.value).toLowerCase()}}
 function scopeHead(){return window.DOIT_SCOPE_HEAD?.()||[T($('#startDate')?.value),T($('#endDate')?.value),T($('#psSelect')?.value)].join('|')+'|'}
-function realTele(r){const tele=T(r.tele),ps=T(r.ps),a=norm(tele),b=norm(ps);return !!tele&&!(a&&b&&(a===b||a.includes(b)||b.includes(a)))}
+function realTele(r){const tele=T(r.tele),ps=T(r.ps),a=norm(tele),b=norm(ps);return !!tele&&!(a&&b&&a===b)}
 function appKey(){return meta.id||fullPayload?.version_id||meta.file_name||''}
 function state(){try{return JSON.parse(localStorage.getItem('doit-json:'+appKey())||'{}')}catch{return{}}}
 function saveState(s){localStorage.setItem('doit-json:'+appKey(),JSON.stringify(s||{}))}
