@@ -4,8 +4,9 @@ function addScript(src,attr){try{if(attr&&document.querySelector('script['+attr+
 function forceScript(src,attr){try{if(attr&&document.querySelector('script['+attr+']'))return;const s=document.createElement('script');s.src=src;if(attr)s.setAttribute(attr,'1');(document.body||document.documentElement).appendChild(s)}catch(e){}}
 function loadHotfixes(){
   addScript('/assets/scope-helper-v308.js?v=308','data-scope-helper-v308');
+  forceScript('/assets/pro-cloud-loader-v265.js?v=310','data-pro-cloud-loader-v310');
   forceScript('/assets/telesale-drawer-v262.js?v=310','data-telesale-drawer-v310');
-  forceScript('/assets/telesale-force-refresh-v310.js?v=310','data-telesale-force-refresh-v310');
+  forceScript('/assets/telesale-force-refresh-v310.js?v=311','data-telesale-force-refresh-v311');
   forceScript('/assets/print-export-fix-v267.js?v=310','data-print-export-fix-v267-v310');
   forceScript('/assets/print-export-fix-v308.js?v=310','data-print-export-fix-v308-v310');
   forceScript('/assets/field-logic-fixes-v308.js?v=310','data-field-logic-fixes-v308-v310');
