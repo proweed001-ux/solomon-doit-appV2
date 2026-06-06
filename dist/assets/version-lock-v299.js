@@ -12,6 +12,7 @@ function loadHotfixes(){
   forceScript('/assets/field-logic-fixes-v308.js?v=310','data-field-logic-fixes-v308-v310');
   addScript('/assets/search-debounce-v308.js?v=308','data-search-debounce-v308');
   forceScript('/assets/insert-product-v309.js?v=310','data-insert-product-v309-v310');
+  forceScript('/assets/pro-stability-v311.js?v=311','data-pro-stability-v311');
 }
 function loadAppCoordinator(){try{
   loadHotfixes();
