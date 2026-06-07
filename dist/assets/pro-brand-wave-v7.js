@@ -1,31 +1,7 @@
 (()=>{'use strict';
 const TITLE='AYA By.พี่ฐาสั่งลุยย';
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function cleanPsLabel(v){
-  const s=String(v??'').trim().replace(/\s+/g,' ');
-  if(!s)return s;
-  const p=s.split(' ').filter(Boolean);
-  const out=[];
-  p.forEach(x=>{if(!out.includes(x))out.push(x)});
-  return out.join(' ');
-}
-function cleanPsDom(){
-  const title=document.querySelector('#pickTitle');
-  const isPs=title&&title.textContent.trim()==='PS';
-  document.querySelectorAll('#pickList .pickItem').forEach(item=>{
-    if(!isPs)return;
-    const spans=item.querySelectorAll('span');
-    const label=spans[1];
-    if(label)label.textContent=cleanPsLabel(label.textContent);
-  });
-  ['#psText'].forEach(sel=>{
-    const el=document.querySelector(sel);
-    if(!el)return;
-    const raw=el.textContent;
-    el.textContent=raw.replace(/^PS:\s*(.+)$/,(m,v)=>'PS: '+cleanPsLabel(v));
-  });
-}
-function patch(){
+function patchTitle(){
   document.title=TITLE;
   const t=document.querySelector('.topbar .title');
   if(!t)return false;
@@ -84,15 +60,6 @@ function patch(){
   t.innerHTML=[...TITLE].map((ch,i)=>`<span class="ayaChar" style="--i:${i}">${ch===' '?'&nbsp;':esc(ch)}</span>`).join('');
   return true;
 }
-let obs=null;
-function boot(){
-  if(!patch())return setTimeout(boot,250);
-  cleanPsDom();
-  if(!obs){
-    obs=new MutationObserver(()=>cleanPsDom());
-    obs.observe(document.body,{childList:true,subtree:true,characterData:true});
-  }
-  setInterval(cleanPsDom,800);
-}
+function boot(){if(!patchTitle())setTimeout(boot,250)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
