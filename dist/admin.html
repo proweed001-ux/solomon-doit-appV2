@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<header class="top"><a href="/pro.html?v=14">← กลับหน้า Pro</a><div class="brand">Admin Upload DOIT</div><span>V0.7</span></header>
+<header class="top"><a href="/pro.html?v=15">← กลับหน้า Pro</a><div class="brand">Admin Upload DOIT</div><span>V0.7</span></header>
 <main class="wrap">
 <section class="card"><h2>อัปโหลดไฟล์ DOIT ประจำวัน</h2><p class="muted"><b>สถานะตอนนี้: JSON pipeline v265 · Admin V0.7</b><br>ปุ่ม “อัปโหลด JSON + ตั้งล่าสุด” จะอัปโหลด Excel, สร้าง JSON/index เบา, บันทึก metadata และตั้งเป็นไฟล์ล่าสุด</p><div class="fileBox"><b>เลือกไฟล์ DOIT .xlsx / .xlsm</b><div class="muted" id="fileName">ยังไม่ได้เลือกไฟล์</div><input id="file" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden><div style="margin-top:12px"><button class="btn" id="choose">เลือกไฟล์</button><button class="btn2" id="clear">ล้าง</button></div></div></section>
 <section class="card"><h3>ตั้งค่า Cloud / Supabase</h3><div class="warn"><b>ห้ามใส่ service_role key ในหน้านี้</b> ใช้เฉพาะ anon public key เท่านั้น หน้า Admin นี้ยังเหมาะสำหรับ limited field test กับผู้ใช้ที่เชื่อถือได้ ไม่ใช่ production admin auth</div><div class="grid" style="margin-top:12px"><div class="field"><label>Supabase URL</label><input id="sbUrl" placeholder="https://xxxx.supabase.co"></div><div class="field"><label>Supabase anon key</label><input id="sbKey" placeholder="eyJ... anon public key"></div></div><div class="row" style="margin-top:12px"><button class="btn2" id="saveCloud">บันทึกค่า Cloud</button><button class="btn2" id="testCloud">ทดสอบการเชื่อมต่อ</button><button class="btn" id="uploadCloud">อัปโหลดขึ้น Cloud</button><button class="btn2" id="setActive">ตั้งเป็นไฟล์ล่าสุด</button></div><div id="cloudStatus" class="muted" style="margin-top:10px">ยังไม่ได้ตั้งค่า Cloud</div></section>
@@ -24,7 +24,6 @@
 </main>
 <script src="/assets/admin-upload-v001.js?v=299"></script>
 <script src="/assets/admin-json-v265.js?v=299"></script>
-<script src="/assets/admin-team-photo-v1.js?v=1"></script>
-<script src="/assets/admin-team-thakoon-v1.js?v=1"></script>
+<script src="/assets/admin-team-photo-v1.js?v=2"></script>
 </body>
 </html>
