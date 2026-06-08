@@ -1,0 +1,14 @@
+(()=>{'use strict';
+const URL0='https://saodmeoilixfdqentofp.supabase.co',BUCKET='doit-files';
+const $=s=>document.querySelector(s),T=v=>String(v??'').trim();
+function cfg(){let c={};try{c=JSON.parse(localStorage.getItem('doit-cloud-cfg')||'{}')}catch{}return{u:T($('#sbUrl')?.value||c.url).replace(/\/$/,'')||URL0,k:T($('#sbKey')?.value||c.key)}}
+function msg(s,ok=false){const el=$('#teamPhotoStatus');if(el)el.innerHTML='<div class="'+(ok?'ok':'warn')+'">'+s+'</div>'}
+function fileToImage(file){return new Promise((res,rej)=>{const img=new Image();img.onload=()=>res(img);img.onerror=()=>rej(Error('อ่านรูปไม่ได้: '+file.name));img.src=URL.createObjectURL(file)})}
+function blobToDataUrl(blob){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(blob)})}
+async function makePhoto(file){const img=await fileToImage(file),W=800,H=540,c=document.createElement('canvas'),ctx=c.getContext('2d');c.width=W;c.height=H;ctx.fillStyle='#ecfdf5';ctx.fillRect(0,0,W,H);const scale=Math.max(W/img.naturalWidth,H/img.naturalHeight),sw=W/scale,sh=H/scale,sx=(img.naturalWidth-sw)/2,sy=(img.naturalHeight-sh)/2;ctx.drawImage(img,Math.max(0,sx),Math.max(0,sy),Math.min(img.naturalWidth,sw),Math.min(img.naturalHeight,sh),0,0,W,H);return await new Promise(res=>c.toBlob(res,'image/jpeg',0.88))}
+async function put(c,path,blob,type){const url=`${c.u}/storage/v1/object/${BUCKET}/${encodeURIComponent(path).replace(/%2F/g,'/')}`;const r=await fetch(url,{method:'POST',headers:{apikey:c.k,authorization:'Bearer '+c.k,'Content-Type':type,'x-upsert':'true'},body:blob});const t=await r.text();if(!r.ok)throw Error(t||r.status)}
+async function preview(){const f=$('#teamThakoonFile')?.files?.[0];if(!f)return;const blob=await makePhoto(f),data=await blobToDataUrl(blob);localStorage.setItem('doit-team-photo-thakoon-dataurl',data);const img=$('#teamThakoonPreview');if(img)img.src=data}
+async function upload(){const f=$('#teamThakoonFile')?.files?.[0];if(!f)return;const c=cfg();if(!c.k)throw Error('ยังไม่ได้ใส่ Supabase anon key');const blob=await makePhoto(f),data=await blobToDataUrl(blob);localStorage.setItem('doit-team-photo-thakoon-dataurl',data);await put(c,'team/team-thakoon.jpg',blob,'image/jpeg')}
+function bind(){const input=$('#teamThakoonFile');if(input)input.addEventListener('change',()=>preview().catch(e=>msg(e.message||e)));const data=localStorage.getItem('doit-team-photo-thakoon-dataurl');if(data&&$('#teamThakoonPreview'))$('#teamThakoonPreview').src=data;const btn=$('#uploadTeamPhotos');if(btn)btn.addEventListener('click',()=>upload().then(()=>msg('อัปโหลดรูปฐากูรแล้ว หน้า Pro จะดึงรูปใหม่อัตโนมัติ',true)).catch(e=>msg('อัปโหลดรูปฐากูรไม่สำเร็จ: '+(e.message||e))))}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+})();
