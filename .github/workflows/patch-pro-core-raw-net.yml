@@ -1,4 +1,5 @@
 name: Patch Pro Core Raw Net
+# trigger: raw-net-1
 
 on:
   push:
