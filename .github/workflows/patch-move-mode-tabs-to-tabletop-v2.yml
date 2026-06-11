@@ -1,0 +1,59 @@
+name: Move Pro mode tabs into table header v2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/patch-move-mode-tabs-to-tabletop-v2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch pro.html layout robustly
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'dist/pro.html';
+          let html = fs.readFileSync(p, 'utf8');
+          const before = html;
+
+          const tabsStart = html.indexOf('<div class="tabs">');
+          if (tabsStart < 0) throw new Error('tabs start not found');
+          const tabsEnd = html.indexOf('</div>', tabsStart);
+          if (tabsEnd < 0) throw new Error('tabs end not found');
+          const tabsBlock = html.slice(tabsStart, tabsEnd + 6);
+          if (!tabsBlock.includes('class="tab"') || !tabsBlock.includes('รวม order')) throw new Error('unexpected tabs block: ' + tabsBlock.slice(0, 300));
+          html = html.slice(0, tabsStart) + html.slice(tabsEnd + 6);
+
+          const topStart = html.indexOf('<div class="tableTop">');
+          if (topStart < 0) throw new Error('tableTop start not found');
+          const wrapStart = html.indexOf('<div class="tableWrap">', topStart);
+          if (wrapStart < 0) throw new Error('tableWrap after tableTop not found');
+          const topBlock = html.slice(topStart, wrapStart);
+          const topEnd = topStart + topBlock.lastIndexOf('</div>') + 6;
+          const newTop = '<div class="tableTop modeTop"><div class="tableTitleBox"><h3>รายการถอดของ</h3><div id="tableCount" class="hint">โหลดไฟล์เพื่อแสดงข้อมูล</div></div><button class="outline" id="displayBtn">ปรับจำนวนแสดง</button>' + tabsBlock + '</div>';
+          html = html.slice(0, topStart) + newTop + html.slice(topEnd);
+
+          const css = '.modeTop{display:grid!important;grid-template-columns:1fr auto!important;gap:10px!important;align-items:start!important}.modeTop .tabs{grid-column:1/-1!important;display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:8px!important;margin:8px 0 0!important}.modeTop .tab{height:40px!important}.tableTitleBox{min-width:0}@media(max-width:720px){.modeTop{grid-template-columns:1fr!important}.modeTop #displayBtn{width:100%!important}.modeTop .tabs{grid-template-columns:1fr 1fr!important}}';
+          if (!html.includes('.modeTop{display:grid')) html = html.replace('</style>', css + '</style>');
+
+          const tabsCount = (html.match(/<div class="tabs">/g) || []).length;
+          if (tabsCount !== 1) throw new Error('expected exactly one tabs block, got ' + tabsCount);
+          if (!html.includes('<div class="tableTop modeTop">')) throw new Error('modeTop tableTop missing');
+          if (!html.includes('<button class="tab orderTab">รวม order</button>')) throw new Error('red order tab missing');
+          if (html === before) throw new Error('no change');
+          fs.writeFileSync(p, html);
+          NODE
+      - name: Commit layout patch
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/pro.html
+          git commit -m "Move mode tabs into table header" || exit 0
+          git push
