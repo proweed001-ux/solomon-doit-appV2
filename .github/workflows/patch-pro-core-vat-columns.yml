@@ -1,0 +1,67 @@
+name: Patch Pro core VAT columns
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/patch-pro-core-vat-columns.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Patch Pro core table columns
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'dist/assets/pro-core-v4.js';
+          let s = fs.readFileSync(p, 'utf8');
+          const vat = x => `(N(${x}.netAmt)||N(${x}.rawAmt))*1.07`;
+          s = s.replace(
+            `<th>ยอดดิบ</th><th>ยอดสุทธิ</th></tr></thead><tbody>`,
+            `<th>ยอดดิบ</th><th>ยอดสุทธิ</th><th>รวม VAT</th></tr></thead><tbody>`
+          );
+          s = s.replace(/colspan="8"/g, 'colspan="9"');
+          s = s.replace(
+            `<td>'+B(g.rawAmt)+'</td><td>'+B(g.netAmt)+'</td></tr>'`,
+            `<td>'+B(g.rawAmt)+'</td><td>'+B(g.netAmt)+'</td><td>'+B(${vat('g')})+'</td></tr>'`
+          );
+          s = s.replace(
+            `['#','สินค้า','จำนวน','ยอดดิบ','ยอดสุทธิ']`,
+            `['#','สินค้า','จำนวน','ยอดดิบ','ยอดสุทธิ','รวม VAT']`
+          );
+          s = s.replace(
+            `<td>'+B(g.rawAmt)+'</td><td>'+B(g.netAmt)+'</td></tr>').join(''));return}if(mode==='dist'`,
+            `<td>'+B(g.rawAmt)+'</td><td>'+B(g.netAmt)+'</td><td>'+B(${vat('g')})+'</td></tr>').join(''));return}if(mode==='dist'`
+          );
+          s = s.replace(
+            `['#','สินค้า','จำนวนที่คีย์','ยอดดิบ','ยอดสุทธิ']`,
+            `['#','สินค้า','จำนวนที่คีย์','ยอดดิบ','ยอดสุทธิ','รวม VAT']`
+          );
+          s = s.replace(
+            `<td>'+B(l.rawAmt)+'</td><td>'+B(l.netAmt)+'</td></tr>').join(''));return}const r=sourceRows`,
+            `<td>'+B(l.rawAmt)+'</td><td>'+B(l.netAmt)+'</td><td>'+B(${vat('l')})+'</td></tr>').join(''));return}const r=sourceRows`
+          );
+          s = s.replace(
+            `$('#amount').textContent='฿ '+(raw?B(raw):'—')+(net?' / สุทธิ ฿ '+B(net):'—');`,
+            `$('#amount').textContent='฿ '+(raw?B(raw):'—')+(net?' / สุทธิ ฿ '+B(net)+' / รวม VAT ฿ '+B(net*1.07):'—');`
+          );
+          if (!s.includes('รวม VAT')) throw new Error('VAT text not found after patch');
+          fs.writeFileSync(p, s);
+          NODE
+          node --check dist/assets/pro-core-v4.js
+      - name: Commit Pro core patch
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/assets/pro-core-v4.js
+          git commit -m "Show gross VAT column in Pro core" || exit 0
+          git push
