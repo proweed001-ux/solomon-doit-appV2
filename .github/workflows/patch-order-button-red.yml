@@ -1,0 +1,40 @@
+name: Patch combined order red button
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/patch-order-button-red.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch pro.html order button color
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'dist/pro.html';
+          let html = fs.readFileSync(p, 'utf8');
+          const before = html;
+          html = html.replace('<button class="tab">รวม order</button>', '<button class="tab orderTab">รวม order</button>');
+          const css = '.orderTab,.orderTab.on{background:linear-gradient(180deg,#fb7185 0%,#e11d48 58%,#9f1239 100%)!important;box-shadow:0 3px 0 #7f1d1d,0 6px 10px rgba(159,18,57,.28),inset 0 1px 0 rgba(255,255,255,.48)!important;color:#fff!important}';
+          if (!html.includes(css)) {
+            html = html.replace('</style>', css + '</style>');
+          }
+          if (html === before) throw new Error('pro.html was not changed');
+          if (!html.includes('orderTab')) throw new Error('orderTab class missing');
+          fs.writeFileSync(p, html);
+          NODE
+      - name: Commit red order button patch
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/pro.html
+          git commit -m "Make combined order button red" || exit 0
+          git push
