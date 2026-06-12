@@ -1,0 +1,106 @@
+name: Apply Android app icon
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-android-app-icon.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-icon:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write launcher icon
+        run: |
+          set -e
+          mkdir -p android-apk/app/src/main/res/mipmap-mdpi
+          base64 -d > android-apk/app/src/main/res/mipmap-mdpi/ic_launcher.png <<'B64'
+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
+SUVORK5CYII=
+B64
+          cp android-apk/app/src/main/res/mipmap-mdpi/ic_launcher.png android-apk/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+      - name: Update manifest
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('android-apk/app/src/main/AndroidManifest.xml')
+          s = p.read_text()
+          if 'android:icon="@mipmap/ic_launcher"' not in s:
+              s = s.replace('android:theme="@style/AppTheme"\n        android:label="AYA DOIT"', 'android:theme="@style/AppTheme"\n        android:icon="@mipmap/ic_launcher"\n        android:roundIcon="@mipmap/ic_launcher_round"\n        android:label="AYA DOIT"')
+          p.write_text(s)
+          PY
+      - name: Commit icon assets
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git rm --ignore-unmatch .github/workflows/apply-android-app-icon.yml
+          git add android-apk/app/src/main/AndroidManifest.xml android-apk/app/src/main/res/mipmap-mdpi
+          git commit -m "Set Android app launcher icon" || exit 0
+          git push
