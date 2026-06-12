@@ -1,0 +1,39 @@
+name: Bump Pro core cache v342
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/bump-pro-core-cache-v342.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Bump pro core script version
+        run: |
+          node <<'NODE'
+          const fs=require('fs');
+          const p='dist/pro.html';
+          let s=fs.readFileSync(p,'utf8');
+          const before=s;
+          s=s.replace(/\/assets\/pro-core-v4\.js\?v=\d+/g,'/assets/pro-core-v4.js?v=342');
+          if(s===before) throw new Error('no pro-core script URL changed');
+          if(!s.includes('/assets/pro-core-v4.js?v=342')) throw new Error('v342 missing');
+          fs.writeFileSync(p,s);
+          NODE
+      - name: Commit bump
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/pro.html
+          git commit -m "Bump Pro core script cache to v342" || exit 0
+          git push
