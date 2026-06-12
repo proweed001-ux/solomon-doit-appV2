@@ -28,7 +28,7 @@ jobs:
           curl -L https://services.gradle.org/distributions/gradle-8.10.2-bin.zip -o gradle.zip
           unzip -q gradle.zip
       - name: Build debug APK
-        run: ./gradle-8.10.2/bin/gradle -p android-apk assembleDebug --no-daemon
+        run: ./gradle-8.10.2/bin/gradle -p android-apk assembleDebug --no-daemon --stacktrace
       - name: Rename APK
         run: |
           mkdir -p apk-out
