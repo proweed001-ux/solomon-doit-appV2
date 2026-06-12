@@ -1,0 +1,43 @@
+name: Pro send actions four columns
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/pro-send-actions-4cols.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: |
+          node <<'NODE'
+          const fs=require('fs');
+          let p='dist/assets/pro-core-v4.js';
+          let s=fs.readFileSync(p,'utf8');
+          const old='.sendActionButtons{grid-column:1/-1;display:grid;grid-template-columns:1fr;gap:8px;margin-top:0}.sendActionButtons button{width:100%;height:42px}@media(max-width:720px){.sendActionButtons{grid-template-columns:1fr}}';
+          const neu='.sendActionButtons{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:0}.sendActionButtons button{width:100%;height:38px;min-width:0;padding:0 3px;font-size:11px;line-height:1.05;white-space:normal}@media(max-width:720px){.sendActionButtons{grid-template-columns:repeat(4,minmax(0,1fr))}.sendActionButtons button{height:38px;font-size:10.8px;padding:0 2px}}';
+          if(!s.includes(old))throw new Error('one column sendActionButtons css not found');
+          s=s.replace(old,neu);
+          if(!s.includes('grid-template-columns:repeat(4,minmax(0,1fr))'))throw new Error('four columns css missing');
+          fs.writeFileSync(p,s);
+          p='dist/pro.html';
+          s=fs.readFileSync(p,'utf8');
+          s=s.replace(/\/assets\/pro-core-v4\.js\?v=\d+/g,'/assets/pro-core-v4.js?v=350');
+          fs.writeFileSync(p,s);
+          NODE
+          node --check dist/assets/pro-core-v4.js
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git rm .github/workflows/pro-send-actions-4cols.yml
+          git add dist/pro.html dist/assets/pro-core-v4.js
+          git commit -m "Set Pro send action buttons to four columns" || exit 0
+          git push
+
+# trigger
