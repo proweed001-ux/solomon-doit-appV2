@@ -35,7 +35,6 @@ jobs:
           d=Path('android-apk/app/src/main/res/drawable')
           d.mkdir(parents=True,exist_ok=True)
           img.resize((192,192), Image.Resampling.LANCZOS).save(d/'ic_launcher.png','PNG')
-          # remove adaptive xml so Android must use PNG fallback from mipmap
           for p in [Path('android-apk/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml'),Path('android-apk/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml')]:
               if p.exists(): p.unlink()
           PY
@@ -57,3 +56,5 @@ jobs:
           git add android-apk/app/build.gradle android-apk/app/src/main/res
           git commit -m "Rebuild launcher icon with valid PNG resources" || exit 0
           git push
+
+# trigger
