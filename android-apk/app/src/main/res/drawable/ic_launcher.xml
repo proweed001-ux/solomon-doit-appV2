@@ -1,0 +1,24 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path android:fillColor="#061B55" android:pathData="M18,0 H90 Q108,0 108,18 V90 Q108,108 90,108 H18 Q0,108 0,90 V18 Q0,0 18,0 Z"/>
+
+    <path android:fillColor="#FFFFFF" android:pathData="M22,16 H34 Q44,16 44,26 Q44,36 34,36 H22 Z M28,22 V30 H34 Q38,30 38,26 Q38,22 34,22 Z" android:fillType="evenOdd"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M48,16 H62 Q70,16 70,26 Q70,36 62,36 H48 Z M54,22 V30 H62 Q64,30 64,26 Q64,22 62,22 Z" android:fillType="evenOdd"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M76,16 H86 V36 H76 Z"/>
+
+    <path android:fillColor="#FFFFFF" android:pathData="M42,38 H70 Q73,38 76,41 L86,51 V72 Q86,76 82,76 H42 Q38,76 38,72 V42 Q38,38 42,38 Z"/>
+    <path android:fillColor="#22A652" android:pathData="M70,38 L86,54 H74 Q70,54 70,50 Z"/>
+    <path android:fillColor="#12893E" android:pathData="M26,48 H56 Q60,48 60,52 V76 Q60,80 56,80 H26 Q22,80 22,76 V52 Q22,48 26,48 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M32,56 H39 L43,64 L48,56 H55 L47,68 L55,80 H48 L43,72 L38,80 H31 L39,68 Z"/>
+    <path android:fillColor="#12893E" android:pathData="M64,56 H72 V63 H64 Z M75,56 H83 V63 H75 Z M64,66 H72 V73 H64 Z M75,66 H83 V73 H75 Z"/>
+
+    <path android:fillColor="#FFFFFF" android:pathData="M18,82 H32 Q44,82 44,94 Q44,106 32,106 H18 Z M25,89 V99 H32 Q36,99 36,94 Q36,89 32,89 Z" android:fillType="evenOdd"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M48,82 H60 Q70,82 70,94 Q70,106 60,106 H48 Z M54,89 V99 H60 Q63,99 63,94 Q63,89 60,89 Z" android:fillType="evenOdd"/>
+    <path android:fillColor="#FF8A00" android:pathData="M76,82 H84 V106 H76 Z"/>
+    <path android:fillColor="#FF8A00" android:pathData="M87,82 H106 V90 H100 V106 H92 V90 H87 Z"/>
+    <path android:fillColor="#FF8A00" android:pathData="M18,101 C42,108 80,106 103,76 C92,104 50,112 18,105 Z"/>
+</vector>
