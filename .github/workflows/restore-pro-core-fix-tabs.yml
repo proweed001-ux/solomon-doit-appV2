@@ -1,0 +1,44 @@
+name: Restore Pro core and fix tabs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/restore-pro-core-fix-tabs.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Restore previous core and fix tab selector
+        run: |
+          set -e
+          git show 3cfca2b996004dc2546f90678d78f37b9283a0a3:dist/assets/pro-core-v4.js > dist/assets/pro-core-v4.js
+          node <<'NODE'
+          const fs=require('fs');
+          const p='dist/assets/pro-core-v4.js';
+          let s=fs.readFileSync(p,'utf8');
+          if(!s.includes("$('.tab').forEach")) throw new Error('broken tab selector not found');
+          s=s.replace("$('.tab').forEach", "$$('.tab').forEach");
+          if(s.includes("$('.tab').forEach")) throw new Error('old selector still present');
+          if(!s.includes("$$('.tab').forEach")) throw new Error('new selector missing');
+          fs.writeFileSync(p,s);
+          NODE
+          node --check dist/assets/pro-core-v4.js
+      - name: Commit restored core
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/assets/pro-core-v4.js
+          git commit -m "Restore Pro core and fix tab selector" || exit 0
+          git push
