@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -24,9 +25,9 @@ public class MainActivity extends Activity {
         window.setNavigationBarColor(Color.rgb(8, 123, 52));
 
         webView = new WebView(this);
-        webView.setLayoutParams(new WebView.LayoutParams(
-                WebView.LayoutParams.MATCH_PARENT,
-                WebView.LayoutParams.MATCH_PARENT
+        webView.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
         ));
         setContentView(webView);
 
