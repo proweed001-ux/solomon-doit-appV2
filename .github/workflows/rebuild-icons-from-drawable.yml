@@ -1,0 +1,76 @@
+name: Rebuild icons from drawable PNG
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rebuild-icons-from-drawable.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  rebuild-icons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Pillow
+        run: python3 -m pip install --upgrade pillow
+      - name: Rebuild valid PNG launcher icons
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          src = Path('android-apk/app/src/main/res/drawable/ic_launcher.png')
+          if not src.exists():
+              raise SystemExit('missing source icon: ' + str(src))
+          img = Image.open(src).convert('RGBA')
+          img.load()
+          sizes = {'mdpi':48, 'hdpi':72, 'xhdpi':96, 'xxhdpi':144, 'xxxhdpi':192}
+          for density, size in sizes.items():
+              outdir = Path(f'android-apk/app/src/main/res/mipmap-{density}')
+              outdir.mkdir(parents=True, exist_ok=True)
+              resized = img.resize((size, size), Image.Resampling.LANCZOS)
+              resized.save(outdir / 'ic_launcher.png', 'PNG')
+              resized.save(outdir / 'ic_launcher_round.png', 'PNG')
+              # verify each written file can be read back
+              Image.open(outdir / 'ic_launcher.png').load()
+              Image.open(outdir / 'ic_launcher_round.png').load()
+          # keep source drawable as a valid 192px PNG too
+          img.resize((192, 192), Image.Resampling.LANCZOS).save(src, 'PNG')
+          Image.open(src).load()
+          # remove adaptive XML files so launcher uses the PNG resources directly
+          for p in [
+              Path('android-apk/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml'),
+              Path('android-apk/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml')
+          ]:
+              if p.exists():
+                  p.unlink()
+          PY
+      - name: Update manifest and version
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          manifest = Path('android-apk/app/src/main/AndroidManifest.xml')
+          s = manifest.read_text()
+          s = s.replace('@drawable/ic_launcher', '@mipmap/ic_launcher')
+          if 'android:icon="@mipmap/ic_launcher"' not in s:
+              s = s.replace('android:theme="@style/AppTheme"\n        android:label="AYA DOIT"', 'android:theme="@style/AppTheme"\n        android:icon="@mipmap/ic_launcher"\n        android:roundIcon="@mipmap/ic_launcher"\n        android:label="AYA DOIT"')
+          manifest.write_text(s)
+
+          gradle = Path('android-apk/app/build.gradle')
+          g = gradle.read_text()
+          g = re.sub(r'versionCode\s+\d+', 'versionCode 3', g)
+          g = re.sub(r"versionName\s+'[^']+'", "versionName '1.0.2'", g)
+          gradle.write_text(g)
+          PY
+      - name: Commit rebuilt icons
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git rm --ignore-unmatch .github/workflows/rebuild-icons-from-drawable.yml .github/workflows/fix-valid-icon-build.yml
+          git add android-apk/app/build.gradle android-apk/app/src/main/AndroidManifest.xml android-apk/app/src/main/res
+          git commit -m "Rebuild valid Android PNG launcher icons" || exit 0
+          git push
