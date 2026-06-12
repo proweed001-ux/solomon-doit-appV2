@@ -5,6 +5,8 @@
         android:allowBackup="true"
         android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme"
+        android:icon="@drawable/ic_launcher"
+        android:roundIcon="@drawable/ic_launcher"
         android:label="AYA DOIT"
         android:supportsRtl="true">
         <activity
