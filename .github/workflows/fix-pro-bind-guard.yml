@@ -1,0 +1,41 @@
+name: Fix Pro bind guard
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-pro-bind-guard.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: |
+          node <<'NODE'
+          const fs=require('fs');
+          let p='dist/assets/pro-core-v4.js';
+          let s=fs.readFileSync(p,'utf8');
+          let old="$('#showDetailBtn').onclick=()=>{push();showDetails=!showDetails;render();msg(showDetails?'แสดงรายละเอียดแล้ว':'ซ่อนรายละเอียดแล้ว')};";
+          let neu="const sd=$('#showDetailBtn');if(sd)sd.onclick=()=>{push();showDetails=!showDetails;render();msg(showDetails?'แสดงรายละเอียดแล้ว':'ซ่อนรายละเอียดแล้ว')};";
+          if(!s.includes(old)&&!s.includes('const sd=$(\'#showDetailBtn\')'))throw new Error('target not found');
+          s=s.replace(old,neu);
+          fs.writeFileSync(p,s);
+          p='dist/pro.html';
+          s=fs.readFileSync(p,'utf8');
+          s=s.replace(/<script id="modeTabRebinder">[\s\S]*?<\/script>/,'');
+          s=s.replace(/\/assets\/pro-core-v4\.js\?v=\d+/g,'/assets/pro-core-v4.js?v=343');
+          fs.writeFileSync(p,s);
+          NODE
+          node --check dist/assets/pro-core-v4.js
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git rm .github/workflows/fix-pro-bind-guard.yml
+          git add dist/pro.html dist/assets/pro-core-v4.js
+          git commit -m "Fix Pro bind guard" || exit 0
+          git push
