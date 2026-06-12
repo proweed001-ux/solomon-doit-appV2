@@ -1,0 +1,59 @@
+name: Rebuild valid Android icon
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-valid-icon-build.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix-icon:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Rebuild launcher PNGs from uploaded source
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import base64
+          from PIL import Image
+          from io import BytesIO
+          src_b64='''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'''
+          img=Image.open(BytesIO(base64.b64decode(src_b64)))
+          img.load()
+          sizes={'mdpi':48,'hdpi':72,'xhdpi':96,'xxhdpi':144,'xxxhdpi':192}
+          for d,n in sizes.items():
+              out=Path(f'android-apk/app/src/main/res/mipmap-{d}')
+              out.mkdir(parents=True,exist_ok=True)
+              r=img.resize((n,n), Image.Resampling.LANCZOS)
+              for name in ['ic_launcher.png','ic_launcher_round.png']:
+                  r.save(out/name,'PNG')
+          d=Path('android-apk/app/src/main/res/drawable')
+          d.mkdir(parents=True,exist_ok=True)
+          img.resize((192,192), Image.Resampling.LANCZOS).save(d/'ic_launcher.png','PNG')
+          # remove adaptive xml so Android must use PNG fallback from mipmap
+          for p in [Path('android-apk/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml'),Path('android-apk/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml')]:
+              if p.exists(): p.unlink()
+          PY
+      - name: Bump APK version
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p=Path('android-apk/app/build.gradle')
+          s=p.read_text()
+          s=s.replace('versionCode 1','versionCode 2')
+          s=s.replace("versionName '1.0.0'","versionName '1.0.1'")
+          p.write_text(s)
+          PY
+      - name: Commit fixed valid icon
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git rm --ignore-unmatch .github/workflows/fix-valid-icon-build.yml
+          git add android-apk/app/build.gradle android-apk/app/src/main/res
+          git commit -m "Rebuild launcher icon with valid PNG resources" || exit 0
+          git push
