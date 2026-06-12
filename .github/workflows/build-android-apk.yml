@@ -1,0 +1,39 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "android-apk/**"
+      - ".github/workflows/build-android-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+      - name: Download Gradle
+        run: |
+          curl -L https://services.gradle.org/distributions/gradle-8.10.2-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+      - name: Build debug APK
+        run: ./gradle-8.10.2/bin/gradle -p android-apk assembleDebug --no-daemon
+      - name: Rename APK
+        run: |
+          mkdir -p apk-out
+          cp android-apk/app/build/outputs/apk/debug/app-debug.apk apk-out/AYA-DOIT-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AYA-DOIT-debug-apk
+          path: apk-out/AYA-DOIT-debug.apk
