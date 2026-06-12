@@ -1,0 +1,37 @@
+name: Rebind moved Pro tabs after core load
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/patch-rebind-tabs-after-core.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inject tab rebinder script
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'dist/pro.html';
+          let html = fs.readFileSync(p, 'utf8');
+          const before = html;
+          const script = `<script id="modeTabRebinder">(()=>{function r(){const order=['pick','dist','ship','done','raw','order'],label={'ถอดของ Pro':'pick','กระจายสินค้า':'dist','ใบส่งร้านจริง':'ship','จัดแล้ว':'done','รายการดิบ':'raw','รวม order':'order'},tabs=[...document.querySelectorAll('.tab')],handlers=tabs.map(t=>t.onclick),by={};order.forEach((m,i)=>{if(handlers[i])by[m]=handlers[i]});tabs.forEach(t=>{const m=label[(t.textContent||'').trim()];if(m&&by[m])t.onclick=by[m]})}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(r,0));else setTimeout(r,0);setTimeout(r,300);setTimeout(r,1200);window.DOIT_REBIND_TABS=r})();</script>`;
+          if (!html.includes('modeTabRebinder')) html = html.replace('</body>', script + '</body>');
+          if (html === before) throw new Error('rebinder script was not inserted');
+          if (!html.includes('window.DOIT_REBIND_TABS')) throw new Error('rebinder marker missing');
+          fs.writeFileSync(p, html);
+          NODE
+      - name: Commit tab rebinder patch
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/pro.html
+          git commit -m "Rebind moved Pro mode tabs after core load" || exit 0
+          git push
