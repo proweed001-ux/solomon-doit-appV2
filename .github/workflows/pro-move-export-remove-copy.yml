@@ -1,0 +1,46 @@
+name: Move export and remove copy
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/pro-move-export-remove-copy.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: |
+          node <<'NODE'
+          const fs=require('fs');
+          let p='dist/assets/pro-core-v4.js';
+          let s=fs.readFileSync(p,'utf8');
+          const marker="function moveProActions()";
+          const inject="function moveDisplayExport(){let st=$('#displayExportCss');if(!st){st=document.createElement('style');st.id='displayExportCss';st.textContent='.displayActionButtons{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center}.displayActionButtons button{width:100%;height:40px;white-space:nowrap}@media(max-width:720px){.displayActionButtons{grid-column:1/-1;grid-template-columns:1fr 1fr}}';document.head.appendChild(st)}const copy=$('#copySummary');if(copy)copy.remove();const top=document.querySelector('.tableTop'),display=$('#displayBtn'),exp=$('#exportCsv');if(!top||!display||!exp)return;let box=$('#displayActionButtons');if(!box){box=document.createElement('div');box.id='displayActionButtons';box.className='displayActionButtons';display.insertAdjacentElement('beforebegin',box)}if(display.parentElement!==box)box.appendChild(display);if(exp.parentElement!==box)box.appendChild(exp)}";
+          if(!s.includes('moveDisplayExport()')){
+            if(!s.includes(marker))throw new Error('moveProActions marker missing');
+            s=s.replace(marker,inject+marker);
+            s=s.replace('moveProActions();const gear=', 'moveProActions();moveDisplayExport();const gear=');
+          }
+          s=s.replace("$('#copySummary').onclick=copySummary;", "const cs=$('#copySummary');if(cs)cs.onclick=copySummary;");
+          if(!s.includes('moveDisplayExport()'))throw new Error('moveDisplayExport missing');
+          if(s.includes("$('#copySummary').onclick=copySummary"))throw new Error('copySummary unguarded');
+          fs.writeFileSync(p,s);
+          p='dist/pro.html';
+          s=fs.readFileSync(p,'utf8');
+          s=s.replace(/\/assets\/pro-core-v4\.js\?v=\d+/g,'/assets/pro-core-v4.js?v=347');
+          fs.writeFileSync(p,s);
+          NODE
+          node --check dist/assets/pro-core-v4.js
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git rm .github/workflows/pro-move-export-remove-copy.yml
+          git add dist/pro.html dist/assets/pro-core-v4.js
+          git commit -m "Move Export CSV next to display and remove Copy summary" || exit 0
+          git push
