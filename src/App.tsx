@@ -29,6 +29,14 @@ import {
   toCsv,
   uniqueSorted,
 } from './lib/analytics';
+import './upload-progress.css';
+
+type UploadProgressState = {
+  percent: number;
+  title: string;
+  detail: string;
+  state: 'uploading' | 'parsing' | 'activating' | 'done' | 'error';
+};
 
 function Header({
   mode,
@@ -479,9 +487,39 @@ function BillPage({ lines }: { lines: BillLine[] }) {
   );
 }
 
-function UploadPage({ rows, fileName, error, loading, onUpload, onGoDashboard, onClear }: {
+function UploadProgressModal({ progress }: { progress: UploadProgressState | null }) {
+  if (!progress) return null;
+  const percent = Math.max(0, Math.min(100, Math.round(progress.percent)));
+  const isDone = progress.state === 'done';
+  const isError = progress.state === 'error';
+
+  return (
+    <div className="upload-modal-backdrop" role="status" aria-live="polite">
+      <div className="upload-modal">
+        <div className={isError ? 'upload-modal-icon error' : isDone ? 'upload-modal-icon done' : 'upload-modal-icon'}>
+          {isError ? '!' : isDone ? '✓' : <UploadCloud size={28} />}
+        </div>
+        <h2>{progress.title}</h2>
+        <p>{progress.detail}</p>
+        <div className="progress-head">
+          <span>{isError ? 'หยุดทำงาน' : isDone ? 'เสร็จแล้ว' : 'กำลังทำงาน'}</span>
+          <b>{percent}%</b>
+        </div>
+        <div className="progress-track">
+          <div className={isError ? 'progress-fill error' : isDone ? 'progress-fill done' : 'progress-fill'} style={{ width: `${percent}%` }} />
+        </div>
+        <div className="progress-note">
+          {isError ? 'ตรวจสอบไฟล์แล้วลองใหม่อีกครั้ง' : isDone ? 'ไฟล์นี้ถูกตั้งเป็นไฟล์ล่าสุดอัตโนมัติ' : 'ห้ามปิดหน้านี้ระหว่างอัปโหลดหรือแปลงไฟล์'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UploadPage({ rows, fileName, latestFileName, error, loading, onUpload, onGoDashboard, onClear }: {
   rows: ParsedRow[];
   fileName: string;
+  latestFileName: string;
   error: string;
   loading: boolean;
   onUpload: (file: File) => void;
@@ -489,8 +527,6 @@ function UploadPage({ rows, fileName, error, loading, onUpload, onGoDashboard, o
   onClear: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const totalQty = rows.reduce((s, r) => s + r.qtyPcs, 0);
-  const totalAmount = rows.reduce((s, r) => s + r.correctAmount, 0);
 
   return (
     <main className="content">
@@ -506,9 +542,10 @@ function UploadPage({ rows, fileName, error, loading, onUpload, onGoDashboard, o
           e.currentTarget.value = '';
         }} />
         <button className="primary-btn" disabled={loading} onClick={() => inputRef.current?.click()}>
-          <UploadCloud size={18} /> {loading ? 'กำลังอ่านไฟล์...' : 'เลือกไฟล์ DOIT'}
+          <UploadCloud size={18} /> {loading ? 'กำลังอัปโหลด/แปลงไฟล์...' : 'เลือกไฟล์ DOIT'}
         </button>
-        {fileName && <div className="file-name">ไฟล์: {fileName}</div>}
+        {fileName && <div className="file-name">ไฟล์ที่เลือก: {fileName}</div>}
+        {latestFileName && <div className="latest-file-badge">ไฟล์ล่าสุดอัตโนมัติ: {latestFileName}</div>}
         {error && <div className="error-box">{error}</div>}
       </section>
 
@@ -538,6 +575,14 @@ export default function App() {
   const [fileName, setFileName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<UploadProgressState | null>(null);
+  const [latestFileName, setLatestFileName] = useState(() => {
+    try {
+      return localStorage.getItem('doit.latestFileName') || '';
+    } catch {
+      return '';
+    }
+  });
 
   const filteredRows = useMemo(() => applyFilters(rows, filters), [rows, filters]);
   const billLines = useMemo(() => buildBillLines(filteredRows), [filteredRows]);
@@ -545,17 +590,37 @@ export default function App() {
   const handleUpload = async (file: File) => {
     setLoading(true);
     setError('');
+    setProgress({ percent: 8, title: 'กำลังอัปโหลดไฟล์ DOIT', detail: file.name, state: 'uploading' });
+
     try {
+      await new Promise(resolve => setTimeout(resolve, 120));
+      setProgress({ percent: 28, title: 'กำลังแปลงไฟล์', detail: 'กำลังอ่าน Excel/CSV และจัดรูปแบบข้อมูล', state: 'parsing' });
+
       const parsed = await parseDataFile(file);
+
+      setProgress({ percent: 76, title: 'กำลังตรวจสอบข้อมูล', detail: `${fmt(parsed.length)} แถว · ตั้งค่าไฟล์ล่าสุด`, state: 'activating' });
+      await new Promise(resolve => setTimeout(resolve, 120));
+
       setRows(parsed);
       setFileName(file.name);
+      setLatestFileName(file.name);
+      try {
+        localStorage.setItem('doit.latestFileName', file.name);
+      } catch {
+        // localStorage can be blocked in some browsers; UI state still updates.
+      }
       setFilters(emptyFilters);
-      setMode('dashboard');
       if (parsed.length === 0) setError('อ่านไฟล์ได้ แต่ไม่พบแถวที่มีจำนวนหรือยอดเงิน');
+
+      setProgress({ percent: 100, title: 'อัปโหลดและแปลงไฟล์สำเร็จ', detail: `${file.name} ถูกตั้งเป็นไฟล์ล่าสุดแล้ว`, state: 'done' });
+      setTimeout(() => setProgress(null), 900);
+      setMode('dashboard');
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'อ่านไฟล์ไม่ได้';
       setRows([]);
       setFileName(file.name);
-      setError(err instanceof Error ? err.message : 'อ่านไฟล์ไม่ได้');
+      setError(message);
+      setProgress({ percent: 100, title: 'อัปโหลดหรือแปลงไฟล์ไม่สำเร็จ', detail: message, state: 'error' });
     } finally {
       setLoading(false);
     }
@@ -588,6 +653,7 @@ export default function App() {
         <UploadPage
           rows={rows}
           fileName={fileName}
+          latestFileName={latestFileName}
           error={error}
           loading={loading}
           onUpload={handleUpload}
@@ -606,6 +672,7 @@ export default function App() {
           {mode === 'issues' && <IssuesPage rows={filteredRows} />}
         </main>
       )}
+      <UploadProgressModal progress={progress} />
     </div>
   );
 }
