@@ -1,0 +1,83 @@
+name: Patch Pro remain summary filter buttons
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/pro-remain-filter-buttons.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const jsPath = 'dist/assets/pro-core-v4.js';
+          let s = fs.readFileSync(jsPath, 'utf8');
+
+          function replaceOnce(oldText, newText, label) {
+            if (s.includes(newText)) return;
+            if (!s.includes(oldText)) throw new Error(label + ' not found');
+            s = s.replace(oldText, newText);
+          }
+
+          replaceOnce(
+            "let rows=[],active=null,key='active',q='',page=1,pageSize=80,mode='pick',showDetails=false,bound=false,pickKind='',tmp=[];",
+            "let rows=[],active=null,key='active',q='',page=1,pageSize=80,mode='pick',showDetails=false,bound=false,pickKind='',tmp=[],remainView='all';",
+            'state variable line'
+          );
+
+          replaceOnce(
+            "function snap(){return JSON.stringify({sel,q,send,add,pull,ins,page,pageSize,mode,showDetails})}",
+            "function snap(){return JSON.stringify({sel,q,send,add,pull,ins,page,pageSize,mode,showDetails,remainView})}",
+            'snap function'
+          );
+
+          replaceOnce(
+            "mode=s.mode||'pick';showDetails=!!s.showDetails;render()",
+            "mode=s.mode||'pick';showDetails=!!s.showDetails;remainView=s.remainView||remainView||'all';render()",
+            'restore function remainView assignment'
+          );
+
+          replaceOnce(
+            "function save(){localStorage.setItem(sk(),JSON.stringify({sel,q,send,add,pull,ins,mode,pageSize,showDetails}))}",
+            "function save(){localStorage.setItem(sk(),JSON.stringify({sel,q,send,add,pull,ins,mode,pageSize,showDetails,remainView}))}",
+            'save function'
+          );
+
+          replaceOnce(
+            "mode=s.mode||mode;pageSize=s.pageSize||pageSize;showDetails=!!s.showDetails",
+            "mode=s.mode||mode;pageSize=s.pageSize||pageSize;showDetails=!!s.showDetails;remainView=s.remainView||remainView||'all'",
+            'loadState function remainView assignment'
+          );
+
+          const oldRemain = "if(mode==='remain'){simpleTable('สรุปของเหลือ '+F(pool.length)+' รายการ',['#','สินค้า','คงเหลือ'],pool.map((g,i)=>'<tr><td>'+(i+1)+'</td><td>'+E(g.sku)+'</td><td class=\"'+(remain(g)<0?'bad':'blue')+'\">'+F(remain(g))+'</td></tr>').join(''));return}";
+          const newRemain = "if(mode==='remain'){const p=pool.filter(g=>remainView==='positive'?remain(g)>0:remainView==='negative'?remain(g)<0:true),label=remainView==='positive'?'เฉพาะของเหลือ':remainView==='negative'?'เฉพาะของขาด':'ทั้งหมด';simpleTable('สรุปของเหลือ '+label+' '+F(p.length)+'/'+F(pool.length)+' รายการ',['#','สินค้า','คงเหลือ'],p.map((g,i)=>'<tr><td>'+(i+1)+'</td><td>'+E(g.sku)+'</td><td class=\"'+(remain(g)<0?'bad':'blue')+'\">'+F(remain(g))+'</td></tr>').join(''));$('#tableCount').innerHTML='สรุปของเหลือ '+E(label)+' '+F(p.length)+'/'+F(pool.length)+' รายการ <span style=\"display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:6px;vertical-align:middle\"><button class=\"page '+(remainView==='all'?'on':'')+'\" style=\"height:28px;padding:0 8px;font-size:11px\" data-remain-view=\"all\">ทั้งหมด</button><button class=\"page '+(remainView==='positive'?'on':'')+'\" style=\"height:28px;padding:0 8px;font-size:11px\" data-remain-view=\"positive\">เหลือ</button><button class=\"page '+(remainView==='negative'?'on':'')+'\" style=\"height:28px;padding:0 8px;font-size:11px\" data-remain-view=\"negative\">ขาด</button></span>';$$('[data-remain-view]').forEach(b=>b.onclick=()=>{push();remainView=b.dataset.remainView||'all';render()});return}";
+          replaceOnce(oldRemain, newRemain, 'remain mode block');
+
+          if (!s.includes("data-remain-view=\"positive\"")) throw new Error('remain filter buttons missing');
+          if (!s.includes("unit:N(g.netUnit)*1.07")) throw new Error('net plus VAT unit formula missing; aborting');
+          if (!s.includes("['รหัส','รายการสินค้า','จำนวน','ราคา/หน่วย','รวมเงิน']")) throw new Error('print header was not kept as default; aborting');
+
+          fs.writeFileSync(jsPath, s);
+
+          const htmlPath = 'dist/pro.html';
+          let h = fs.readFileSync(htmlPath, 'utf8');
+          h = h.replace(/\/assets\/pro-core-v4\.js\?v=\d+/g, '/assets/pro-core-v4.js?v=353');
+          fs.writeFileSync(htmlPath, h);
+          NODE
+          node --check dist/assets/pro-core-v4.js
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git rm .github/workflows/pro-remain-filter-buttons.yml
+          git add dist/pro.html dist/assets/pro-core-v4.js
+          git commit -m "Add remain summary filter buttons" || exit 0
+          git push
