@@ -26,7 +26,7 @@ function ensure(){
   if(modal)return;
   modal=document.createElement('div');
   modal.className='adminPopMask';
-  modal.innerHTML=`<div class="adminPop"><div class="adminPopIcon" id="adminPopIcon">⇧</div><h3 id="adminPopTitle">กำลังทำงาน</h3><p id="adminPopDetail">รอสถานะ</p><div class="adminPopHead"><span id="adminPopNoteTop">สถานะ</span><b id="adminPopPct">0%</b></div><div class="adminPopTrack"><div class="adminPopFill" id="adminPopFill"></div></div><div class="adminPopNote" id="adminPopNote">ห้ามปิดหน้านี้ระหว่างอัปโหลดหรือแปลงไฟล์</div></div>`;
+  modal.innerHTML=`<div class="adminPop"><div class="adminPopIcon" id="adminPopIcon">⇧</div><h3 id="adminPopTitle">กำลังทำงาน</h3><p id="adminPopDetail">รอสถานะ</p><div class="adminPopHead"><span id="adminPopNoteTop">สถานะจริงจากแถบหลัก</span><b id="adminPopPct">0%</b></div><div class="adminPopTrack"><div class="adminPopFill" id="adminPopFill"></div></div><div class="adminPopNote" id="adminPopNote">เปอร์เซ็นต์นี้อ่านจากหลอดสถานะหลัก ไม่สร้างเลขหลอกเพิ่ม</div></div>`;
   document.body.appendChild(modal);
   fill=$('#adminPopFill');title=$('#adminPopTitle');detail=$('#adminPopDetail');pct=$('#adminPopPct');note=$('#adminPopNote');
 }
@@ -36,34 +36,37 @@ function percentFromBar(){
   const m=w.match(/([0-9.]+)/);
   return m?Math.max(0,Math.min(100,Number(m[1])||0)):0;
 }
-function show(p,msg){
+function statusText(fallback=''){
+  return String($('#status')?.textContent||fallback||'กำลังทำงาน').trim();
+}
+function show(msg){
   ensure();
   clearTimeout(hideTimer);
-  const n=Math.round(Math.max(0,Math.min(100,p||0)));
-  const text=String(msg||$('#status')?.textContent||'กำลังทำงาน').trim();
+  const n=Math.round(percentFromBar());
+  const text=statusText(msg);
   modal.classList.add('on');
   fill.style.width=n+'%';
   pct.textContent=n+'%';
   detail.textContent=text;
   if(/ผิดพลาด|error|ไม่ได้|fail/i.test(text)){
     title.textContent='อัปโหลดหรือแปลงไฟล์ไม่สำเร็จ';
-    note.textContent='ตรวจสอบไฟล์หรือค่า Supabase แล้วลองใหม่อีกครั้ง';
+    note.textContent='สถานะผิดพลาดจากแถบหลัก';
   }else if(n>=100||/เสร็จ|สำเร็จ|active|ล่าสุด|พร้อมใช้งาน/i.test(text)){
     title.textContent='อัปโหลด/แปลงไฟล์สำเร็จ';
-    note.textContent='กำลังตั้งไฟล์ล่าสุดอัตโนมัติ หรือเสร็จแล้ว';
+    note.textContent='เสร็จตามสถานะหลักแล้ว';
     hideTimer=setTimeout(()=>modal.classList.remove('on'),1800);
   }else if(/อ่าน|แปลง|index|JSON/i.test(text)){
     title.textContent='กำลังแปลงไฟล์ DOIT';
-    note.textContent='ระบบกำลังอ่านไฟล์และสร้าง JSON/index';
+    note.textContent='อ่านเปอร์เซ็นต์จากหลอดสถานะหลักเท่านั้น';
   }else if(/อัปโหลด|Cloud/i.test(text)){
     title.textContent='กำลังอัปโหลดขึ้น Cloud';
-    note.textContent='ระบบกำลังส่งไฟล์ขึ้น Supabase';
+    note.textContent='อ่านเปอร์เซ็นต์จากหลอดสถานะหลักเท่านั้น';
   }else{
     title.textContent='กำลังทำงาน';
-    note.textContent='ห้ามปิดหน้านี้ระหว่างอัปโหลดหรือแปลงไฟล์';
+    note.textContent='เปอร์เซ็นต์นี้อ่านจากหลอดสถานะหลัก ไม่สร้างเลขหลอกเพิ่ม';
   }
 }
-function refresh(){show(percentFromBar(),$('#status')?.textContent||'');}
+function refresh(){show();}
 function autoActive(){
   const el=$('#cloudStatus');
   if(!el)return;
@@ -71,12 +74,12 @@ function autoActive(){
   const btn=$('#setActive');
   if(btn&&/กด.*ตั้งเป็นไฟล์ล่าสุด|บันทึก metadata สำเร็จ|อัปโหลดไฟล์และบันทึก metadata สำเร็จ/.test(tx)&&tx!==lastAutoActive){
     lastAutoActive=tx;
-    show(94,'อัปโหลดสำเร็จ กำลังตั้งเป็นไฟล์ล่าสุดอัตโนมัติ');
+    show('กำลังตั้งเป็นไฟล์ล่าสุดอัตโนมัติ');
     setTimeout(()=>btn.click(),250);
   }
   if(/ตั้งเป็นไฟล์ล่าสุดแล้ว|Cloud JSON active|อัปโหลด Excel \+ JSON และตั้งเป็นไฟล์ล่าสุดแล้ว/.test(tx)){
     try{localStorage.setItem('doit-admin-latest-status',tx);localStorage.setItem('doit-admin-latest-at',new Date().toISOString())}catch{}
-    show(100,'ตั้งไฟล์ล่าสุดอัตโนมัติสำเร็จ');
+    show('ตั้งไฟล์ล่าสุดอัตโนมัติสำเร็จ');
     if(!$('#adminLatestBadge')){
       const b=document.createElement('div');b.id='adminLatestBadge';b.className='adminLatestBadge';b.textContent='ไฟล์ล่าสุดถูกตั้งอัตโนมัติแล้ว';
       el.appendChild(b);
@@ -87,8 +90,8 @@ function bind(){
   ensure();
   ['bar','pct','status'].forEach(id=>{const el=$('#'+id);if(el)new MutationObserver(refresh).observe(el,{attributes:true,childList:true,subtree:true,characterData:true,attributeFilter:['style']});});
   const cs=$('#cloudStatus');if(cs)new MutationObserver(autoActive).observe(cs,{childList:true,subtree:true,characterData:true});
-  const file=$('#file');if(file)file.addEventListener('change',()=>{const f=file.files&&file.files[0];if(f)show(3,'เลือกไฟล์: '+f.name);},true);
-  const up=$('#uploadCloud');if(up)up.addEventListener('click',()=>show(5,'เริ่มอัปโหลดขึ้น Cloud'),true);
+  const file=$('#file');if(file)file.addEventListener('change',()=>{const f=file.files&&file.files[0];if(f){show('เลือกไฟล์: '+f.name)}},true);
+  const up=$('#uploadCloud');if(up)up.addEventListener('click',()=>show('เริ่มอัปโหลดขึ้น Cloud'),true);
   setTimeout(autoActive,600);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
