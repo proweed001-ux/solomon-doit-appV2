@@ -45,3 +45,5 @@ jobs:
           git add dist/pro.html dist/assets/pro-core-v4.js
           git commit -m "Fix remain filter buttons binding" || exit 0
           git push
+
+# trigger: 1
