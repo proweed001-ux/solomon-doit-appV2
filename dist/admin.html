@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-store">
-<title>Admin Upload DOIT V0.7</title>
+<title>Admin Upload DOIT V0.8</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
@@ -12,9 +12,9 @@
 </style>
 </head>
 <body>
-<header class="top"><a href="/pro.html?v=15">← กลับหน้า Pro</a><div class="brand">Admin Upload DOIT</div><span>V0.7</span></header>
+<header class="top"><a href="/pro.html?v=15">← กลับหน้า Pro</a><div class="brand">Admin Upload DOIT</div><span>V0.8</span></header>
 <main class="wrap">
-<section class="card"><h2>อัปโหลดไฟล์ DOIT ประจำวัน</h2><p class="muted"><b>สถานะตอนนี้: JSON pipeline v265 · Admin V0.7</b><br>ปุ่ม “อัปโหลด JSON + ตั้งล่าสุด” จะอัปโหลด Excel, สร้าง JSON/index เบา, บันทึก metadata และตั้งเป็นไฟล์ล่าสุด</p><div class="fileBox"><b>เลือกไฟล์ DOIT .xlsx / .xlsm</b><div class="muted" id="fileName">ยังไม่ได้เลือกไฟล์</div><input id="file" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden><div style="margin-top:12px"><button class="btn" id="choose">เลือกไฟล์</button><button class="btn2" id="clear">ล้าง</button></div></div></section>
+<section class="card"><h2>อัปโหลดไฟล์ DOIT ประจำวัน</h2><p class="muted"><b>สถานะตอนนี้: JSON pipeline v265 · Admin V0.8</b><br>ปุ่ม “อัปโหลด JSON + ตั้งล่าสุด” จะอัปโหลด Excel, สร้าง JSON/index เบา, บันทึก metadata และตั้งเป็นไฟล์ล่าสุดอัตโนมัติ</p><div class="fileBox"><b>เลือกไฟล์ DOIT .xlsx / .xlsm</b><div class="muted" id="fileName">ยังไม่ได้เลือกไฟล์</div><input id="file" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden><div style="margin-top:12px"><button class="btn" id="choose">เลือกไฟล์</button><button class="btn2" id="clear">ล้าง</button></div></div></section>
 <section class="card"><h3>ตั้งค่า Cloud / Supabase</h3><div class="warn"><b>ห้ามใส่ service_role key ในหน้านี้</b> ใช้เฉพาะ anon public key เท่านั้น หน้า Admin นี้ยังเหมาะสำหรับ limited field test กับผู้ใช้ที่เชื่อถือได้ ไม่ใช่ production admin auth</div><div class="grid" style="margin-top:12px"><div class="field"><label>Supabase URL</label><input id="sbUrl" placeholder="https://xxxx.supabase.co"></div><div class="field"><label>Supabase anon key</label><input id="sbKey" placeholder="eyJ... anon public key"></div></div><div class="row" style="margin-top:12px"><button class="btn2" id="saveCloud">บันทึกค่า Cloud</button><button class="btn2" id="testCloud">ทดสอบการเชื่อมต่อ</button><button class="btn" id="uploadCloud">อัปโหลดขึ้น Cloud</button><button class="btn2" id="setActive">ตั้งเป็นไฟล์ล่าสุด</button></div><div id="cloudStatus" class="muted" style="margin-top:10px">ยังไม่ได้ตั้งค่า Cloud</div></section>
 <section class="card"><h3>อัปโหลดรูปทีมพัฒนา</h3><p class="muted">อัปโหลดรูปแยกคนละช่อง ระบบจะปรับขนาดเป็น 800 x 540 และส่งขึ้น Cloud ให้หน้า Pro ดึงรูปใหม่อัตโนมัติ</p><div class="teamGrid"><div class="teamBox"><h4>ฐากูร อุปมัย</h4><div class="muted"><b>DSHFSAYA</b><br>ผู้ควบคุมงาน/หัวหน้าสั่งการ</div><input id="teamThakoonFile" class="teamFile" type="file" accept="image/png,image/jpeg,image/jpg"><img id="teamThakoonPreview" class="teamPreview" alt="Preview ฐากูร"></div><div class="teamBox"><h4>นาย อรรถวิทย์ ชัยชะนะ</h4><div class="muted"><b>AYAADS01</b><br>ที่ปรึกษา/แอดมิน</div><input id="teamAtthawitFile" class="teamFile" type="file" accept="image/png,image/jpeg,image/jpg"><img id="teamAtthawitPreview" class="teamPreview" alt="Preview อรรถวิทย์"></div><div class="teamBox"><h4>นาย ฉัตรชัย จันทร์กลิ่น</h4><div class="muted"><b>AYAPS062</b><br>ผู้สร้าง/จัดทำ</div><input id="teamChatchaiFile" class="teamFile" type="file" accept="image/png,image/jpeg,image/jpg"><img id="teamChatchaiPreview" class="teamPreview" alt="Preview ฉัตรชัย"></div></div><div class="row" style="margin-top:12px"><button class="btn" id="uploadTeamPhotos">อัปโหลดรูปทีมพัฒนา</button><button class="btn2" id="openProAfterTeam">เปิดหน้า Pro เพื่อตรวจ</button></div><div id="teamPhotoStatus" class="muted" style="margin-top:10px">ยังไม่ได้เลือกรูปทีมพัฒนา</div></section>
 <section class="card"><h3>สถานะ</h3><div class="progress"><div class="bar" id="bar"></div></div><div class="row"><strong id="pct">0%</strong><span id="status" class="muted">รอเลือกไฟล์</span></div><div class="steps" style="margin-top:12px"><div class="step" data-s="pick">เลือกไฟล์</div><div class="step" data-s="read">อ่านไฟล์</div><div class="step" data-s="parse">แปลงข้อมูล</div><div class="step" data-s="index">สร้าง Index</div><div class="step" data-s="upload">Cloud</div><div class="step" data-s="ready">พร้อมใช้งาน</div></div></section>
@@ -22,8 +22,9 @@
 <section class="card"><div class="row" style="justify-content:space-between"><h3>ผลตรวจไฟล์ล่าสุด</h3><div><button class="btn2" id="saveVersion">บันทึกประวัติในเครื่อง</button><button class="btn2 danger" id="clearHistory">ล้างประวัติ</button></div></div><div id="result" class="muted">ยังไม่มีผลตรวจ</div></section>
 <section class="card"><h3>ประวัติไฟล์ที่ตรวจในเครื่องนี้</h3><div class="tableWrap"><table class="tbl"><thead><tr><th>เวลา</th><th>ชื่อไฟล์</th><th>แถว</th><th>ร้าน</th><th>PS</th><th>Telesale Bills</th><th>สถานะ</th></tr></thead><tbody id="hist"><tr><td colspan="7" class="muted">ยังไม่มีประวัติ</td></tr></tbody></table></div></section>
 </main>
-<script src="/assets/admin-upload-v001.js?v=299"></script>
-<script src="/assets/admin-json-v265.js?v=331"></script>
+<script src="/assets/admin-upload-v001.js?v=300"></script>
+<script src="/assets/admin-json-v265.js?v=332"></script>
 <script src="/assets/admin-team-photo-v1.js?v=2"></script>
+<script src="/assets/admin-progress-popup-v1.js?v=1"></script>
 </body>
 </html>
