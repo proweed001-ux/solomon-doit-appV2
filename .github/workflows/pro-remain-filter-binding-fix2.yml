@@ -21,7 +21,7 @@ jobs:
           const jsPath = 'dist/assets/pro-core-v4.js';
           let s = fs.readFileSync(jsPath, 'utf8');
 
-          s = s.replace(/\$\('\[data-remain-view\]'\)\.forEach/g, "$$('[data-remain-view]').forEach");
+          s = s.replace(/\$\('\[data-remain-view\]'\)\.forEach/g, () => "$$('[data-remain-view]').forEach");
 
           if (!s.includes("$$('[data-remain-view]').forEach")) {
             throw new Error('remain filter button binding still not fixed');
@@ -34,7 +34,7 @@ jobs:
 
           const htmlPath = 'dist/pro.html';
           let h = fs.readFileSync(htmlPath, 'utf8');
-          h = h.replace(/\/assets\/pro-core-v4\.js\?v=\d+/g, '/assets/pro-core-v4.js?v=355');
+          h = h.replace(/\/assets\/pro-core-v4\.js\?v=\d+/g, '/assets/pro-core-v4.js?v=356');
           fs.writeFileSync(htmlPath, h);
           NODE
           node --check dist/assets/pro-core-v4.js
@@ -46,4 +46,4 @@ jobs:
           git commit -m "Fix remain filter buttons binding" || exit 0
           git push
 
-# trigger: 1
+# trigger: 2
