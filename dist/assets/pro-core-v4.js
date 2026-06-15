@@ -1,82 +1,36 @@
 (()=>{
 'use strict';
 const CORE_URL='https://cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2@a5ab43603f9e6893c7958a85906f224594aee21d/dist/assets/pro-core-v4.js';
-function T(v){return String(v??'').trim()}
-function N(v){return Number(String(v??'').replace(/,/g,'').replace(/[^0-9.\-]/g,''))||0}
-function B(n){return N(n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})}
-function patchPrintMax12(){
-  const btn=document.querySelector('#prepPrint');
-  if(!btn||btn.dataset.max12Patch==='1')return false;
-  btn.dataset.max12Patch='1';
-  btn.addEventListener('click',()=>setTimeout(splitLatestPrintOverlay,80));
-  return true;
-}
-function splitLatestPrintOverlay(){
-  const overlays=[...document.querySelectorAll('.printOverlay')];
-  const ov=overlays[overlays.length-1];
-  if(!ov||ov.dataset.max12Done==='1')return;
-  const page=ov.querySelector('.receiptPage');
-  if(!page)return;
-  const rows=[...page.querySelectorAll('tr[data-line]')];
-  if(rows.length<=12){ov.dataset.max12Done='1';return;}
-  ov.dataset.max12Done='1';
-  const pages=[];
-  for(let i=0;i<rows.length;i+=12)pages.push(rows.slice(i,i+12));
-  const originalPages=[...ov.querySelectorAll('.receiptPage')];
-  const printBar=ov.querySelector('.printBar');
-  originalPages.forEach(x=>x.remove());
-  pages.forEach((chunk)=>{
-    const clone=page.cloneNode(true);
-    const body=clone.querySelector('tbody');
-    if(!body)return;
-    const oldData=[...clone.querySelectorAll('tr[data-line]')];
-    oldData.forEach(x=>x.remove());
-    const foot=[...body.querySelectorAll('tr')].find(tr=>!tr.matches('[data-line]'));
-    chunk.forEach((r,idx)=>{
-      const nr=r.cloneNode(true);
-      const first=nr.children&&nr.children[0];
-      if(first)first.textContent=String(idx+1);
-      if(foot)body.insertBefore(nr,foot);else body.appendChild(nr);
-    });
-    if(printBar)printBar.insertAdjacentElement('afterend',clone);else ov.appendChild(clone);
-    recalcReceiptPage(clone);
-  });
-  ov.addEventListener('input',e=>{if(e.target.closest('.receiptTable'))ov.querySelectorAll('.receiptPage').forEach(recalcReceiptPage)});
-  ov.addEventListener('blur',e=>{if(e.target.closest('.receiptTable'))ov.querySelectorAll('.receiptPage').forEach(recalcReceiptPage)},true);
-}
-function recalcReceiptPage(pg){
-  let total=0;
-  pg.querySelectorAll('tr[data-line]').forEach(tr=>{
-    const q=N(tr.querySelector('.rq')?.textContent);
-    const u=N(tr.querySelector('.ru')?.textContent);
-    const t=q*u;
-    total+=t;
-    const rt=tr.querySelector('.rt');
-    if(rt)rt.textContent=B(t);
-  });
-  const tt=pg.querySelector('#ctxTotal,[data-page-total]');
-  const hh=pg.querySelector('#ctxHeaderTotal,[data-header-total]');
-  if(tt)tt.textContent=B(total);
-  if(hh)hh.textContent=B(total)+' บาท';
-}
-function install(){
-  let tries=0;
-  const tick=()=>{
-    tries++;
-    patchPrintMax12();
-    if(tries<80)setTimeout(tick,250);
-  };
-  tick();
-}
-async function boot(){
-  const r=await fetch(CORE_URL,{cache:'no-store'});
-  if(!r.ok)throw new Error('โหลด Pro core เดิมไม่ได้: '+r.status);
-  const code=await r.text();
-  (0,eval)(code);
-  install();
-}
-boot().catch(e=>{
-  console.error(e);
-  document.body.innerHTML='<div style="font-family:system-ui;padding:18px;color:#991b1b"><b>โหลดหน้า Pro ไม่สำเร็จ</b><br>'+String(e.message||e)+'</div>';
-});
+const SEP='\u001f';
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const T=v=>String(v??'').trim();
+const N=v=>Number(String(v??'').replace(/,/g,'').replace(/[^0-9.\-]/g,''))||0;
+const F=n=>N(n).toLocaleString('th-TH');
+const B=n=>N(n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const E=s=>T(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function K(s){return T(s).toLowerCase().replace(/[^a-z0-9ก-ฮ]+/g,'')}
+function parseIso(s){const t=T(s);if(!/^\d{4}-\d{2}-\d{2}$/.test(t))return null;const d=new Date(t+'T00:00:00+07:00');return isNaN(d)?null:d}
+function thaiDate(d=new Date()){return d?d.toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'long',year:'numeric'}):'-'}
+function prevDay(d){const x=new Date(d.getTime());x.setDate(x.getDate()-1);return x}
+function scopeOf(sel){return JSON.stringify({d:sel?.dates||[],p:sel?.ps||[],c:sel?.orderStores||[]})}
+function parseKey(k){const s=String(k);if(s.includes(SEP)){const p=s.split(SEP);return{scope:p[0]||'',store:p[1]||'',pk:p.slice(2).join(SEP)}}const p=s.split('|');if(p.length>=10){return{legacy:true,scope:{d:p[0]||'',p:p[1]||'',c:p[2]||''},store:p[4]||'',pk:p.slice(5).join('|')}}return{scope:'',store:'',pk:s}}
+function scopeOk(x,sel){if(!x)return false;if(x.legacy)return x.scope.d===(sel?.dates||[]).join(',')&&x.scope.p===(sel?.ps||[]).join(',')&&x.scope.c===(sel?.orderStores||[]).join(',');return x.scope===scopeOf(sel)}
+function getState(){const keys=Object.keys(localStorage).filter(k=>k.startsWith('doit-core-unified-v1:'));const health=(window.DOIT_CORE_APP&&window.DOIT_CORE_APP.health&&window.DOIT_CORE_APP.health())||{};let best=null,bestScore=-1;keys.forEach(key=>{try{const s=JSON.parse(localStorage.getItem(key)||'{}');const manual=Object.keys(s.send||{}).length+Object.keys(s.add||{}).length+Object.keys(s.pull||{}).length;const sameRec=JSON.stringify(s.sel?.receivers||[])===JSON.stringify(health.receivers||[])?10000:0;const score=sameRec+manual;if(score>bestScore){bestScore=score;best=s}}catch{}});return best}
+function sourceRows(state){const sel=state.sel||{},q=T(state.q).toLowerCase();return (window.__doitCoreRows||[]).filter(r=>!r.isTele&&(!sel.dates?.length||sel.dates.includes(r.date))&&(!sel.ps?.length||sel.ps.includes(r.ps))&&!(sel.orderStores||[]).includes(r.store)&&(!sel.brands?.length||sel.brands.includes(r.brand))&&(!sel.types?.length||sel.types.includes(r.type))&&(!q||[r.date,r.inv,r.code,r.sku,r.store,r.ps,r.brand,r.type].join(' ').toLowerCase().includes(q)))}
+function pkey(r){return[r.brand,r.size,r.code||r.sku,r.sku,r.type].join('|')}
+function group(rs){const m=new Map();rs.forEach(r=>{const k=pkey(r);let g=m.get(k);if(!g){g={poolKey:k,brand:r.brand,size:r.size,code:r.code,sku:r.sku,type:r.type,qty:0,rawAmt:0,netAmt:0,netUnit:0};m.set(k,g)}g.qty+=N(r.qty);g.rawAmt+=N(r.rawAmt);g.netAmt+=N(r.netAmt);g.netUnit=g.qty&&g.netAmt?g.netAmt/g.qty:g.netUnit});return[...m.values()].sort((a,b)=>T(a.brand).localeCompare(T(b.brand),'th')||T(a.size).localeCompare(T(b.size),'th')||T(a.sku).localeCompare(T(b.sku),'th'))}
+function insertedGroups(state){return(state.ins||[]).map(x=>({poolKey:T(x.id),brand:'แทรกสินค้า',size:'เพิ่มเอง',code:T(x.code)||'INSERT',sku:T(x.name)||'สินค้าแทรก',type:'INSERT',qty:N(x.qty),rawAmt:N(x.qty)*N(x.unit),netAmt:N(x.qty)*N(x.unit),netUnit:N(x.unit),inserted:true}))}
+function mapVal(map,pk,store,sel){let out=0;Object.entries(map||{}).forEach(([k,v])=>{const p=parseKey(k);if(scopeOk(p,sel)&&p.pk===pk&&p.store===store)out+=N(v)});return out}
+function keyedStores(state){const sel=state.sel||{},set=new Set();[state.send,state.add,state.pull].forEach(map=>Object.keys(map||{}).forEach(k=>{const p=parseKey(k);if(scopeOk(p,sel)&&p.store)set.add(p.store)}));return[...set]}
+function pickSaleDate(state){let d=parseIso((state.sel?.dates||[])[0]);if(!d){const ds=[...new Set(sourceRows(state).map(r=>r.date).filter(Boolean))].sort();d=parseIso(ds[0])}return d?thaiDate(prevDay(d)):'-'}
+function rowsForStore(state,store,pool){const out=[];pool.forEach(g=>{const s=mapVal(state.send,g.poolKey,store,state.sel),a=mapVal(state.add,g.poolKey,store,state.sel),p=mapVal(state.pull,g.poolKey,store,state.sel),qty=s+a-p;if(!qty)return;out.push({code:g.code||'',name:g.sku,qty,unit:N(g.netUnit)*1.07})});return out.filter(x=>T(x.name)&&N(x.qty)>0)}
+function buildBills(){const state=getState();if(!state)return[];const pool=group(sourceRows(state)).concat(insertedGroups(state));const keyed=keyedStores(state);let stores=keyed.length>1?keyed:[...(state.sel?.receivers||[])];if(!stores.length)stores=keyed;const bills=[];stores.forEach(store=>{const rows=rowsForStore(state,store,pool);if(!rows.length)return;for(let i=0;i<rows.length;i+=12){const chunk=rows.slice(i,i+12),total=chunk.reduce((s,x)=>s+x.qty*x.unit,0);bills.push({store,rows:chunk,total,state})}});return bills}
+function metaRows(bill){const sel=bill.state.sel||{};return[['ชื่อร้าน',bill.store||'-'],['วันที่ขาย',pickSaleDate(bill.state)],['วันที่ส่ง',thaiDate(new Date())],['รหัส PS',sel.ps?.length?sel.ps.join(', '):'ทั้งหมด'],['ราคารวม',B(bill.total)+' บาท']]}
+function receiptHtml(bill){const doc='DOIT-'+Date.now().toString().slice(-8),title='บิลสินค้า/ ใบเสร็จ',heads=['รหัส','รายการสินค้า','จำนวน','ราคา/หน่วย','รวมเงิน'];const m=metaRows(bill).map(([k,v])=>`<div contenteditable="true"><b>${E(k)}:</b> ${k==='ราคารวม'?`<span data-header-total>${E(v)}</span>`:E(v)}</div>`).join('');const h=heads.map(x=>`<th>${E(x)}</th>`).join('');const b=bill.rows.map((x,i)=>{const r=[x.code,x.name,F(x.qty),B(x.unit),B(x.qty*x.unit)];return `<tr data-line><td class="c">${i+1}</td>${r.map((v,j)=>`<td class="${j>=2?'r':''} ${j===2?'rq':''} ${j===3?'ru':''} ${j===4?'rt':''}" contenteditable="${j===4?'false':'true'}">${E(v)}</td>`).join('')}</tr>`}).join('');const foot=`<tr class="totalRow"><td colspan="${heads.length}" class="r" contenteditable="true">รวมทั้งหมด</td><td class="r" data-page-total>${E(B(bill.total))}</td></tr>`;return `<section class="receiptPage"><div class="receiptTop"><div><h1 class="receiptTitle" contenteditable="true">${E(title)}</h1></div><div class="docBox"><div contenteditable="true"><b>เลขที่เอกสาร:</b> ${E(doc)}</div></div></div><div class="metaGrid">${m}</div><table class="receiptTable"><thead><tr><th style="width:36px">#</th>${h}</tr></thead><tbody>${b}${foot}</tbody></table><div class="noteBox" contenteditable="true">หมายเหตุ: </div><div class="signGrid"><div class="signBox" contenteditable="true">ผู้ส่งสินค้า / ผู้จัดทำ</div><div class="signBox" contenteditable="true">ผู้รับสินค้า</div></div></section>`}
+function openAutoPrint(bills){const ov=document.createElement('div');ov.className='printOverlay printAutoPackMax12';ov.innerHTML=`<style>.printAutoPackMax12 .receiptPage{width:194mm!important;min-height:0!important;margin:8px auto 4mm!important;padding:6mm!important;background:#fff;break-inside:avoid;page-break-inside:avoid}.printAutoPackMax12 .receiptTop{margin-bottom:8px!important;padding-bottom:8px!important}.printAutoPackMax12 .metaGrid{margin-bottom:8px!important}.printAutoPackMax12 .noteBox{margin-top:8px!important;min-height:28px!important}.printAutoPackMax12 .signGrid{margin-top:20px!important}@media print{.printAutoPackMax12{position:static!important}.printAutoPackMax12 .receiptPage{width:auto!important;min-height:0!important;margin:0 0 4mm 0!important;padding:0!important;break-inside:avoid!important;page-break-inside:avoid!important}.printAutoPackMax12 .printBar{display:none!important}}</style><div class="printBar"><b>ตรวจ/แก้ไขก่อนปริ้น</b><span><button onclick="this.closest('.printOverlay').remove()">ปิด</button> <button onclick="window.print()">ปริ้น</button></span></div>${bills.map(receiptHtml).join('')}`;document.body.appendChild(ov);ov.addEventListener('input',e=>{if(e.target.closest('.receiptTable'))ov.querySelectorAll('.receiptPage').forEach(recalcReceiptPage)});ov.addEventListener('blur',e=>{if(e.target.closest('.receiptTable'))ov.querySelectorAll('.receiptPage').forEach(recalcReceiptPage)},true);return ov}
+function recalcReceiptPage(pg){let total=0;pg.querySelectorAll('tr[data-line]').forEach(tr=>{const q=N(tr.querySelector('.rq')?.textContent),u=N(tr.querySelector('.ru')?.textContent),t=q*u;total+=t;const rt=tr.querySelector('.rt');if(rt)rt.textContent=B(t)});const tt=pg.querySelector('[data-page-total]'),hh=pg.querySelector('[data-header-total]');if(tt)tt.textContent=B(total);if(hh)hh.textContent=B(total)+' บาท'}
+function handlePrep(e){const active=$$('.tab').find(t=>t.classList.contains('on'));if(!active||!T(active.textContent).includes('ถอดของ Pro'))return;const bills=buildBills();if(!bills.length)return;if(bills.length===1&&bills[0].rows.length<=12)return;e.preventDefault();e.stopImmediatePropagation();openAutoPrint(bills)}
+function install(){let tries=0;const tick=()=>{tries++;const btn=$('#prepPrint');if(btn&&btn.dataset.max12AutoPack!=='1'){btn.dataset.max12AutoPack='1';btn.addEventListener('click',handlePrep,true)}if(tries<80)setTimeout(tick,250)};tick()}
+async function boot(){const r=await fetch(CORE_URL,{cache:'no-store'});if(!r.ok)throw new Error('โหลด Pro core เดิมไม่ได้: '+r.status);const code=await r.text();(0,eval)(code);install()}
+boot().catch(e=>{console.error(e);document.body.innerHTML='<div style="font-family:system-ui;padding:18px;color:#991b1b"><b>โหลดหน้า Pro ไม่สำเร็จ</b><br>'+String(e.message||e)+'</div>'});
 })();
