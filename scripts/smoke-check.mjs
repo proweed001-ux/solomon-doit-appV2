@@ -53,9 +53,11 @@ const requiredFiles = [
   'dist/assets/pro-core-v4.js',
   'dist/assets/pro-print-store-bills.js',
   'dist/assets/pro-print.css',
+  'scripts/qa-doit-file.mjs',
   'docs/ARCHITECTURE.md',
   'docs/FEATURE_RULES.md',
   'docs/ROADMAP.md',
+  'docs/REAL_FILE_QA.md',
   '.github/workflows/web-ci.yml',
   '.github/workflows/build-android-apk.yml',
 ];
@@ -79,6 +81,8 @@ mustContain('src/lib/parser.ts', 'parseDataFile');
 mustContain('src/lib/parser.ts', 'normalizeRows');
 mustContain('src/lib/pricing.ts', 'unitPriceFromAmount');
 mustContain('src/lib/analytics.ts', 'buildBillLines');
+mustContain('scripts/qa-doit-file.mjs', 'rowsFromPivotCache');
+mustContain('scripts/qa-doit-file.mjs', 'checkPrintGuardrails');
 
 mustNotExist('.github/workflows/patch-pro-print-max12.yml');
 mustNotExist('.github/workflows/pro-send-actions-4cols.yml');
@@ -91,4 +95,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: required files, Pro print guardrails, workflows, and package scripts are intact.');
+console.log('Smoke check passed: required files, Pro print guardrails, real-file QA tooling, workflows, and package scripts are intact.');
