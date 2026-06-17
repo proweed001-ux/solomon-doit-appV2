@@ -56,6 +56,7 @@
 ```text
 docs/PROJECT_STRUCTURE.md    สารบัญโครงสร้างไฟล์และจุดเสี่ยง
 docs/ARCHITECTURE.md         ภาพรวมสถาปัตยกรรม
+docs/SOURCE_AUDIT.md         baseline source audit และแผนแยกไฟล์ในอนาคต
 docs/FEATURE_RULES.md        กติกาก่อนเพิ่มฟีเจอร์หรือ refactor
 docs/ROADMAP.md              แผนพัฒนาต่อ
 docs/QA_CHECKLIST.md         checklist ก่อน merge
