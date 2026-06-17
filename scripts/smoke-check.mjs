@@ -75,8 +75,8 @@ mustContain('dist/assets/pro-print-store-bills.js', 'const BILLS_PER_A4 = 2');
 mustContain('dist/assets/pro-print-store-bills.js', "const EDIT_KEY = 'doit-pro-print-price-edits-v1'");
 mustContain('dist/assets/pro-print.css', '@page');
 mustContain('dist/assets/pro-print.css', '.printMobileSafeA4');
-mustContain('src/lib/parser.ts', 'const QUANTITY_ALIASES');
-mustContain('src/lib/parser.ts', 'const AMOUNT_ALIASES');
+mustContain('src/lib/parser.ts', 'parseDataFile');
+mustContain('src/lib/parser.ts', 'normalizeRows');
 mustContain('src/lib/pricing.ts', 'unitPriceFromAmount');
 mustContain('src/lib/analytics.ts', 'buildBillLines');
 
