@@ -43,7 +43,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: TypeScript check
-        run: npm exec tsc -- --noEmit
+        id: tsc
+        continue-on-error: true
+        run: |
+          npm exec tsc -- --noEmit --pretty false > tsc-output.txt 2>&1
+          cat tsc-output.txt
+      - name: Upload TypeScript diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-ci-typescript-diagnostics
+          path: tsc-output.txt
+      - name: Fail if TypeScript failed
+        if: steps.tsc.outcome == 'failure'
+        run: exit 1
       - name: Vite build
         run: npm exec vite -- build
       - name: Foundation smoke check
