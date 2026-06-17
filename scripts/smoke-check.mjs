@@ -56,6 +56,7 @@ const requiredFiles = [
   'scripts/qa-doit-file.mjs',
   'docs/ARCHITECTURE.md',
   'docs/PROJECT_STRUCTURE.md',
+  'docs/SOURCE_AUDIT.md',
   'docs/FEATURE_RULES.md',
   'docs/ROADMAP.md',
   'docs/REAL_FILE_QA.md',
@@ -86,6 +87,7 @@ mustContain('src/lib/analytics.ts', 'buildBillLines');
 mustContain('scripts/qa-doit-file.mjs', 'rowsFromPivotCache');
 mustContain('scripts/qa-doit-file.mjs', 'checkPrintGuardrails');
 mustContain('docs/PROJECT_STRUCTURE.md', 'Files that should not be edited casually');
+mustContain('docs/SOURCE_AUDIT.md', 'Refactor candidates for later');
 
 mustNotExist('.github/workflows/patch-pro-print-max12.yml');
 mustNotExist('.github/workflows/pro-send-actions-4cols.yml');
@@ -101,4 +103,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: required files, Pro print guardrails, real-file QA tooling, project docs, cleanup audit, workflows, and package scripts are intact.');
+console.log('Smoke check passed: required files, Pro print guardrails, real-file QA tooling, project docs, source audit, cleanup audit, workflows, and package scripts are intact.');
