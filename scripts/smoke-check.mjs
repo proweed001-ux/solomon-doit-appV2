@@ -55,6 +55,7 @@ const requiredFiles = [
   'dist/assets/pro-print.css',
   'scripts/qa-doit-file.mjs',
   'docs/ARCHITECTURE.md',
+  'docs/PROJECT_STRUCTURE.md',
   'docs/FEATURE_RULES.md',
   'docs/ROADMAP.md',
   'docs/REAL_FILE_QA.md',
@@ -84,6 +85,7 @@ mustContain('src/lib/pricing.ts', 'unitPriceFromAmount');
 mustContain('src/lib/analytics.ts', 'buildBillLines');
 mustContain('scripts/qa-doit-file.mjs', 'rowsFromPivotCache');
 mustContain('scripts/qa-doit-file.mjs', 'checkPrintGuardrails');
+mustContain('docs/PROJECT_STRUCTURE.md', 'Files that should not be edited casually');
 
 mustNotExist('.github/workflows/patch-pro-print-max12.yml');
 mustNotExist('.github/workflows/pro-send-actions-4cols.yml');
@@ -99,4 +101,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: required files, Pro print guardrails, real-file QA tooling, cleanup audit, workflows, and package scripts are intact.');
+console.log('Smoke check passed: required files, Pro print guardrails, real-file QA tooling, project docs, cleanup audit, workflows, and package scripts are intact.');
