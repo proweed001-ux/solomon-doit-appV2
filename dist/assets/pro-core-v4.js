@@ -4,7 +4,7 @@
   const CORE_URL = 'https://cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2@a5ab43603f9e6893c7958a85906f224594aee21d/dist/assets/pro-core-v4.js';
   const SELF_SRC = document.currentScript?.src || location.href;
   const ASSET_BASE = new URL('.', SELF_SRC).href;
-  const VERSION = '1009';
+  const VERSION = '1010';
 
   function assetUrl(fileName) {
     return `${ASSET_BASE}${fileName}?v=${VERSION}`;
@@ -41,6 +41,7 @@
     loadCss(assetUrl('pro-print.css'));
     await loadScript(assetUrl('pro-print-store-bills.js'));
     await loadScript(assetUrl('pro-print-mode-fixes.js'));
+    await loadScript(assetUrl('pro-print-column-widths.js'));
   }
 
   boot().catch(error => {
