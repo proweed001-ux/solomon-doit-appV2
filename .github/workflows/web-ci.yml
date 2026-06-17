@@ -41,5 +41,19 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run build
-      - run: npm run smoke
+      - name: Build
+        run: npm run build > build.log 2>&1
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-ci-build-log
+          path: build.log
+      - name: Smoke check
+        run: npm run smoke > smoke.log 2>&1
+      - name: Upload smoke log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-ci-smoke-log
+          path: smoke.log
