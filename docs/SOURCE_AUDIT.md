@@ -10,6 +10,9 @@ This round does not change runtime behavior.
 src/App.tsx
   React UI shell and pages. Handles upload, top-level state, filters, routing by mode, dashboard pages, drill-down pages, and export buttons.
 
+src/components/AppHeader.tsx
+  Header component scaffold prepared for the first low-risk App.tsx extraction.
+
 src/lib/parser.ts
   Reads workbook data from pivotCache first, falls back to worksheet rows, maps DOIT aliases, parses dates, qty, amount, person, store, SKU, and invoice fields.
 
@@ -35,7 +38,7 @@ Status: working but broad.
 Future split candidates:
 
 ```text
-src/components/Header.tsx
+src/components/AppHeader.tsx
 src/components/FilterBar.tsx
 src/pages/UploadPage.tsx
 src/pages/DashboardPage.tsx
@@ -95,11 +98,12 @@ Reason: these are small, production-sensitive, or already isolated enough for th
 ## Suggested order after this audit
 
 ```text
-1. Extract FilterBar from App.tsx
-2. Extract UploadPage from App.tsx
-3. Extract Dashboard-related view components
-4. Extract analytics bill-line logic only after real-file QA is stable
-5. Split parser last
+1. Wire AppHeader into App.tsx after a build-capable check
+2. Extract FilterBar from App.tsx
+3. Extract UploadPage from App.tsx
+4. Extract Dashboard-related view components
+5. Extract analytics bill-line logic only after real-file QA is stable
+6. Split parser last
 ```
 
 ## Required verification before any source refactor merge
