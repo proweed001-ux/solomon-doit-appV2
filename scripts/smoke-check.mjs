@@ -58,6 +58,7 @@ const requiredFiles = [
   'docs/FEATURE_RULES.md',
   'docs/ROADMAP.md',
   'docs/REAL_FILE_QA.md',
+  'docs/CLEANUP_AUDIT.md',
   '.github/workflows/web-ci.yml',
   '.github/workflows/build-android-apk.yml',
 ];
@@ -88,6 +89,9 @@ mustNotExist('.github/workflows/patch-pro-print-max12.yml');
 mustNotExist('.github/workflows/pro-send-actions-4cols.yml');
 mustNotExist('.github/workflows/patch-admin-upload-progress.yml');
 mustNotExist('.github/workflows/build-apk.yml');
+mustNotExist('.github/workflows/apply-icon-from-b64.yml');
+mustNotExist('.github/workflows/rebuild-icons-from-drawable.yml');
+mustNotExist('.github/workflows/fix-valid-icon-build.yml');
 
 if (failures.length) {
   console.error('\nSmoke check failed:\n');
@@ -95,4 +99,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: required files, Pro print guardrails, real-file QA tooling, workflows, and package scripts are intact.');
+console.log('Smoke check passed: required files, Pro print guardrails, real-file QA tooling, cleanup audit, workflows, and package scripts are intact.');
