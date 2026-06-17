@@ -3,21 +3,273 @@ import JSZip from 'jszip';
 import type { ParsedRow, PriceSource } from '../types';
 import { roundMoney, safeNum, safeQty, unitPriceFromAmount } from './pricing';
 
-const nk=(v:string)=>String(v||'').toLowerCase().replace(/[\s_\-./()]/g,'').trim();
-const tx=(v:unknown)=>String(v??'').trim();
-const cl=(v:unknown,f='')=>tx(v)||f;
-const storeName=(v:unknown)=>cl(v,'ไม่ระบุร้าน');
-function cancelled(v:unknown){const s=tx(v).toLowerCase();return !!(s&&s!=='0'&&s!=='false'&&s!=='no');}
-function person(name:string,id:string,tn='',ti=''){const n=cl(name),i=cl(id),a=cl(tn),b=cl(ti); if(n&&i)return `${i} ${n}`; if(n)return n; if(i)return i; if(a&&b)return `${b} ${a}`; return a||b||'ไม่ระบุบุคคล';}
-function col(row:Record<string,unknown>, aliases:string[]){const ks=Object.keys(row), m=new Map(ks.map(k=>[nk(k),k])); for(const a of aliases){const k=m.get(nk(a)); if(k)return k} for(const k of ks){const x=nk(k); for(const a of aliases){const y=nk(a); if(x.includes(y)||y.includes(x))return k}} return ''}
-function text(row:Record<string,unknown>, aliases:string[], f=''){const k=col(row,aliases); return k?cl(row[k],f):f}
-function number(row:Record<string,unknown>, aliases:string[]){const k=col(row,aliases); return k?safeNum(row[k]):0}
-function amount(row:Record<string,unknown>):{amount:number;source:PriceSource}{const list:Array<[PriceSource,string[]]>=[['InvoiceAmt',['InvoiceAmt','Invoice Amount','InvAmt']],['Amount',['NetAmount','Net Amount','Amount']],['Correct Amount',['Correct Amount','CorrectAmount','LineAmount','Line Amount']],['TotInvc',['TotInvc','TotalInvoice','Total Invoice']],['Amt',['Amt','amt']],['detailAmt',['detailAmt','DetailAmt']],['row.amt',['row.amt','row_amt']],['LineAmtBeforeDisc',['LineAmtBeforeDisc','Line Amount Before Disc']]]; for(const [source,a] of list){const k=col(row,a); if(k){const n=safeNum(row[k]); if(n>0)return {amount:n,source}}} return {amount:0,source:'missing'}}
-function date(v:unknown){const s=tx(v); if(!s)return''; const n=Number(s); if(Number.isFinite(n)&&n>25000&&n<80000){const d=new Date(Date.UTC(1899,11,30+Math.floor(n))); return d.toISOString().slice(0,10)} const d=new Date(s); return Number.isNaN(d.getTime())?s:d.toISOString().slice(0,10)}
-function row(raw:Record<string,unknown>,i:number,source:'pivotCache'|'worksheet'):ParsedRow|null{if(cancelled(text(raw,['Cancelled','Cancel','IsCancelled','VoidFlag'])))return null; const qtyPcs=safeQty(number(raw,['ShipQtyPCS','ShipQtyPC','QtyShipPCS','Qty Ship PCS','Qty PCS','Qty_PCS','PCS','Qty','Quantity','จำนวน','จำนวนชิ้น'])); const picked=amount(raw); const skuCode=text(raw,['SKU_Code','SKUCode','SKU Code','ItemCode','Item Code','ProductCode','Product Code','Material','Code']); const product=cl(text(raw,['SKU_Desc','SKU Desc','TAS_THName','SKU / Product','SKU/Product','Product','ProductName','Product Name','Description','Item','ItemName','สินค้า','รายการสินค้า','SKU'],skuCode),skuCode||'ไม่ระบุสินค้า'); if(qtyPcs<=0&&picked.amount<=0&&!product)return null; const salespersonId=text(raw,['SalespersonID','SO_SalespersonID','Salesperson ID']); const salespersonName=text(raw,['Salesperson_Name','Salesperson Name','SalespersonName']); const telesaleId=text(raw,['TelesaleId','TelesaleID']); const telesaleName=text(raw,['TelesaleName','Telesale Name']); return {rowNo:i,type:text(raw,['Type','SOTypeID','SO Type','SO_Type','Document Type','DocType'],'ไม่ระบุประเภท'),store:storeName(text(raw,['Customer Name','CustomerName','ShipName','c_Name','Store','StoreName','Store Name','Customer','ShipTo','Ship To','ShipToName','Outlet','ร้าน','ชื่อร้าน'])),customerId:text(raw,['cID','ShiptoID','ShipToID','CustomerID','Customer ID']),sku:skuCode?`${skuCode} ${product}`.trim():product,skuCode,product,qtyPcs,correctAmount:roundMoney(picked.amount),unitPrice:unitPriceFromAmount(picked.amount,qtyPcs),priceSource:picked.source,salespersonId,salespersonName,personKey:person(salespersonName,salespersonId,telesaleName,telesaleId),telesaleId,telesaleName,territory:text(raw,['Territory'],'ไม่ระบุเขต'),territoryDesc:text(raw,['Territory_Desc','Territory Desc']),area:text(raw,['Area'],'ไม่ระบุพื้นที่'),channel:text(raw,['ChannelDescr','Global_Channel','Channel'],'ไม่ระบุช่องทาง'),subChannel:text(raw,['Global_Sub_Channel','Sub Channel']),category:text(raw,['Category','TAS_Category','GroupCategory'],'ไม่ระบุหมวด'),brand:text(raw,['Brand','TAS_Brand','GroupBrand'],'ไม่ระบุแบรนด์'),brandForm:text(raw,['BrandForm','TAS_BrandForm']),date:date(text(raw,['InvcDate','InvoiceDate','Invoice_Date','ShipDateAct','OrdDate','SO_Date'])),invoiceNo:text(raw,['InvcNbr','InvoiceNo','Invoice No','Invoice_No','SO No','SONo','OrderNo']),shipperId:text(raw,['ShipperID','Shipper ID']),lineRef:text(raw,['LineRef','Line Ref']),source,raw};}
-function xml(v:string){return String(v||'').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')}
-function attr(s:string,n:string){const m=s.match(new RegExp(`${n}="([^"]*)"`));return m?xml(m[1]):''}
-export async function parseDataFile(file:File):Promise<ParsedRow[]>{const buf=await file.arrayBuffer(), name=file.name.toLowerCase(); if(name.endsWith('.xlsx')||name.endsWith('.xlsm')){const p=await pivot(buf); if(p.length)return p} return sheet(buf)}
-async function pivot(buf:ArrayBuffer):Promise<ParsedRow[]>{const zip=await JSZip.loadAsync(buf), def=Object.keys(zip.files).find(n=>n.startsWith('xl/pivotCache/pivotCacheDefinition')&&n.endsWith('.xml')); if(!def)return[]; const rec=def.replace('pivotCacheDefinition','pivotCacheRecords'), df=zip.file(def), rf=zip.file(rec); if(!df||!rf)return[]; const dx=await df.async('string'), fields:string[]=[], shared:string[][]=[]; for(const m of dx.matchAll(/<cacheField\b([^>]*)>([\s\S]*?)<\/cacheField>/g)){fields.push(attr(m[1],'name')); const vals:string[]=[]; const sm=m[2].match(/<sharedItems\b[^>]*>([\s\S]*?)<\/sharedItems>/); if(sm)for(const it of sm[1].matchAll(/<(s|n|d|b|e|m)\b([^>]*)\/>/g))vals.push(it[1]==='m'?'':attr(it[2],'v')); shared.push(vals)} const rx=await rf.async('string'), out:ParsedRow[]=[]; let rn=0; for(const rm of rx.matchAll(/<r>([\s\S]*?)<\/r>/g)){rn++; const obj:Record<string,unknown>={}; let c=0; for(const cm of rm[1].matchAll(/<(x|n|s|d|b|e|m)\b([^>]*)\/>/g)){const k=fields[c]; if(k){const tag=cm[1], v=attr(cm[2],'v'); obj[k]=tag==='x'?(shared[c]?.[Number(v)]??''):(tag==='m'?'':v)} c++} const r=row(obj,rn,'pivotCache'); if(r)out.push(r)} return out}
-function sheet(buf:ArrayBuffer):ParsedRow[]{const wb=XLSX.read(buf,{type:'array',raw:false,cellDates:false,sheetRows:0}), all:Record<string,unknown>[]=[]; for(const s of wb.SheetNames){all.push(...XLSX.utils.sheet_to_json<Record<string,unknown>>(wb.Sheets[s],{defval:'',raw:false}))} return normalizeRows(all)}
-export function normalizeRows(rows:Record<string,unknown>[]):ParsedRow[]{return rows.map((r,i)=>row(r,i+2,'worksheet')).filter((r):r is ParsedRow=>Boolean(r))}
+type RawRow = Record<string, unknown>;
+type RowSource = 'pivotCache' | 'worksheet';
+
+type AmountPick = {
+  amount: number;
+  source: PriceSource;
+};
+
+const QUANTITY_ALIASES = [
+  'ShipQtyPCS',
+  'ShipQtyPC',
+  'QtyShipPCS',
+  'Qty Ship PCS',
+  'Qty PCS',
+  'Qty_PCS',
+  'PCS',
+  'Qty',
+  'Quantity',
+  'จำนวน',
+  'จำนวนชิ้น',
+];
+
+const AMOUNT_ALIASES: Array<[PriceSource, string[]]> = [
+  ['InvoiceAmt', ['InvoiceAmt', 'Invoice Amount', 'InvAmt']],
+  ['Amount', ['NetAmount', 'Net Amount', 'Amount']],
+  ['Correct Amount', ['Correct Amount', 'CorrectAmount', 'LineAmount', 'Line Amount']],
+  ['TotInvc', ['TotInvc', 'TotalInvoice', 'Total Invoice']],
+  ['Amt', ['Amt', 'amt']],
+  ['detailAmt', ['detailAmt', 'DetailAmt']],
+  ['row.amt', ['row.amt', 'row_amt']],
+  ['LineAmtBeforeDisc', ['LineAmtBeforeDisc', 'Line Amount Before Disc']],
+];
+
+function normalizeKey(value: string): string {
+  return String(value || '').toLowerCase().replace(/[\s_\-./()]/g, '').trim();
+}
+
+function textValue(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function cleanText(value: unknown, fallback = ''): string {
+  return textValue(value) || fallback;
+}
+
+function storeName(value: unknown): string {
+  return cleanText(value, 'ไม่ระบุร้าน');
+}
+
+function isCancelled(value: unknown): boolean {
+  const s = textValue(value).toLowerCase();
+  return Boolean(s && s !== '0' && s !== 'false' && s !== 'no');
+}
+
+function personLabel(name: string, id: string, telesaleName = '', telesaleId = ''): string {
+  const personName = cleanText(name);
+  const personId = cleanText(id);
+  const teleName = cleanText(telesaleName);
+  const teleId = cleanText(telesaleId);
+
+  if (personName && personId) return `${personId} ${personName}`;
+  if (personName) return personName;
+  if (personId) return personId;
+  if (teleName && teleId) return `${teleId} ${teleName}`;
+  return teleName || teleId || 'ไม่ระบุบุคคล';
+}
+
+function findColumn(row: RawRow, aliases: string[]): string {
+  const keys = Object.keys(row);
+  const exactMap = new Map(keys.map(key => [normalizeKey(key), key]));
+
+  for (const alias of aliases) {
+    const key = exactMap.get(normalizeKey(alias));
+    if (key) return key;
+  }
+
+  for (const key of keys) {
+    const normalizedKey = normalizeKey(key);
+    for (const alias of aliases) {
+      const normalizedAlias = normalizeKey(alias);
+      if (normalizedKey.includes(normalizedAlias) || normalizedAlias.includes(normalizedKey)) return key;
+    }
+  }
+
+  return '';
+}
+
+function text(row: RawRow, aliases: string[], fallback = ''): string {
+  const key = findColumn(row, aliases);
+  return key ? cleanText(row[key], fallback) : fallback;
+}
+
+function number(row: RawRow, aliases: string[]): number {
+  const key = findColumn(row, aliases);
+  return key ? safeNum(row[key]) : 0;
+}
+
+function pickAmount(row: RawRow): AmountPick {
+  for (const [source, aliases] of AMOUNT_ALIASES) {
+    const key = findColumn(row, aliases);
+    if (!key) continue;
+
+    const amount = safeNum(row[key]);
+    if (amount > 0) return { amount, source };
+  }
+
+  return { amount: 0, source: 'missing' };
+}
+
+function parseDate(value: unknown): string {
+  const s = textValue(value);
+  if (!s) return '';
+
+  const n = Number(s);
+  if (Number.isFinite(n) && n > 25000 && n < 80000) {
+    const d = new Date(Date.UTC(1899, 11, 30 + Math.floor(n)));
+    return d.toISOString().slice(0, 10);
+  }
+
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? s : d.toISOString().slice(0, 10);
+}
+
+function parseRow(raw: RawRow, index: number, source: RowSource): ParsedRow | null {
+  if (isCancelled(text(raw, ['Cancelled', 'Cancel', 'IsCancelled', 'VoidFlag']))) return null;
+
+  const qtyPcs = safeQty(number(raw, QUANTITY_ALIASES));
+  const picked = pickAmount(raw);
+  const skuCode = text(raw, ['SKU_Code', 'SKUCode', 'SKU Code', 'ItemCode', 'Item Code', 'ProductCode', 'Product Code', 'Material', 'Code']);
+  const product = cleanText(
+    text(raw, ['SKU_Desc', 'SKU Desc', 'TAS_THName', 'SKU / Product', 'SKU/Product', 'Product', 'ProductName', 'Product Name', 'Description', 'Item', 'ItemName', 'สินค้า', 'รายการสินค้า', 'SKU'], skuCode),
+    skuCode || 'ไม่ระบุสินค้า',
+  );
+
+  if (qtyPcs <= 0 && picked.amount <= 0 && !product) return null;
+
+  const salespersonId = text(raw, ['SalespersonID', 'SO_SalespersonID', 'Salesperson ID']);
+  const salespersonName = text(raw, ['Salesperson_Name', 'Salesperson Name', 'SalespersonName']);
+  const telesaleId = text(raw, ['TelesaleId', 'TelesaleID']);
+  const telesaleName = text(raw, ['TelesaleName', 'Telesale Name']);
+
+  return {
+    rowNo: index,
+    type: text(raw, ['Type', 'SOTypeID', 'SO Type', 'SO_Type', 'Document Type', 'DocType'], 'ไม่ระบุประเภท'),
+    store: storeName(text(raw, ['Customer Name', 'CustomerName', 'ShipName', 'c_Name', 'Store', 'StoreName', 'Store Name', 'Customer', 'ShipTo', 'Ship To', 'ShipToName', 'Outlet', 'ร้าน', 'ชื่อร้าน'])),
+    customerId: text(raw, ['cID', 'ShiptoID', 'ShipToID', 'CustomerID', 'Customer ID']),
+    sku: skuCode ? `${skuCode} ${product}`.trim() : product,
+    skuCode,
+    product,
+    qtyPcs,
+    correctAmount: roundMoney(picked.amount),
+    unitPrice: unitPriceFromAmount(picked.amount, qtyPcs),
+    priceSource: picked.source,
+    salespersonId,
+    salespersonName,
+    personKey: personLabel(salespersonName, salespersonId, telesaleName, telesaleId),
+    telesaleId,
+    telesaleName,
+    territory: text(raw, ['Territory'], 'ไม่ระบุเขต'),
+    territoryDesc: text(raw, ['Territory_Desc', 'Territory Desc']),
+    area: text(raw, ['Area'], 'ไม่ระบุพื้นที่'),
+    channel: text(raw, ['ChannelDescr', 'Global_Channel', 'Channel'], 'ไม่ระบุช่องทาง'),
+    subChannel: text(raw, ['Global_Sub_Channel', 'Sub Channel']),
+    category: text(raw, ['Category', 'TAS_Category', 'GroupCategory'], 'ไม่ระบุหมวด'),
+    brand: text(raw, ['Brand', 'TAS_Brand', 'GroupBrand'], 'ไม่ระบุแบรนด์'),
+    brandForm: text(raw, ['BrandForm', 'TAS_BrandForm']),
+    date: parseDate(text(raw, ['InvcDate', 'InvoiceDate', 'Invoice_Date', 'ShipDateAct', 'OrdDate', 'SO_Date'])),
+    invoiceNo: text(raw, ['InvcNbr', 'InvoiceNo', 'Invoice No', 'Invoice_No', 'SO No', 'SONo', 'OrderNo']),
+    shipperId: text(raw, ['ShipperID', 'Shipper ID']),
+    lineRef: text(raw, ['LineRef', 'Line Ref']),
+    source,
+    raw,
+  };
+}
+
+function decodeXml(value: string): string {
+  return String(value || '')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+function attr(xml: string, name: string): string {
+  const match = xml.match(new RegExp(`${name}="([^"]*)"`));
+  return match ? decodeXml(match[1]) : '';
+}
+
+export async function parseDataFile(file: File): Promise<ParsedRow[]> {
+  const buffer = await file.arrayBuffer();
+  const name = file.name.toLowerCase();
+
+  if (name.endsWith('.xlsx') || name.endsWith('.xlsm')) {
+    const pivotRows = await pivot(buffer);
+    if (pivotRows.length) return pivotRows;
+  }
+
+  return sheet(buffer);
+}
+
+async function pivot(buffer: ArrayBuffer): Promise<ParsedRow[]> {
+  const zip = await JSZip.loadAsync(buffer);
+  const definitionPath = Object.keys(zip.files).find(name => name.startsWith('xl/pivotCache/pivotCacheDefinition') && name.endsWith('.xml'));
+  if (!definitionPath) return [];
+
+  const recordsPath = definitionPath.replace('pivotCacheDefinition', 'pivotCacheRecords');
+  const definitionFile = zip.file(definitionPath);
+  const recordsFile = zip.file(recordsPath);
+  if (!definitionFile || !recordsFile) return [];
+
+  const definitionXml = await definitionFile.async('string');
+  const fields: string[] = [];
+  const shared: string[][] = [];
+
+  for (const fieldMatch of definitionXml.matchAll(/<cacheField\b([^>]*)>([\s\S]*?)<\/cacheField>/g)) {
+    fields.push(attr(fieldMatch[1], 'name'));
+    const values: string[] = [];
+    const sharedMatch = fieldMatch[2].match(/<sharedItems\b[^>]*>([\s\S]*?)<\/sharedItems>/);
+
+    if (sharedMatch) {
+      for (const itemMatch of sharedMatch[1].matchAll(/<(s|n|d|b|e|m)\b([^>]*)\/>/g)) {
+        values.push(itemMatch[1] === 'm' ? '' : attr(itemMatch[2], 'v'));
+      }
+    }
+    shared.push(values);
+  }
+
+  const recordsXml = await recordsFile.async('string');
+  const out: ParsedRow[] = [];
+  let rowNumber = 0;
+
+  for (const rowMatch of recordsXml.matchAll(/<r>([\s\S]*?)<\/r>/g)) {
+    rowNumber += 1;
+    const obj: RawRow = {};
+    let columnIndex = 0;
+
+    for (const cellMatch of rowMatch[1].matchAll(/<(x|n|s|d|b|e|m)\b([^>]*)\/>/g)) {
+      const key = fields[columnIndex];
+      if (key) {
+        const tag = cellMatch[1];
+        const value = attr(cellMatch[2], 'v');
+        obj[key] = tag === 'x' ? (shared[columnIndex]?.[Number(value)] ?? '') : (tag === 'm' ? '' : value);
+      }
+      columnIndex += 1;
+    }
+
+    const parsed = parseRow(obj, rowNumber, 'pivotCache');
+    if (parsed) out.push(parsed);
+  }
+
+  return out;
+}
+
+function sheet(buffer: ArrayBuffer): ParsedRow[] {
+  const workbook = XLSX.read(buffer, { type: 'array', raw: false, cellDates: false, sheetRows: 0 });
+  const allRows: RawRow[] = [];
+
+  for (const sheetName of workbook.SheetNames) {
+    allRows.push(...XLSX.utils.sheet_to_json<RawRow>(workbook.Sheets[sheetName], { defval: '', raw: false }));
+  }
+
+  return normalizeRows(allRows);
+}
+
+export function normalizeRows(rows: RawRow[]): ParsedRow[] {
+  return rows
+    .map((row, index) => parseRow(row, index + 2, 'worksheet'))
+    .filter((row): row is ParsedRow => Boolean(row));
+}
