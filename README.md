@@ -51,6 +51,26 @@
   - รายร้าน
   - summary อื่น ๆ จากหน้า dashboard
 
+## โครงสร้างไฟล์สำคัญ
+
+```text
+src/App.tsx                       หน้าหลัก React และ UI รายงาน
+src/lib/parser.ts                 อ่าน Excel / pivotCache / normalize DOIT rows
+src/lib/analytics.ts              filter, aggregate, bill lines, CSV export
+src/lib/pricing.ts                สูตรราคาและปัดเศษ
+src/types.ts                      type กลางของระบบ
+dist/assets/pro-core-v4.js        wrapper โหลด core เดิม + โหลดโมดูลปริ้น
+dist/assets/pro-print-store-bills.js  logic เตรียมปริ้น Pro แยกตามร้าน
+dist/assets/pro-print.css         CSS ปริ้น A4 มือถือ 2 บิลต่อหน้า
+```
+
+## แนวทางแก้ไขต่อจากนี้
+
+- งานหลักควรแก้ใน `src/` ก่อน แล้วค่อย build
+- งานปริ้น Pro เฉพาะหน้าปัจจุบันถูกแยกไว้ที่ `dist/assets/pro-print-store-bills.js` และ `dist/assets/pro-print.css`
+- หลีกเลี่ยงการใส่ CSS/JS ใหม่ยาว ๆ ลงใน `dist/pro.html` โดยตรง
+- หลีกเลี่ยง workflow แบบ patch ไฟล์อัตโนมัติ เพราะเสี่ยงเขียนทับงานใหม่
+
 ## วิธีรัน
 
 ```bash
