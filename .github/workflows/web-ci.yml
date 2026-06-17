@@ -16,6 +16,11 @@ on:
     paths:
       - "src/**"
       - "scripts/**"
+      - "docs/**"
+      - "dist/pro.html"
+      - "dist/assets/pro-core-v4.js"
+      - "dist/assets/pro-print-store-bills.js"
+      - "dist/assets/pro-print.css"
       - "package.json"
       - "package-lock.json"
       - "tsconfig*.json"
@@ -27,13 +32,13 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build
+      - name: Foundation smoke check
+        run: node scripts/smoke-check.mjs
