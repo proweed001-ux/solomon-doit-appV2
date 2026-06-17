@@ -95,6 +95,12 @@ src/lib/pricing.ts
 
 Reason: these are small, production-sensitive, or already isolated enough for the current cleanup stage.
 
+## Build-capable CI guardrail
+
+`web-ci.yml` now installs dependencies, runs `npm run build`, and then runs `npm run smoke` before source refactors are merged.
+
+This is required before wiring extracted React components into `App.tsx`.
+
 ## Suggested order after this audit
 
 ```text
@@ -109,6 +115,7 @@ Reason: these are small, production-sensitive, or already isolated enough for th
 ## Required verification before any source refactor merge
 
 ```text
+npm run build
 npm run smoke
 node scripts/qa-doit-file.mjs "path/to/DOIT.xlsx"
 ```
