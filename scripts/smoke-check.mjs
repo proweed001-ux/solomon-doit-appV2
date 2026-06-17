@@ -45,6 +45,7 @@ const requiredFiles = [
   'package.json',
   'src/App.tsx',
   'src/main.tsx',
+  'src/components/AppHeader.tsx',
   'src/lib/parser.ts',
   'src/lib/analytics.ts',
   'src/lib/pricing.ts',
@@ -84,6 +85,7 @@ mustContain('src/lib/parser.ts', 'parseDataFile');
 mustContain('src/lib/parser.ts', 'normalizeRows');
 mustContain('src/lib/pricing.ts', 'unitPriceFromAmount');
 mustContain('src/lib/analytics.ts', 'buildBillLines');
+mustContain('src/components/AppHeader.tsx', 'export function AppHeader');
 mustContain('scripts/qa-doit-file.mjs', 'rowsFromPivotCache');
 mustContain('scripts/qa-doit-file.mjs', 'checkPrintGuardrails');
 mustContain('docs/PROJECT_STRUCTURE.md', 'Files that should not be edited casually');
@@ -103,4 +105,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: required files, Pro print guardrails, real-file QA tooling, project docs, source audit, cleanup audit, workflows, and package scripts are intact.');
+console.log('Smoke check passed: required files, AppHeader scaffold, Pro print guardrails, real-file QA tooling, project docs, source audit, cleanup audit, workflows, and package scripts are intact.');
