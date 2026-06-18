@@ -56,6 +56,21 @@
       .proPrintFix .totalRow td:first-child {
         text-align: right !important;
       }
+      @media print {
+        @page {
+          size: A4 portrait;
+          margin: 10mm 6mm 10mm 6mm;
+        }
+        .proPrintFix .receiptPage {
+          padding-top: 2mm !important;
+          padding-bottom: 2mm !important;
+          box-sizing: border-box !important;
+        }
+        .proPrintFix .receiptTable tr {
+          break-inside: avoid !important;
+          page-break-inside: avoid !important;
+        }
+      }
     `;
     document.head.appendChild(style);
   }
