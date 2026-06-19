@@ -41,13 +41,16 @@ const pkg = JSON.parse(read('package.json'));
 ['build', 'smoke', 'verify'].forEach(name => check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`));
 
 mustContain('dist/pro.html', 'pro-core-v4.js');
-mustContain('dist/assets/pro-core-v4.js', 'CORE_URL');
 mustContain('dist/assets/pro-core-v4.js', 'patchLegacyCore');
-mustContain('dist/assets/pro-core-v4.js', 'renderDoneFromCore');
+mustContain('dist/assets/pro-core-v4.js', 'oldOrderBranch');
+mustContain('dist/assets/pro-core-v4.js', 'newOrderBranch');
+mustContain('dist/assets/pro-core-v4.js', 'ราคารวม VAT');
+mustContain('dist/assets/pro-core-v4.js', 'qtyTotal=p.reduce');
 mustContain('dist/assets/pro-core-v4.js', 'oldTeleRender');
 mustContain('dist/assets/pro-core-v4.js', 'newTeleRender');
 mustContain('dist/assets/pro-core-v4.js', 'rawTotal=N(b.amt)');
 mustContain('dist/assets/pro-core-v4.js', 'vatTotal=b.lines.reduce');
+mustContain('dist/assets/pro-core-v4.js', 'renderDoneFromCore');
 mustContain('dist/assets/pro-core-v4.js', 'pro-print-store-bills.js');
 mustNotContain('dist/assets/pro-core-v4.js', 'pro-print-pro-fixes.js');
 mustNotContain('dist/assets/pro-core-v4.js', 'pro-print-total-display-fix.js');
@@ -90,4 +93,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: done mode core path, Telesale bill totals, and single Pro print source are intact.');
+console.log('Smoke check passed: order grand total, done mode, Telesale totals, and single Pro print source are intact.');
