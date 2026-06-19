@@ -36,6 +36,11 @@ function mustContain(relativePath, needle) {
   check(read(relativePath).includes(needle), `${relativePath} must contain: ${needle}`);
 }
 
+function mustNotContain(relativePath, needle) {
+  if (!exists(relativePath)) return;
+  check(!read(relativePath).includes(needle), `${relativePath} must not contain: ${needle}`);
+}
+
 function mustHavePackageScript(scriptName) {
   const pkg = JSON.parse(read('package.json'));
   check(Boolean(pkg.scripts?.[scriptName]), `package.json missing script: ${scriptName}`);
@@ -76,9 +81,14 @@ mustContain('dist/pro.html', 'pro-core-v4.js');
 mustContain('dist/assets/pro-core-v4.js', 'CORE_URL');
 mustContain('dist/assets/pro-core-v4.js', 'pro-print.css');
 mustContain('dist/assets/pro-core-v4.js', 'pro-print-store-bills.js');
+mustNotContain('dist/assets/pro-core-v4.js', 'pro-print-pro-fixes.js');
+mustNotContain('dist/assets/pro-core-v4.js', 'pro-print-total-display-fix.js');
 mustContain('dist/assets/pro-print-store-bills.js', 'const BILL_ROWS = 12');
 mustContain('dist/assets/pro-print-store-bills.js', 'const BILLS_PER_A4 = 2');
 mustContain('dist/assets/pro-print-store-bills.js', "const EDIT_KEY = 'doit-pro-print-price-edits-v1'");
+mustContain('dist/assets/pro-print-store-bills.js', 'function buildBills()');
+mustContain('dist/assets/pro-print-store-bills.js', 'function renderDoneFromBills()');
+mustContain('dist/assets/pro-print-store-bills.js', 'รวมจากบิลเตรียมปริ้น');
 mustContain('dist/assets/pro-print.css', '@page');
 mustContain('dist/assets/pro-print.css', '.printMobileSafeA4');
 mustContain('src/lib/parser.ts', 'parseDataFile');
@@ -91,6 +101,8 @@ mustContain('scripts/qa-doit-file.mjs', 'checkPrintGuardrails');
 mustContain('docs/PROJECT_STRUCTURE.md', 'Files that should not be edited casually');
 mustContain('docs/SOURCE_AUDIT.md', 'Refactor candidates for later');
 
+mustNotExist('dist/assets/pro-print-pro-fixes.js');
+mustNotExist('dist/assets/pro-print-total-display-fix.js');
 mustNotExist('.github/workflows/patch-pro-print-max12.yml');
 mustNotExist('.github/workflows/pro-send-actions-4cols.yml');
 mustNotExist('.github/workflows/patch-admin-upload-progress.yml');
@@ -105,4 +117,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: required files, AppHeader scaffold, Pro print guardrails, real-file QA tooling, project docs, source audit, cleanup audit, workflows, and package scripts are intact.');
+console.log('Smoke check passed: required files, single Pro print source, print guardrails, real-file QA tooling, project docs, source audit, cleanup audit, workflows, and package scripts are intact.');
