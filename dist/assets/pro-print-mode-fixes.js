@@ -56,6 +56,13 @@
         box-sizing: border-box;
         background: #fff;
       }
+      .proPrintFix.orderPrintFix .receiptPage {
+        min-height: auto;
+        margin-top: 3mm;
+        margin-bottom: 3mm;
+        padding-top: 4mm;
+        padding-bottom: 4mm;
+      }
       .proPrintFix .receiptTop {
         display: flex;
         justify-content: space-between;
@@ -162,6 +169,10 @@
           padding: 0 !important;
           box-shadow: none !important;
         }
+        .proPrintFix.orderPrintFix .receiptPage {
+          padding-top: 4mm !important;
+          padding-bottom: 4mm !important;
+        }
         .proPrintFix .receiptTable th {
           background: #eee !important;
           -webkit-print-color-adjust: exact;
@@ -259,7 +270,7 @@
       : '';
 
     const overlay = document.createElement('div');
-    overlay.className = 'printOverlay proPrintFix';
+    overlay.className = `printOverlay proPrintFix ${options.printClass || ''}`.trim();
     overlay.innerHTML = `
       <div class="printBar"><b>ตรวจ/แก้ไขก่อนปริ้น — ${E(title)}</b><span><button onclick="this.closest('.printOverlay').remove()">ปิด</button> <button onclick="window.print()">ปริ้น</button></span></div>
       <section class="receiptPage">
@@ -282,17 +293,19 @@
 
     let total = null;
     let title = label;
+    let printClass = '';
     if (isOrderMode(label)) {
       const order = orderPrintShape(heads, rows);
       heads = order.heads;
       rows = order.rows;
       total = order.total;
       title = 'รวมออเดอร์';
+      printClass = 'orderPrintFix';
     }
 
     event.preventDefault();
     event.stopImmediatePropagation();
-    openPrint(title, heads, rows, { total });
+    openPrint(title, heads, rows, { total, printClass });
   }
 
   function install() {
