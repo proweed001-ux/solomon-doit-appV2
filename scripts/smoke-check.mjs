@@ -48,9 +48,9 @@ mustContain('dist/assets/pro-core-v4.js', 'pro-print-store-bills.js');
 mustNotContain('dist/assets/pro-core-v4.js', 'pro-print-pro-fixes.js');
 mustNotContain('dist/assets/pro-core-v4.js', 'pro-print-total-display-fix.js');
 
-mustContain('dist/assets/pro-print-store-bills.js', 'const BILL_ROWS = 12');
-mustContain('dist/assets/pro-print-store-bills.js', 'const BILLS_PER_A4 = 2');
-mustContain('dist/assets/pro-print-store-bills.js', "const EDIT_KEY = 'doit-pro-print-price-edits-v1'");
+mustContain('dist/assets/pro-print-store-bills.js', 'BILL_ROWS=12');
+mustContain('dist/assets/pro-print-store-bills.js', 'BILLS_PER_A4=2');
+mustContain('dist/assets/pro-print-store-bills.js', "EDIT_KEY='doit-pro-print-price-edits-v1'");
 mustContain('dist/assets/pro-print-store-bills.js', 'function buildBills()');
 mustContain('dist/assets/pro-print-store-bills.js', 'function renderDoneFromCore()');
 mustContain('dist/assets/pro-print-store-bills.js', 'รวมจากบิลเตรียมปริ้น');
