@@ -173,6 +173,10 @@
           padding-top: 4mm !important;
           padding-bottom: 4mm !important;
         }
+        .proPrintFix.orderPrintFix .receiptTable tr {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
         .proPrintFix .receiptTable th {
           background: #eee !important;
           -webkit-print-color-adjust: exact;
@@ -260,6 +264,7 @@
   function openPrint(title, heads, rows, options = {}) {
     ensureStyle();
     const docNo = 'DOIT-' + Date.now().toString().slice(-8);
+    const pageStyle = options.pageStyle ? `<style>${options.pageStyle}</style>` : '';
     const meta = metaRows(title).map(([key, value]) => `<div contenteditable="true"><b>${E(key)}:</b> ${E(value)}</div>`).join('');
     const headHtml = heads.map(head => `<th>${E(head)}</th>`).join('');
     const bodyHtml = rows.map((row, index) => (
@@ -272,6 +277,7 @@
     const overlay = document.createElement('div');
     overlay.className = `printOverlay proPrintFix ${options.printClass || ''}`.trim();
     overlay.innerHTML = `
+      ${pageStyle}
       <div class="printBar"><b>ตรวจ/แก้ไขก่อนปริ้น — ${E(title)}</b><span><button onclick="this.closest('.printOverlay').remove()">ปิด</button> <button onclick="window.print()">ปริ้น</button></span></div>
       <section class="receiptPage">
         <div class="receiptTop"><h1 class="receiptTitle" contenteditable="true">${E(title)}</h1><div class="docBox"><div contenteditable="true"><b>เลขที่เอกสาร:</b> ${E(docNo)}</div></div></div>
@@ -294,6 +300,7 @@
     let total = null;
     let title = label;
     let printClass = '';
+    let pageStyle = '';
     if (isOrderMode(label)) {
       const order = orderPrintShape(heads, rows);
       heads = order.heads;
@@ -301,11 +308,12 @@
       total = order.total;
       title = 'รวมออเดอร์';
       printClass = 'orderPrintFix';
+      pageStyle = '@media print { @page { size: A4 portrait; margin: 7mm 4mm 8mm 4mm; } }';
     }
 
     event.preventDefault();
     event.stopImmediatePropagation();
-    openPrint(title, heads, rows, { total, printClass });
+    openPrint(title, heads, rows, { total, printClass, pageStyle });
   }
 
   function install() {

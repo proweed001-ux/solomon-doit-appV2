@@ -42,7 +42,7 @@ const pkg = JSON.parse(read('package.json'));
 ['build', 'smoke', 'verify'].forEach(name => check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`));
 
 mustContain('dist/pro.html', 'pro-core-v4.js');
-mustContain('dist/assets/pro-core-v4.js', "VERSION = '1020'");
+mustContain('dist/assets/pro-core-v4.js', "VERSION = '1021'");
 mustContain('dist/assets/pro-core-v4.js', 'patchLegacyCore');
 mustContain('dist/assets/pro-core-v4.js', 'oldOrderBranch');
 mustContain('dist/assets/pro-core-v4.js', 'newOrderBranch');
@@ -63,6 +63,10 @@ mustContain('dist/assets/pro-print-mode-fixes.js', '!isTotalLikeRow(tr, row)');
 mustContain('dist/assets/pro-print-mode-fixes.js', 'orderPrintShape');
 mustContain('dist/assets/pro-print-mode-fixes.js', 'orderPrintFix');
 mustContain('dist/assets/pro-print-mode-fixes.js', 'printClass');
+mustContain('dist/assets/pro-print-mode-fixes.js', 'pageStyle');
+mustContain('dist/assets/pro-print-mode-fixes.js', '@page { size: A4 portrait; margin: 7mm 4mm 8mm 4mm; }');
+mustContain('dist/assets/pro-print-mode-fixes.js', 'break-inside: avoid');
+mustContain('dist/assets/pro-print-mode-fixes.js', 'page-break-inside: avoid');
 mustContain('dist/assets/pro-print-mode-fixes.js', 'padding-top: 4mm');
 mustContain('dist/assets/pro-print-mode-fixes.js', 'padding-bottom: 4mm');
 
@@ -104,4 +108,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: order print margins are scoped to order mode, order totals skip existing total rows, and single Pro print source is intact.');
+console.log('Smoke check passed: order print physical page margins apply to every printed A4 page, order totals skip total rows, and single Pro print source is intact.');
