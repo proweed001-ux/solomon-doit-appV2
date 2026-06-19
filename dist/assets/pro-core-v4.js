@@ -4,7 +4,7 @@
   const CORE_URL = 'https://cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2@a5ab43603f9e6893c7958a85906f224594aee21d/dist/assets/pro-core-v4.js';
   const SELF_SRC = document.currentScript?.src || location.href;
   const ASSET_BASE = new URL('.', SELF_SRC).href;
-  const VERSION = '1016';
+  const VERSION = '1017';
 
   function assetUrl(fileName) {
     return `${ASSET_BASE}${fileName}?v=${VERSION}`;
@@ -29,17 +29,28 @@
     });
   }
 
+  function patchLegacyCore(code) {
+    const oldDoneBranch = "if(mode==='done'){const out=[];pool.forEach(g=>{const qty=manualSent(g);if(qty>0)out.push({name:g.sku,qty,rawAmt:qty*N(g.unit),netAmt:qty*N(g.netUnit)})});simpleTable('จัดแล้ว '+F(out.length)+' รายการ',['#','สินค้า','จำนวนที่คีย์','ยอดดิบ','ยอดสุทธิ','รวม VAT'],out.map((l,i)=>'<tr><td>'+(i+1)+'</td><td>'+E(l.name)+'</td><td>'+F(l.qty)+'</td><td>'+B(l.rawAmt)+'</td><td>'+B(l.netAmt)+'</td><td>'+B((N(l.netAmt)||N(l.rawAmt))*1.07)+'</td></tr>').join(''));return}";
+    const newDoneBranch = "if(mode==='done'){if(window.DOIT_PRO_PRINT_STORE_BILLS&&window.DOIT_PRO_PRINT_STORE_BILLS.renderDoneFromCore){window.DOIT_PRO_PRINT_STORE_BILLS.renderDoneFromCore();return}simpleTable('จัดแล้ว 0 รายการ',['#','สินค้า','จำนวนที่ส่งทั้งหมด','ราคารวมส่ง'],'<tr><td colspan=\"4\" class=\"empty\">ระบบบิลเตรียมปริ้นยังโหลดไม่เสร็จ</td></tr>');return}";
+
+    if (!code.includes(oldDoneBranch)) {
+      console.warn('ไม่พบ done-mode branch เดิม จึงไม่ได้ patch renderMode(done)');
+      return code;
+    }
+    return code.replace(oldDoneBranch, newDoneBranch);
+  }
+
   async function loadLegacyCore() {
     const response = await fetch(CORE_URL, { cache: 'no-store' });
     if (!response.ok) throw new Error(`โหลด Pro core เดิมไม่ได้: ${response.status}`);
-    const code = await response.text();
+    const code = patchLegacyCore(await response.text());
     (0, eval)(code);
   }
 
   async function boot() {
-    await loadLegacyCore();
     loadCss(assetUrl('pro-print.css'));
     await loadScript(assetUrl('pro-print-store-bills.js'));
+    await loadLegacyCore();
     await loadScript(assetUrl('pro-print-mode-fixes.js'));
     await loadScript(assetUrl('pro-print-column-widths.js'));
     await loadScript(assetUrl('pro-print-a4-pro-fix.js'));
