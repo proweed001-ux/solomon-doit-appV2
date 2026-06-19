@@ -57,13 +57,9 @@
         text-align: right !important;
       }
       @media print {
-        @page {
-          size: A4 portrait;
-          margin: 10mm 6mm 10mm 6mm;
-        }
         .proPrintFix .receiptPage {
-          padding-top: 2mm !important;
-          padding-bottom: 2mm !important;
+          padding-top: 6mm !important;
+          padding-bottom: 6mm !important;
           box-sizing: border-box !important;
         }
         .proPrintFix .receiptTable tr {
