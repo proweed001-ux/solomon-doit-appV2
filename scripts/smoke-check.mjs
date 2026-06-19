@@ -42,6 +42,7 @@ const pkg = JSON.parse(read('package.json'));
 ['build', 'smoke', 'verify'].forEach(name => check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`));
 
 mustContain('dist/pro.html', 'pro-core-v4.js');
+mustContain('dist/assets/pro-core-v4.js', "VERSION = '1020'");
 mustContain('dist/assets/pro-core-v4.js', 'patchLegacyCore');
 mustContain('dist/assets/pro-core-v4.js', 'oldOrderBranch');
 mustContain('dist/assets/pro-core-v4.js', 'newOrderBranch');
@@ -60,6 +61,10 @@ mustContain('dist/assets/pro-print-mode-fixes.js', 'function isTotalLikeRow');
 mustContain('dist/assets/pro-print-mode-fixes.js', "tr.classList.contains('totalRow')");
 mustContain('dist/assets/pro-print-mode-fixes.js', '!isTotalLikeRow(tr, row)');
 mustContain('dist/assets/pro-print-mode-fixes.js', 'orderPrintShape');
+mustContain('dist/assets/pro-print-mode-fixes.js', 'orderPrintFix');
+mustContain('dist/assets/pro-print-mode-fixes.js', 'printClass');
+mustContain('dist/assets/pro-print-mode-fixes.js', 'padding-top: 4mm');
+mustContain('dist/assets/pro-print-mode-fixes.js', 'padding-bottom: 4mm');
 
 mustContain('dist/assets/pro-print-store-bills.js', 'BILL_ROWS=12');
 mustContain('dist/assets/pro-print-store-bills.js', 'BILLS_PER_A4=2');
@@ -99,4 +104,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: order print totals skip existing total rows, order grand total, done mode, Telesale totals, and single Pro print source are intact.');
+console.log('Smoke check passed: order print margins are scoped to order mode, order totals skip existing total rows, and single Pro print source is intact.');
