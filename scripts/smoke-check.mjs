@@ -24,6 +24,7 @@ const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `$
   'dist/pro.html',
   'dist/assets/pro-core-v4.js',
   'dist/assets/pro-print-store-bills.js',
+  'dist/assets/pro-print-mode-fixes.js',
   'dist/assets/pro-print.css',
   'scripts/qa-doit-file.mjs',
   'docs/ARCHITECTURE.md',
@@ -54,6 +55,11 @@ mustContain('dist/assets/pro-core-v4.js', 'renderDoneFromCore');
 mustContain('dist/assets/pro-core-v4.js', 'pro-print-store-bills.js');
 mustNotContain('dist/assets/pro-core-v4.js', 'pro-print-pro-fixes.js');
 mustNotContain('dist/assets/pro-core-v4.js', 'pro-print-total-display-fix.js');
+
+mustContain('dist/assets/pro-print-mode-fixes.js', 'function isTotalLikeRow');
+mustContain('dist/assets/pro-print-mode-fixes.js', "tr.classList.contains('totalRow')");
+mustContain('dist/assets/pro-print-mode-fixes.js', '!isTotalLikeRow(tr, row)');
+mustContain('dist/assets/pro-print-mode-fixes.js', 'orderPrintShape');
 
 mustContain('dist/assets/pro-print-store-bills.js', 'BILL_ROWS=12');
 mustContain('dist/assets/pro-print-store-bills.js', 'BILLS_PER_A4=2');
@@ -93,4 +99,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: order grand total, done mode, Telesale totals, and single Pro print source are intact.');
+console.log('Smoke check passed: order print totals skip existing total rows, order grand total, done mode, Telesale totals, and single Pro print source are intact.');

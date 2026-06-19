@@ -200,14 +200,24 @@
     return heads[0] === '#' ? heads.slice(1) : heads;
   }
 
+  function isTotalLikeRow(tr, row) {
+    if (tr.classList.contains('totalRow')) return true;
+    const text = row.join(' ');
+    return /^รวมทั้งหมด\b/.test(text) || /^รวมสุทธิ\+?7%\b/.test(text);
+  }
+
   function tableRowsFromDom() {
     return $$('#table tbody tr')
-      .map(tr => [...tr.children].map(td => {
-        const input = td.querySelector('input');
-        return input ? T(input.value) : T(td.innerText || td.textContent);
+      .map(tr => ({
+        tr,
+        row: [...tr.children].map(td => {
+          const input = td.querySelector('input');
+          return input ? T(input.value) : T(td.innerText || td.textContent);
+        }),
       }))
-      .filter(row => row.length && row.join('').trim() && !/ไม่มีข้อมูล|โหลดไฟล์|เลือก “ส่งให้ร้าน”/.test(row.join(' ')))
-      .map(row => row[0] === '#' || /^\d+$/.test(row[0]) ? row.slice(1) : row);
+      .filter(({ row }) => row.length && row.join('').trim() && !/ไม่มีข้อมูล|โหลดไฟล์|เลือก “ส่งให้ร้าน”/.test(row.join(' ')))
+      .filter(({ tr, row }) => !isTotalLikeRow(tr, row))
+      .map(({ row }) => row[0] === '#' || /^\d+$/.test(row[0]) ? row.slice(1) : row);
   }
 
   function orderPrintShape(heads, rows) {
