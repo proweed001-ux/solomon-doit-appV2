@@ -26,12 +26,15 @@ const pkg = JSON.parse(read('package.json'));
 ['build', 'smoke', 'verify'].forEach(name => check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`));
 
 mustContain('dist/pro.html', 'pro-core-v4.js');
-mustContain('dist/assets/pro-core-v4.js', "VERSION = '1024'");
+mustContain('dist/assets/pro-core-v4.js', "VERSION = '1025'");
 mustContain('dist/assets/pro-core-v4.js', 'installPickSendEnterNext');
+mustContain('dist/assets/pro-core-v4.js', 'SEND_SELECTOR');
 mustContain('dist/assets/pro-core-v4.js', '#table input.jdata[data-map="send"]');
 mustContain('dist/assets/pro-core-v4.js', "event.key !== 'Enter'");
 mustContain('dist/assets/pro-core-v4.js', "input.enterKeyHint = 'next'");
 mustContain('dist/assets/pro-core-v4.js', 'input.tabIndex = 1000 + index');
+mustContain('dist/assets/pro-core-v4.js', 'nextIndexFor');
+mustContain('dist/assets/pro-core-v4.js', 'focusSendAt(nextIndexFor(input))');
 mustNotContain('dist/assets/pro-core-v4.js', 'oldPickSendNav');
 mustNotContain('dist/assets/pro-core-v4.js', 'newPickSendNav');
 mustNotContain('dist/assets/pro-core-v4.js', 'focusSendDown');
@@ -67,4 +70,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: send inputs move down on Enter/Next and old pick string patch is absent.');
+console.log('Smoke check passed: send inputs keep moving down after value change and old pick string patch is absent.');
