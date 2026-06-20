@@ -6,7 +6,23 @@ This document tracks cleanup work before future feature development.
 
 Keep the live Pro page stable while reducing risky or stale project files.
 
-## Workflow inventory
+## Stable baseline
+
+```text
+Pro Stable = 1025
+main = production baseline
+```
+
+Use this as the rollback point before starting new features.
+
+## Stale work inventory
+
+### Close / do not merge
+
+- PR #1 `Clean runtime v310 preview`
+  - Reason: old preview/runtime experiment before Pro 1025 stabilized.
+  - Risk: stale branch has many old commits and can conflict with the current live Pro page.
+  - Action: keep unmerged; close when GitHub action is available.
 
 ### Keep
 
@@ -36,7 +52,7 @@ Reasons:
 
 ## Cleanup rule
 
-Do not delete app source, Pro print files, parser logic, or Android source during cleanup unless there is a separate feature branch and explicit QA.
+Do not delete app source, Pro print files, parser logic, Android source, or the current stable Pro 1025 files during cleanup unless there is a separate feature branch and explicit QA.
 
 ## Verification after cleanup
 
