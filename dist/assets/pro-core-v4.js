@@ -4,7 +4,7 @@
   const CORE_URL = 'https://cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2@a5ab43603f9e6893c7958a85906f224594aee21d/dist/assets/pro-core-v4.js';
   const SELF_SRC = document.currentScript?.src || location.href;
   const ASSET_BASE = new URL('.', SELF_SRC).href;
-  const VERSION = '1023';
+  const VERSION = '1024';
 
   function assetUrl(fileName) {
     return `${ASSET_BASE}${fileName}?v=${VERSION}`;
@@ -50,11 +50,57 @@
     return patched;
   }
 
+  function installPickSendEnterNext() {
+    if (window.__DOIT_PICK_SEND_ENTER_NEXT__) return;
+    window.__DOIT_PICK_SEND_ENTER_NEXT__ = true;
+
+    const sendInputs = () => [...document.querySelectorAll('#table input.jdata[data-map="send"]')]
+      .filter(input => !input.disabled);
+
+    const refreshSendInputs = () => {
+      sendInputs().forEach((input, index) => {
+        input.enterKeyHint = 'next';
+        input.tabIndex = 1000 + index;
+      });
+    };
+
+    const focusNextSend = index => {
+      setTimeout(() => {
+        refreshSendInputs();
+        const inputs = sendInputs();
+        const next = inputs[index + 1] || inputs[index] || inputs[0];
+        if (!next) return;
+        next.focus();
+        try { next.select(); } catch {}
+      }, 80);
+    };
+
+    document.addEventListener('keydown', event => {
+      const input = event.target?.closest?.('#table input.jdata[data-map="send"]');
+      if (!input || event.key !== 'Enter') return;
+      const inputs = sendInputs();
+      const index = Math.max(0, inputs.indexOf(input));
+      event.preventDefault();
+      event.stopPropagation();
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      focusNextSend(index);
+    }, true);
+
+    document.addEventListener('focusin', event => {
+      if (event.target?.matches?.('#table input.jdata[data-map="send"]')) refreshSendInputs();
+    }, true);
+
+    const observer = new MutationObserver(refreshSendInputs);
+    observer.observe(document.body, { childList: true, subtree: true });
+    refreshSendInputs();
+  }
+
   async function loadLegacyCore() {
     const response = await fetch(CORE_URL, { cache: 'no-store' });
     if (!response.ok) throw new Error(`โหลด Pro core เดิมไม่ได้: ${response.status}`);
     const code = patchLegacyCore(await response.text());
     (0, eval)(code);
+    installPickSendEnterNext();
   }
 
   async function boot() {
