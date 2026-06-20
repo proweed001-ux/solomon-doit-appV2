@@ -26,7 +26,7 @@ const pkg = JSON.parse(read('package.json'));
 ['build', 'smoke', 'verify'].forEach(name => check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`));
 
 mustContain('dist/pro.html', 'pro-core-v4.js');
-mustContain('dist/assets/pro-core-v4.js', "VERSION = '1025'");
+mustContain('dist/assets/pro-core-v4.js', "VERSION = '1026'");
 mustContain('dist/assets/pro-core-v4.js', 'installPickSendEnterNext');
 mustContain('dist/assets/pro-core-v4.js', 'SEND_SELECTOR');
 mustContain('dist/assets/pro-core-v4.js', '#table input.jdata[data-map="send"]');
@@ -57,6 +57,10 @@ mustContain('dist/assets/pro-print-store-bills.js', 'BILL_ROWS=12');
 mustContain('dist/assets/pro-print-store-bills.js', 'BILLS_PER_A4=2');
 mustContain('dist/assets/pro-print-store-bills.js', 'function buildBills()');
 mustContain('dist/assets/pro-print-store-bills.js', 'function renderDoneFromCore()');
+mustContain('dist/assets/pro-print-store-bills.js', 'const qty=mapVal(st.send,g.poolKey,store,st.sel)');
+mustContain('dist/assets/pro-print-store-bills.js', 'Object.keys(st?.send||{})');
+mustNotContain('dist/assets/pro-print-store-bills.js', 'mapVal(st.send,g.poolKey,store,st.sel)+mapVal(st.add');
+mustNotContain('dist/assets/pro-print-store-bills.js', '[st?.send,st?.add,st?.pull]');
 
 [
   'dist/assets/pro-print-pro-fixes.js',
@@ -70,4 +74,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: send inputs keep moving down after value change and old pick string patch is absent.');
+console.log('Smoke check passed: Pro print uses send quantities only; add/pull do not enter print bills.');
