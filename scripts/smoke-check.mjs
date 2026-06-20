@@ -49,7 +49,7 @@ mustContain('dist/assets/pro-core-v4.js', 'newPickSendNav');
 mustContain('dist/assets/pro-core-v4.js', 'sendInputs');
 mustContain('dist/assets/pro-core-v4.js', 'focusSendDown');
 mustContain('dist/assets/pro-core-v4.js', "e.key==='Enter'");
-mustContain('dist/assets/pro-core-v4.js', "data-map=\"send\"");
+mustContain('dist/assets/pro-core-v4.js', 'data-map=\\"send\\"');
 mustContain('dist/assets/pro-core-v4.js', "input.enterKeyHint='next'");
 mustContain('dist/assets/pro-core-v4.js', 'oldOrderBranch');
 mustContain('dist/assets/pro-core-v4.js', 'newOrderBranch');
