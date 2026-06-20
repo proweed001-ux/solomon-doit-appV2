@@ -42,15 +42,12 @@ const pkg = JSON.parse(read('package.json'));
 ['build', 'smoke', 'verify'].forEach(name => check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`));
 
 mustContain('dist/pro.html', 'pro-core-v4.js');
-mustContain('dist/assets/pro-core-v4.js', "VERSION = '1022'");
+mustContain('dist/assets/pro-core-v4.js', "VERSION = '1023'");
 mustContain('dist/assets/pro-core-v4.js', 'patchLegacyCore');
-mustContain('dist/assets/pro-core-v4.js', 'oldPickSendNav');
-mustContain('dist/assets/pro-core-v4.js', 'newPickSendNav');
-mustContain('dist/assets/pro-core-v4.js', 'sendInputs');
-mustContain('dist/assets/pro-core-v4.js', 'focusSendDown');
-mustContain('dist/assets/pro-core-v4.js', "e.key==='Enter'");
-mustContain('dist/assets/pro-core-v4.js', 'data-map=\\"send\\"');
-mustContain('dist/assets/pro-core-v4.js', "input.enterKeyHint='next'");
+mustNotContain('dist/assets/pro-core-v4.js', 'oldPickSendNav');
+mustNotContain('dist/assets/pro-core-v4.js', 'newPickSendNav');
+mustNotContain('dist/assets/pro-core-v4.js', 'focusSendDown');
+mustNotContain('dist/assets/pro-core-v4.js', "input.enterKeyHint='next'");
 mustContain('dist/assets/pro-core-v4.js', 'oldOrderBranch');
 mustContain('dist/assets/pro-core-v4.js', 'newOrderBranch');
 mustContain('dist/assets/pro-core-v4.js', 'ราคารวม VAT');
@@ -115,4 +112,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: pick send inputs move down on Enter/Next, order print page margins, order totals, done mode, Telesale totals, and single Pro print source are intact.');
+console.log('Smoke check passed: incorrect pick input runtime patch is removed, order print page margins, order totals, done mode, Telesale totals, and single Pro print source are intact.');
