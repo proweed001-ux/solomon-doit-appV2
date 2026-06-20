@@ -4,7 +4,7 @@
   const CORE_URL = 'https://cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2@a5ab43603f9e6893c7958a85906f224594aee21d/dist/assets/pro-core-v4.js';
   const SELF_SRC = document.currentScript?.src || location.href;
   const ASSET_BASE = new URL('.', SELF_SRC).href;
-  const VERSION = '1024';
+  const VERSION = '1025';
 
   function assetUrl(fileName) {
     return `${ASSET_BASE}${fileName}?v=${VERSION}`;
@@ -54,7 +54,9 @@
     if (window.__DOIT_PICK_SEND_ENTER_NEXT__) return;
     window.__DOIT_PICK_SEND_ENTER_NEXT__ = true;
 
-    const sendInputs = () => [...document.querySelectorAll('#table input.jdata[data-map="send"]')]
+    const SEND_SELECTOR = '#table input.jdata[data-map="send"]';
+
+    const sendInputs = () => [...document.querySelectorAll(SEND_SELECTOR)]
       .filter(input => !input.disabled);
 
     const refreshSendInputs = () => {
@@ -64,30 +66,41 @@
       });
     };
 
-    const focusNextSend = index => {
+    const focusSendAt = index => {
       setTimeout(() => {
-        refreshSendInputs();
-        const inputs = sendInputs();
-        const next = inputs[index + 1] || inputs[index] || inputs[0];
-        if (!next) return;
-        next.focus();
-        try { next.select(); } catch {}
-      }, 80);
+        requestAnimationFrame(() => {
+          refreshSendInputs();
+          const inputs = sendInputs();
+          const next = inputs[index] || inputs[inputs.length - 1] || inputs[0];
+          if (!next) return;
+          next.focus({ preventScroll: true });
+          next.scrollIntoView({ block: 'center', inline: 'nearest' });
+          try { next.select(); } catch {}
+        });
+      }, 140);
     };
 
-    document.addEventListener('keydown', event => {
-      const input = event.target?.closest?.('#table input.jdata[data-map="send"]');
-      if (!input || event.key !== 'Enter') return;
+    const nextIndexFor = input => {
       const inputs = sendInputs();
-      const index = Math.max(0, inputs.indexOf(input));
+      return Math.max(0, inputs.indexOf(input)) + 1;
+    };
+
+    document.addEventListener('change', event => {
+      const input = event.target?.closest?.(SEND_SELECTOR);
+      if (!input) return;
+      focusSendAt(nextIndexFor(input));
+    }, true);
+
+    document.addEventListener('keydown', event => {
+      const input = event.target?.closest?.(SEND_SELECTOR);
+      if (!input || event.key !== 'Enter') return;
       event.preventDefault();
       event.stopPropagation();
       input.dispatchEvent(new Event('change', { bubbles: true }));
-      focusNextSend(index);
     }, true);
 
     document.addEventListener('focusin', event => {
-      if (event.target?.matches?.('#table input.jdata[data-map="send"]')) refreshSendInputs();
+      if (event.target?.matches?.(SEND_SELECTOR)) refreshSendInputs();
     }, true);
 
     const observer = new MutationObserver(refreshSendInputs);
