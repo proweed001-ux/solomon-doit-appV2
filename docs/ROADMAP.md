@@ -6,9 +6,25 @@
 
 ```text
 main = เวอร์ชันใช้งานจริง
+Pro Stable = 1025
+สถานะทดสอบจริง = ผ่าน
 ```
 
 ห้ามใช้ `main` เป็นที่ทดลองฟีเจอร์หรือรีแฟกเตอร์ใหญ่
+
+## Stable 1025 baseline
+
+```text
+ใช้เป็นจุด rollback ถ้าพัฒนาเพิ่มแล้วพัง
+```
+
+ผ่านการทดสอบหลักแล้ว:
+
+- ปริ้นยอดไม่ซ้ำ
+- ระยะขอบปริ้น A4 ใช้งานได้
+- หน้า 2 ไม่ชิดขอบ
+- ช่อง “ส่งร้านนี้” กด Enter/Next ลงล่างได้
+- หลังใส่ตัวเลขแล้วไม่ต้องแตะช่องใหม่เอง
 
 ## Phase 0 — Foundation guardrails
 
@@ -18,16 +34,16 @@ main = เวอร์ชันใช้งานจริง
 - [x] เพิ่ม Web CI
 - [x] เพิ่ม architecture guide
 - [x] แยก Pro print logic/CSS ออกจาก wrapper
-- [ ] เพิ่ม smoke check เข้า PR flow
-- [ ] ใช้ branch/PR สำหรับงานใหญ่ทุกครั้ง
+- [x] เพิ่ม smoke check เข้า PR flow
+- [x] ใช้ branch/PR สำหรับงานใหญ่ทุกครั้ง
 
 ## Phase 1 — Safer feature workflow
 
 เป้าหมาย: เพิ่มฟีเจอร์โดยไม่ให้ตัวหลักโดนทับ
 
-- [ ] สร้าง feature branch ทุกงาน
-- [ ] เปิด draft PR ก่อน merge
-- [ ] ให้ `npm run verify` ผ่านก่อน
+- [x] สร้าง feature branch ทุกงาน
+- [x] เปิด draft PR ก่อน merge
+- [x] ให้ `npm run verify` ผ่านก่อน
 - [ ] รอ preview deploy ก่อนเปิดใช้จริง
 - [ ] สรุป rollback plan ใน PR ทุกครั้ง
 
