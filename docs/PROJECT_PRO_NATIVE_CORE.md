@@ -58,7 +58,8 @@ pro.html
 Phase 1: DONE — baseline confirmed
 Phase 2: DONE — native core snapshot extracted
 Phase 3: DONE — preview bridge tested by user and merged
-Phase 4: STARTED — replace wrapper plan / no production switch yet
+Phase 4: DONE — native UI mirror tested by user and merged
+Phase 5: STARTED — production switch candidate branch opened
 ```
 
 ## Phase 1 — Freeze baseline
@@ -107,39 +108,49 @@ dist/pro-native-test.html
 dist/assets/pro-native-core-overrides.js
 ```
 
-## Phase 4 — Replace wrapper
+## Phase 4 — Native UI mirror
 
-เป้าหมายของ phase นี้คือย้ายจาก “preview bridge” ไปเป็น “native core ตัวจริง” อย่างระวัง
+ผลลัพธ์:
 
-สิ่งที่จะทำทีละขั้น:
+- ทำหน้า `dist/pro-native-ui.html`
+- ใช้หน้าตา `dist/pro.html` เดิมเป็น visual source
+- แทนเฉพาะ core stack เป็น native core
+- ผู้ใช้ตรวจแล้วแจ้งว่า “ผ่าน”
+- checkpoint ถูก merge แล้ว
+
+กติกาที่ได้จาก Phase 4:
 
 ```text
-1. วิเคราะห์จุดที่ยังอยู่ใน pro-native-core-overrides.js
-2. ย้าย currentState เข้า pro-native-core.js จริง
-3. ย้าย send Next navigation เข้า pro-native-core.js จริง
-4. ย้าย done/order/Telesale logic เข้า pro-native-core.js จริง
-5. ลด dependency ของ preview bridge ลงทีละจุด
-6. ทำหน้า preview อีกครั้ง
-7. ยังไม่เปลี่ยน production pro.html จนกว่าผ่าน QA จริง
+- ห้ามเอาหน้า phase4 shell ไปใช้จริง เพราะหน้าตาไม่เหมือน
+- production switch ต้องยึด UI จาก pro.html เดิม
+- เปลี่ยนเฉพาะ core stack เท่านั้น
 ```
 
-กฎ Phase 4:
+## Phase 5 — Production switch candidate
+
+เป้าหมายคือเตรียม PR สำหรับเปลี่ยน production `pro.html` จาก wrapper เป็น native core stack
+
+ลำดับทำงาน:
 
 ```text
-- ห้ามแก้ production pro.html ใน commit แรกของ Phase 4
-- ห้ามลบ wrapper production จนกว่า native core preview ผ่านครบ
+1. เปิด branch native-core-prod-switch จาก main
+2. แก้เฉพาะ script stack ใน pro.html
+3. ห้ามเปลี่ยน layout/css/html อื่น
+4. ให้ pro.html ใช้ native core stack เหมือน pro-native-ui ที่ผ่านแล้ว
+5. รัน smoke
+6. deploy preview
+7. mobile QA บน preview
+8. merge เฉพาะเมื่อผ่านอีกครั้ง
+```
+
+ข้อห้ามของ Phase 5:
+
+```text
 - ห้ามเปลี่ยนสูตรยอดเงิน
-- ห้ามเปลี่ยนจำนวนต่อบิล
-- ห้ามให้สินค้า 0 ชิ้นเข้าใบปริ้น
-- ถ้า CI ตก ให้หยุดและแก้เฉพาะจุด
-```
-
-## Phase 5 — Final QA ก่อน production switch
-
-ต้องผ่าน:
-
-```text
-npm run smoke
+- ห้ามเปลี่ยนจำนวนบิล
+- ห้ามเปลี่ยนหน้าตา UI
+- ห้ามลบ rollback path
+- ห้าม merge ถ้า preview ยังไม่ได้เช็คจากมือถือ
 ```
 
 Manual QA:
@@ -174,7 +185,7 @@ Manual QA:
 
 ```text
 Issue: #41
-Merged checkpoint: PR #42
-Active branch: native-core-phase4
-Production pro.html: untouched by Phase 4 start
+Merged checkpoint: PR #42, PR #43
+Active branch: native-core-prod-switch
+Production pro.html: not switched yet
 ```
