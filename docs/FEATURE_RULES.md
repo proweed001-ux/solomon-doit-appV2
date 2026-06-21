@@ -8,9 +8,6 @@
 main
   เวอร์ชันใช้งานจริง ห้ามทดลองหรือ refactor ใหญ่ตรงนี้
 
-safe-foundation
-  branch วางรากฐานและชุดตรวจอัตโนมัติ
-
 feature/<short-name>
   ฟีเจอร์ใหม่แต่ละก้อน ต้องแยก branch
 ```
@@ -28,9 +25,11 @@ feature/<short-name>
 
 1. Refactor ต้องไม่เปลี่ยนพฤติกรรม
 2. แยกไฟล์ก่อนได้ แต่ห้ามเขียน logic ใหม่พร้อมกัน
-3. ทุก refactor ต้องผ่าน `npm run verify`
-4. ถ้าแตะ `dist/pro.html` ต้องมีเหตุผลชัดเจน เพราะเป็น legacy ที่เสี่ยงสูง
-5. ถ้าแตะระบบปริ้น Pro ต้องตรวจ smoke guardrails เสมอ
+3. งาน Pro legacy ให้รัน `npm run smoke` หรือ `npm run verify`
+4. งาน React migration เท่านั้นที่ใช้ `npm run verify:react`
+5. ห้าม commit ผล `vite build` ที่ทับ `dist/pro.html` หรือ `dist/assets/pro-*` โดยไม่มี QA แยก
+6. ถ้าแตะ `dist/pro.html` ต้องมีเหตุผลชัดเจน เพราะเป็น legacy ที่เสี่ยงสูง
+7. ถ้าแตะระบบปริ้น Pro ต้องตรวจ smoke guardrails เสมอ
 
 ## กฎสำหรับระบบปริ้น Pro
 
@@ -50,16 +49,23 @@ EDIT_KEY = doit-pro-print-price-edits-v1
 
 ## Definition of Done
 
-ฟีเจอร์หรือ refactor จะถือว่าเสร็จได้ต่อเมื่อ:
+ฟีเจอร์หรือ refactor ฝั่ง Pro legacy จะถือว่าเสร็จได้ต่อเมื่อ:
 
 ```text
-npm run build ผ่าน
 npm run smoke ผ่าน
 ไม่มี workflow patch เก่ากลับมา
 ไม่มีการแก้ main ตรง ๆ
 มีสรุปไฟล์ที่แก้
 มีวิธี rollback ถ้าพัง
 ```
+
+ฟีเจอร์ฝั่ง React migration ใช้:
+
+```text
+npm run verify:react
+```
+
+แต่ห้าม commit `dist` ที่ build ทับ Pro legacy โดยไม่ตรวจ diff ทุกไฟล์ก่อน
 
 ## Rollback rule
 
