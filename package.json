@@ -13,7 +13,8 @@
     "preview": "vite preview --host=0.0.0.0 --port=3000",
     "clean": "rimraf dist",
     "smoke": "node scripts/smoke-check.mjs",
-    "verify": "npm run build && npm run smoke",
+    "verify": "npm run smoke",
+    "verify:react": "npm run build && npm run smoke",
     "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\""
   },
   "dependencies": {
