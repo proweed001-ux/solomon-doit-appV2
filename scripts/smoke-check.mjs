@@ -13,6 +13,7 @@ const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `$
 
 [
   'package.json',
+  'README.md',
   'dist/index.html',
   'dist/pro.html',
   'dist/pro-native-test.html',
@@ -28,6 +29,7 @@ const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `$
   'dist/assets/pro-print-store-bills.js',
   'dist/assets/pro-print-mode-fixes.js',
   'dist/assets/pro-print.css',
+  'docs/HANDOFF_1028_NATIVE.md',
   'scripts/qa-doit-file.mjs',
   '.github/workflows/web-ci.yml',
 ].forEach(mustExist);
@@ -36,6 +38,8 @@ const pkg = JSON.parse(read('package.json'));
 ['build', 'smoke', 'verify', 'verify:react'].forEach(name => check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`));
 check(pkg.scripts.verify === 'npm run smoke', 'package.json verify must be smoke-only for Pro legacy');
 
+mustContain('README.md', 'Pro Stable 1028 Native');
+mustContain('README.md', 'docs/HANDOFF_1028_NATIVE.md');
 mustContain('dist/index.html', 'Pro Stable 1028 Native');
 mustContain('dist/index.html', '/pro.html?t=1028');
 mustContain('dist/pro-v310.html', "location.replace('/pro.html?t=1028')");
@@ -127,9 +131,13 @@ mustContain('dist/assets/pro-print-store-bills.js', 'Object.keys(st?.send||{})')
 mustNotContain('dist/assets/pro-print-store-bills.js', 'mapVal(st.send,g.poolKey,store,st.sel)+mapVal(st.add');
 mustNotContain('dist/assets/pro-print-store-bills.js', '[st?.send,st?.add,st?.pull]');
 
+mustContain('docs/HANDOFF_1028_NATIVE.md', 'Project Pro Native Core: COMPLETE');
+mustContain('docs/HANDOFF_1028_NATIVE.md', 'pro-core-v4.js ไม่ fetch legacy core จาก jsdelivr แล้ว');
+mustContain('docs/HANDOFF_1028_NATIVE.md', 'Business rules ที่ห้ามพัง');
 mustContain('docs/ROADMAP.md', 'Pro Stable = 1028 Native');
 mustContain('docs/CLEANUP_AUDIT.md', 'Pro Stable = 1028 Native');
 mustContain('docs/PROJECT_PRO_NATIVE_CORE.md', 'Status: COMPLETE');
+mustContain('docs/QA_CHECKLIST.md', 'docs/HANDOFF_1028_NATIVE.md');
 mustContain('docs/QA_CHECKLIST.md', 'verify:react');
 mustContain('docs/FEATURE_RULES.md', 'verify:react');
 
@@ -145,4 +153,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: Pro Stable 1028 Native guardrails are intact.');
+console.log('Smoke check passed: Pro Stable 1028 Native handoff is documented and guardrails are intact.');
