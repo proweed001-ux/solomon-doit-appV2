@@ -40,11 +40,9 @@ jobs:
       </div>`);'''
           s = re.sub(r"document\.body\.insertAdjacentHTML\('beforeend', `<div id=\\\"storageModal\\\"[\s\S]*?</div>`\);", new_modal, s)
           s = s.replace('เปิด Pop-up เลือกไฟล์', 'เลือกไฟล์ในหน้าต่าง')
-          s = s.replace('เปิด Pop-up เลือกไฟล์', 'เลือกไฟล์ในหน้าต่าง')
           s = s.replace('เพื่อเลือกโดยไม่ต้องเลื่อนหน้ายาว', 'เพื่อเลือกแบบหน้าต่าง ไม่ต้องเลื่อนหน้าหลัก')
           s = s.replace('เลือกไฟล์เก่าให้แล้วใน Pop-up ยังไม่ลบจริง', 'เลือกไฟล์เก่าให้แล้วในหน้าต่าง ยังไม่ลบจริง')
-          wf = Path('.github/workflows/patch-storage-modal-polish.yml')
-          wf.unlink()
+          Path('.github/workflows/patch-storage-modal-polish.yml').unlink()
           p.write_text(s, encoding='utf-8')
           PY
       - name: Run smoke
@@ -56,3 +54,4 @@ jobs:
           git add dist/assets/admin-storage-manager-v1.js .github/workflows/patch-storage-modal-polish.yml
           git commit -m "Polish storage cleanup modal UI"
           git push origin admin-storage-manager
+# trigger 2
