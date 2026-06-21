@@ -4,9 +4,19 @@
 
 คำแปลแบบชาวบ้าน: ย้ายไส้ในหน้า Pro จากระบบพ่วง CDN/patch ให้เป็น core ตัวจริงของเราเองใน repo
 
-## ทำไมต้องมีงานนี้
+## ผลลัพธ์สุดท้าย
 
-ตอนนี้หน้า Pro ใช้งานได้จริงแล้ว แต่โครงสร้างข้างในยังมีชั้นเสี่ยง:
+```text
+Status: COMPLETE
+Production stable: Pro Stable 1028 Native
+Production URL: /pro.html?t=1028
+```
+
+production ผ่านการทดสอบจากมือถือจริงแล้ว และ `pro-core-v4.js` ไม่ใช้ legacy jsdelivr/eval/patch wrapper path แล้ว
+
+## โครงสร้างเก่าที่ถูกยกเลิก
+
+ก่อน migration หน้า Pro ใช้โครงสร้างนี้:
 
 ```text
 pro.html
@@ -17,29 +27,34 @@ pro.html
     -> โหลด print modules เพิ่ม
 ```
 
-งานนี้จะเปลี่ยนเป็น:
+## โครงสร้างใหม่
+
+ตอนนี้หน้า Pro ใช้โครงสร้างนี้:
 
 ```text
 pro.html
-  -> /assets/pro-core-v4.js ของ repo เราเอง
-    -> ทำงานตรง
-    -> ไม่มี fetch legacy core จาก jsdelivr
-    -> ไม่มี eval
-    -> ไม่มี string replace patch
+  -> /assets/pro-core-v4.js
+    -> native stack bootstrap
+      -> pro-print-store-bills.js
+      -> pro-native-core.js
+      -> pro-native-core-overrides.js
+      -> pro-print-mode-fixes.js
+      -> pro-print-column-widths.js
+      -> pro-print-a4-pro-fix.js
 ```
 
-## เป้าหมาย
+## สิ่งที่ทำสำเร็จแล้ว
 
 - เอา `CORE_URL` ที่ชี้ jsdelivr ออก
 - เอา `fetch(CORE_URL)` ออก
 - เอา `(0, eval)(code)` ออก
 - เอา `patchLegacyCore()` ออก
-- รวม fix ปัจจุบันเข้า core จริง
-- ให้ `window.DOIT_CORE_APP.currentState()` เป็น API จริง ไม่ใช่ patch string
-- ให้หน้าเตรียมปริ้นยังอ่าน state สดจาก core
-- รักษา Pro Stable 1026/1027 behavior ให้เหมือนเดิม
+- รวม fix ปัจจุบันเข้า production bootstrap path
+- ให้หน้าเตรียมปริ้นอ่าน state สดผ่าน `window.DOIT_CORE_APP.currentState()`
+- รักษา Pro behavior เดิมให้ใช้งานได้จริง
+- ไม่เปลี่ยนหน้าตา UI production
 
-## สิ่งที่ห้ามเปลี่ยน
+## สิ่งที่ห้ามเปลี่ยนในงานต่อไป
 
 - สูตรยอดเงิน
 - ราคา VAT
@@ -59,17 +74,17 @@ Phase 1: DONE — baseline confirmed
 Phase 2: DONE — native core snapshot extracted
 Phase 3: DONE — preview bridge tested by user and merged
 Phase 4: DONE — native UI mirror tested by user and merged
-Phase 5: STARTED — production switch candidate branch opened
+Phase 5: DONE — production switch tested by user and merged
+Stable lock: DONE — Pro Stable 1028 Native
 ```
 
 ## Phase 1 — Freeze baseline
 
 ผลลัพธ์:
 
-- `main` ยังเป็น production baseline
-- Pro Stable 1026/1027 ยังใช้งานจริงได้
+- `main` เป็น production baseline
 - smoke check ผ่าน
-- production `pro.html` ยังไม่ถูกรื้อ
+- production ยังปลอดภัยก่อนเริ่ม migration
 
 ## Phase 2 — Extract native core
 
@@ -87,8 +102,6 @@ dist/assets/pro-native-core.js
 ```text
 dist/pro-native-test.html
 ```
-
-- ยังไม่ให้ production ใช้แทน `pro.html`
 
 ## Phase 3 — Preview behavior bridge
 
@@ -126,37 +139,21 @@ dist/assets/pro-native-core-overrides.js
 - เปลี่ยนเฉพาะ core stack เท่านั้น
 ```
 
-## Phase 5 — Production switch candidate
+## Phase 5 — Production switch
 
-เป้าหมายคือเตรียม PR สำหรับเปลี่ยน production `pro.html` จาก wrapper เป็น native core stack
+ผลลัพธ์:
 
-ลำดับทำงาน:
+- เปิด PR #44 สำหรับ production switch candidate
+- เปลี่ยน `dist/assets/pro-core-v4.js` เป็น native stack bootstrap
+- ไม่แก้ layout/css/html ของ `dist/pro.html`
+- smoke ผ่าน
+- Vercel production deploy ผ่าน
+- ผู้ใช้ตรวจ production แล้วแจ้งว่า “ปกติ” และ “ผ่าน”
 
-```text
-1. เปิด branch native-core-prod-switch จาก main
-2. แก้เฉพาะ script stack ใน pro.html
-3. ห้ามเปลี่ยน layout/css/html อื่น
-4. ให้ pro.html ใช้ native core stack เหมือน pro-native-ui ที่ผ่านแล้ว
-5. รัน smoke
-6. deploy preview
-7. mobile QA บน preview
-8. merge เฉพาะเมื่อผ่านอีกครั้ง
-```
-
-ข้อห้ามของ Phase 5:
+## Manual QA ที่ผ่านแล้ว
 
 ```text
-- ห้ามเปลี่ยนสูตรยอดเงิน
-- ห้ามเปลี่ยนจำนวนบิล
-- ห้ามเปลี่ยนหน้าตา UI
-- ห้ามลบ rollback path
-- ห้าม merge ถ้า preview ยังไม่ได้เช็คจากมือถือ
-```
-
-Manual QA:
-
-```text
-1. เปิด Pro preview บนมือถือ
+1. เปิด Pro production บนมือถือ
 2. โหลด Cloud
 3. เลือกวันที่
 4. เลือก PS
@@ -165,9 +162,8 @@ Manual QA:
 7. เตรียมปริ้น
 8. ตรวจ 12 รายการต่อบิล
 9. ตรวจ 2 บิลต่อ A4
-10. ปริ้นจริง
-11. ตรวจ Telesale
-12. ตรวจ autosave
+10. ตรวจ Telesale
+11. ตรวจ autosave
 ```
 
 ## Rollback
@@ -175,17 +171,27 @@ Manual QA:
 ถ้าพัง:
 
 ```text
-1. ไม่ merge PR ที่เสี่ยง
-2. ปิด branch migration
-3. main ยังใช้ Pro Stable ปัจจุบัน
-4. เปิดบั๊กย่อยใหม่
+1. ใช้ main commit ก่อน PR #44 เป็น rollback point
+2. กลับไป Pro Stable 1026/1027 wrapper path จาก git history ได้
+3. เปิด bugfix branch ใหม่
+4. ห้ามแก้บน main ตรง ๆ
+```
+
+## งานต่อไปหลัง production stable
+
+```text
+1. ใช้งาน production จริงอย่างน้อย 1–2 รอบงาน
+2. ยังไม่ลบ preview files ทันที
+3. ค่อยย้าย logic จาก pro-native-core-overrides.js เข้า pro-native-core.js
+4. ค่อยลด bridge ทีละจุด
+5. ทำ cleanup PR แยก
 ```
 
 ## สถานะล่าสุด
 
 ```text
 Issue: #41
-Merged checkpoint: PR #42, PR #43
-Active branch: native-core-prod-switch
-Production pro.html: not switched yet
+Merged checkpoint: PR #42, PR #43, PR #44
+Stable: Pro Stable 1028 Native
+Production pro.html: switched and user-tested
 ```

@@ -6,20 +6,22 @@
 
 ```text
 main = เวอร์ชันใช้งานจริง
-Pro Stable = 1026
-สถานะทดสอบจริง = ผ่าน
+Pro Stable = 1028 Native
+สถานะทดสอบจริง = ผ่าน production mobile QA
 ```
 
 ห้ามใช้ `main` เป็นที่ทดลองฟีเจอร์หรือรีแฟกเตอร์ใหญ่
 
-## Stable 1026 baseline
+## Stable 1028 Native baseline
 
 ```text
-ใช้เป็นจุด rollback ถ้าพัฒนาเพิ่มแล้วพัง
+ใช้เป็นจุด rollback หลัง Project Pro Native Core production switch ผ่านแล้ว
 ```
 
 ผ่านการทดสอบหลักแล้ว:
 
+- production `pro.html?t=1028` เปิดได้ปกติ
+- native core bootstrap ทำงานแทน jsdelivr/eval wrapper
 - ปริ้นยอดไม่ซ้ำ
 - ระยะขอบปริ้น A4 ใช้งานได้
 - หน้า 2 ไม่ชิดขอบ
@@ -45,12 +47,22 @@ Pro Stable = 1026
 - [x] สร้าง feature branch ทุกงาน
 - [x] เปิด draft PR ก่อน merge
 - [x] ให้ `npm run verify` ผ่านก่อน
-- [ ] รอ preview deploy ก่อนเปิดใช้จริง
-- [ ] สรุป rollback plan ใน PR ทุกครั้ง
+- [x] รอ preview deploy ก่อนเปิดใช้จริง
+- [x] สรุป rollback plan ใน PR ทุกครั้ง
 
-## Phase 2 — Split UI gradually
+## Phase 2 — Native core cleanup
 
-เป้าหมาย: ทำ `src/App.tsx` ให้เล็กลงโดยไม่เปลี่ยน behavior
+เป้าหมาย: ลด bridge ทีละจุดโดยไม่เปลี่ยน behavior
+
+- [ ] ย้าย `currentState` bridge เข้า `pro-native-core.js` โดยตรง
+- [ ] ย้าย send Next navigation เข้า `pro-native-core.js` โดยตรง
+- [ ] ย้าย done/order/Telesale bridge เข้า core/source ที่ชัดเจน
+- [ ] ลดบทบาท `pro-native-core-overrides.js`
+- [ ] เก็บหน้า preview ที่ไม่จำเป็นหลังใช้งานจริงครบหลายรอบ
+
+## Phase 3 — Split UI gradually
+
+เป้าหมาย: ทำ source ให้เล็กลงโดยไม่เปลี่ยน behavior
 
 - [ ] แยก `Header`
 - [ ] แยก `FilterBar`
@@ -58,7 +70,7 @@ Pro Stable = 1026
 - [ ] แยก `RankingTable`
 - [ ] แยก pages: upload/dashboard/people/stores/skus/tod/bill/issues
 
-## Phase 3 — Isolate business logic
+## Phase 4 — Isolate business logic
 
 เป้าหมาย: ย้าย logic ออกจาก UI เพื่อเพิ่มฟีเจอร์ง่ายขึ้น
 
@@ -68,14 +80,14 @@ Pro Stable = 1026
 - [ ] แยก storage helpers
 - [ ] เพิ่ม sample parse check ถ้ามีไฟล์ตัวอย่างที่ปลอดภัย
 
-## Phase 4 — Legacy Pro migration
+## Completed — Project Pro Native Core
 
-เป้าหมาย: ลดความเสี่ยงของ `dist/pro.html` โดยไม่รื้อครั้งเดียว
-
-- [ ] แยกส่วนที่ยังอยู่ใน `dist/pro.html` เป็นโมดูลย่อย
-- [ ] ทำ adapter ให้หน้าเก่าเรียก logic ใหม่
-- [ ] ทดสอบมือถือ/ปริ้นจริงก่อนลบของเก่า
-- [ ] ค่อยย้ายกลับเข้า source ถ้าพร้อมทดสอบเต็ม
+```text
+PR #42: native core preview checkpoint
+PR #43: native UI mirror checkpoint
+PR #44: production switch candidate
+สถานะ: production ผ่านแล้ว
+```
 
 ## Parking lot — Future features
 

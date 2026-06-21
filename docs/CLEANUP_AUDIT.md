@@ -9,7 +9,7 @@ Keep the live Pro page stable while reducing risky or stale project files.
 ## Stable baseline
 
 ```text
-Pro Stable = 1026
+Pro Stable = 1028 Native
 main = production baseline
 ```
 
@@ -17,19 +17,22 @@ Use this as the rollback point before starting new features.
 
 ## Cleanup status
 
-- Landing page points to `/pro.html?t=1026`.
-- Old public V310 pages redirect to `/pro.html?t=1026`.
+- Landing page points to `/pro.html?t=1028`.
+- Old public V310 pages redirect to `/pro.html?t=1028`.
 - Web CI runs smoke checks for `dist/*.html`, `dist/assets/**`, `docs/**`, and script changes on push and PR.
+- Production `pro-core-v4.js` now boots native stack directly.
+- Production no longer uses the legacy jsdelivr core fetch / eval / patch wrapper path.
 - Pro print reads live state from `window.DOIT_CORE_APP.currentState()` when available, with localStorage scan only as fallback.
 - Product rows with 0 quantity remain excluded from print bills by design.
 - PR #1 `Clean runtime v310 preview` is closed and remains unmerged.
+- PR #42, PR #43, and PR #44 completed Project Pro Native Core production switch.
 
 ## Stale work inventory
 
 ### Closed / do not merge
 
 - PR #1 `Clean runtime v310 preview`
-  - Reason: old preview/runtime experiment before Pro 1026 stabilized.
+  - Reason: old preview/runtime experiment before Pro 1028 Native stabilized.
   - Risk: stale branch has many old commits and can conflict with the current live Pro page.
   - Action: closed unmerged on 2026-06-21.
 
@@ -42,6 +45,11 @@ Use this as the rollback point before starting new features.
 - `.github/workflows/build-android-apk.yml`
   - Purpose: manual or path-based Android debug APK build.
   - Risk: medium, but still useful for APK output.
+
+- `dist/pro-native-test.html`, `dist/pro-native-phase4.html`, `dist/pro-native-ui.html`
+  - Purpose: native migration checkpoints and rollback comparison.
+  - Risk: low if not linked as production.
+  - Action: keep temporarily until Pro Stable 1028 Native has been used in real work for several cycles.
 
 ### Remove / quarantine later after repo-wide reference audit
 
@@ -65,7 +73,7 @@ Reasons:
 
 ## Cleanup rule
 
-Do not delete app source, Pro print files, parser logic, Android source, or the current stable Pro 1026 files during cleanup unless there is a separate feature branch and explicit QA.
+Do not delete app source, Pro print files, parser logic, Android source, or the current stable Pro 1028 Native files during cleanup unless there is a separate feature branch and explicit QA.
 
 ## Verification after cleanup
 
