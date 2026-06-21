@@ -146,7 +146,7 @@ node scripts/qa-doit-file.mjs "path/to/DOIT.xlsx" --json=qa-result.json
 - SKU: `SKU_Code`, `SKU_Desc`
 - Region/Area: `Area`, `Territory`, `Territory_Desc`
 - Channel: `ChannelDescr`, `Global_Channel`, `Global_Sub_Channel`
-- Category/Brand: `Category`, `BrandForm`
+- Category/Brand: `Category`, `Brand`, `BrandForm`
 - Document: `SOTypeID`, `InvcNbr`, `ShipperID`, `LineRef`
 
 ## หมายเหตุ
