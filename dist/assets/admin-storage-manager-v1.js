@@ -1,10 +1,9 @@
 (() => {
   'use strict';
 
-  const END = 'https://saodmeoilixfdqentofp.supabase.co/functions/v1/admin-storage';
+  const DEFAULT_URL = 'https://saodmeoilixfdqentofp.supabase.co';
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
-  const tokenKey = 'doit-admin-storage-token';
   let state = null;
 
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -20,11 +19,33 @@
     const box = $('#storageStatus');
     if (box) box.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
   };
-  const token = () => ($('#storageToken')?.value || '').trim();
-  const headers = () => ({ 'content-type': 'application/json', 'x-admin-token': token() });
+
+  function cloudCfg() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('doit-cloud-cfg') || '{}'); } catch {}
+    const url = String($('#sbUrl')?.value || saved.url || DEFAULT_URL).trim().replace(/\/$/, '');
+    const key = String($('#sbKey')?.value || saved.key || '').trim();
+    return { url, key };
+  }
+
+  function endpoint() {
+    return cloudCfg().url + '/functions/v1/admin-storage';
+  }
+
+  function headers() {
+    const cfg = cloudCfg();
+    return {
+      'content-type': 'application/json',
+      'apikey': cfg.key,
+      'authorization': 'Bearer ' + cfg.key,
+      'x-admin-token': cfg.key,
+    };
+  }
 
   async function api(path = '', options = {}) {
-    const res = await fetch(END + path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
+    const cfg = cloudCfg();
+    if (!cfg.key) throw { error: 'missing_cloud_token', detail: 'กรุณาใส่ Supabase anon key ในกล่อง Cloud / Supabase ด้านบนก่อน' };
+    const res = await fetch(endpoint() + path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch { data = { raw: text }; }
@@ -40,8 +61,8 @@
     body.innerHTML = files.length ? files.map(f => {
       const tags = [
         f.is_active ? '<span class="pill ready">ACTIVE</span>' : '',
-        f.protected ? '<span class="pill fail">PROTECT</span>' : '',
-        f.is_latest_protected ? '<span class="pill cloud">LATEST</span>' : '',
+        f.protected ? '<span class="pill fail">กันลบ</span>' : '',
+        f.is_latest_protected ? '<span class="pill cloud">ล่าสุด</span>' : '',
       ].join(' ');
       const version = f.version ? `${esc(f.version.file_name || '-')}<br><span class="muted">rows ${Number(f.version.row_count || 0).toLocaleString('th-TH')} / PS ${Number(f.version.ps_count || 0).toLocaleString('th-TH')}</span>` : '<span class="muted">ไม่มี version</span>';
       return `<tr>
@@ -59,7 +80,7 @@
 
   async function refresh() {
     try {
-      log('กำลังโหลด Storage...');
+      log('กำลังโหลด Storage จาก Cloud config ด้านบน...');
       state = await api('');
       $('#storageCount').textContent = Number(state.summary?.object_count || 0).toLocaleString('th-TH');
       $('#storageSize').textContent = fmtSize(state.summary?.total_bytes || 0);
@@ -85,9 +106,6 @@
 
   function init() {
     if (!$('#adminStoragePanel')) return;
-    $('#storageToken').value = localStorage.getItem(tokenKey) || '';
-    $('#storageSaveToken').onclick = () => { localStorage.setItem(tokenKey, token()); log('บันทึก token แล้ว'); };
-    $('#storageClearToken').onclick = () => { localStorage.removeItem(tokenKey); $('#storageToken').value = ''; log('ล้าง token แล้ว'); };
     $('#storageRefresh').onclick = refresh;
     $('#storageFilter').oninput = renderFiles;
     $('#storageCheckAll').onchange = e => $$('.storagePick:not(:disabled)').forEach(c => c.checked = e.target.checked);
