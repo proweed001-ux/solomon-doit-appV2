@@ -22,15 +22,16 @@ Use this as the rollback point before starting new features.
 - Web CI runs smoke checks for `dist/*.html`, `dist/assets/**`, `docs/**`, and script changes on push and PR.
 - Pro print reads live state from `window.DOIT_CORE_APP.currentState()` when available, with localStorage scan only as fallback.
 - Product rows with 0 quantity remain excluded from print bills by design.
+- PR #1 `Clean runtime v310 preview` is closed and remains unmerged.
 
 ## Stale work inventory
 
-### Close / do not merge
+### Closed / do not merge
 
 - PR #1 `Clean runtime v310 preview`
   - Reason: old preview/runtime experiment before Pro 1026 stabilized.
   - Risk: stale branch has many old commits and can conflict with the current live Pro page.
-  - Action: keep unmerged; close when GitHub action is available.
+  - Action: closed unmerged on 2026-06-21.
 
 ### Keep
 
