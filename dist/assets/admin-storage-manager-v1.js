@@ -2,6 +2,7 @@
   'use strict';
 
   const DEFAULT_URL = 'https://saodmeoilixfdqentofp.supabase.co';
+  const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhb2RtZW9pbGl4ZmRxZW50b2ZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4OTIxMzcsImV4cCI6MjA5NTQ2ODEzN30.l74gUatsGTmTlp3l_lWImU4qzyFD1ubA464dkYX7u_Y';
   const BUCKET = 'doit-files';
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
@@ -26,7 +27,7 @@
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem('doit-cloud-cfg') || '{}'); } catch {}
     const url = String($('#sbUrl')?.value || saved.url || DEFAULT_URL).trim().replace(/\/$/, '');
-    const key = String($('#sbKey')?.value || saved.key || '').trim();
+    const key = String($('#sbKey')?.value || saved.key || DEFAULT_KEY).trim();
     return { url, key };
   }
 
@@ -37,7 +38,6 @@
 
   async function rest(path, options = {}) {
     const cfg = cloudCfg();
-    if (!cfg.key) throw { error: 'missing_cloud_token', detail: 'กรุณาใส่ Supabase anon key ในกล่อง Cloud / Supabase ด้านบนก่อน' };
     const res = await fetch(cfg.url + path, { ...options, headers: { ...authHeaders(options.headers || {}) } });
     const text = await res.text();
     let data;
@@ -109,7 +109,7 @@
 
   async function refresh() {
     try {
-      log('กำลังโหลดรายการไฟล์จากประวัติ Admin...');
+      log('กำลังเชื่อมคลังไฟล์อัตโนมัติ...');
       const versions = await rest('/rest/v1/doit_versions?select=id,file_name,file_size,storage_path,data_path,row_count,store_count,ps_count,telesale_bill_count,status,is_active,uploaded_at,data_status&order=uploaded_at.desc&limit=200');
       const built = buildFiles(Array.isArray(versions) ? versions : []);
       state = {
@@ -129,7 +129,7 @@
       $('#storageLatest').textContent = fmtDate(state.summary.latest_upload);
       $('#storageActive').textContent = state.active?.file_name || '—';
       renderFiles();
-      log({ ok: true, source: 'doit_versions metadata', summary: state.summary, active: state.active, protected_paths: state.protected_paths });
+      log({ ok: true, source: 'linked Supabase project / doit_versions', summary: state.summary, active: state.active, protected_paths: state.protected_paths });
     } catch (err) {
       log(err);
     }
@@ -138,7 +138,6 @@
   async function downloadPath(path) {
     try {
       const cfg = cloudCfg();
-      if (!cfg.key) throw { error: 'missing_cloud_token' };
       const res = await fetch(`${cfg.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, { headers: authHeaders() });
       if (!res.ok) throw { error: 'download_failed', detail: await res.text() };
       const blob = await res.blob();
@@ -177,6 +176,7 @@
     $('#storagePreviewOld').onclick = previewOld;
     $('#storageDeleteOld').onclick = () => deleteDisabled('deleteOld');
     $('#storageDeleteSelected').onclick = () => deleteDisabled('deleteSelected');
+    setTimeout(refresh, 400);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
