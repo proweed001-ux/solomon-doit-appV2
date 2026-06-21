@@ -4,7 +4,7 @@
   const CORE_URL = 'https://cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2@a5ab43603f9e6893c7958a85906f224594aee21d/dist/assets/pro-core-v4.js';
   const SELF_SRC = document.currentScript?.src || location.href;
   const ASSET_BASE = new URL('.', SELF_SRC).href;
-  const VERSION = '1026';
+  const VERSION = '1027';
 
   function assetUrl(fileName) {
     return `${ASSET_BASE}${fileName}?v=${VERSION}`;
@@ -36,6 +36,8 @@
     const newOrderBranch = "if(mode==='order'){const p=group(rows.filter(r=>okDate(r)&&okPs(r)&&okCut(r)&&okBrand(r)&&okType(r)&&okQ(r))),rawTotal=p.reduce((s,g)=>s+N(g.rawAmt),0),netTotal=p.reduce((s,g)=>s+N(g.netAmt),0),vatTotal=p.reduce((s,g)=>s+(N(g.netAmt)||N(g.rawAmt))*1.07,0),qtyTotal=p.reduce((s,g)=>s+N(g.qty),0);simpleTable('รวม order PS + Telesale '+F(p.length)+' รายการ · ราคารวม VAT ฿ '+B(vatTotal),['#','สินค้า','จำนวนรวม','ยอดดิบ','ยอดสุทธิ','รวม VAT'],p.map((g,i)=>'<tr><td>'+(i+1)+'</td><td>'+E(g.sku)+'</td><td>'+F(g.qty)+'</td><td>'+B(g.rawAmt)+'</td><td>'+B(g.netAmt)+'</td><td>'+B((N(g.netAmt)||N(g.rawAmt))*1.07)+'</td></tr>').join('')+'<tr class=\"totalRow\"><td colspan=\"2\" class=\"r\">รวมทั้งหมด</td><td>'+F(qtyTotal)+'</td><td>'+B(rawTotal)+'</td><td>'+B(netTotal)+'</td><td>'+B(vatTotal)+'</td></tr>');return}";
     const oldTeleRender = `function renderTele(){const bs=teleBills();$('#teleBtn').textContent='บิล Telesale ('+F(bs.length)+')';$('#drawerBody').innerHTML=bs.length?bs.map(b=>'<div class="teleBill"><div class="teleBillHead"><b>ร้าน: '+E(b.store)+'</b><br><small>บิล: '+E(b.inv)+' · วันที่ '+E(dlabel(b.date))+' · Tele: '+E(b.tele)+'</small></div><table class="teleTbl"><thead><tr><th>สินค้า</th><th>จำนวน</th><th>ยอดดิบ</th><th>สุทธิ+VAT</th></tr></thead><tbody>'+b.lines.map(r=>'<tr><td>'+E(r.sku)+'</td><td>'+F(r.qty)+'</td><td>'+B(r.rawAmt)+'</td><td>'+B((N(r.netAmt)||N(r.rawAmt))*1.07)+'</td></tr>').join('')+'</tbody></table></div>').join(''):'<div class="empty">ไม่พบ Telesale ตามตัวเลือกที่ติ๊ก</div>'}`;
     const newTeleRender = `function renderTele(){const bs=teleBills();$('#teleBtn').textContent='บิล Telesale ('+F(bs.length)+')';$('#drawerBody').innerHTML=bs.length?bs.map(b=>{const rawTotal=N(b.amt),vatTotal=b.lines.reduce((s,r)=>s+(N(r.netAmt)||N(r.rawAmt))*1.07,0);return '<div class="teleBill"><div class="teleBillHead"><b>ร้าน: '+E(b.store)+'</b><br><small>บิล: '+E(b.inv)+' · วันที่ '+E(dlabel(b.date))+' · Tele: '+E(b.tele)+'</small></div><table class="teleTbl"><thead><tr><th>สินค้า</th><th>จำนวน</th><th>ยอดดิบ</th><th>สุทธิ+VAT</th></tr></thead><tbody>'+b.lines.map(r=>'<tr><td>'+E(r.sku)+'</td><td>'+F(r.qty)+'</td><td>'+B(r.rawAmt)+'</td><td>'+B((N(r.netAmt)||N(r.rawAmt))*1.07)+'</td></tr>').join('')+'<tr class="totalRow"><td>รวมทั้งหมด</td><td>'+F(b.qty)+'</td><td>'+B(rawTotal)+'</td><td>'+B(vatTotal)+'</td></tr></tbody></table></div>'}).join(''):'<div class="empty">ไม่พบ Telesale ตามตัวเลือกที่ติ๊ก</div>'}`;
+    const oldCoreAppExport = "window.DOIT_CORE_APP={load:loadData,health:()=>({rows:rows.length,pickRows:sourceRows().length,shipRows:shipPool().length,distRows:sourceRows({ignoreDate:true}).length,teleRows:rows.filter(r=>r.isTele).length,teleBills:teleBills().length,receivers:sel.receivers,manualKeys:Object.keys(send).length,inserted:ins.length,mode,bound,flow:'single-core-raw-net-v2'})};window.DOIT_JSON_APP=window.DOIT_CORE_APP;bind();check();";
+    const newCoreAppExport = "window.DOIT_CORE_APP={load:loadData,currentState:()=>JSON.parse(JSON.stringify({sel,q,send,add,pull,ins,key,page,pageSize,mode,showDetails,remainView})),health:()=>({rows:rows.length,pickRows:sourceRows().length,shipRows:shipPool().length,distRows:sourceRows({ignoreDate:true}).length,teleRows:rows.filter(r=>r.isTele).length,teleBills:teleBills().length,receivers:sel.receivers,manualKeys:Object.keys(send).length,inserted:ins.length,mode,bound,flow:'single-core-raw-net-v2'})};window.DOIT_JSON_APP=window.DOIT_CORE_APP;bind();check();";
 
     let patched = code;
     if (patched.includes(oldDoneBranch)) patched = patched.replace(oldDoneBranch, newDoneBranch);
@@ -46,6 +48,9 @@
 
     if (patched.includes(oldTeleRender)) patched = patched.replace(oldTeleRender, newTeleRender);
     else console.warn('ไม่พบ renderTele เดิม จึงไม่ได้ patch บิล Telesale');
+
+    if (patched.includes(oldCoreAppExport)) patched = patched.replace(oldCoreAppExport, newCoreAppExport);
+    else console.warn('ไม่พบ DOIT_CORE_APP export เดิม จึงไม่ได้เพิ่ม currentState');
 
     return patched;
   }
