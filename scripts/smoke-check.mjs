@@ -36,10 +36,10 @@ const pkg = JSON.parse(read('package.json'));
 ['build', 'smoke', 'verify', 'verify:react'].forEach(name => check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`));
 check(pkg.scripts.verify === 'npm run smoke', 'package.json verify must be smoke-only for Pro legacy');
 
-mustContain('dist/index.html', 'Pro Stable 1026');
-mustContain('dist/index.html', '/pro.html?t=1026');
-mustContain('dist/pro-v310.html', "location.replace('/pro.html?t=1026')");
-mustContain('dist/pro-v310-test.html', "location.replace('/pro.html?t=1026')");
+mustContain('dist/index.html', 'Pro Stable 1028 Native');
+mustContain('dist/index.html', '/pro.html?t=1028');
+mustContain('dist/pro-v310.html', "location.replace('/pro.html?t=1028')");
+mustContain('dist/pro-v310-test.html', "location.replace('/pro.html?t=1028')");
 
 mustContain('.github/workflows/web-ci.yml', 'dist/*.html');
 mustContain('.github/workflows/web-ci.yml', 'dist/assets/**');
@@ -127,8 +127,9 @@ mustContain('dist/assets/pro-print-store-bills.js', 'Object.keys(st?.send||{})')
 mustNotContain('dist/assets/pro-print-store-bills.js', 'mapVal(st.send,g.poolKey,store,st.sel)+mapVal(st.add');
 mustNotContain('dist/assets/pro-print-store-bills.js', '[st?.send,st?.add,st?.pull]');
 
-mustContain('docs/ROADMAP.md', 'Pro Stable = 1026');
-mustContain('docs/CLEANUP_AUDIT.md', 'Old public V310 pages redirect');
+mustContain('docs/ROADMAP.md', 'Pro Stable = 1028 Native');
+mustContain('docs/CLEANUP_AUDIT.md', 'Pro Stable = 1028 Native');
+mustContain('docs/PROJECT_PRO_NATIVE_CORE.md', 'Status: COMPLETE');
 mustContain('docs/QA_CHECKLIST.md', 'verify:react');
 mustContain('docs/FEATURE_RULES.md', 'verify:react');
 
@@ -144,4 +145,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: Pro production core now boots native stack without jsdelivr/eval wrapper.');
+console.log('Smoke check passed: Pro Stable 1028 Native guardrails are intact.');
