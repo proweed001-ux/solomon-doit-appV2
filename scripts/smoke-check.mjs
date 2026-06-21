@@ -16,11 +16,15 @@ const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `$
   'dist/index.html',
   'dist/pro.html',
   'dist/pro-native-test.html',
+  'dist/pro-native-phase4.html',
+  'dist/pro-native-ui.html',
   'dist/pro-v310.html',
   'dist/pro-v310-test.html',
   'dist/assets/pro-core-v4.js',
   'dist/assets/pro-native-core.js',
   'dist/assets/pro-native-core-overrides.js',
+  'dist/assets/pro-native-phase4-readiness.js',
+  'dist/assets/pro-native-ui-readiness.js',
   'dist/assets/pro-print-store-bills.js',
   'dist/assets/pro-print-mode-fixes.js',
   'dist/assets/pro-print.css',
@@ -69,6 +73,22 @@ mustContain('dist/pro-native-test.html', 'Project Pro Native Core Preview');
 mustContain('dist/pro-native-test.html', '/assets/pro-native-core.js?v=phase2');
 mustContain('dist/pro-native-test.html', '/assets/pro-native-core-overrides.js?v=phase2');
 mustNotContain('dist/pro-native-test.html', 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
+
+mustContain('dist/pro-native-phase4.html', 'Project Pro Native Core Phase 4');
+mustContain('dist/pro-native-phase4.html', 'Phase 4 preview: native core stack only');
+mustContain('dist/pro-native-phase4.html', '/assets/pro-native-core.js?v=phase4');
+mustContain('dist/pro-native-phase4.html', '/assets/pro-native-core-overrides.js?v=phase4');
+mustContain('dist/pro-native-phase4.html', '/assets/pro-native-phase4-readiness.js?v=phase4');
+mustNotContain('dist/pro-native-phase4.html', 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
+
+mustContain('dist/pro-native-ui.html', 'Native Core UI Mirror');
+mustContain('dist/pro-native-ui.html', "fetch('/pro.html?t=1027'");
+mustContain('dist/pro-native-ui.html', 'pro-core-v4.js');
+mustContain('dist/pro-native-ui.html', '/assets/pro-native-core.js?v=phase4-ui');
+mustContain('dist/pro-native-ui.html', '/assets/pro-native-core-overrides.js?v=phase4-ui');
+mustContain('dist/pro-native-ui.html', '/assets/pro-native-ui-readiness.js?v=phase4-ui');
+mustNotContain('dist/pro-native-ui.html', 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
+
 mustContain('dist/assets/pro-native-core.js', "const END='https://saodmeoilixfdqentofp.supabase.co/functions/v1/doit-active'");
 mustContain('dist/assets/pro-native-core-overrides.js', 'DOIT_NATIVE_CORE_PREVIEW');
 mustContain('dist/assets/pro-native-core-overrides.js', "version: 'phase3'");
@@ -77,6 +97,17 @@ mustContain('dist/assets/pro-native-core-overrides.js', 'renderDoneFromPrintModu
 mustContain('dist/assets/pro-native-core-overrides.js', 'enhanceOrderTable');
 mustContain('dist/assets/pro-native-core-overrides.js', 'enhanceTeleBills');
 mustContain('dist/assets/pro-native-core-overrides.js', '#table input.jdata[data-map="send"]');
+
+mustContain('dist/assets/pro-native-phase4-readiness.js', 'DOIT_NATIVE_PHASE4_READINESS');
+mustContain('dist/assets/pro-native-phase4-readiness.js', 'currentState API available');
+mustContain('dist/assets/pro-native-phase4-readiness.js', 'production untouched');
+mustContain('dist/assets/pro-native-phase4-readiness.js', 'phase4VisualMatchCss');
+mustContain('dist/assets/pro-native-phase4-readiness.js', 'visual style matched');
+mustContain('dist/assets/pro-native-phase4-readiness.js', 'linear-gradient(180deg,#22c55e 0%,#0b8f3a 58%,#06652b 100%)');
+
+mustContain('dist/assets/pro-native-ui-readiness.js', 'DOIT_NATIVE_UI_PREVIEW');
+mustContain('dist/assets/pro-native-ui-readiness.js', "visualSource: 'dist/pro.html'");
+mustContain('dist/assets/pro-native-ui-readiness.js', "version: 'phase4-ui'");
 
 mustContain('dist/assets/pro-print-mode-fixes.js', 'function isTotalLikeRow');
 mustContain('dist/assets/pro-print-mode-fixes.js', 'orderPrintFix');
@@ -112,4 +143,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: Pro Stable guardrails and Project Pro Native Core phase 3 preview bridge are intact.');
+console.log('Smoke check passed: Pro Stable guardrails and Project Pro Native Core UI mirror are intact.');
