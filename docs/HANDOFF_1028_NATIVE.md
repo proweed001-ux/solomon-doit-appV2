@@ -19,6 +19,7 @@ PR #42: native core preview checkpoint
 PR #43: native UI mirror checkpoint
 PR #44: production switch candidate
 PR #45: lock Pro Stable 1028 Native
+PR #46: stable handoff / README / QA notes
 ```
 
 ผลลัพธ์หลัก:
@@ -31,6 +32,21 @@ PR #45: lock Pro Stable 1028 Native
 - ไม่มี eval(code) ใน production bootstrap path
 - ไม่มี patchLegacyCore/string replace ใน production bootstrap path
 - หน้าแรกและ redirect เก่าไป /pro.html?t=1028 แล้ว
+```
+
+## CurrentState status
+
+```text
+Current state API now prefers active-session state captured from the current Pro core save cycle.
+Fallback localStorage scoring is kept only as backup.
+```
+
+เหตุผล:
+
+```text
+- ลดความเสี่ยงกรณี localStorage มีหลายไฟล์/หลายวันค้างอยู่
+- currentState ไม่ควรเลือกไฟล์เก่าจาก sendCount สูงกว่า ถ้ามี active session ล่าสุดแล้ว
+- ยังไม่ลบ fallback จนกว่าจะย้าย API เข้า pro-native-core.js โดยตรงครบและ QA แล้ว
 ```
 
 ## โครงสร้าง production ตอนนี้
@@ -110,7 +126,7 @@ Manual QA บนมือถือ:
 ```text
 1. ใช้งาน production จริง 1–2 รอบงาน
 2. เปิด cleanup PR เพื่อตรวจ reference ของ preview files
-3. ย้าย currentState bridge เข้า pro-native-core.js ทีละ commit
+3. ย้าย currentState API เข้า pro-native-core.js โดยตรงจาก closure ทีละ commit
 4. ย้าย send Next navigation เข้า pro-native-core.js ทีละ commit
 5. ย้าย done/order/Telesale bridge ทีละจุด
 6. ลด pro-native-core-overrides.js หลังทุกอย่างผ่าน QA
@@ -133,6 +149,7 @@ Rollback checkpoint ที่ควรรู้:
 ก่อน production native switch: commit ก่อน PR #44
 หลัง production native switch: PR #44 merge commit 79b26613c7f01c4c7c8f0e3555d889baa614928d
 Stable lock: PR #45 merge commit 6a6ff9a83b395c54122290c71194e919b791b77c
+Handoff: PR #46 merge commit 6e99bd69f2b78ca059089446becb6bec9aa1affc
 ```
 
 ## สรุปสั้น
@@ -140,5 +157,6 @@ Stable lock: PR #45 merge commit 6a6ff9a83b395c54122290c71194e919b791b77c
 ```text
 งานใหญ่เสร็จแล้ว
 ตอนนี้ให้ใช้ Pro Stable 1028 Native เป็นตัวจริง
+currentState ลดการเดา localStorage แล้วโดยใช้ active-session state ก่อน fallback
 งานต่อไปคือ cleanup/refactor แบบค่อยเป็นค่อยไปเท่านั้น
 ```

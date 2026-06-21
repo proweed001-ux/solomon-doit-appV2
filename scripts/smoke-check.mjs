@@ -96,12 +96,18 @@ mustNotContain('dist/pro-native-ui.html', 'cdn.jsdelivr.net/gh/proweed001-ux/sol
 
 mustContain('dist/assets/pro-native-core.js', "const END='https://saodmeoilixfdqentofp.supabase.co/functions/v1/doit-active'");
 mustContain('dist/assets/pro-native-core-overrides.js', 'DOIT_NATIVE_CORE_PREVIEW');
-mustContain('dist/assets/pro-native-core-overrides.js', "version: 'phase3'");
-mustContain('dist/assets/pro-native-core-overrides.js', 'installCurrentStateApi');
+mustContain('dist/assets/pro-native-core-overrides.js', "version: 'phase3-current-state-active-session'");
+mustContain('dist/assets/pro-native-core-overrides.js', 'installActiveStateRecorder');
+mustContain('dist/assets/pro-native-core-overrides.js', '__DOIT_NATIVE_ACTIVE_STATE__');
+mustContain('dist/assets/pro-native-core-overrides.js', 'localStorage.setItem-active-session');
+mustContain('dist/assets/pro-native-core-overrides.js', 'currentStateSnapshot');
+mustContain('dist/assets/pro-native-core-overrides.js', 'stateApiSource');
+mustContain('dist/assets/pro-native-core-overrides.js', 'currentStateActiveSession');
 mustContain('dist/assets/pro-native-core-overrides.js', 'renderDoneFromPrintModule');
 mustContain('dist/assets/pro-native-core-overrides.js', 'enhanceOrderTable');
 mustContain('dist/assets/pro-native-core-overrides.js', 'enhanceTeleBills');
 mustContain('dist/assets/pro-native-core-overrides.js', '#table input.jdata[data-map="send"]');
+mustNotContain('dist/assets/pro-native-core-overrides.js', 'app.currentState = () => JSON.parse(JSON.stringify(bestStoredState() || {}))');
 
 mustContain('dist/assets/pro-native-phase4-readiness.js', 'DOIT_NATIVE_PHASE4_READINESS');
 mustContain('dist/assets/pro-native-phase4-readiness.js', 'currentState API available');
@@ -153,4 +159,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: Pro Stable 1028 Native handoff is documented and guardrails are intact.');
+console.log('Smoke check passed: Pro Stable 1028 Native active-session currentState guardrails are intact.');
