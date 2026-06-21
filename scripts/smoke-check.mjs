@@ -46,28 +46,29 @@ mustContain('.github/workflows/web-ci.yml', 'dist/assets/**');
 mustContain('.github/workflows/web-ci.yml', 'docs/**');
 
 mustContain('dist/pro.html', 'pro-core-v4.js');
-mustContain('dist/assets/pro-core-v4.js', "VERSION = '1027'");
-mustContain('dist/assets/pro-core-v4.js', 'currentState:()=>JSON.parse');
-mustContain('dist/assets/pro-core-v4.js', 'installPickSendEnterNext');
-mustContain('dist/assets/pro-core-v4.js', 'SEND_SELECTOR');
-mustContain('dist/assets/pro-core-v4.js', '#table input.jdata[data-map="send"]');
-mustContain('dist/assets/pro-core-v4.js', "event.key !== 'Enter'");
-mustContain('dist/assets/pro-core-v4.js', "input.enterKeyHint = 'next'");
-mustContain('dist/assets/pro-core-v4.js', 'input.tabIndex = 1000 + index');
-mustContain('dist/assets/pro-core-v4.js', 'nextIndexFor');
-mustContain('dist/assets/pro-core-v4.js', 'focusSendAt(nextIndexFor(input))');
+mustContain('dist/assets/pro-core-v4.js', "VERSION = '1028-native'");
+mustContain('dist/assets/pro-core-v4.js', "mode: 'native-stack-bootstrap'");
+mustContain('dist/assets/pro-core-v4.js', 'legacyWrapperRemoved: true');
+mustContain('dist/assets/pro-core-v4.js', "assetUrl('pro-print-store-bills.js'");
+mustContain('dist/assets/pro-core-v4.js', "assetUrl('pro-native-core.js')");
+mustContain('dist/assets/pro-core-v4.js', "assetUrl('pro-native-core-overrides.js')");
+mustContain('dist/assets/pro-core-v4.js', "assetUrl('pro-print-mode-fixes.js'");
+mustContain('dist/assets/pro-core-v4.js', "assetUrl('pro-print-column-widths.js'");
+mustContain('dist/assets/pro-core-v4.js', "assetUrl('pro-print-a4-pro-fix.js'");
+mustContain('dist/assets/pro-core-v4.js', "loadCss(assetUrl('pro-print.css'");
+mustContain('dist/assets/pro-core-v4.js', 'for (const src of stack) await loadScript(src)');
+mustNotContain('dist/assets/pro-core-v4.js', 'CORE_URL');
+mustNotContain('dist/assets/pro-core-v4.js', 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
+mustNotContain('dist/assets/pro-core-v4.js', 'fetch(CORE_URL');
+mustNotContain('dist/assets/pro-core-v4.js', '(0, eval)');
+mustNotContain('dist/assets/pro-core-v4.js', 'patchLegacyCore');
 mustNotContain('dist/assets/pro-core-v4.js', 'oldPickSendNav');
 mustNotContain('dist/assets/pro-core-v4.js', 'newPickSendNav');
 mustNotContain('dist/assets/pro-core-v4.js', 'focusSendDown');
-
-mustContain('dist/assets/pro-core-v4.js', 'oldOrderBranch');
-mustContain('dist/assets/pro-core-v4.js', 'newOrderBranch');
-mustContain('dist/assets/pro-core-v4.js', 'oldTeleRender');
-mustContain('dist/assets/pro-core-v4.js', 'newTeleRender');
-mustContain('dist/assets/pro-core-v4.js', 'renderDoneFromCore');
-mustContain('dist/assets/pro-core-v4.js', 'pro-print-store-bills.js');
-mustNotContain('dist/assets/pro-core-v4.js', 'pro-print-pro-fixes.js');
-mustNotContain('dist/assets/pro-core-v4.js', 'pro-print-total-display-fix.js');
+mustNotContain('dist/assets/pro-core-v4.js', 'oldOrderBranch');
+mustNotContain('dist/assets/pro-core-v4.js', 'newOrderBranch');
+mustNotContain('dist/assets/pro-core-v4.js', 'oldTeleRender');
+mustNotContain('dist/assets/pro-core-v4.js', 'newTeleRender');
 
 mustContain('dist/pro-native-test.html', 'Project Pro Native Core Preview');
 mustContain('dist/pro-native-test.html', '/assets/pro-native-core.js?v=phase2');
@@ -143,4 +144,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: Pro Stable guardrails and Project Pro Native Core UI mirror are intact.');
+console.log('Smoke check passed: Pro production core now boots native stack without jsdelivr/eval wrapper.');
