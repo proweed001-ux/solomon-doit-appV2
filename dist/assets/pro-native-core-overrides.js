@@ -5,10 +5,62 @@
   window.__DOIT_PRO_NATIVE_OVERRIDES__ = true;
 
   const SEND_SELECTOR = '#table input.jdata[data-map="send"]';
+  const STATE_KEY_PREFIX = 'doit-core-unified-v1:';
   const T = value => String(value ?? '').trim();
   const N = value => Number(String(value ?? '').replace(/,/g, '').replace(/[^0-9.\-]/g, '')) || 0;
   const F = value => N(value).toLocaleString('th-TH');
   const B = value => N(value).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  let activeStateKey = '';
+  let activeStateCache = null;
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value || {}));
+  }
+
+  function rememberState(key, value) {
+    const k = String(key || '');
+    if (!k.startsWith(STATE_KEY_PREFIX)) return;
+    try {
+      const parsed = typeof value === 'string' ? JSON.parse(value || '{}') : value;
+      if (!parsed || typeof parsed !== 'object') return;
+      activeStateKey = k;
+      activeStateCache = clone(parsed);
+      window.__DOIT_NATIVE_ACTIVE_STATE__ = {
+        key: activeStateKey,
+        state: clone(activeStateCache),
+        updatedAt: Date.now(),
+        source: 'localStorage.setItem-active-session'
+      };
+    } catch {}
+  }
+
+  function installActiveStateRecorder() {
+    if (window.__DOIT_NATIVE_ACTIVE_STATE_RECORDER__) return;
+    window.__DOIT_NATIVE_ACTIVE_STATE_RECORDER__ = true;
+    try {
+      const proto = Storage.prototype;
+      const originalSetItem = proto.setItem;
+      proto.setItem = function patchedDoitSetItem(key, value) {
+        if (this === localStorage) rememberState(key, value);
+        return originalSetItem.apply(this, arguments);
+      };
+    } catch {
+      try {
+        const originalSetItem = localStorage.setItem.bind(localStorage);
+        localStorage.setItem = function patchedDoitLocalSetItem(key, value) {
+          rememberState(key, value);
+          return originalSetItem(key, value);
+        };
+      } catch {}
+    }
+  }
+
+  function latestRecordedState() {
+    if (activeStateCache) return clone(activeStateCache);
+    const cached = window.__DOIT_NATIVE_ACTIVE_STATE__?.state;
+    return cached ? clone(cached) : null;
+  }
 
   function sendInputs() {
     return [...document.querySelectorAll(SEND_SELECTOR)].filter(input => !input.disabled);
@@ -41,7 +93,7 @@
   }
 
   function labelText(selector, label) {
-    const raw = T(document.querySelector(selector)?.textContent).replace(new RegExp('^' + label + ':\\s*'), '');
+    const raw = T(document.querySelector(selector)?.textContent).replace(new RegExp('^' + label + ':\s*'), '');
     return (!raw || raw.includes('ทั้งหมด') || raw.includes('เลือก') || raw.includes('ยังไม่เลือก')) ? '' : raw;
   }
 
@@ -65,7 +117,7 @@
   function bestStoredState() {
     const ps = currentPs();
     const receivers = currentReceivers();
-    const keys = Object.keys(localStorage).filter(k => k.startsWith('doit-core-unified-v1:'));
+    const keys = Object.keys(localStorage).filter(k => k.startsWith(STATE_KEY_PREFIX));
     let best = null;
     let score = -Infinity;
     keys.forEach(key => {
@@ -86,11 +138,18 @@
     return best;
   }
 
+  function currentStateSnapshot() {
+    const recorded = latestRecordedState();
+    if (recorded) return recorded;
+    return clone(bestStoredState() || {});
+  }
+
   function installCurrentStateApi() {
     const app = window.DOIT_CORE_APP;
-    if (!app || app.__nativePreviewStateApi) return false;
-    app.currentState = () => JSON.parse(JSON.stringify(bestStoredState() || {}));
+    if (!app) return false;
+    app.currentState = () => currentStateSnapshot();
     app.__nativePreviewStateApi = true;
+    app.__nativeStateApiSource = activeStateCache ? 'active-session-state' : 'active-session-state-with-localStorage-fallback';
     return true;
   }
 
@@ -134,6 +193,8 @@
     });
   }
 
+  installActiveStateRecorder();
+
   document.addEventListener('change', event => {
     const input = event.target?.closest?.(SEND_SELECTOR);
     if (!input) return;
@@ -176,9 +237,10 @@
   refreshSendInputs();
 
   window.DOIT_NATIVE_CORE_PREVIEW = {
-    version: 'phase3',
+    version: 'phase3-current-state-active-session',
     mode: 'native-core-file-plus-behavior-bridge',
-    production: false,
-    fixes: ['currentState', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal']
+    production: true,
+    stateApiSource: 'active-session-state-with-localStorage-fallback',
+    fixes: ['currentStateActiveSession', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal']
   };
 })();
