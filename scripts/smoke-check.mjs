@@ -71,6 +71,11 @@ mustContain('dist/pro-native-test.html', '/assets/pro-native-core-overrides.js?v
 mustNotContain('dist/pro-native-test.html', 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
 mustContain('dist/assets/pro-native-core.js', "const END='https://saodmeoilixfdqentofp.supabase.co/functions/v1/doit-active'");
 mustContain('dist/assets/pro-native-core-overrides.js', 'DOIT_NATIVE_CORE_PREVIEW');
+mustContain('dist/assets/pro-native-core-overrides.js', "version: 'phase3'");
+mustContain('dist/assets/pro-native-core-overrides.js', 'installCurrentStateApi');
+mustContain('dist/assets/pro-native-core-overrides.js', 'renderDoneFromPrintModule');
+mustContain('dist/assets/pro-native-core-overrides.js', 'enhanceOrderTable');
+mustContain('dist/assets/pro-native-core-overrides.js', 'enhanceTeleBills');
 mustContain('dist/assets/pro-native-core-overrides.js', '#table input.jdata[data-map="send"]');
 
 mustContain('dist/assets/pro-print-mode-fixes.js', 'function isTotalLikeRow');
@@ -107,4 +112,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: Pro Stable guardrails and Project Pro Native Core preview files are intact.');
+console.log('Smoke check passed: Pro Stable guardrails and Project Pro Native Core phase 3 preview bridge are intact.');
