@@ -1,0 +1,257 @@
+name: Patch currentState closure native
+
+on:
+  push:
+    branches:
+      - fix-currentstate-closure-native
+    paths:
+      - '.github/workflows/patch-currentstate-closure-native.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-currentstate-closure-native
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Apply closure-native currentState patch
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          core = Path('dist/assets/pro-native-core.js')
+          text = core.read_text(encoding='utf-8')
+          if "currentState:()=>JSON.parse(snap())" not in text:
+              text = text.replace(
+                  "window.DOIT_CORE_APP={load:loadData,health:()=>(",
+                  "window.DOIT_CORE_APP={load:loadData,currentState:()=>JSON.parse(snap()),health:()=>(",
+              )
+          if "currentStateSource:'closure-native'" not in text:
+              text = text.replace(
+                  "flow:'single-core-raw-net-v2'",
+                  "flow:'single-core-raw-net-v2',currentStateSource:'closure-native'",
+              )
+          if "currentState:()=>JSON.parse(snap())" not in text:
+              raise SystemExit('core currentState patch failed')
+          core.write_text(text, encoding='utf-8')
+
+          overrides = Path('dist/assets/pro-native-core-overrides.js')
+          overrides.write_text(r"""(() => {
+            'use strict';
+
+            if (window.__DOIT_PRO_NATIVE_OVERRIDES__) return;
+            window.__DOIT_PRO_NATIVE_OVERRIDES__ = true;
+
+            const SEND_SELECTOR = '#table input.jdata[data-map="send"]';
+            const T = value => String(value ?? '').trim();
+            const N = value => Number(String(value ?? '').replace(/,/g, '').replace(/[^0-9.\-]/g, '')) || 0;
+            const F = value => N(value).toLocaleString('th-TH');
+            const B = value => N(value).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            function preserveCoreCurrentState() {
+              const app = window.DOIT_CORE_APP;
+              if (!app) return false;
+              if (typeof app.currentState !== 'function') {
+                app.__nativeStateApiMissing = true;
+                return false;
+              }
+              app.__nativePreviewStateApi = true;
+              app.__nativeStateApiSource = 'closure-native-core';
+              return true;
+            }
+
+            function sendInputs() {
+              return [...document.querySelectorAll(SEND_SELECTOR)].filter(input => !input.disabled);
+            }
+
+            function refreshSendInputs() {
+              sendInputs().forEach((input, index) => {
+                input.enterKeyHint = 'next';
+                input.tabIndex = 1000 + index;
+              });
+            }
+
+            function focusSendAt(index) {
+              setTimeout(() => {
+                requestAnimationFrame(() => {
+                  refreshSendInputs();
+                  const inputs = sendInputs();
+                  const next = inputs[index] || inputs[inputs.length - 1] || inputs[0];
+                  if (!next) return;
+                  next.focus({ preventScroll: true });
+                  next.scrollIntoView({ block: 'center', inline: 'nearest' });
+                  try { next.select(); } catch {}
+                });
+              }, 140);
+            }
+
+            function nextIndexFor(input) {
+              const inputs = sendInputs();
+              return Math.max(0, inputs.indexOf(input)) + 1;
+            }
+
+            function renderDoneFromPrintModule() {
+              if (window.DOIT_PRO_PRINT_STORE_BILLS?.renderDoneFromCore) {
+                window.DOIT_PRO_PRINT_STORE_BILLS.renderDoneFromCore();
+              }
+            }
+
+            function enhanceOrderTable() {
+              const count = T(document.querySelector('#tableCount')?.textContent);
+              const table = document.querySelector('#table');
+              const body = table?.querySelector('tbody');
+              if (!body || !count.includes('รวม order') || body.querySelector('.nativeOrderTotal')) return;
+              const rows = [...body.querySelectorAll('tr')].filter(row => !row.classList.contains('totalRow'));
+              if (!rows.length) return;
+              let qty = 0, raw = 0, net = 0, vat = 0;
+              rows.forEach(row => {
+                const cells = [...row.children].map(cell => cell.textContent);
+                qty += N(cells[2]);
+                raw += N(cells[3]);
+                net += N(cells[4]);
+                vat += N(cells[5]);
+              });
+              body.insertAdjacentHTML('beforeend', `<tr class="totalRow nativeOrderTotal"><td colspan="2" class="r">รวมทั้งหมด</td><td>${F(qty)}</td><td>${B(raw)}</td><td>${B(net)}</td><td>${B(vat)}</td></tr>`);
+            }
+
+            function enhanceTeleBills() {
+              document.querySelectorAll('.teleBill tbody').forEach(body => {
+                if (body.querySelector('.nativeTeleTotal')) return;
+                const rows = [...body.querySelectorAll('tr')];
+                if (!rows.length) return;
+                let qty = 0, raw = 0, vat = 0;
+                rows.forEach(row => {
+                  const cells = [...row.children].map(cell => cell.textContent);
+                  qty += N(cells[1]);
+                  raw += N(cells[2]);
+                  vat += N(cells[3]);
+                });
+                body.insertAdjacentHTML('beforeend', `<tr class="totalRow nativeTeleTotal"><td>รวมทั้งหมด</td><td>${F(qty)}</td><td>${B(raw)}</td><td>${B(vat)}</td></tr>`);
+              });
+            }
+
+            document.addEventListener('change', event => {
+              const input = event.target?.closest?.(SEND_SELECTOR);
+              if (!input) return;
+              focusSendAt(nextIndexFor(input));
+            }, true);
+
+            document.addEventListener('keydown', event => {
+              const input = event.target?.closest?.(SEND_SELECTOR);
+              if (!input || event.key !== 'Enter') return;
+              event.preventDefault();
+              event.stopPropagation();
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            }, true);
+
+            document.addEventListener('focusin', event => {
+              if (event.target?.matches?.(SEND_SELECTOR)) refreshSendInputs();
+            }, true);
+
+            document.addEventListener('click', event => {
+              const tab = event.target?.closest?.('.tab');
+              if (!tab) return;
+              const text = T(tab.textContent);
+              if (text.includes('จัดแล้ว')) setTimeout(renderDoneFromPrintModule, 80);
+              if (text.includes('รวม order')) setTimeout(enhanceOrderTable, 80);
+            }, true);
+
+            const observer = new MutationObserver(() => {
+              preserveCoreCurrentState();
+              refreshSendInputs();
+              enhanceOrderTable();
+              enhanceTeleBills();
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+
+            const timer = setInterval(() => {
+              if (preserveCoreCurrentState()) clearInterval(timer);
+            }, 100);
+            setTimeout(() => clearInterval(timer), 10000);
+
+            refreshSendInputs();
+
+            window.DOIT_NATIVE_CORE_PREVIEW = {
+              version: 'phase4-closure-native-current-state',
+              mode: 'native-core-file-plus-behavior-bridge',
+              production: true,
+              stateApiSource: 'closure-native-core',
+              fixes: ['closureNativeCurrentState', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal']
+            };
+          })();
+          """, encoding='utf-8')
+
+          smoke = Path('scripts/smoke-check.mjs')
+          s = smoke.read_text(encoding='utf-8')
+          old_tokens = [
+              "mustContain('dist/assets/pro-native-core-overrides.js', \"version: 'phase3-current-state-active-session'\");",
+              "mustContain('dist/assets/pro-native-core-overrides.js', 'installActiveStateRecorder');",
+              "mustContain('dist/assets/pro-native-core-overrides.js', '__DOIT_NATIVE_ACTIVE_STATE__');",
+              "mustContain('dist/assets/pro-native-core-overrides.js', 'localStorage.setItem-active-session');",
+              "mustContain('dist/assets/pro-native-core-overrides.js', 'currentStateSnapshot');",
+              "mustContain('dist/assets/pro-native-core-overrides.js', 'stateApiSource');",
+              "mustContain('dist/assets/pro-native-core-overrides.js', 'currentStateActiveSession');",
+              "mustNotContain('dist/assets/pro-native-core-overrides.js', 'app.currentState = () => JSON.parse(JSON.stringify(bestStoredState() || {}))');",
+          ]
+          lines = s.splitlines()
+          lines = [line for line in lines if line not in old_tokens]
+          out = []
+          inserted_core = False
+          inserted_override = False
+          for line in lines:
+              out.append(line)
+              if not inserted_core and "mustContain('dist/assets/pro-native-core.js', \"const END='https://saodmeoilixfdqentofp.supabase.co/functions/v1/doit-active'\");" in line:
+                  out.append("mustContain('dist/assets/pro-native-core.js', 'currentState:()=>JSON.parse(snap())');")
+                  out.append("mustContain('dist/assets/pro-native-core.js', \"currentStateSource:'closure-native'\");")
+                  inserted_core = True
+              if not inserted_override and "mustContain('dist/assets/pro-native-core-overrides.js', 'DOIT_NATIVE_CORE_PREVIEW');" in line:
+                  out.append("mustContain('dist/assets/pro-native-core-overrides.js', \"version: 'phase4-closure-native-current-state'\");")
+                  out.append("mustContain('dist/assets/pro-native-core-overrides.js', 'preserveCoreCurrentState');")
+                  out.append("mustContain('dist/assets/pro-native-core-overrides.js', 'closureNativeCurrentState');")
+                  out.append("mustContain('dist/assets/pro-native-core-overrides.js', \"stateApiSource: 'closure-native-core'\");")
+                  out.append("mustNotContain('dist/assets/pro-native-core-overrides.js', 'bestStoredState');")
+                  out.append("mustNotContain('dist/assets/pro-native-core-overrides.js', 'installActiveStateRecorder');")
+                  out.append("mustNotContain('dist/assets/pro-native-core-overrides.js', '__DOIT_NATIVE_ACTIVE_STATE__');")
+                  out.append("mustNotContain('dist/assets/pro-native-core-overrides.js', 'currentStateSnapshot');")
+                  out.append("mustNotContain('dist/assets/pro-native-core-overrides.js', 'app.currentState =');")
+                  inserted_override = True
+          if not inserted_core or not inserted_override:
+              raise SystemExit('smoke guard patch failed')
+          smoke.write_text('\n'.join(out) + '\n', encoding='utf-8')
+
+          handoff = Path('docs/HANDOFF_1028_NATIVE.md')
+          if handoff.exists():
+              h = handoff.read_text(encoding='utf-8')
+              h = h.replace(
+                  'Current state API now prefers active-session state captured from the current Pro core save cycle.\nFallback localStorage scoring is kept only as backup.',
+                  'Current state API is now exported directly from inside pro-native-core.js closure.\nIt reads sel/q/send/add/pull/ins/mode/page/pageSize/showDetails/remainView from the live core state via snap().'
+              )
+              h = h.replace(
+                  'currentState ลดการเดา localStorage แล้วโดยใช้ active-session state ก่อน fallback',
+                  'currentState เป็น closure-native แล้ว ไม่ใช้ localStorage scoring เป็นตัวหลัก'
+              )
+              h = h.replace(
+                  'ย้าย currentState API เข้า pro-native-core.js โดยตรงจาก closure ทีละ commit',
+                  'currentState API ย้ายเข้า pro-native-core.js แล้ว; งานต่อไปคือย้าย send Next navigation เข้า core'
+              )
+              handoff.write_text(h, encoding='utf-8')
+
+          Path('.github/workflows/patch-currentstate-closure-native.yml').unlink()
+          PY
+      - name: Run smoke
+        run: npm run smoke
+      - name: Commit patched files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git status --short
+          git add dist/assets/pro-native-core.js dist/assets/pro-native-core-overrides.js scripts/smoke-check.mjs docs/HANDOFF_1028_NATIVE.md .github/workflows/patch-currentstate-closure-native.yml
+          git commit -m "Move currentState into native core closure"
+          git push origin fix-currentstate-closure-native
