@@ -13,7 +13,10 @@ const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `$
 
 [
   'package.json',
+  'dist/index.html',
   'dist/pro.html',
+  'dist/pro-v310.html',
+  'dist/pro-v310-test.html',
   'dist/assets/pro-core-v4.js',
   'dist/assets/pro-print-store-bills.js',
   'dist/assets/pro-print-mode-fixes.js',
@@ -23,10 +26,21 @@ const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `$
 ].forEach(mustExist);
 
 const pkg = JSON.parse(read('package.json'));
-['build', 'smoke', 'verify'].forEach(name => check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`));
+['build', 'smoke', 'verify', 'verify:react'].forEach(name => check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`));
+check(pkg.scripts.verify === 'npm run smoke', 'package.json verify must be smoke-only for Pro legacy');
+
+mustContain('dist/index.html', 'Pro Stable 1026');
+mustContain('dist/index.html', '/pro.html?t=1026');
+mustContain('dist/pro-v310.html', "location.replace('/pro.html?t=1026')");
+mustContain('dist/pro-v310-test.html', "location.replace('/pro.html?t=1026')");
+
+mustContain('.github/workflows/web-ci.yml', 'dist/*.html');
+mustContain('.github/workflows/web-ci.yml', 'dist/assets/**');
+mustContain('.github/workflows/web-ci.yml', 'docs/**');
 
 mustContain('dist/pro.html', 'pro-core-v4.js');
-mustContain('dist/assets/pro-core-v4.js', "VERSION = '1026'");
+mustContain('dist/assets/pro-core-v4.js', "VERSION = '1027'");
+mustContain('dist/assets/pro-core-v4.js', 'currentState:()=>JSON.parse');
 mustContain('dist/assets/pro-core-v4.js', 'installPickSendEnterNext');
 mustContain('dist/assets/pro-core-v4.js', 'SEND_SELECTOR');
 mustContain('dist/assets/pro-core-v4.js', '#table input.jdata[data-map="send"]');
@@ -57,10 +71,18 @@ mustContain('dist/assets/pro-print-store-bills.js', 'BILL_ROWS=12');
 mustContain('dist/assets/pro-print-store-bills.js', 'BILLS_PER_A4=2');
 mustContain('dist/assets/pro-print-store-bills.js', 'function buildBills()');
 mustContain('dist/assets/pro-print-store-bills.js', 'function renderDoneFromCore()');
+mustContain('dist/assets/pro-print-store-bills.js', 'function liveState()');
+mustContain('dist/assets/pro-print-store-bills.js', 'window.DOIT_CORE_APP?.currentState?.()');
+mustContain('dist/assets/pro-print-store-bills.js', 'const live=liveState();if(live)return live');
 mustContain('dist/assets/pro-print-store-bills.js', 'const qty=mapVal(st.send,g.poolKey,store,st.sel)');
 mustContain('dist/assets/pro-print-store-bills.js', 'Object.keys(st?.send||{})');
 mustNotContain('dist/assets/pro-print-store-bills.js', 'mapVal(st.send,g.poolKey,store,st.sel)+mapVal(st.add');
 mustNotContain('dist/assets/pro-print-store-bills.js', '[st?.send,st?.add,st?.pull]');
+
+mustContain('docs/ROADMAP.md', 'Pro Stable = 1026');
+mustContain('docs/CLEANUP_AUDIT.md', 'Old public V310 pages redirect');
+mustContain('docs/QA_CHECKLIST.md', 'verify:react');
+mustContain('docs/FEATURE_RULES.md', 'verify:react');
 
 [
   'dist/assets/pro-print-pro-fixes.js',
@@ -74,4 +96,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: Pro print uses send quantities only; add/pull do not enter print bills.');
+console.log('Smoke check passed: Pro Stable 1026 cleanup guardrails, redirects, live state handoff, and send-only print bills are intact.');
