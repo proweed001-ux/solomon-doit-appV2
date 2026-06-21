@@ -15,9 +15,12 @@ const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `$
   'package.json',
   'dist/index.html',
   'dist/pro.html',
+  'dist/pro-native-test.html',
   'dist/pro-v310.html',
   'dist/pro-v310-test.html',
   'dist/assets/pro-core-v4.js',
+  'dist/assets/pro-native-core.js',
+  'dist/assets/pro-native-core-overrides.js',
   'dist/assets/pro-print-store-bills.js',
   'dist/assets/pro-print-mode-fixes.js',
   'dist/assets/pro-print.css',
@@ -62,6 +65,19 @@ mustContain('dist/assets/pro-core-v4.js', 'pro-print-store-bills.js');
 mustNotContain('dist/assets/pro-core-v4.js', 'pro-print-pro-fixes.js');
 mustNotContain('dist/assets/pro-core-v4.js', 'pro-print-total-display-fix.js');
 
+mustContain('dist/pro-native-test.html', 'Project Pro Native Core Preview');
+mustContain('dist/pro-native-test.html', '/assets/pro-native-core.js?v=phase2');
+mustContain('dist/pro-native-test.html', '/assets/pro-native-core-overrides.js?v=phase2');
+mustNotContain('dist/pro-native-test.html', 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
+mustContain('dist/assets/pro-native-core.js', "const END='https://saodmeoilixfdqentofp.supabase.co/functions/v1/doit-active'");
+mustContain('dist/assets/pro-native-core-overrides.js', 'DOIT_NATIVE_CORE_PREVIEW');
+mustContain('dist/assets/pro-native-core-overrides.js', "version: 'phase3'");
+mustContain('dist/assets/pro-native-core-overrides.js', 'installCurrentStateApi');
+mustContain('dist/assets/pro-native-core-overrides.js', 'renderDoneFromPrintModule');
+mustContain('dist/assets/pro-native-core-overrides.js', 'enhanceOrderTable');
+mustContain('dist/assets/pro-native-core-overrides.js', 'enhanceTeleBills');
+mustContain('dist/assets/pro-native-core-overrides.js', '#table input.jdata[data-map="send"]');
+
 mustContain('dist/assets/pro-print-mode-fixes.js', 'function isTotalLikeRow');
 mustContain('dist/assets/pro-print-mode-fixes.js', 'orderPrintFix');
 mustContain('dist/assets/pro-print-mode-fixes.js', 'pageStyle');
@@ -96,4 +112,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: Pro Stable 1026 cleanup guardrails, redirects, live state handoff, and send-only print bills are intact.');
+console.log('Smoke check passed: Pro Stable guardrails and Project Pro Native Core phase 3 preview bridge are intact.');
