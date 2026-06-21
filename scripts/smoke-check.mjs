@@ -91,6 +91,9 @@ mustContain('dist/assets/pro-native-core-overrides.js', '#table input.jdata[data
 mustContain('dist/assets/pro-native-phase4-readiness.js', 'DOIT_NATIVE_PHASE4_READINESS');
 mustContain('dist/assets/pro-native-phase4-readiness.js', 'currentState API available');
 mustContain('dist/assets/pro-native-phase4-readiness.js', 'production untouched');
+mustContain('dist/assets/pro-native-phase4-readiness.js', 'phase4VisualMatchCss');
+mustContain('dist/assets/pro-native-phase4-readiness.js', 'visual style matched');
+mustContain('dist/assets/pro-native-phase4-readiness.js', 'linear-gradient(180deg,#22c55e 0%,#0b8f3a 58%,#06652b 100%)');
 
 mustContain('dist/assets/pro-print-mode-fixes.js', 'function isTotalLikeRow');
 mustContain('dist/assets/pro-print-mode-fixes.js', 'orderPrintFix');
@@ -126,4 +129,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: Pro Stable guardrails and Project Pro Native Core phase 4 preview are intact.');
+console.log('Smoke check passed: Pro Stable guardrails and Project Pro Native Core phase 4 visual match are intact.');
