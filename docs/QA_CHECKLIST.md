@@ -4,10 +4,9 @@ Checklist นี้ใช้ก่อน merge ฟีเจอร์หรือ
 
 ## Automated checks
 
-ต้องผ่านทั้งหมด:
+สำหรับงาน Pro legacy ต้องผ่าน:
 
 ```bash
-npm run build
 npm run smoke
 ```
 
@@ -16,6 +15,16 @@ npm run smoke
 ```bash
 npm run verify
 ```
+
+ตอนนี้ `verify` เป็น smoke-only เพื่อไม่ให้ `vite build` ทับ `dist` ที่ใช้จริงโดยไม่ตั้งใจ
+
+สำหรับงานย้าย React app เท่านั้น:
+
+```bash
+npm run verify:react
+```
+
+หลัง `verify:react` ห้าม commit ผล build ใน `dist` จนกว่าจะตรวจ diff ทุกไฟล์แล้วว่าไม่ทับ Pro legacy
 
 ## Manual quick check
 
