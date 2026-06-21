@@ -37,8 +37,8 @@ PR #46: stable handoff / README / QA notes
 ## CurrentState status
 
 ```text
-Current state API now prefers active-session state captured from the current Pro core save cycle.
-Fallback localStorage scoring is kept only as backup.
+Current state API is now exported directly from inside pro-native-core.js closure.
+It reads sel/q/send/add/pull/ins/mode/page/pageSize/showDetails/remainView from the live core state via snap().
 ```
 
 เหตุผล:
@@ -126,7 +126,7 @@ Manual QA บนมือถือ:
 ```text
 1. ใช้งาน production จริง 1–2 รอบงาน
 2. เปิด cleanup PR เพื่อตรวจ reference ของ preview files
-3. ย้าย currentState API เข้า pro-native-core.js โดยตรงจาก closure ทีละ commit
+3. currentState API ย้ายเข้า pro-native-core.js แล้ว; งานต่อไปคือย้าย send Next navigation เข้า core
 4. ย้าย send Next navigation เข้า pro-native-core.js ทีละ commit
 5. ย้าย done/order/Telesale bridge ทีละจุด
 6. ลด pro-native-core-overrides.js หลังทุกอย่างผ่าน QA
@@ -157,6 +157,6 @@ Handoff: PR #46 merge commit 6e99bd69f2b78ca059089446becb6bec9aa1affc
 ```text
 งานใหญ่เสร็จแล้ว
 ตอนนี้ให้ใช้ Pro Stable 1028 Native เป็นตัวจริง
-currentState ลดการเดา localStorage แล้วโดยใช้ active-session state ก่อน fallback
+currentState เป็น closure-native แล้ว ไม่ใช้ localStorage scoring เป็นตัวหลัก
 งานต่อไปคือ cleanup/refactor แบบค่อยเป็นค่อยไปเท่านั้น
 ```

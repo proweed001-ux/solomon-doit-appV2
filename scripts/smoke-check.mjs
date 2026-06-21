@@ -95,19 +95,22 @@ mustContain('dist/pro-native-ui.html', '/assets/pro-native-ui-readiness.js?v=pha
 mustNotContain('dist/pro-native-ui.html', 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
 
 mustContain('dist/assets/pro-native-core.js', "const END='https://saodmeoilixfdqentofp.supabase.co/functions/v1/doit-active'");
+mustContain('dist/assets/pro-native-core.js', 'currentState:()=>JSON.parse(snap())');
+mustContain('dist/assets/pro-native-core.js', "currentStateSource:'closure-native'");
 mustContain('dist/assets/pro-native-core-overrides.js', 'DOIT_NATIVE_CORE_PREVIEW');
-mustContain('dist/assets/pro-native-core-overrides.js', "version: 'phase3-current-state-active-session'");
-mustContain('dist/assets/pro-native-core-overrides.js', 'installActiveStateRecorder');
-mustContain('dist/assets/pro-native-core-overrides.js', '__DOIT_NATIVE_ACTIVE_STATE__');
-mustContain('dist/assets/pro-native-core-overrides.js', 'localStorage.setItem-active-session');
-mustContain('dist/assets/pro-native-core-overrides.js', 'currentStateSnapshot');
-mustContain('dist/assets/pro-native-core-overrides.js', 'stateApiSource');
-mustContain('dist/assets/pro-native-core-overrides.js', 'currentStateActiveSession');
+mustContain('dist/assets/pro-native-core-overrides.js', "version: 'phase4-closure-native-current-state'");
+mustContain('dist/assets/pro-native-core-overrides.js', 'preserveCoreCurrentState');
+mustContain('dist/assets/pro-native-core-overrides.js', 'closureNativeCurrentState');
+mustContain('dist/assets/pro-native-core-overrides.js', "stateApiSource: 'closure-native-core'");
+mustNotContain('dist/assets/pro-native-core-overrides.js', 'bestStoredState');
+mustNotContain('dist/assets/pro-native-core-overrides.js', 'installActiveStateRecorder');
+mustNotContain('dist/assets/pro-native-core-overrides.js', '__DOIT_NATIVE_ACTIVE_STATE__');
+mustNotContain('dist/assets/pro-native-core-overrides.js', 'currentStateSnapshot');
+mustNotContain('dist/assets/pro-native-core-overrides.js', 'app.currentState =');
 mustContain('dist/assets/pro-native-core-overrides.js', 'renderDoneFromPrintModule');
 mustContain('dist/assets/pro-native-core-overrides.js', 'enhanceOrderTable');
 mustContain('dist/assets/pro-native-core-overrides.js', 'enhanceTeleBills');
 mustContain('dist/assets/pro-native-core-overrides.js', '#table input.jdata[data-map="send"]');
-mustNotContain('dist/assets/pro-native-core-overrides.js', 'app.currentState = () => JSON.parse(JSON.stringify(bestStoredState() || {}))');
 
 mustContain('dist/assets/pro-native-phase4-readiness.js', 'DOIT_NATIVE_PHASE4_READINESS');
 mustContain('dist/assets/pro-native-phase4-readiness.js', 'currentState API available');
