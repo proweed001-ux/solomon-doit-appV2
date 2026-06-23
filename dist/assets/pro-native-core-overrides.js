@@ -152,27 +152,25 @@
 
   function ensureDeveloperQrStyle() {
     if (document.querySelector('#doitDevQrStyle')) return;
-    document.head.insertAdjacentHTML('beforeend', `<style id="doitDevQrStyle">.devQrPerson{margin-bottom:0}.devQrPerson .devInfo{text-align:center}.devQrLogoTop{font-weight:950;font-size:18px;letter-spacing:.5px;color:#0f3f55;line-height:1.05}.devQrLine{width:128px;height:4px;background:linear-gradient(90deg,#0f3f55,#22c55e,#0f3f55);border-radius:999px;margin:5px auto 8px}.devQrPerson .devCode{display:inline-flex;margin:4px auto 8px;background:#e9fff2;color:#087b34;border-color:#86efac}.devQrPerson .devRole{font-size:13px;color:#64748b;font-weight:850}.devQrBrand{font-weight:950;font-size:28px;line-height:1;color:#0f3f55;letter-spacing:1px;margin-top:8px}.devQrScan{font-weight:900;font-size:12px;color:#087b34;margin-top:4px}.devQrPerson .devPhotoFrame{background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden}.devQrPerson .devPhotoFrame img{width:100%;height:100%;object-fit:contain;display:block;background:#fff;padding:7px}.devQrPerson .devQrUpdated{display:block;color:#94a3b8;font-size:10.5px;margin-top:5px}.devQrPerson .devQrEmpty{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#166534;font-weight:950;padding:8px}.devQrPlaceholder{width:100%;height:100%;min-height:120px;display:flex;align-items:center;justify-content:center;border:1px dashed #86efac;border-radius:8px;background:#fff;color:#166534;font-weight:950;text-align:center;padding:8px}@media(max-width:720px){.devQrLogoTop{font-size:13px}.devQrLine{width:96px;height:3px;margin:3px auto 5px}.devQrPerson .devRole{font-size:11px}.devQrBrand{font-size:20px;letter-spacing:.5px;margin-top:5px}.devQrScan{font-size:10px}.devQrPerson .devPhotoFrame img{padding:4px}.devQrPerson .devQrUpdated{font-size:9.5px;margin-top:4px}.devQrPlaceholder{min-height:92px}}</style>`);
+    document.head.insertAdjacentHTML('beforeend', `<style id="doitDevQrStyle">.devQrPoster{background:#fff!important;border:0!important;border-radius:0!important;box-shadow:none!important;margin:4px auto 0!important;padding:0 0 6px!important;text-align:center!important;width:100%!important}.devQrPosterTop{font-weight:950!important;font-size:18px!important;line-height:1!important;color:#0f3f55!important;letter-spacing:.7px!important;margin:0 auto 3px!important}.devQrPosterLine{width:168px!important;height:4px!important;background:linear-gradient(90deg,#0f3f55 0 42%,#22c55e 42% 58%,#0f3f55 58% 100%)!important;border-radius:999px!important;margin:0 auto 6px!important}.devQrPosterFrame{display:inline-flex!important;align-items:center!important;justify-content:center!important;background:#fff!important;border:0!important;border-radius:0!important;padding:0!important;margin:0 auto!important}.devQrPosterFrame img{width:min(160px,38vw)!important;height:min(160px,38vw)!important;object-fit:contain!important;display:block!important;background:#fff!important}.devQrPosterBrand{font-weight:950!important;font-size:34px!important;line-height:.9!important;color:#0f3f55!important;letter-spacing:1.2px!important;margin:3px auto 0!important}.devQrPosterScan{font-weight:900!important;font-size:12px!important;color:#087b34!important;line-height:1.1!important;margin-top:5px!important}.devQrPosterEmpty{width:min(160px,38vw)!important;height:min(160px,38vw)!important;display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;border:1px dashed #86efac!important;color:#166534!important;font-weight:950!important;background:#fff!important}@media(max-width:720px){.devQrPoster{margin-top:2px!important;padding-bottom:4px!important}.devQrPosterTop{font-size:15px!important;letter-spacing:.5px!important;margin-bottom:2px!important}.devQrPosterLine{width:136px!important;height:3px!important;margin-bottom:4px!important}.devQrPosterFrame img,.devQrPosterEmpty{width:min(132px,35vw)!important;height:min(132px,35vw)!important}.devQrPosterBrand{font-size:27px!important;letter-spacing:.9px!important;margin-top:2px!important}.devQrPosterScan{font-size:10.5px!important;margin-top:3px!important}}</style>`);
   }
 
-  function qrTitleParts(config) {
+  function qrPosterParts(config) {
     return {
       top: escapeHtml(config?.top_text || config?.header || 'CNR SDO HFSAYA'),
       brand: escapeHtml(config?.brand_text || 'AYA DOIT'),
-      scan: escapeHtml(config?.bottom_text || 'Scan QR Code'),
-      note: escapeHtml(config?.note || 'สแกนเพื่อเปิดข้อมูลเพิ่มเติม')
+      scan: escapeHtml(config?.bottom_text || 'Scan QR Code')
     };
   }
 
   function renderDeveloperQrBlock(block, config) {
-    block.className = 'devPerson devQrPerson';
+    block.className = 'devQrPoster';
+    const p = qrPosterParts(config || {});
     if (!config || config.enabled === false || !config.image_url) {
-      block.innerHTML = `<div class="devInfo"><div class="devQrLogoTop">CNR SDO HFSAYA</div><div class="devQrLine"></div><span class="devCode">QR</span><div class="devRole">เว้นพื้นที่ไว้สำหรับอัปโหลด QR Code จากหน้า Admin</div><div class="devQrBrand">AYA DOIT</div><div class="devQrScan">Scan QR Code</div></div><div class="devPhotoFrame"><div class="devQrPlaceholder">รออัปโหลด<br>QR Code</div></div>`;
+      block.innerHTML = `<div class="devQrPosterTop">${p.top}</div><div class="devQrPosterLine"></div><div class="devQrPosterFrame"><div class="devQrPosterEmpty">รอ QR Code</div></div><div class="devQrPosterBrand">${p.brand}</div><div class="devQrPosterScan">${p.scan}</div>`;
       return;
     }
-    const p = qrTitleParts(config);
-    const updated = config.updated_at ? `<small class="devQrUpdated">อัปเดต ${escapeHtml(new Date(config.updated_at).toLocaleString('th-TH'))}</small>` : '';
-    block.innerHTML = `<div class="devInfo"><div class="devQrLogoTop">${p.top}</div><div class="devQrLine"></div><span class="devCode">QR</span><div class="devRole">${p.note}</div><div class="devQrBrand">${p.brand}</div><div class="devQrScan">${p.scan}</div>${updated}</div><div class="devPhotoFrame"><img src="${escapeHtml(config.image_url)}" alt="QR Code"></div>`;
+    block.innerHTML = `<div class="devQrPosterTop">${p.top}</div><div class="devQrPosterLine"></div><div class="devQrPosterFrame"><img src="${escapeHtml(config.image_url)}" alt="QR Code"></div><div class="devQrPosterBrand">${p.brand}</div><div class="devQrPosterScan">${p.scan}</div>`;
   }
 
   async function injectDeveloperQr() {
@@ -181,7 +179,7 @@
     ensureDeveloperQrStyle();
     let block = document.querySelector('#devQrBlock');
     if (!block) {
-      body.insertAdjacentHTML('beforeend', `<div class="devPerson devQrPerson" id="devQrBlock"><div class="devInfo"><div class="devQrLogoTop">CNR SDO HFSAYA</div><div class="devQrLine"></div><span class="devCode">QR</span><div class="devRole">กำลังโหลดข้อมูลจากฝั่ง Admin</div><div class="devQrBrand">AYA DOIT</div><div class="devQrScan">Scan QR Code</div></div><div class="devPhotoFrame"><div class="devQrPlaceholder">กำลังโหลด QR</div></div></div>`);
+      body.insertAdjacentHTML('beforeend', `<div class="devQrPoster" id="devQrBlock"><div class="devQrPosterTop">CNR SDO HFSAYA</div><div class="devQrPosterLine"></div><div class="devQrPosterFrame"><div class="devQrPosterEmpty">กำลังโหลด QR</div></div><div class="devQrPosterBrand">AYA DOIT</div><div class="devQrPosterScan">Scan QR Code</div></div>`);
       block = document.querySelector('#devQrBlock');
     }
     if (devQrCache) {
@@ -267,6 +265,6 @@
     mode: 'native-core-file-plus-behavior-bridge',
     production: true,
     stateApiSource: 'closure-native-core',
-    fixes: ['closureNativeCurrentState', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal', 'developerQrPrivateStorage', 'developerQrPreload', 'developerQrTeamStructure', 'developerQrBrandedLayout']
+    fixes: ['closureNativeCurrentState', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal', 'developerQrPrivateStorage', 'developerQrPreload', 'developerQrPosterReferenceLayout']
   };
 })();
