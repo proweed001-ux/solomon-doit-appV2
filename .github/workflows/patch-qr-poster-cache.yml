@@ -1,0 +1,52 @@
+name: Patch QR Poster Cache
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/patch-qr-poster-cache.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Bump Pro override cache and remove workflow
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          pro = Path('dist/pro.html')
+          s = pro.read_text(encoding='utf-8')
+          s = re.sub(r'/assets/pro-native-core-overrides\.js\?v=\d+', '/assets/pro-native-core-overrides.js?v=10', s)
+          pro.write_text(s, encoding='utf-8')
+          smoke = Path('scripts/smoke-check.mjs')
+          ss = smoke.read_text(encoding='utf-8')
+          marker = "mustContain('dist/pro.html', 'pro-core-v4.js');\n"
+          add = """mustContain('dist/pro.html', '/assets/pro-native-core-overrides.js?v=10');
+mustContain('dist/assets/pro-native-core-overrides.js', 'developerQrPosterReferenceLayout');
+mustContain('dist/assets/pro-native-core-overrides.js', 'devQrPosterTop');
+"""
+          if add not in ss:
+              ss = ss.replace(marker, marker + add)
+          smoke.write_text(ss, encoding='utf-8')
+          Path('.github/workflows/patch-qr-poster-cache.yml').unlink()
+          PY
+      - name: Run smoke
+        run: npm run smoke
+      - name: Commit QR poster cache patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Bump QR poster cache buster"
+          git push origin main
