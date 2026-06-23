@@ -1,0 +1,52 @@
+name: Patch Pro QR Visibility
+
+on:
+  push:
+    branches:
+      - admin-dev-qr-upload
+    paths:
+      - '.github/workflows/patch-pro-qr-visible.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: admin-dev-qr-upload
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Bump Pro override cache and smoke guard
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('dist/pro.html')
+          s = p.read_text(encoding='utf-8')
+          s = re.sub(r'/assets/pro-native-core-overrides\.js\?v=\d+', '/assets/pro-native-core-overrides.js?v=6', s)
+          p.write_text(s, encoding='utf-8')
+          smoke = Path('scripts/smoke-check.mjs')
+          ss = smoke.read_text(encoding='utf-8')
+          marker = "mustContain('dist/pro.html', 'pro-core-v4.js');\n"
+          add = """mustContain('dist/pro.html', '/assets/pro-native-core-overrides.js?v=6');
+mustContain('dist/assets/pro-native-core-overrides.js', 'ยังไม่ได้อัปโหลด QR Code จากหน้า Admin');
+mustContain('dist/assets/pro-native-core-overrides.js', 'developerQr');
+"""
+          if add not in ss:
+              ss = ss.replace(marker, marker + add)
+          smoke.write_text(ss, encoding='utf-8')
+          Path('.github/workflows/patch-pro-qr-visible.yml').unlink()
+          PY
+      - name: Run smoke
+        run: npm run smoke
+      - name: Commit Pro QR visibility patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/pro.html scripts/smoke-check.mjs .github/workflows/patch-pro-qr-visible.yml
+          git commit -m "Show developer QR area in Pro modal"
+          git push origin admin-dev-qr-upload
