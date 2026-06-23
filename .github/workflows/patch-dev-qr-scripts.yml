@@ -1,0 +1,66 @@
+name: Patch Developer QR Scripts
+
+on:
+  push:
+    branches:
+      - admin-dev-qr-upload
+    paths:
+      - '.github/workflows/patch-dev-qr-scripts.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: admin-dev-qr-upload
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Add QR script tags and guards
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          admin = Path('dist/admin.html')
+          s = admin.read_text(encoding='utf-8')
+          tag = '<script src="/assets/admin-dev-qr-v1.js?v=1"></script>'
+          if tag not in s:
+              s = s.replace('<script src="/assets/admin-storage-manager-v1.js?v=2"></script>', '<script src="/assets/admin-storage-manager-v1.js?v=2"></script>\n' + tag)
+              if tag not in s:
+                  s = s.replace('</body>', tag + '\n</body>')
+          admin.write_text(s, encoding='utf-8')
+
+          pro = Path('dist/pro.html')
+          s = pro.read_text(encoding='utf-8')
+          tag = '<script src="/assets/pro-dev-qr-v1.js?v=1"></script>'
+          if tag not in s:
+              s = s.replace('</body>', tag + '</body>')
+          pro.write_text(s, encoding='utf-8')
+
+          smoke = Path('scripts/smoke-check.mjs')
+          ss = smoke.read_text(encoding='utf-8')
+          marker = "mustContain('dist/pro.html', 'pro-core-v4.js');\n"
+          add = """mustContain('dist/pro.html', '/assets/pro-dev-qr-v1.js?v=1');
+mustContain('dist/admin.html', '/assets/admin-dev-qr-v1.js?v=1');
+mustContain('dist/assets/admin-dev-qr-v1.js', 'อัปโหลด QR Code ใต้ทีมผู้พัฒนา');
+mustContain('dist/assets/pro-dev-qr-v1.js', 'devQrBlock');
+"""
+          if add not in ss:
+              ss = ss.replace(marker, marker + add)
+          smoke.write_text(ss, encoding='utf-8')
+
+          Path('.github/workflows/patch-dev-qr-scripts.yml').unlink()
+          PY
+      - name: Run smoke
+        run: npm run smoke
+      - name: Commit QR wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/admin.html dist/pro.html scripts/smoke-check.mjs .github/workflows/patch-dev-qr-scripts.yml
+          git commit -m "Wire developer QR upload and display scripts"
+          git push origin admin-dev-qr-upload
