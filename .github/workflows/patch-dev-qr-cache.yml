@@ -1,0 +1,45 @@
+name: Patch Developer QR Cache Busters
+
+on:
+  push:
+    branches:
+      - admin-dev-qr-upload
+    paths:
+      - '.github/workflows/patch-dev-qr-cache.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: admin-dev-qr-upload
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Bump script versions
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          for name in ['dist/admin.html', 'dist/pro.html']:
+              p = Path(name)
+              s = p.read_text(encoding='utf-8')
+              s = s.replace('/assets/admin-team-photo-v1.js?v=2', '/assets/admin-team-photo-v1.js?v=3')
+              s = s.replace('/assets/pro-native-core-overrides.js?v=4', '/assets/pro-native-core-overrides.js?v=5')
+              s = s.replace('/assets/pro-native-core-overrides.js?v=3', '/assets/pro-native-core-overrides.js?v=5')
+              s = s.replace('/assets/pro-native-core-overrides.js?v=2', '/assets/pro-native-core-overrides.js?v=5')
+              p.write_text(s, encoding='utf-8')
+          Path('.github/workflows/patch-dev-qr-cache.yml').unlink()
+          PY
+      - name: Run smoke
+        run: npm run smoke
+      - name: Commit cache busters
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/admin.html dist/pro.html .github/workflows/patch-dev-qr-cache.yml
+          git commit -m "Bump developer QR cache busters"
+          git push origin admin-dev-qr-upload
