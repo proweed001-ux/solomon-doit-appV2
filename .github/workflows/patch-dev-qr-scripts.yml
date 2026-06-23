@@ -64,3 +64,4 @@ mustContain('dist/assets/pro-dev-qr-v1.js', 'devQrBlock');
           git add dist/admin.html dist/pro.html scripts/smoke-check.mjs .github/workflows/patch-dev-qr-scripts.yml
           git commit -m "Wire developer QR upload and display scripts"
           git push origin admin-dev-qr-upload
+# trigger
