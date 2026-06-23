@@ -152,16 +152,19 @@
 
   function ensureDeveloperQrStyle() {
     if (document.querySelector('#doitDevQrStyle')) return;
-    document.head.insertAdjacentHTML('beforeend', `<style id="doitDevQrStyle">.devQrBlock{margin-top:12px;border:1px solid #bbf7d0;background:linear-gradient(180deg,#f0fdf4,#fff);border-radius:16px;padding:12px;text-align:center}.devQrBlock h3{margin:0 0 4px;color:#064e3b;font-size:17px}.devQrBlock p{margin:0 0 10px;color:#475569;font-weight:800;font-size:13px}.devQrFrame{background:#fff;border:1px solid #d1d5db;border-radius:14px;padding:8px;display:inline-flex;align-items:center;justify-content:center;max-width:100%}.devQrFrame img{width:min(220px,58vw);height:min(220px,58vw);object-fit:contain;display:block}.devQrEmpty{border:1px dashed #86efac;border-radius:14px;background:#f8fafc;color:#64748b;font-weight:900;padding:16px}.devQrUpdated{display:block;color:#64748b;font-size:11px;margin-top:6px}@media(max-width:720px){.devQrBlock{padding:10px}.devQrBlock h3{font-size:15px}.devQrBlock p{font-size:12px}.devQrFrame{padding:7px}.devQrFrame img{width:min(185px,50vw);height:min(185px,50vw)}}</style>`);
+    document.head.insertAdjacentHTML('beforeend', `<style id="doitDevQrStyle">.devQrPerson{margin-bottom:0}.devQrPerson .devPhotoFrame{background:#fff;border-radius:8px}.devQrPerson .devPhotoFrame img{width:100%;height:100%;object-fit:contain;display:block;background:#fff;padding:6px}.devQrPerson .devQrUpdated{display:block;color:#64748b;font-size:11px;margin-top:7px}.devQrPerson .devQrEmpty{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#166534;font-weight:950;padding:8px}.devQrPerson .devRole{font-size:15px}@media(max-width:720px){.devQrPerson .devRole{font-size:12px}.devQrPerson .devPhotoFrame img{padding:4px}.devQrPerson .devQrUpdated{font-size:10.5px;margin-top:5px}}</style>`);
   }
 
   function renderDeveloperQrBlock(block, config) {
+    block.className = 'devPerson devQrPerson';
     if (!config || config.enabled === false || !config.image_url) {
-      block.innerHTML = `<h3>QR Code</h3><p>ยังไม่ได้อัปโหลด QR Code จากหน้า Admin</p><div class="devQrEmpty">เปิดหน้า Admin แล้วอัปโหลด QR Code ใต้ทีมผู้พัฒนา</div>`;
+      block.innerHTML = `<div class="devInfo"><b>QR Code</b><span class="devCode">QR</span><div class="devRole">ยังไม่ได้อัปโหลด QR Code จากหน้า Admin</div></div><div class="devPhotoFrame"><div class="devQrEmpty">รอ QR Code</div></div>`;
       return;
     }
+    const title = escapeHtml(config.title || 'QR Code');
+    const note = escapeHtml(config.note || 'สแกนเพื่อเปิดข้อมูลเพิ่มเติม');
     const updated = config.updated_at ? `<small class="devQrUpdated">อัปเดต ${escapeHtml(new Date(config.updated_at).toLocaleString('th-TH'))}</small>` : '';
-    block.innerHTML = `<h3>${escapeHtml(config.title || 'QR Code')}</h3><p>${escapeHtml(config.note || 'สแกนเพื่อเปิดข้อมูลเพิ่มเติม')}</p><div class="devQrFrame"><img src="${escapeHtml(config.image_url)}" alt="QR Code"></div>${updated}`;
+    block.innerHTML = `<div class="devInfo"><b>${title}</b><span class="devCode">QR</span><div class="devRole">${note}</div>${updated}</div><div class="devPhotoFrame"><img src="${escapeHtml(config.image_url)}" alt="QR Code"></div>`;
   }
 
   async function injectDeveloperQr() {
@@ -170,7 +173,7 @@
     ensureDeveloperQrStyle();
     let block = document.querySelector('#devQrBlock');
     if (!block) {
-      body.insertAdjacentHTML('beforeend', `<div class="devQrBlock" id="devQrBlock"><h3>QR Code</h3><p>ข้อมูลจากฝั่ง Admin</p><div class="devQrEmpty">กำลังโหลด QR Code...</div></div>`);
+      body.insertAdjacentHTML('beforeend', `<div class="devPerson devQrPerson" id="devQrBlock"><div class="devInfo"><b>QR Code</b><span class="devCode">QR</span><div class="devRole">กำลังโหลดข้อมูลจากฝั่ง Admin</div></div><div class="devPhotoFrame"><div class="devQrEmpty">กำลังโหลด QR</div></div></div>`);
       block = document.querySelector('#devQrBlock');
     }
     if (devQrCache) {
@@ -256,6 +259,6 @@
     mode: 'native-core-file-plus-behavior-bridge',
     production: true,
     stateApiSource: 'closure-native-core',
-    fixes: ['closureNativeCurrentState', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal', 'developerQrPrivateStorage', 'developerQrPreload']
+    fixes: ['closureNativeCurrentState', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal', 'developerQrPrivateStorage', 'developerQrPreload', 'developerQrTeamStructure']
   };
 })();
