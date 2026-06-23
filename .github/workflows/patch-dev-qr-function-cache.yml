@@ -53,3 +53,4 @@ mustContain('supabase/functions/dev-qr/index.ts', 'action === \"image\"');
           git add dist/pro.html scripts/smoke-check.mjs .github/workflows/patch-dev-qr-function-cache.yml
           git commit -m "Route developer QR through Edge Function"
           git push origin fix-dev-qr-private-storage
+# trigger
