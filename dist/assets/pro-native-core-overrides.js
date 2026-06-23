@@ -10,6 +10,7 @@
   const F = value => N(value).toLocaleString('th-TH');
   const B = value => N(value).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const DEV_QR_URL = 'https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/public/doit-files/team/dev-qr-config.json';
+  let devQrBusy = false;
 
   function preserveCoreCurrentState() {
     const app = window.DOIT_CORE_APP;
@@ -111,18 +112,30 @@
 
   function ensureDeveloperQrStyle() {
     if (document.querySelector('#doitDevQrStyle')) return;
-    document.head.insertAdjacentHTML('beforeend', `<style id="doitDevQrStyle">.devQrBlock{margin-top:14px;border:1px solid #bbf7d0;background:linear-gradient(180deg,#f0fdf4,#fff);border-radius:16px;padding:14px;text-align:center}.devQrBlock h3{margin:0 0 6px;color:#064e3b;font-size:18px}.devQrBlock p{margin:0 0 12px;color:#475569;font-weight:800}.devQrFrame{background:#fff;border:1px solid #d1d5db;border-radius:18px;padding:12px;display:inline-flex;align-items:center;justify-content:center;max-width:100%}.devQrFrame img{width:min(330px,78vw);height:min(330px,78vw);object-fit:contain;display:block}.devQrUpdated{display:block;color:#64748b;font-size:11px;margin-top:8px}@media(max-width:720px){.devQrBlock{padding:12px}.devQrBlock h3{font-size:16px}.devQrFrame img{width:min(270px,76vw);height:min(270px,76vw)}}</style>`);
+    document.head.insertAdjacentHTML('beforeend', `<style id="doitDevQrStyle">.devQrBlock{margin-top:14px;border:1px solid #bbf7d0;background:linear-gradient(180deg,#f0fdf4,#fff);border-radius:16px;padding:14px;text-align:center}.devQrBlock h3{margin:0 0 6px;color:#064e3b;font-size:18px}.devQrBlock p{margin:0 0 12px;color:#475569;font-weight:800}.devQrFrame{background:#fff;border:1px solid #d1d5db;border-radius:18px;padding:12px;display:inline-flex;align-items:center;justify-content:center;max-width:100%}.devQrFrame img{width:min(330px,78vw);height:min(330px,78vw);object-fit:contain;display:block}.devQrEmpty{border:1px dashed #86efac;border-radius:14px;background:#f8fafc;color:#64748b;font-weight:900;padding:18px}.devQrUpdated{display:block;color:#64748b;font-size:11px;margin-top:8px}@media(max-width:720px){.devQrBlock{padding:12px}.devQrBlock h3{font-size:16px}.devQrFrame img{width:min(270px,76vw);height:min(270px,76vw)}}</style>`);
   }
 
   async function injectDeveloperQr() {
     const body = document.querySelector('.devBody');
-    if (!body) return;
-    document.querySelector('#devQrBlock')?.remove();
-    const config = await loadDeveloperQr();
-    if (!config || config.enabled === false || !config.image_url) return;
+    if (!body || devQrBusy) return;
     ensureDeveloperQrStyle();
-    const updated = config.updated_at ? `<small class="devQrUpdated">อัปเดต ${escapeHtml(new Date(config.updated_at).toLocaleString('th-TH'))}</small>` : '';
-    body.insertAdjacentHTML('beforeend', `<div class="devQrBlock" id="devQrBlock"><h3>${escapeHtml(config.title || 'QR Code')}</h3><p>${escapeHtml(config.note || 'สแกนเพื่อเปิดข้อมูลเพิ่มเติม')}</p><div class="devQrFrame"><img src="${escapeHtml(config.image_url)}" alt="QR Code"></div>${updated}</div>`);
+    let block = document.querySelector('#devQrBlock');
+    if (!block) {
+      body.insertAdjacentHTML('beforeend', `<div class="devQrBlock" id="devQrBlock"><h3>QR Code</h3><p>ข้อมูลจากฝั่ง Admin</p><div class="devQrEmpty">กำลังโหลด QR Code...</div></div>`);
+      block = document.querySelector('#devQrBlock');
+    }
+    devQrBusy = true;
+    try {
+      const config = await loadDeveloperQr();
+      if (!config || config.enabled === false || !config.image_url) {
+        block.innerHTML = `<h3>QR Code</h3><p>ยังไม่ได้อัปโหลด QR Code จากหน้า Admin</p><div class="devQrEmpty">เปิดหน้า Admin แล้วอัปโหลด QR Code ใต้ทีมผู้พัฒนา</div>`;
+        return;
+      }
+      const updated = config.updated_at ? `<small class="devQrUpdated">อัปเดต ${escapeHtml(new Date(config.updated_at).toLocaleString('th-TH'))}</small>` : '';
+      block.innerHTML = `<h3>${escapeHtml(config.title || 'QR Code')}</h3><p>${escapeHtml(config.note || 'สแกนเพื่อเปิดข้อมูลเพิ่มเติม')}</p><div class="devQrFrame"><img src="${escapeHtml(config.image_url)}" alt="QR Code"></div>${updated}`;
+    } finally {
+      devQrBusy = false;
+    }
   }
 
   function patchDeveloperTeamModal() {
@@ -131,6 +144,7 @@
       window.openDevTeamModal = function(...args) {
         const out = original.apply(this, args);
         setTimeout(injectDeveloperQr, 250);
+        setTimeout(injectDeveloperQr, 700);
         return out;
       };
       window.openDevTeamModal.__devQrPatched = true;
@@ -162,7 +176,10 @@
       if (text.includes('จัดแล้ว')) setTimeout(renderDoneFromPrintModule, 80);
       if (text.includes('รวม order')) setTimeout(enhanceOrderTable, 80);
     }
-    if (event.target?.closest?.('.devTeamBtn')) setTimeout(injectDeveloperQr, 350);
+    if (event.target?.closest?.('.devTeamBtn')) {
+      setTimeout(injectDeveloperQr, 350);
+      setTimeout(injectDeveloperQr, 900);
+    }
   }, true);
 
   const observer = new MutationObserver(() => {
@@ -171,12 +188,14 @@
     enhanceOrderTable();
     enhanceTeleBills();
     patchDeveloperTeamModal();
+    if (document.querySelector('.devBody') && !document.querySelector('#devQrBlock')) setTimeout(injectDeveloperQr, 50);
   });
   observer.observe(document.body, { childList: true, subtree: true });
 
   const timer = setInterval(() => {
     const ready = preserveCoreCurrentState();
     patchDeveloperTeamModal();
+    if (document.querySelector('.devBody') && !document.querySelector('#devQrBlock')) injectDeveloperQr();
     if (ready) clearInterval(timer);
   }, 100);
   setTimeout(() => clearInterval(timer), 10000);
