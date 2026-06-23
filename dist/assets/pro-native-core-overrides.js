@@ -9,7 +9,8 @@
   const N = value => Number(String(value ?? '').replace(/,/g, '').replace(/[^0-9.\-]/g, '')) || 0;
   const F = value => N(value).toLocaleString('th-TH');
   const B = value => N(value).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const DEV_QR_URL = 'https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/public/doit-files/team/dev-qr-config.json';
+  const DEV_QR_CONFIG_URL = 'https://saodmeoilixfdqentofp.supabase.co/functions/v1/dev-qr?action=config';
+  const DEV_QR_IMAGE_URL = 'https://saodmeoilixfdqentofp.supabase.co/functions/v1/dev-qr?action=image';
   let devQrBusy = false;
 
   function preserveCoreCurrentState() {
@@ -98,21 +99,31 @@
     return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   }
 
+  function normalizeQrConfig(config) {
+    if (!config) return null;
+    const out = { ...config };
+    if (out.enabled !== false) out.enabled = true;
+    if (!out.image_url || String(out.image_url).includes('/storage/v1/object/public/doit-files/team/dev-qr.png')) {
+      out.image_url = DEV_QR_IMAGE_URL + '&t=' + encodeURIComponent(out.updated_at || Date.now());
+    }
+    return out;
+  }
+
   async function loadDeveloperQr() {
     try {
-      const response = await fetch(DEV_QR_URL + '?t=' + Date.now(), { cache: 'no-store' });
+      const response = await fetch(DEV_QR_CONFIG_URL + '&t=' + Date.now(), { cache: 'no-store' });
       if (!response.ok) throw new Error(String(response.status));
-      const config = await response.json();
+      const config = normalizeQrConfig(await response.json());
       localStorage.setItem('doit-dev-qr-config-v1', JSON.stringify(config));
       return config;
     } catch {
-      try { return JSON.parse(localStorage.getItem('doit-dev-qr-config-v1') || 'null'); } catch { return null; }
+      try { return normalizeQrConfig(JSON.parse(localStorage.getItem('doit-dev-qr-config-v1') || 'null')); } catch { return null; }
     }
   }
 
   function ensureDeveloperQrStyle() {
     if (document.querySelector('#doitDevQrStyle')) return;
-    document.head.insertAdjacentHTML('beforeend', `<style id="doitDevQrStyle">.devQrBlock{margin-top:14px;border:1px solid #bbf7d0;background:linear-gradient(180deg,#f0fdf4,#fff);border-radius:16px;padding:14px;text-align:center}.devQrBlock h3{margin:0 0 6px;color:#064e3b;font-size:18px}.devQrBlock p{margin:0 0 12px;color:#475569;font-weight:800}.devQrFrame{background:#fff;border:1px solid #d1d5db;border-radius:18px;padding:12px;display:inline-flex;align-items:center;justify-content:center;max-width:100%}.devQrFrame img{width:min(330px,78vw);height:min(330px,78vw);object-fit:contain;display:block}.devQrEmpty{border:1px dashed #86efac;border-radius:14px;background:#f8fafc;color:#64748b;font-weight:900;padding:18px}.devQrUpdated{display:block;color:#64748b;font-size:11px;margin-top:8px}@media(max-width:720px){.devQrBlock{padding:12px}.devQrBlock h3{font-size:16px}.devQrFrame img{width:min(270px,76vw);height:min(270px,76vw)}}</style>`);
+    document.head.insertAdjacentHTML('beforeend', `<style id="doitDevQrStyle">.devQrBlock{margin-top:12px;border:1px solid #bbf7d0;background:linear-gradient(180deg,#f0fdf4,#fff);border-radius:16px;padding:12px;text-align:center}.devQrBlock h3{margin:0 0 4px;color:#064e3b;font-size:17px}.devQrBlock p{margin:0 0 10px;color:#475569;font-weight:800;font-size:13px}.devQrFrame{background:#fff;border:1px solid #d1d5db;border-radius:14px;padding:8px;display:inline-flex;align-items:center;justify-content:center;max-width:100%}.devQrFrame img{width:min(220px,58vw);height:min(220px,58vw);object-fit:contain;display:block}.devQrEmpty{border:1px dashed #86efac;border-radius:14px;background:#f8fafc;color:#64748b;font-weight:900;padding:16px}.devQrUpdated{display:block;color:#64748b;font-size:11px;margin-top:6px}@media(max-width:720px){.devQrBlock{padding:10px}.devQrBlock h3{font-size:15px}.devQrBlock p{font-size:12px}.devQrFrame{padding:7px}.devQrFrame img{width:min(185px,50vw);height:min(185px,50vw)}}</style>`);
   }
 
   async function injectDeveloperQr() {
@@ -208,6 +219,6 @@
     mode: 'native-core-file-plus-behavior-bridge',
     production: true,
     stateApiSource: 'closure-native-core',
-    fixes: ['closureNativeCurrentState', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal', 'developerQr']
+    fixes: ['closureNativeCurrentState', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal', 'developerQrPrivateStorage']
   };
 })();
