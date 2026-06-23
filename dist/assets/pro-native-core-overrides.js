@@ -9,7 +9,8 @@
   const N = value => Number(String(value ?? '').replace(/,/g, '').replace(/[^0-9.\-]/g, '')) || 0;
   const F = value => N(value).toLocaleString('th-TH');
   const B = value => N(value).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const DEV_QR_URL = 'https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/public/doit-files/team/dev-qr-config.json';
+  const DEV_QR_CONFIG_URL = 'https://saodmeoilixfdqentofp.supabase.co/functions/v1/dev-qr?action=config';
+  const DEV_QR_IMAGE_URL = 'https://saodmeoilixfdqentofp.supabase.co/functions/v1/dev-qr?action=image';
   let devQrBusy = false;
 
   function preserveCoreCurrentState() {
@@ -98,15 +99,25 @@
     return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   }
 
+  function normalizeQrConfig(config) {
+    if (!config) return null;
+    const out = { ...config };
+    if (out.enabled !== false) out.enabled = true;
+    if (!out.image_url || String(out.image_url).includes('/storage/v1/object/public/doit-files/team/dev-qr.png')) {
+      out.image_url = DEV_QR_IMAGE_URL + '&t=' + encodeURIComponent(out.updated_at || Date.now());
+    }
+    return out;
+  }
+
   async function loadDeveloperQr() {
     try {
-      const response = await fetch(DEV_QR_URL + '?t=' + Date.now(), { cache: 'no-store' });
+      const response = await fetch(DEV_QR_CONFIG_URL + '&t=' + Date.now(), { cache: 'no-store' });
       if (!response.ok) throw new Error(String(response.status));
-      const config = await response.json();
+      const config = normalizeQrConfig(await response.json());
       localStorage.setItem('doit-dev-qr-config-v1', JSON.stringify(config));
       return config;
     } catch {
-      try { return JSON.parse(localStorage.getItem('doit-dev-qr-config-v1') || 'null'); } catch { return null; }
+      try { return normalizeQrConfig(JSON.parse(localStorage.getItem('doit-dev-qr-config-v1') || 'null')); } catch { return null; }
     }
   }
 
@@ -208,6 +219,6 @@
     mode: 'native-core-file-plus-behavior-bridge',
     production: true,
     stateApiSource: 'closure-native-core',
-    fixes: ['closureNativeCurrentState', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal', 'developerQr']
+    fixes: ['closureNativeCurrentState', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal', 'developerQrPrivateStorage']
   };
 })();
