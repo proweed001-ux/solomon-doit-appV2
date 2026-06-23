@@ -12,6 +12,8 @@
   const DEV_QR_CONFIG_URL = 'https://saodmeoilixfdqentofp.supabase.co/functions/v1/dev-qr?action=config';
   const DEV_QR_IMAGE_URL = 'https://saodmeoilixfdqentofp.supabase.co/functions/v1/dev-qr?action=image';
   let devQrBusy = false;
+  let devQrCache = null;
+  let devQrPromise = null;
 
   function preserveCoreCurrentState() {
     const app = window.DOIT_CORE_APP;
@@ -109,6 +111,16 @@
     return out;
   }
 
+  function preloadImage(src) {
+    return new Promise((resolve, reject) => {
+      if (!src) return resolve(false);
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => reject(new Error('developer_qr_image_preload_failed'));
+      img.src = src;
+    });
+  }
+
   async function loadDeveloperQr() {
     try {
       const response = await fetch(DEV_QR_CONFIG_URL + '&t=' + Date.now(), { cache: 'no-store' });
@@ -121,9 +133,35 @@
     }
   }
 
+  async function primeDeveloperQr() {
+    if (devQrCache) return devQrCache;
+    if (!devQrPromise) {
+      devQrPromise = loadDeveloperQr().then(async config => {
+        devQrCache = config;
+        if (config?.enabled !== false && config?.image_url) {
+          try { await preloadImage(config.image_url); } catch {}
+        }
+        return devQrCache;
+      }).catch(error => {
+        devQrPromise = null;
+        throw error;
+      });
+    }
+    return devQrPromise;
+  }
+
   function ensureDeveloperQrStyle() {
     if (document.querySelector('#doitDevQrStyle')) return;
     document.head.insertAdjacentHTML('beforeend', `<style id="doitDevQrStyle">.devQrBlock{margin-top:12px;border:1px solid #bbf7d0;background:linear-gradient(180deg,#f0fdf4,#fff);border-radius:16px;padding:12px;text-align:center}.devQrBlock h3{margin:0 0 4px;color:#064e3b;font-size:17px}.devQrBlock p{margin:0 0 10px;color:#475569;font-weight:800;font-size:13px}.devQrFrame{background:#fff;border:1px solid #d1d5db;border-radius:14px;padding:8px;display:inline-flex;align-items:center;justify-content:center;max-width:100%}.devQrFrame img{width:min(220px,58vw);height:min(220px,58vw);object-fit:contain;display:block}.devQrEmpty{border:1px dashed #86efac;border-radius:14px;background:#f8fafc;color:#64748b;font-weight:900;padding:16px}.devQrUpdated{display:block;color:#64748b;font-size:11px;margin-top:6px}@media(max-width:720px){.devQrBlock{padding:10px}.devQrBlock h3{font-size:15px}.devQrBlock p{font-size:12px}.devQrFrame{padding:7px}.devQrFrame img{width:min(185px,50vw);height:min(185px,50vw)}}</style>`);
+  }
+
+  function renderDeveloperQrBlock(block, config) {
+    if (!config || config.enabled === false || !config.image_url) {
+      block.innerHTML = `<h3>QR Code</h3><p>ยังไม่ได้อัปโหลด QR Code จากหน้า Admin</p><div class="devQrEmpty">เปิดหน้า Admin แล้วอัปโหลด QR Code ใต้ทีมผู้พัฒนา</div>`;
+      return;
+    }
+    const updated = config.updated_at ? `<small class="devQrUpdated">อัปเดต ${escapeHtml(new Date(config.updated_at).toLocaleString('th-TH'))}</small>` : '';
+    block.innerHTML = `<h3>${escapeHtml(config.title || 'QR Code')}</h3><p>${escapeHtml(config.note || 'สแกนเพื่อเปิดข้อมูลเพิ่มเติม')}</p><div class="devQrFrame"><img src="${escapeHtml(config.image_url)}" alt="QR Code"></div>${updated}`;
   }
 
   async function injectDeveloperQr() {
@@ -135,15 +173,13 @@
       body.insertAdjacentHTML('beforeend', `<div class="devQrBlock" id="devQrBlock"><h3>QR Code</h3><p>ข้อมูลจากฝั่ง Admin</p><div class="devQrEmpty">กำลังโหลด QR Code...</div></div>`);
       block = document.querySelector('#devQrBlock');
     }
+    if (devQrCache) {
+      renderDeveloperQrBlock(block, devQrCache);
+      return;
+    }
     devQrBusy = true;
     try {
-      const config = await loadDeveloperQr();
-      if (!config || config.enabled === false || !config.image_url) {
-        block.innerHTML = `<h3>QR Code</h3><p>ยังไม่ได้อัปโหลด QR Code จากหน้า Admin</p><div class="devQrEmpty">เปิดหน้า Admin แล้วอัปโหลด QR Code ใต้ทีมผู้พัฒนา</div>`;
-        return;
-      }
-      const updated = config.updated_at ? `<small class="devQrUpdated">อัปเดต ${escapeHtml(new Date(config.updated_at).toLocaleString('th-TH'))}</small>` : '';
-      block.innerHTML = `<h3>${escapeHtml(config.title || 'QR Code')}</h3><p>${escapeHtml(config.note || 'สแกนเพื่อเปิดข้อมูลเพิ่มเติม')}</p><div class="devQrFrame"><img src="${escapeHtml(config.image_url)}" alt="QR Code"></div>${updated}`;
+      renderDeveloperQrBlock(block, await primeDeveloperQr());
     } finally {
       devQrBusy = false;
     }
@@ -154,8 +190,8 @@
     if (typeof original === 'function' && !original.__devQrPatched) {
       window.openDevTeamModal = function(...args) {
         const out = original.apply(this, args);
+        injectDeveloperQr();
         setTimeout(injectDeveloperQr, 250);
-        setTimeout(injectDeveloperQr, 700);
         return out;
       };
       window.openDevTeamModal.__devQrPatched = true;
@@ -188,8 +224,8 @@
       if (text.includes('รวม order')) setTimeout(enhanceOrderTable, 80);
     }
     if (event.target?.closest?.('.devTeamBtn')) {
-      setTimeout(injectDeveloperQr, 350);
-      setTimeout(injectDeveloperQr, 900);
+      injectDeveloperQr();
+      setTimeout(injectDeveloperQr, 250);
     }
   }, true);
 
@@ -199,7 +235,7 @@
     enhanceOrderTable();
     enhanceTeleBills();
     patchDeveloperTeamModal();
-    if (document.querySelector('.devBody') && !document.querySelector('#devQrBlock')) setTimeout(injectDeveloperQr, 50);
+    if (document.querySelector('.devBody') && !document.querySelector('#devQrBlock')) injectDeveloperQr();
   });
   observer.observe(document.body, { childList: true, subtree: true });
 
@@ -211,6 +247,7 @@
   }, 100);
   setTimeout(() => clearInterval(timer), 10000);
 
+  primeDeveloperQr().catch(() => {});
   refreshSendInputs();
   patchDeveloperTeamModal();
 
@@ -219,6 +256,6 @@
     mode: 'native-core-file-plus-behavior-bridge',
     production: true,
     stateApiSource: 'closure-native-core',
-    fixes: ['closureNativeCurrentState', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal', 'developerQrPrivateStorage']
+    fixes: ['closureNativeCurrentState', 'sendNext', 'doneSummary', 'orderTotal', 'teleTotal', 'developerQrPrivateStorage', 'developerQrPreload']
   };
 })();
