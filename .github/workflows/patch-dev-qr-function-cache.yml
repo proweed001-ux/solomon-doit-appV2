@@ -1,56 +1,10 @@
-name: Patch Developer QR Function Cache
+name: Disabled Obsolete QR Patch
 
 on:
-  push:
-    branches:
-      - fix-dev-qr-private-storage
-    paths:
-      - '.github/workflows/patch-dev-qr-function-cache.yml'
-
-permissions:
-  contents: write
+  workflow_dispatch:
 
 jobs:
-  patch:
+  noop:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: fix-dev-qr-private-storage
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Bump Pro override cache and guard QR function
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          import re
-          pro = Path('dist/pro.html')
-          s = pro.read_text(encoding='utf-8')
-          s = re.sub(r'/assets/pro-native-core-overrides\.js\?v=\d+', '/assets/pro-native-core-overrides.js?v=8', s)
-          pro.write_text(s, encoding='utf-8')
-
-          smoke = Path('scripts/smoke-check.mjs')
-          ss = smoke.read_text(encoding='utf-8')
-          marker = "mustContain('dist/pro.html', 'pro-core-v4.js');\n"
-          add = """mustContain('dist/pro.html', '/assets/pro-native-core-overrides.js?v=8');
-mustContain('dist/assets/pro-native-core-overrides.js', '/functions/v1/dev-qr?action=config');
-mustContain('dist/assets/pro-native-core-overrides.js', 'developerQrPrivateStorage');
-mustContain('supabase/functions/dev-qr/index.ts', 'team/dev-qr.png');
-mustContain('supabase/functions/dev-qr/index.ts', 'action === \"image\"');
-"""
-          if add not in ss:
-              ss = ss.replace(marker, marker + add)
-          smoke.write_text(ss, encoding='utf-8')
-          Path('.github/workflows/patch-dev-qr-function-cache.yml').unlink()
-          PY
-      - name: Run smoke
-        run: npm run smoke
-      - name: Commit QR function wiring
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dist/pro.html scripts/smoke-check.mjs .github/workflows/patch-dev-qr-function-cache.yml
-          git commit -m "Route developer QR through Edge Function"
-          git push origin fix-dev-qr-private-storage
-# trigger
+      - run: echo "obsolete QR patch workflow disabled"
