@@ -7,6 +7,10 @@
     {
       "source": "/performance",
       "destination": "/pro.html"
+    },
+    {
+      "source": "/admin-performance",
+      "destination": "/admin-performance.html"
     }
   ]
 }
