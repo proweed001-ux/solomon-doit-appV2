@@ -63,6 +63,7 @@
       assetUrl('pro-print-store-bills.js', LEGACY_SAFE_VERSION),
       assetUrl('pro-native-core.js'),
       assetUrl('pro-native-core-overrides.js'),
+      assetUrl('pro-results-mode.js'),
       assetUrl('pro-print-mode-fixes.js', LEGACY_SAFE_VERSION),
       assetUrl('pro-print-column-widths.js', LEGACY_SAFE_VERSION),
       assetUrl('pro-print-a4-pro-fix.js', LEGACY_SAFE_VERSION)
