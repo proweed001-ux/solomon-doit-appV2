@@ -5,7 +5,8 @@
   const DEFAULT_URL = 'https://saodmeoilixfdqentofp.supabase.co';
   const DEFAULT_KEY = 'sb_publishable_JThYwAl_-askk_cIaCd75w_TCWK2BTT';
   const BUCKET = 'doit-files';
-  let popup, popFill, popTitle, popDetail, popPct, popNote, hideTimer, wb = null, out = null, lastAutoActive = '';
+  let popup, popFill, popTitle, popDetail, popPct, popNote, hideTimer;
+  let wb = null, out = null, lastAutoActive = '', uploadInFlight = false;
 
   const T = (v) => String(v ?? '').trim();
   const K = (v) => T(v).replace(/\s+/g, '').toLowerCase();
@@ -13,6 +14,7 @@
   const F = (v) => N(v).toLocaleString('th-TH', { maximumFractionDigits: 0 });
   const P = (v) => N(v).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
   const E = (v) => T(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const wait = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 
   function css() {
     if ($('#adminProgressPopupCss')) return;
@@ -54,16 +56,16 @@
     popFill.style.width = n + '%';
     popPct.textContent = n + '%';
     popDetail.textContent = text;
-    if (mode === 'error' || /ผิดพลาด|ไม่สำเร็จ|error|fail/i.test(text)) {
+    if (mode === 'error' || /ผิดพลาด|ไม่สำเร็จ|error|fail|timeout|หมดเวลา/i.test(text)) {
       popTitle.textContent = 'ทำงานไม่สำเร็จ';
-      popNote.textContent = 'ตรวจข้อความผิดพลาดด้านล่าง';
+      popNote.textContent = 'ไม่ปล่อยให้ค้าง ตรวจข้อความผิดพลาดด้านล่าง';
     } else if (n >= 100 || mode === 'done') {
       popTitle.textContent = 'ทำงานสำเร็จ';
       popNote.textContent = 'เสร็จตาม action ปุ่มจริงแล้ว';
       hideTimer = setTimeout(() => popup.classList.remove('on'), 1800);
-    } else if (/อัปโหลด|Supabase|Cloud/i.test(text)) {
+    } else if (/อัปโหลด|Supabase|Cloud|active|ตรวจสอบ/i.test(text)) {
       popTitle.textContent = 'กำลังอัปโหลดขึ้น Cloud';
-      popNote.textContent = 'กำลังส่ง JSON และตั้ง active';
+      popNote.textContent = 'มี timeout และ verify กันค้างแล้ว';
     } else if (/อ่าน|ตรวจ|แปลง|JSON|Excel/i.test(text)) {
       popTitle.textContent = 'กำลังประมวลผลไฟล์';
       popNote.textContent = 'อ่านไฟล์และสร้าง JSON';
@@ -91,12 +93,64 @@
     return { u, k };
   }
   const H = (c, x = {}) => ({ apikey: c.k, authorization: 'Bearer ' + c.k, ...x });
-  async function put(c, path, blob, type) {
+
+  async function fetchWithTimeout(url, options, label, timeoutMs, slowProgress, slowMsg) {
+    const controller = new AbortController();
+    let tick = 0;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const slow = setInterval(() => {
+      tick += 1;
+      const bump = Math.min(6, tick * 2);
+      setProgress(Math.min(94, slowProgress + bump), `${slowMsg} (${Math.round((tick * 3))} วินาที)`);
+    }, 3000);
+    try {
+      const r = await fetch(url, { ...options, signal: controller.signal, cache: 'no-store' });
+      return r;
+    } catch (e) {
+      if (e?.name === 'AbortError') throw new Error(`${label} timeout เกิน ${Math.round(timeoutMs / 1000)} วินาที: Supabase หรือเน็ตไม่ตอบ`);
+      throw e;
+    } finally {
+      clearTimeout(timer);
+      clearInterval(slow);
+    }
+  }
+
+  async function put(c, path, blob, type, progressStart = 30, timeoutMs = 45000) {
     const url = `${c.u}/storage/v1/object/${BUCKET}/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
-    const r = await fetch(url, { method: 'POST', headers: H(c, { 'Content-Type': type, 'x-upsert': 'true' }), body: blob });
+    const r = await fetchWithTimeout(
+      url,
+      { method: 'POST', headers: H(c, { 'Content-Type': type, 'x-upsert': 'true' }), body: blob },
+      `อัปโหลด ${path}`,
+      timeoutMs,
+      progressStart,
+      `กำลังรอ Supabase ตอบกลับ: ${path}`
+    );
     const t = await r.text();
-    if (!r.ok) throw Error(t);
+    if (!r.ok) throw Error(`Supabase ${r.status}: ${t || r.statusText}`);
     return t;
+  }
+
+  async function getJson(c, path, progressStart = 88, timeoutMs = 20000) {
+    const url = `${c.u}/storage/v1/object/${BUCKET}/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
+    const r = await fetchWithTimeout(url, { method: 'GET', headers: H(c) }, `ตรวจสอบ ${path}`, timeoutMs, progressStart, `กำลังตรวจสอบไฟล์ล่าสุด: ${path}`);
+    const t = await r.text();
+    if (!r.ok) throw Error(`Verify ${r.status}: ${t || r.statusText}`);
+    try { return JSON.parse(t); } catch { throw Error(`อ่าน ${path} เป็น JSON ไม่ได้`); }
+  }
+
+  function setBusy(busy, activeId = '') {
+    const ids = ['performanceFileBtn', 'performanceCheckBtn', 'performanceConvertBtn', 'performanceUploadBtn', 'performanceDownloadBtn', 'performanceOpenBtn'];
+    ids.forEach(id => {
+      const el = $('#' + id);
+      if (!el) return;
+      if (busy) {
+        el.dataset.prevDisabled = el.disabled ? '1' : '0';
+        el.disabled = id !== activeId;
+      } else {
+        el.disabled = el.dataset.prevDisabled === '1';
+        delete el.dataset.prevDisabled;
+      }
+    });
   }
 
   function currentFile() { return $('#performanceFile')?.files?.[0] || null; }
@@ -136,6 +190,7 @@
     const f = currentFile();
     if (!f) throw new Error('ยังไม่ได้เลือกไฟล์ Tracking จากปุ่มในกล่อง Performance');
     setProgress(12, 'กำลังอ่านไฟล์ Tracking Excel...');
+    await wait(30);
     wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: false });
     return wb;
   }
@@ -250,56 +305,100 @@
 
   async function check() {
     try {
+      setBusy(true, 'performanceCheckBtn');
       setProgress(5, 'เริ่มตรวจไฟล์ Tracking...');
       await readWorkbook();
       setProgress(55, 'กำลังตรวจชีตที่จำเป็น...');
+      await wait(30);
       const req = ['Summary v.2', 'Seller Report', ' Sales Person', 'MAS SBD', 'Data MAS New Product', 'Data MAS SBD'];
       const lines = req.map(n => (hasSheet(n) ? '✓ ' : '✕ ') + n), ok = ['Summary v.2', 'Seller Report'].every(hasSheet);
       $('#performanceConvertBtn').disabled = !ok;
       setStatus(lines.join('<br>') + (ok ? '<br><b>พร้อมแปลงผลงาน JSON รวม Seller Report ทุกหัวข้อ</b>' : '<br><b>ขาดชีตหลัก ห้ามแปลง</b>'), ok ? 'ok' : 'warn');
-      setProgress(ok ? 100 : 100, ok ? 'ตรวจไฟล์ Tracking สำเร็จ พร้อมแปลง JSON' : 'ตรวจไฟล์เสร็จ แต่ขาดชีตหลัก', ok ? 'done' : 'error');
-    } catch (e) { setStatus('ตรวจไฟล์ Tracking ไม่สำเร็จ: ' + E(e.message), 'warn'); setProgress(100, 'ตรวจไฟล์ Tracking ไม่สำเร็จ: ' + (e.message || e), 'error'); }
+      setProgress(100, ok ? 'ตรวจไฟล์ Tracking สำเร็จ พร้อมแปลง JSON' : 'ตรวจไฟล์เสร็จ แต่ขาดชีตหลัก', ok ? 'done' : 'error');
+    } catch (e) {
+      setStatus('ตรวจไฟล์ Tracking ไม่สำเร็จ: ' + E(e.message), 'warn');
+      setProgress(100, 'ตรวจไฟล์ Tracking ไม่สำเร็จ: ' + (e.message || e), 'error');
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function convert() {
+  async function convert() {
     try {
+      setBusy(true, 'performanceConvertBtn');
       if (!wb) throw new Error('ต้องกด “ตรวจไฟล์ Tracking” ก่อน');
       setProgress(10, 'เริ่มแปลง Seller Report...');
+      await wait(30);
       const sellerAll = parseSellerReportAll();
       setProgress(35, 'กำลังแปลง ADS / PS...');
+      await wait(30);
       const ps = parsePs(sellerAll), ads = mergeAds(parseAds(), ps);
       setProgress(65, 'กำลังแปลง MS / MAS SBD...');
+      await wait(30);
       const msData = parseMs();
       if (!ps.length) throw new Error('ไม่พบข้อมูล PS จาก Seller Report');
-      out = { schema: 'performance-json-v5', updatedAt: new Date().toISOString(), updatedAtText: new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }), source: 'Excel Tracking: ' + (currentFile()?.name || '-'), mode: 'supabase-storage-performance-json', separatedFromDoitFile: true, sellerReportFields: sellerAll.fields, sellerReportRows: sellerAll.rows, ads, ps, ...msData };
+      out = { schema: 'performance-json-v6', updatedAt: new Date().toISOString(), updatedAtText: new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }), source: 'Excel Tracking: ' + (currentFile()?.name || '-'), mode: 'supabase-storage-performance-json', separatedFromDoitFile: true, sellerReportFields: sellerAll.fields, sellerReportRows: sellerAll.rows, ads, ps, ...msData };
       setProgress(88, 'กำลังสร้าง Preview และบันทึก JSON ในเครื่อง...');
+      await wait(20);
       localStorage.setItem('doit-performance-data-v1', JSON.stringify(out));
       window.DOIT_PERFORMANCE_DATA = out;
       $('#performanceOpenBtn').disabled = false; $('#performanceDownloadBtn').disabled = false; $('#performanceUploadBtn').disabled = false;
       preview();
       setStatus(`✓ แปลงผลงาน JSON สำเร็จ<br>ADS ${ads.length} · PS ${ps.length} · MS ${out.ms.length}<br>Seller Report ${sellerAll.fields.length} หัวข้อ · ${sellerAll.rows.length} แถว<br>ใช้ไฟล์ Tracking แยกจาก DOIT แล้ว ไม่ชนยอด DOIT`, 'ok');
       setProgress(100, `แปลง JSON สำเร็จ ADS ${ads.length} · PS ${ps.length} · MS ${out.ms.length}`, 'done');
-    } catch (e) { setStatus('แปลงผลงานไม่สำเร็จ: ' + E(e.message || e), 'warn'); setProgress(100, 'แปลงผลงานไม่สำเร็จ: ' + (e.message || e), 'error'); }
+      return out;
+    } catch (e) {
+      setStatus('แปลงผลงานไม่สำเร็จ: ' + E(e.message || e), 'warn');
+      setProgress(100, 'แปลงผลงานไม่สำเร็จ: ' + (e.message || e), 'error');
+      throw e;
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function uploadSupabase() {
+    if (uploadInFlight) {
+      setStatus('กำลังอัปโหลดอยู่ ห้ามกดซ้ำ', 'warn');
+      setProgress(45, 'กำลังอัปโหลดอยู่ ห้ามกดซ้ำ');
+      return;
+    }
+    uploadInFlight = true;
     try {
-      if (!out) convert();
+      setBusy(true, 'performanceUploadBtn');
+      setProgress(5, 'เริ่มอัปโหลด Performance JSON...');
+      if (!out) await convert();
       if (!out) throw new Error('ยังไม่มี JSON สำหรับอัปโหลด');
-      const c = cfg(); if (!c.k) throw Error('ยังไม่ได้ใส่ Supabase anon key');
+      const c = cfg();
+      if (!c.k) throw Error('ยังไม่ได้ใส่ Supabase anon key');
       localStorage.setItem('doit-cloud-cfg', JSON.stringify({ url: c.u, key: c.k }));
-      const id = crypto.randomUUID(), day = new Date().toISOString().slice(0, 10), safe = (currentFile()?.name || 'tracking.xlsx').replace(/[^\w.ก-๙-]+/g, '_'), dataPath = `performance/${day}/${id}.json`, activePath = 'performance/active.json';
+      const id = crypto.randomUUID();
+      const day = new Date().toISOString().slice(0, 10);
+      const safe = (currentFile()?.name || 'tracking.xlsx').replace(/[^\w.ก-๙-]+/g, '_');
+      const dataPath = `performance/${day}/${id}.json`;
+      const activePath = 'performance/active.json';
       const payload = { ...out, versionId: id, sourceFile: safe, dataPath, activePath, publishedAt: new Date().toISOString() };
       const active = { schema: 'performance-active-v1', versionId: id, updatedAt: payload.publishedAt, sourceFile: safe, dataPath, adsCount: out.ads.length, psCount: out.ps.length, msCount: (out.ms || []).length, sellerReportFieldCount: (out.sellerReportFields || []).length, separatedFromDoitFile: true };
-      setStatus('กำลังอัปโหลด Performance JSON เข้า Supabase Storage...', 'muted');
-      setProgress(15, 'กำลังเตรียมอัปโหลด Performance JSON เข้า Supabase...');
-      await put(c, dataPath, new Blob([JSON.stringify(payload)], { type: 'application/json;charset=utf-8' }), 'application/json;charset=utf-8');
-      setProgress(70, 'อัปโหลด JSON แล้ว กำลังตั้ง active performance/active.json...');
-      await put(c, activePath, new Blob([JSON.stringify(active)], { type: 'application/json;charset=utf-8' }), 'application/json;charset=utf-8');
-      localStorage.setItem('doit-performance-active-path', activePath); localStorage.setItem('doit-performance-data-v1', JSON.stringify(payload));
-      setStatus(`✓ อัปโหลด Performance JSON เข้า Supabase สำเร็จ<br>✓ ตั้ง active แล้ว: <b>${activePath}</b><br>✓ ADS ${out.ads.length} · PS ${out.ps.length} · MS ${(out.ms || []).length} · Seller Report ${(out.sellerReportFields || []).length} หัวข้อ<br>✓ ไม่แตะไฟล์ DOIT`, 'ok');
-      setProgress(100, 'อัปโหลด Performance JSON + ตั้งล่าสุดสำเร็จ', 'done');
-    } catch (e) { setStatus('อัปโหลด Supabase ไม่สำเร็จ: ' + E(e.message || e), 'warn'); setProgress(100, 'อัปโหลด Supabase ไม่สำเร็จ: ' + (e.message || e), 'error'); }
+      const payloadText = JSON.stringify(payload);
+      setStatus(`กำลังอัปโหลด Performance JSON เข้า Supabase Storage...<br>ขนาด JSON ประมาณ ${(payloadText.length / 1024 / 1024).toFixed(2)} MB`, 'muted');
+      setProgress(15, 'เตรียม JSON เสร็จ กำลังส่งไฟล์ข้อมูลหลักไป Supabase...');
+      await put(c, dataPath, new Blob([payloadText], { type: 'application/json;charset=utf-8' }), 'application/json;charset=utf-8', 25, 60000);
+      setProgress(68, 'ไฟล์ข้อมูลหลักอัปโหลดสำเร็จ กำลังเขียน active pointer...');
+      await put(c, activePath, new Blob([JSON.stringify(active)], { type: 'application/json;charset=utf-8' }), 'application/json;charset=utf-8', 72, 30000);
+      setProgress(88, 'เขียน active แล้ว กำลัง verify performance/active.json...');
+      const verify = await getJson(c, activePath, 88, 20000);
+      if (!verify || verify.dataPath !== dataPath || verify.versionId !== id) throw new Error('verify active ไม่ตรงกับไฟล์ที่เพิ่งอัปโหลด');
+      localStorage.setItem('doit-performance-active-path', activePath);
+      localStorage.setItem('doit-performance-data-v1', JSON.stringify(payload));
+      setStatus(`✓ อัปโหลด Performance JSON เข้า Supabase สำเร็จ<br>✓ ตั้ง active แล้ว: <b>${activePath}</b><br>✓ Verify active ตรงกับไฟล์ล่าสุดแล้ว<br>✓ ADS ${out.ads.length} · PS ${out.ps.length} · MS ${(out.ms || []).length} · Seller Report ${(out.sellerReportFields || []).length} หัวข้อ<br>✓ ไม่แตะไฟล์ DOIT`, 'ok');
+      setProgress(100, 'อัปโหลด Performance JSON + ตั้งล่าสุด + ตรวจสอบสำเร็จ', 'done');
+    } catch (e) {
+      const msg = e?.message || String(e);
+      setStatus('อัปโหลด Supabase ไม่สำเร็จ: ' + E(msg) + '<br>ระบบหยุดแล้ว ไม่ค้างหลอด ให้ตรวจ Supabase key / bucket policy / network', 'warn');
+      setProgress(100, 'อัปโหลด Supabase ไม่สำเร็จ: ' + msg, 'error');
+    } finally {
+      uploadInFlight = false;
+      setBusy(false);
+    }
   }
 
   function downloadJson() {
