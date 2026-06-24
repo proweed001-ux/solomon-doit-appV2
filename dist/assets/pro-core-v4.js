@@ -5,6 +5,7 @@
   const ASSET_BASE = new URL('.', SELF_SRC).href;
   const VERSION = '1028-native';
   const LEGACY_SAFE_VERSION = '1027';
+  const IS_PERFORMANCE_ROUTE = location.pathname === '/performance';
 
   function assetUrl(fileName, version = VERSION) {
     return `${ASSET_BASE}${fileName}?v=${version}`;
@@ -54,16 +55,20 @@
       version: VERSION,
       mode: 'native-stack-bootstrap',
       productionCandidate: true,
-      legacyWrapperRemoved: true
+      legacyWrapperRemoved: true,
+      performanceRouteFastBoot: true
     };
 
     loadCss(assetUrl('pro-print.css', LEGACY_SAFE_VERSION));
+
+    await loadScript(assetUrl('pro-results-mode.js'));
+
+    if (IS_PERFORMANCE_ROUTE) return;
 
     const stack = [
       assetUrl('pro-print-store-bills.js', LEGACY_SAFE_VERSION),
       assetUrl('pro-native-core.js'),
       assetUrl('pro-native-core-overrides.js'),
-      assetUrl('pro-results-mode.js'),
       assetUrl('pro-print-mode-fixes.js', LEGACY_SAFE_VERSION),
       assetUrl('pro-print-column-widths.js', LEGACY_SAFE_VERSION),
       assetUrl('pro-print-a4-pro-fix.js', LEGACY_SAFE_VERSION)
