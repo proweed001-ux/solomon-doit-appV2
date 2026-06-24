@@ -11,6 +11,10 @@
     {
       "source": "/admin-performance",
       "destination": "/admin-performance.html"
+    },
+    {
+      "source": "/admin-integration-preview",
+      "destination": "/admin-integration-preview.html"
     }
   ]
 }
