@@ -1,8 +1,98 @@
 (()=>{
 'use strict';
-if(window.__DOIT_ADMIN_PERF_HOTFIX__)return;window.__DOIT_ADMIN_PERF_HOTFIX__=true;
 const $=s=>document.querySelector(s);
-function css(){if($('#adminProgressPopupCss'))return;document.head.insertAdjacentHTML('beforeend',`<style id="adminProgressPopupCss">.perfFileRow{margin-top:10px;display:grid;grid-template-columns:170px 1fr;gap:8px;align-items:center;border:1px solid #d1fae5;background:#f0fdf4;border-radius:12px;padding:9px}.perfFileName{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#166534;font-weight:900}.perfWarn{border:1px solid #fed7aa;background:#fff7ed;color:#9a3412;border-radius:10px;padding:8px 10px;margin-top:10px;font-size:12px;font-weight:900;line-height:1.45}.right{text-align:right!important}</style>`)}
-function inject(){css();if($('#performanceInlinePanel'))return;const cloud=$('#uploadCloud')?.closest('.card')||document.querySelector('main .card');if(!cloud)return;cloud.insertAdjacentHTML('afterend',`<section class="card" id="performanceInlinePanel"><h3>แปลงผลงาน Tracking</h3><p class="muted">ใช้ไฟล์ Tracking แยกจากไฟล์ DOIT เพื่อไม่ให้ยอด DOIT เพี้ยน</p><div class="perfWarn">ห้ามเลือกไฟล์ Tracking จากปุ่ม “เลือกไฟล์ DOIT” ด้านบน ให้เลือกจากปุ่ม “เลือกไฟล์ Tracking” ในกล่องนี้เท่านั้น</div><div class="perfFileRow"><button class="btn2" id="performanceFileBtn" type="button">เลือกไฟล์ Tracking</button><span class="perfFileName" id="performanceFileName">ยังไม่ได้เลือกไฟล์ Tracking</span><input id="performanceFile" type="file" accept=".xlsx,.xlsm,.xls,.csv" hidden></div><div class="row" style="margin-top:10px"><button class="btn2" id="performanceCheckBtn" disabled>ตรวจไฟล์ Tracking</button><button class="btn" id="performanceConvertBtn" disabled>แปลงผลงาน JSON</button><button class="btn" id="performanceUploadBtn" disabled>อัปโหลด Performance JSON + ตั้งล่าสุด</button><button class="btn2" id="performanceDownloadBtn" disabled>ดาวน์โหลด JSON</button><button class="btn2" id="performanceOpenBtn" disabled>เปิดหน้า /performance</button></div><div id="performanceInlineStatus" class="muted" style="margin-top:10px">เลือกไฟล์จากปุ่ม “เลือกไฟล์ Tracking” ในกล่องนี้ แล้วกด “ตรวจไฟล์ Tracking”</div><div class="grid" style="margin-top:12px"><div class="stat"><b>ADS</b><strong id="performanceAdsCount">-</strong></div><div class="stat"><b>PS</b><strong id="performancePsCount">-</strong></div><div class="stat"><b>MS</b><strong id="performanceMsCount">-</strong></div><div class="stat"><b>Seller Report หัวข้อ</b><strong id="performanceSellerFieldCount">-</strong></div><div class="stat"><b>ยอดจริงรวม</b><strong id="performanceActualSum">-</strong></div><div class="stat"><b>PS ต่ำกว่า 80%</b><strong id="performanceBelow80">-</strong></div></div><div class="tableWrap" style="margin-top:10px"><table class="tbl"><thead><tr><th>#</th><th>ADS</th><th>PS</th><th>ชื่อ</th><th class="right">เป้า</th><th class="right">ยอดจริง</th><th class="right">Index</th></tr></thead><tbody id="performancePreviewRows"><tr><td colspan="7" class="muted">Hotfix: ปิด popup ค้างจากปุ่มเลือกไฟล์ DOIT แล้ว ต้องใส่ parser กลับใน commit ถัดไป</td></tr></tbody></table></div><div id="performanceInlineLog" class="statusBox" style="margin-top:10px">พร้อม</div></section>`);$('#performanceFileBtn').onclick=()=>$('#performanceFile')?.click();$('#performanceFile').onchange=()=>{const f=$('#performanceFile')?.files?.[0];$('#performanceFileName').textContent=f?f.name:'ยังไม่ได้เลือกไฟล์ Tracking';$('#performanceCheckBtn').disabled=!f;$('#performanceInlineStatus').textContent=f?'เลือกไฟล์ Tracking แล้ว: '+f.name:'ยังไม่ได้เลือกไฟล์ Tracking'};$('#performanceOpenBtn').onclick=()=>location.href='/performance'}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',inject);else inject();
+let modal,fill,title,detail,pct,note,hideTimer,lastAutoActive='';
+function css(){
+  if($('#adminProgressPopupCss'))return;
+  const s=document.createElement('style');
+  s.id='adminProgressPopupCss';
+  s.textContent=`
+  .adminPopMask{position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.58);backdrop-filter:blur(8px);display:none;place-items:center;padding:18px}
+  .adminPopMask.on{display:grid}
+  .adminPop{width:min(430px,100%);background:#fff;border-radius:22px;border:1px solid #d1fae5;box-shadow:0 28px 100px rgba(2,6,23,.28);padding:20px;color:#111827;text-align:center}
+  .adminPopIcon{width:62px;height:62px;border-radius:20px;margin:0 auto 12px;display:grid;place-items:center;background:linear-gradient(135deg,#087b34,#22c55e);color:#fff;font-weight:950;font-size:28px}
+  .adminPop h3{margin:0;font-size:20px;letter-spacing:-.03em;color:#064e3b}
+  .adminPop p{margin:8px 0 14px;color:#4b5563;line-height:1.45;word-break:break-word}
+  .adminPopHead{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:950;color:#087b34;margin-bottom:7px}
+  .adminPopTrack{height:14px;border-radius:999px;background:#e5e7eb;overflow:hidden;border:1px solid #d1d5db}
+  .adminPopFill{height:100%;width:0;background:linear-gradient(90deg,#087b34,#22c55e);transition:.18s ease}
+  .adminPopNote{margin-top:10px;font-size:12px;color:#6b7280;line-height:1.45}
+  .adminLatestBadge{margin-top:10px;display:inline-block;border-radius:999px;padding:7px 11px;background:#dcfce7;color:#166534;font-size:12px;font-weight:950;border:1px solid #bbf7d0}
+  `;
+  document.head.appendChild(s);
+}
+function ensure(){
+  css();
+  if(modal)return;
+  modal=document.createElement('div');
+  modal.className='adminPopMask';
+  modal.innerHTML=`<div class="adminPop"><div class="adminPopIcon" id="adminPopIcon">⇧</div><h3 id="adminPopTitle">กำลังทำงาน</h3><p id="adminPopDetail">รอสถานะ</p><div class="adminPopHead"><span id="adminPopNoteTop">สถานะจริงจากแถบหลัก</span><b id="adminPopPct">0%</b></div><div class="adminPopTrack"><div class="adminPopFill" id="adminPopFill"></div></div><div class="adminPopNote" id="adminPopNote">เปอร์เซ็นต์นี้อ่านจากหลอดสถานะหลัก ไม่สร้างเลขหลอกเพิ่ม</div></div>`;
+  document.body.appendChild(modal);
+  fill=$('#adminPopFill');title=$('#adminPopTitle');detail=$('#adminPopDetail');pct=$('#adminPopPct');note=$('#adminPopNote');
+}
+function percentFromBar(){
+  const b=$('#bar');
+  const w=(b&&b.style&&b.style.width)||'';
+  const m=w.match(/([0-9.]+)/);
+  return m?Math.max(0,Math.min(100,Number(m[1])||0)):0;
+}
+function statusText(fallback=''){
+  return String($('#status')?.textContent||fallback||'กำลังทำงาน').trim();
+}
+function show(msg){
+  ensure();
+  clearTimeout(hideTimer);
+  const n=Math.round(percentFromBar());
+  const text=statusText(msg);
+  modal.classList.add('on');
+  fill.style.width=n+'%';
+  pct.textContent=n+'%';
+  detail.textContent=text;
+  if(/ผิดพลาด|error|ไม่ได้|fail/i.test(text)){
+    title.textContent='อัปโหลดหรือแปลงไฟล์ไม่สำเร็จ';
+    note.textContent='สถานะผิดพลาดจากแถบหลัก';
+  }else if(n>=100||/เสร็จ|สำเร็จ|active|ล่าสุด|พร้อมใช้งาน/i.test(text)){
+    title.textContent='อัปโหลด/แปลงไฟล์สำเร็จ';
+    note.textContent='เสร็จตามสถานะหลักแล้ว';
+    hideTimer=setTimeout(()=>modal.classList.remove('on'),1800);
+  }else if(/อ่าน|แปลง|index|JSON/i.test(text)){
+    title.textContent='กำลังแปลงไฟล์ DOIT';
+    note.textContent='อ่านเปอร์เซ็นต์จากหลอดสถานะหลักเท่านั้น';
+  }else if(/อัปโหลด|Cloud/i.test(text)){
+    title.textContent='กำลังอัปโหลดขึ้น Cloud';
+    note.textContent='อ่านเปอร์เซ็นต์จากหลอดสถานะหลักเท่านั้น';
+  }else{
+    title.textContent='กำลังทำงาน';
+    note.textContent='เปอร์เซ็นต์นี้อ่านจากหลอดสถานะหลัก ไม่สร้างเลขหลอกเพิ่ม';
+  }
+}
+function refresh(){show();}
+function autoActive(){
+  const el=$('#cloudStatus');
+  if(!el)return;
+  const tx=el.textContent||'';
+  const btn=$('#setActive');
+  if(btn&&/กด.*ตั้งเป็นไฟล์ล่าสุด|บันทึก metadata สำเร็จ|อัปโหลดไฟล์และบันทึก metadata สำเร็จ/.test(tx)&&tx!==lastAutoActive){
+    lastAutoActive=tx;
+    show('กำลังตั้งเป็นไฟล์ล่าสุดอัตโนมัติ');
+    setTimeout(()=>btn.click(),250);
+  }
+  if(/ตั้งเป็นไฟล์ล่าสุดแล้ว|Cloud JSON active|อัปโหลด Excel \+ JSON และตั้งเป็นไฟล์ล่าสุดแล้ว/.test(tx)){
+    try{localStorage.setItem('doit-admin-latest-status',tx);localStorage.setItem('doit-admin-latest-at',new Date().toISOString())}catch{}
+    show('ตั้งไฟล์ล่าสุดอัตโนมัติสำเร็จ');
+    if(!$('#adminLatestBadge')){
+      const b=document.createElement('div');b.id='adminLatestBadge';b.className='adminLatestBadge';b.textContent='ไฟล์ล่าสุดถูกตั้งอัตโนมัติแล้ว';
+      el.appendChild(b);
+    }
+  }
+}
+function bind(){
+  ensure();
+  ['bar','pct','status'].forEach(id=>{const el=$('#'+id);if(el)new MutationObserver(refresh).observe(el,{attributes:true,childList:true,subtree:true,characterData:true,attributeFilter:['style']});});
+  const cs=$('#cloudStatus');if(cs)new MutationObserver(autoActive).observe(cs,{childList:true,subtree:true,characterData:true});
+  const file=$('#file');if(file)file.addEventListener('change',()=>{const f=file.files&&file.files[0];if(f){show('เลือกไฟล์: '+f.name)}},true);
+  const up=$('#uploadCloud');if(up)up.addEventListener('click',()=>show('เริ่มอัปโหลดขึ้น Cloud'),true);
+  setTimeout(autoActive,600);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
 })();
