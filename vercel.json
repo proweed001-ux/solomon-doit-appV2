@@ -3,6 +3,13 @@
   "outputDirectory": "dist",
   "installCommand": "echo skip install",
   "framework": null,
+  "redirects": [
+    {
+      "source": "/admin-performance.html",
+      "destination": "/admin.html",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/performance",
