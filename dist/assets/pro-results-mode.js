@@ -1,20 +1,22 @@
 (() => {
   'use strict';
-
   if (window.__DOIT_PRO_RESULTS_MODE__) return;
   window.__DOIT_PRO_RESULTS_MODE__ = true;
 
   const ROUTE_PATH = '/performance';
   const PRO_URL = '/pro.html?t=1028';
+  const DEFAULT_URL = 'https://saodmeoilixfdqentofp.supabase.co';
+  const DEFAULT_KEY = 'sb_publishable_JThYwAl_-askk_cIaCd75w_TCWK2BTT';
+  const BUCKET = 'doit-files';
   const T = v => String(v ?? '').trim();
   const N = v => Number(v) || 0;
   const money = v => N(v).toLocaleString('th-TH', { maximumFractionDigits: 0 });
   const pct = v => N(v).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
-  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 
   const mockData = {
-    updatedAt: 'mock preview',
-    source: 'ยังไม่มี JSON จาก Admin จึงแสดงข้อมูลตัวอย่าง',
+    updatedAtText: 'mock preview',
+    source: 'ยังไม่มี JSON จาก Supabase จึงแสดงข้อมูลตัวอย่าง',
     ads: [
       { adsCode: 'AYAADS01', adsName: 'ทีมตัวอย่าง 1', target: 1775000, actual: 1405279, dgp: 39240, bills: 1288 },
       { adsCode: 'AYAADS02', adsName: 'ทีมตัวอย่าง 2', target: 1620000, actual: 1507896, dgp: 41880, bills: 1194 },
@@ -29,35 +31,43 @@
     ]
   };
 
-  function getData() {
+  function cloudCfg() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('doit-cloud-cfg') || '{}'); } catch {}
+    return { u: T(saved.url || DEFAULT_URL).replace(/\/$/, ''), k: T(saved.key || DEFAULT_KEY) };
+  }
+  function headers(c) { return { apikey: c.k, authorization: 'Bearer ' + c.k }; }
+  async function fetchStorageJson(path) {
+    const c = cloudCfg();
+    const res = await fetch(`${c.u}/storage/v1/object/${BUCKET}/${encodeURIComponent(path).replace(/%2F/g, '/')}`, { headers: headers(c), cache: 'no-store' });
+    const text = await res.text();
+    if (!res.ok) throw new Error(text);
+    return JSON.parse(text);
+  }
+  async function loadData() {
+    try {
+      const active = await fetchStorageJson('performance/active.json');
+      if (active?.dataPath) {
+        const data = await fetchStorageJson(active.dataPath);
+        if (Array.isArray(data?.ps) && data.ps.length) {
+          localStorage.setItem('doit-performance-data-v1', JSON.stringify(data));
+          return { data, sourceMode: 'supabase' };
+        }
+      }
+    } catch (err) {
+      console.warn('[performance] Supabase active JSON load failed', err);
+    }
     try {
       const saved = JSON.parse(localStorage.getItem('doit-performance-data-v1') || 'null');
-      if (saved && Array.isArray(saved.ps) && saved.ps.length) return saved;
+      if (saved && Array.isArray(saved.ps) && saved.ps.length) return { data: saved, sourceMode: 'localStorage fallback' };
     } catch {}
-    if (window.DOIT_PERFORMANCE_DATA && Array.isArray(window.DOIT_PERFORMANCE_DATA.ps)) return window.DOIT_PERFORMANCE_DATA;
-    return mockData;
+    if (window.DOIT_PERFORMANCE_DATA && Array.isArray(window.DOIT_PERFORMANCE_DATA.ps)) return { data: window.DOIT_PERFORMANCE_DATA, sourceMode: 'window data' };
+    return { data: mockData, sourceMode: 'mock' };
   }
 
-  function withIndex(row) {
-    const target = N(row.target);
-    return { ...row, index: target ? (N(row.actual) / target) * 100 : 0 };
-  }
-
-  function statusFor(index) {
-    if (index >= 100) return { text: 'เกินเป้า', cls: 'good' };
-    if (index >= 80) return { text: 'ใกล้เป้า', cls: 'warn' };
-    return { text: 'ต่ำกว่าเป้า ต้องเร่ง', cls: 'bad' };
-  }
-
-  function sumRows(rows) {
-    return withIndex(rows.reduce((s, r) => {
-      s.target += N(r.target);
-      s.actual += N(r.actual);
-      s.dgp += N(r.dgp);
-      s.bills += N(r.bills);
-      return s;
-    }, { target: 0, actual: 0, dgp: 0, bills: 0 }));
-  }
+  function withIndex(row) { const target = N(row.target); return { ...row, index: target ? (N(row.actual) / target) * 100 : 0 }; }
+  function statusFor(index) { if (index >= 100) return { text:'เกินเป้า', cls:'good' }; if (index >= 80) return { text:'ใกล้เป้า', cls:'warn' }; return { text:'ต่ำกว่าเป้า ต้องเร่ง', cls:'bad' }; }
+  function sumRows(rows) { return withIndex(rows.reduce((s,r)=>{s.target+=N(r.target);s.actual+=N(r.actual);s.dgp+=N(r.dgp);s.bills+=N(r.bills);return s;},{target:0,actual:0,dgp:0,bills:0})); }
 
   function style() {
     if (document.querySelector('#doitResultsModeStyle')) return;
@@ -66,43 +76,40 @@
     </style>`);
   }
 
+  function pageShell() {
+    style();
+    let page = document.querySelector('#resultsModePage');
+    if (!page) { page = document.createElement('div'); page.id = 'resultsModePage'; page.className = 'resultsPage'; document.body.appendChild(page); }
+    return page;
+  }
+
   function injectButton() {
     style();
     const card = document.querySelector('.uploadCard');
     if (!card || document.querySelector('#resultsModeBtn')) return;
     const btn = document.createElement('button');
-    btn.id = 'resultsModeBtn';
-    btn.type = 'button';
-    btn.className = 'resultsModeBtn';
-    btn.textContent = 'ผลงาน';
-    btn.addEventListener('click', () => open(true));
-    const dev = card.querySelector('.devTeamBtn');
-    if (dev) card.insertBefore(btn, dev); else card.prepend(btn);
+    btn.id = 'resultsModeBtn'; btn.type = 'button'; btn.className = 'resultsModeBtn'; btn.textContent = 'ผลงาน'; btn.addEventListener('click', () => open(true));
+    const dev = card.querySelector('.devTeamBtn'); if (dev) card.insertBefore(btn, dev); else card.prepend(btn);
   }
 
-  function render() {
-    style();
-    const data = getData();
-    const adsCode = document.querySelector('#resultsModePage')?.dataset.adsCode || '';
-    const psCode = document.querySelector('#resultsModePage')?.dataset.psCode || '';
-    let rows = data.ps.map(withIndex).filter(r => (!adsCode || r.adsCode === adsCode) && (!psCode || r.psCode === psCode));
-    const summary = psCode && rows[0] ? rows[0] : sumRows(rows.length ? rows : data.ps.map(withIndex));
+  async function render() {
+    const page = pageShell();
+    page.innerHTML = `<div class="resultsTopbar"><button class="resultsBack" id="resultsBackBtn">← กลับหน้า Pro</button><div class="resultsTitle">โหมดผลงาน</div><div></div></div><main class="resultsWrap"><section class="resultsCard resultsMeta"><b>กำลังโหลดข้อมูลผลงาน</b><span>กำลังดึง performance/active.json จาก Supabase...</span></section></main>`;
+    page.querySelector('#resultsBackBtn').onclick = () => close(true);
+    const { data, sourceMode } = await loadData();
+    const adsCode = page.dataset.adsCode || '';
+    const psCode = page.dataset.psCode || '';
+    const filtered = data.ps.map(withIndex).filter(r => (!adsCode || r.adsCode === adsCode) && (!psCode || r.psCode === psCode));
+    const summary = psCode && filtered[0] ? filtered[0] : sumRows(filtered.length ? filtered : data.ps.map(withIndex));
     const st = statusFor(summary.index);
     const rankRows = data.ps.map(withIndex).filter(r => !adsCode || r.adsCode === adsCode).sort((a,b)=>b.index-a.index);
     const all = data.ps.map(withIndex);
     const over = all.filter(r=>r.index>=100);
     const below80 = all.filter(r=>r.index<80).length;
-    const worst = data.ads.map(withIndex).sort((a,b)=>a.index-b.index)[0] || {};
-    const adsOpts = data.ads.map(a=>`<option value="${esc(a.adsCode)}" ${a.adsCode===adsCode?'selected':''}>${esc(a.adsCode)}</option>`).join('');
+    const worst = (data.ads || []).map(withIndex).sort((a,b)=>a.index-b.index)[0] || {};
+    const adsOpts = (data.ads || []).map(a=>`<option value="${esc(a.adsCode)}" ${a.adsCode===adsCode?'selected':''}>${esc(a.adsCode)}</option>`).join('');
     const psOpts = data.ps.filter(p=>!adsCode||p.adsCode===adsCode).map(p=>`<option value="${esc(p.psCode)}" ${p.psCode===psCode?'selected':''}>${esc(p.psCode)}</option>`).join('');
-    let page = document.querySelector('#resultsModePage');
-    if (!page) {
-      page = document.createElement('div');
-      page.id = 'resultsModePage';
-      page.className = 'resultsPage';
-      document.body.appendChild(page);
-    }
-    page.innerHTML = `<div class="resultsTopbar"><button class="resultsBack" id="resultsBackBtn">← กลับหน้า Pro</button><div class="resultsTitle">โหมดผลงาน</div><div></div></div><main class="resultsWrap"><section class="resultsCard resultsMeta"><b>ข้อมูลล่าสุด</b><span>อัปเดต: ${esc(data.updatedAt || '-')}</span><span>${esc(data.source || '-')}</span></section><section class="resultsCard"><div class="resultsSectionTitle">ค้นหาผลงาน</div><div class="resultsGrid"><div class="resultsField"><label>ADS</label><select id="resultsAds"><option value="">ADS: ทั้งหมด</option>${adsOpts}</select></div><div class="resultsField"><label>PS</label><select id="resultsPs"><option value="">PS: ทั้งหมด</option>${psOpts}</select></div></div><button class="resultsSearchBtn" id="resultsSearchBtn">ดูผลงาน</button></section><section class="resultsCard"><div class="resultsPerson">${esc(psCode || adsCode || 'ผลงานรวมทั้งหมด')}</div><div class="resultsSub">${esc(psCode ? (summary.psName || '-') : 'อ่านจาก JSON ที่ Admin แปลงไว้')}</div><div class="resultsStats"><div class="resultsStat"><span>เป้ายอดขาย</span><strong>${money(summary.target)}</strong></div><div class="resultsStat"><span>ยอดขายจริง</span><strong>${money(summary.actual)}</strong></div><div class="resultsStat"><span>Sales Index</span><strong>${pct(summary.index)}</strong></div><div class="resultsStat"><span>DGP</span><strong>${money(summary.dgp)}</strong></div><div class="resultsStat"><span>บิลซื้อ</span><strong>${money(summary.bills)}</strong></div><div class="resultsStat"><span>สถานะผลงาน</span><strong>${esc(st.text)}</strong></div></div><div class="resultsBadge ${st.cls}">${esc(st.text)}</div></section><section class="resultsCard"><div class="resultsSectionTitle">อันดับ PS</div><div class="rankList">${rankRows.map((r,i)=>`<div class="rankItem"><div class="rankNo">${i+1}</div><div class="rankName"><b>${esc(r.psCode)} · ${esc(r.psName)}</b><span>${esc(r.adsCode)} · ยอด ${money(r.actual)} / เป้า ${money(r.target)}</span></div><div class="rankPct">${pct(r.index)}</div></div>`).join('') || '<div class="feedItem warn">ไม่พบข้อมูล</div>'}</div></section><section class="resultsCard"><div class="resultsSectionTitle">[เมตริกแบบเรียลไทม์]</div><div class="feedList"><div class="feedItem">อ่านข้อมูลจาก JSON ล่าสุดในเครื่องนี้</div><div class="feedItem">PS ที่เกินเป้า: ${esc(over.map(r=>r.psCode).join(', ') || 'ยังไม่มี')}</div><div class="feedItem bad">ADS ที่ต้องเร่ง: ${esc(worst.adsCode || '-')} · Index ${pct(worst.index || 0)}</div><div class="feedItem warn">จำนวน PS ต่ำกว่า 80%: ${below80} คน</div></div></section></main>`;
+    page.innerHTML = `<div class="resultsTopbar"><button class="resultsBack" id="resultsBackBtn">← กลับหน้า Pro</button><div class="resultsTitle">โหมดผลงาน</div><div></div></div><main class="resultsWrap"><section class="resultsCard resultsMeta"><b>ข้อมูลล่าสุด</b><span>แหล่งข้อมูล: ${esc(sourceMode)}</span><span>อัปเดต: ${esc(data.updatedAtText || data.updatedAt || '-')}</span><span>${esc(data.source || data.sourceFile || '-')}</span></section><section class="resultsCard"><div class="resultsSectionTitle">ค้นหาผลงาน</div><div class="resultsGrid"><div class="resultsField"><label>ADS</label><select id="resultsAds"><option value="">ADS: ทั้งหมด</option>${adsOpts}</select></div><div class="resultsField"><label>PS</label><select id="resultsPs"><option value="">PS: ทั้งหมด</option>${psOpts}</select></div></div><button class="resultsSearchBtn" id="resultsSearchBtn">ดูผลงาน</button></section><section class="resultsCard"><div class="resultsPerson">${esc(psCode || adsCode || 'ผลงานรวมทั้งหมด')}</div><div class="resultsSub">${esc(psCode ? (summary.psName || '-') : 'อ่านจาก Performance JSON ที่ Admin ตั้งล่าสุด')}</div><div class="resultsStats"><div class="resultsStat"><span>เป้ายอดขาย</span><strong>${money(summary.target)}</strong></div><div class="resultsStat"><span>ยอดขายจริง</span><strong>${money(summary.actual)}</strong></div><div class="resultsStat"><span>Sales Index</span><strong>${pct(summary.index)}</strong></div><div class="resultsStat"><span>DGP</span><strong>${money(summary.dgp)}</strong></div><div class="resultsStat"><span>บิลซื้อ</span><strong>${money(summary.bills)}</strong></div><div class="resultsStat"><span>สถานะผลงาน</span><strong>${esc(st.text)}</strong></div></div><div class="resultsBadge ${st.cls}">${esc(st.text)}</div></section><section class="resultsCard"><div class="resultsSectionTitle">อันดับ PS</div><div class="rankList">${rankRows.map((r,i)=>`<div class="rankItem"><div class="rankNo">${i+1}</div><div class="rankName"><b>${esc(r.psCode)} · ${esc(r.psName)}</b><span>${esc(r.adsCode)} · ยอด ${money(r.actual)} / เป้า ${money(r.target)}</span></div><div class="rankPct">${pct(r.index)}</div></div>`).join('') || '<div class="feedItem warn">ไม่พบข้อมูล</div>'}</div></section><section class="resultsCard"><div class="resultsSectionTitle">[เมตริกแบบเรียลไทม์]</div><div class="feedList"><div class="feedItem">ดึงข้อมูลจาก Performance JSON ล่าสุด</div><div class="feedItem">PS ที่เกินเป้า: ${esc(over.map(r=>r.psCode).join(', ') || 'ยังไม่มี')}</div><div class="feedItem bad">ADS ที่ต้องเร่ง: ${esc(worst.adsCode || '-')} · Index ${pct(worst.index || 0)}</div><div class="feedItem warn">จำนวน PS ต่ำกว่า 80%: ${below80} คน</div></div></section></main>`;
     page.querySelector('#resultsBackBtn').onclick = () => close(true);
     page.querySelector('#resultsAds').onchange = e => { page.dataset.adsCode = e.target.value; page.dataset.psCode = ''; render(); };
     page.querySelector('#resultsPs').onchange = e => { page.dataset.psCode = e.target.value; };
@@ -115,7 +122,6 @@
 
   document.addEventListener('click', e => { if (e.target?.closest?.('#resultsModeBtn')) open(true); }, true);
   window.addEventListener('popstate', route);
-  new MutationObserver(injectButton).observe(document.body, { childList: true, subtree: true });
-  injectButton();
-  route();
+  new MutationObserver(injectButton).observe(document.body, { childList:true, subtree:true });
+  injectButton(); route();
 })();
