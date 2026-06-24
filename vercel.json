@@ -2,5 +2,11 @@
   "buildCommand": "echo using verified prebuilt dist",
   "outputDirectory": "dist",
   "installCommand": "echo skip install",
-  "framework": null
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/performance",
+      "destination": "/pro.html"
+    }
+  ]
 }
