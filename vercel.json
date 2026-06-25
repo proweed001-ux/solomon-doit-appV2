@@ -2,5 +2,18 @@
   "buildCommand": "echo using verified prebuilt dist",
   "outputDirectory": "dist",
   "installCommand": "echo skip install",
-  "framework": null
+  "framework": null,
+  "redirects": [
+    {
+      "source": "/admin-performance.html",
+      "destination": "/admin.html",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/performance",
+      "destination": "/performance.html"
+    }
+  ]
 }
