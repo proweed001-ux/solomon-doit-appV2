@@ -21,6 +21,8 @@ const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `$
   'dist/pro-native-ui.html',
   'dist/pro-v310.html',
   'dist/pro-v310-test.html',
+  'dist/admin.html',
+  'dist/performance.html',
   'dist/assets/pro-core-v4.js',
   'dist/assets/pro-native-core.js',
   'dist/assets/pro-native-core-overrides.js',
@@ -29,6 +31,9 @@ const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `$
   'dist/assets/pro-print-store-bills.js',
   'dist/assets/pro-print-mode-fixes.js',
   'dist/assets/pro-print.css',
+  'dist/assets/admin-storage-manager-v1.js',
+  'src/lib/parser.ts',
+  'src/lib/pricing.ts',
   'docs/HANDOFF_1028_NATIVE.md',
   'scripts/qa-doit-file.mjs',
   '.github/workflows/web-ci.yml',
@@ -140,6 +145,23 @@ mustContain('dist/assets/pro-print-store-bills.js', 'Object.keys(st?.send||{})')
 mustNotContain('dist/assets/pro-print-store-bills.js', 'mapVal(st.send,g.poolKey,store,st.sel)+mapVal(st.add');
 mustNotContain('dist/assets/pro-print-store-bills.js', '[st?.send,st?.add,st?.pull]');
 
+// Admin / Performance / Storage guardrails.
+mustContain('dist/admin.html', 'id="file"');
+mustContain('dist/admin.html', 'id="perfFile"');
+mustContain('dist/admin.html', '/assets/admin-storage-manager-v1.js');
+mustContain('dist/performance.html', 'Smart Compare วันต่อวัน');
+mustContain('dist/performance.html', 'sameDayRevisions');
+mustContain('dist/performance.html', 'Month Trend Dashboard');
+mustContain('dist/assets/admin-storage-manager-v1.js', 'DELETE DOIT');
+mustContain('dist/assets/admin-storage-manager-v1.js', 'ห้ามลบ Performance กับ DOIT ปนกัน');
+mustContain('dist/assets/admin-storage-manager-v1.js', "modalFilter === 'doit'");
+mustContain('dist/assets/admin-storage-manager-v1.js', 'cleanupCandidates().forEach');
+mustContain('src/lib/parser.ts', "['TotInvc'");
+mustContain('src/lib/parser.ts', 'amount !== 0');
+mustContain('src/lib/parser.ts', 'scorePivot(fields, rows)');
+mustContain('src/lib/pricing.ts', 'if (qty === 0) return 0');
+mustNotContain('src/lib/pricing.ts', 'if (n <= 0) return 0');
+
 mustContain('docs/HANDOFF_1028_NATIVE.md', 'Project Pro Native Core: COMPLETE');
 mustContain('docs/HANDOFF_1028_NATIVE.md', 'pro-core-v4.js ไม่ fetch legacy core จาก jsdelivr แล้ว');
 mustContain('docs/HANDOFF_1028_NATIVE.md', 'Business rules ที่ห้ามพัง');
@@ -162,4 +184,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Smoke check passed: Pro Stable 1028 Native active-session currentState guardrails are intact.');
+console.log('Smoke check passed: Pro Stable 1028 Native plus Admin/Performance/Storage guardrails are intact.');
