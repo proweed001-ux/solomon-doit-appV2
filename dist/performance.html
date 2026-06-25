@@ -24,7 +24,7 @@ function index(r){return N(r.target)?N(r.actual)/N(r.target)*100:0}function addI
 function sum(rows){return addIndex(rows.reduce((a,r)=>{a.target+=N(r.target);a.actual+=N(r.actual);a.dgp+=N(r.dgp);a.bills+=N(r.bills);return a},{target:0,actual:0,dgp:0,bills:0}))}
 function field(o,terms,ex=[]){const keys=Object.keys(o||{}),ts=terms.map(norm),xs=ex.map(norm);const k=keys.find(key=>ts.every(t=>norm(key).includes(t))&&!xs.some(x=>norm(key).includes(x)));return k?{key:k,value:o[k]}:null}
 function smart(v){const n=N(v);return pct(Math.abs(n)<=2?n*100:n)}
-function seller(d,ps){const rows=Array.isArray(d.sellerReportRows)?d.sellerReportRows:[];return rows.find(r=>r.psCode===ps)?.sellerReport || d.ps.find(p=>p.psCode===ps)?.sellerReport || null}
+function seller(d,psCode){const rows=Array.isArray(d.sellerReportRows)?d.sellerReportRows:[];return rows.find(r=>r.psCode===psCode)?.sellerReport || d.ps.find(p=>p.psCode===psCode)?.sellerReport || null}
 function msRows(d){if(Array.isArray(d.ms)&&d.ms.length)return d.ms;const m=new Map();(d.msSbd||[]).forEach(r=>m.set(r.msCode,{...r,msName:r.msCode}));(d.msNewProduct||[]).forEach(r=>m.set(r.msCode,{...(m.get(r.msCode)||{msCode:r.msCode,msName:r.msCode}),newProduct:r}));return[...m.values()]}
 function bar(a,t){const i=N(t)?N(a)/N(t)*100:0;return `<div class="meter"><div class="fill" style="width:${Math.min(140,i)}%"></div></div><div class="gap">${pct(i)} · ${N(a)>=N(t)?'เกิน '+money(N(a)-N(t)):'ขาด '+money(N(t)-N(a))}</div>`}
 function kpi(label,value,sub){return `<div class="kpi"><span>${esc(label)}</span><strong>${esc(value)}</strong><small>${esc(sub||'')}</small></div>`}
