@@ -50,6 +50,59 @@ Performance convert:    #perfConvert
 Performance upload:     #perfUpload
 ```
 
+## Performance comparison rules
+
+The purpose of compare is not only to show numeric difference. It must answer:
+
+```text
+Did performance improve or worsen?
+Why did it change?
+Which ADS/PS must be fixed first?
+Was the uploaded data valid?
+```
+
+Required compare behavior:
+
+```text
+reportDate is the business/report date.
+uploadedAt is only the upload timestamp.
+Same reportDate uploaded more than once = revision, not yesterday.
+Daily compare must use the latest file from the previous reportDate only.
+The same file/path must never be compared with itself.
+If only same-day revisions exist, show no previous-day compare.
+```
+
+Performance dashboard must keep these sections:
+
+```text
+Data Status
+Storage Retention
+Smart Compare วันต่อวัน
+Cause Dashboard
+Problem Dashboard
+Month Trend Dashboard
+ADS Board
+Top PS / ต้องเร่งก่อน
+Seller Report Detail
+Raw tab
+```
+
+## Storage retention rules
+
+Keep JSON as the long-term format. Do not keep raw Excel for long periods.
+
+```text
+Performance JSON: keep 30 days.
+Raw Excel / uploads / parsed temp files: keep 7 days.
+Same-day revisions: keep latest + 3 recent revisions per reportDate.
+Never delete performance/active.json.
+Never delete performance/index.json.
+Never delete current active dataPath.
+Never delete previousDataPath used for compare.
+```
+
+`dist/assets/admin-storage-manager-v1.js` owns the safe cleanup UI. It must preview first and require typing `DELETE` before deleting files.
+
 ## Old Vercel preview deployment
 
 An old immutable Vercel Preview deployment may still be reachable even after the file is removed from the latest branch:
@@ -84,6 +137,8 @@ Do not route users to /admin-performance.html.
 Do not move Performance logic back into admin-progress-popup-v1.js.
 Do not bind Performance code to DOIT #file, #choose, or #uploadCloud.
 Do not claim the old Vercel deployment is deleted unless it is deleted from Vercel itself.
+Do not compare same reportDate revisions as yesterday.
+Do not store fake/mock Performance data.
 ```
 
 ## Safe action for future AI agents
@@ -96,4 +151,6 @@ Expected direction:
 One visible Admin page only: /admin.html
 Old admin-performance page: abandoned / do not use
 Old preview deployment: delete if possible, otherwise ignore and warn
+Performance compare: reportDate-aware, revision-safe, JSON-first
+Storage retention: JSON 30 days, raw files 7 days, preview before delete
 ```
