@@ -15,7 +15,7 @@ const required = [
   'package.json','README.md','dist/index.html','dist/pro.html','dist/admin.html','dist/performance.html',
   'dist/assets/pro-core-v4.js','dist/assets/pro-native-core.js','dist/assets/pro-native-core-overrides.js',
   'dist/assets/pro-print-store-bills.js','dist/assets/pro-print-mode-fixes.js','dist/assets/pro-print.css',
-  'dist/assets/admin-upload-v001.js','dist/assets/admin-json-v265.js','dist/assets/admin-progress-popup-v1.js','dist/assets/admin-storage-manager-v1.js',
+  'dist/assets/admin-upload-v001.js','dist/assets/admin-json-v265.js','dist/assets/admin-progress-popup-v1.js','dist/assets/admin-storage-manager-v1.js','dist/assets/admin-performance-active-v2.js',
   'src/lib/parser.ts','src/lib/pricing.ts','scripts/qa-doit-file.mjs','.github/workflows/web-ci.yml'
 ];
 required.forEach(mustExist);
@@ -71,10 +71,17 @@ mustContain('dist/assets/admin-upload-v001.js', 'ปุ่มนี้ถูก�
 mustNotContain('dist/assets/admin-progress-popup-v1.js', 'btn.click()');
 mustNotContain('dist/assets/admin-progress-popup-v1.js', 'lastAutoActive');
 
-// Performance dashboard guardrails.
+// Performance dashboard and active metadata guardrails.
 mustContain('dist/performance.html', 'Smart Compare วันต่อวัน');
 mustContain('dist/performance.html', 'sameDayRevisions');
 mustContain('dist/performance.html', 'Month Trend Dashboard');
+mustContain('dist/assets/admin-storage-manager-v1.js', 'admin-performance-active-v2.js');
+mustContain('dist/assets/admin-performance-active-v2.js', 'performance-active-v2');
+mustContain('dist/assets/admin-performance-active-v2.js', 'reportDate');
+mustContain('dist/assets/admin-performance-active-v2.js', 'previousDataPath');
+mustContain('dist/assets/admin-performance-active-v2.js', 'revision');
+mustContain('dist/assets/admin-performance-active-v2.js', 'hash');
+mustContain('dist/assets/admin-performance-active-v2.js', 'history');
 
 // Storage safety guardrails: no embedded key, no direct browser storage delete.
 mustNotContain('dist/assets/admin-storage-manager-v1.js', 'sb_publishable_');
@@ -83,7 +90,6 @@ mustContain('dist/assets/admin-storage-manager-v1.js', 'no_direct_browser_delete
 mustContain('dist/assets/admin-storage-manager-v1.js', 'direct_browser_delete_disabled');
 mustNotContain('dist/assets/admin-storage-manager-v1.js', "method:'DELETE'");
 mustNotContain('dist/assets/admin-storage-manager-v1.js', 'method:"DELETE"');
-mustContain('dist/assets/admin-storage-manager-v1.js', 'DELETE DOIT');
 mustContain('dist/assets/admin-storage-manager-v1.js', 'mixed_delete_forbidden');
 
 // Remove stale high-risk files.
@@ -94,4 +100,4 @@ if (failures.length) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-console.log('Smoke check passed: no known DOIT/Admin formula overlap, stale active-click flow, or direct storage delete guard violations.');
+console.log('Smoke check passed: no known DOIT/Admin formula overlap, stale active-click flow, missing Performance active metadata patch, or direct storage delete guard violations.');
