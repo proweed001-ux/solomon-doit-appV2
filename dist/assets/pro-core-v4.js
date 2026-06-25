@@ -56,8 +56,7 @@
       mode: 'native-stack-bootstrap',
       productionCandidate: true,
       legacyWrapperRemoved: true,
-      performanceRouteFastBoot: true,
-      defaultInvcGuard: true
+      performanceRouteFastBoot: true
     };
 
     loadCss(assetUrl('pro-print.css', LEGACY_SAFE_VERSION));
@@ -68,7 +67,6 @@
 
     const stack = [
       assetUrl('pro-print-store-bills.js', LEGACY_SAFE_VERSION),
-      assetUrl('pro-default-invc-v1.js'),
       assetUrl('pro-native-core.js'),
       assetUrl('pro-native-core-overrides.js'),
       assetUrl('pro-print-mode-fixes.js', LEGACY_SAFE_VERSION),
