@@ -36,6 +36,7 @@
     return '';
   };
   const isPerformance = p => /^performance\//i.test(String(p || ''));
+  const isDoit = p => !isPerformance(p);
   const isRaw = p => /\.(xlsx|xlsm|xls|csv)$/i.test(p) || /(^|\/)(uploads|raw|parsed)\//i.test(p);
   const isPerfJson = p => /^performance\//i.test(p) && /\.json$/i.test(p);
   const isPerfRaw = p => /^performance\//i.test(p) && isRaw(p);
@@ -104,11 +105,18 @@
     return p;
   }
   function classifyFile(f) {
-    if (state.protected.has(f.path) || isSystem(f.path)) return { label: 'กันลบ', css: 'locked', locked: true, reason: 'active/latest/previous/system' };
-    if (!isPerformance(f.path)) return { label: 'DOIT กันลบ', css: 'locked', locked: true, reason: 'DOIT/raw/team file locked by default' };
-    if (isPerfJson(f.path)) return { label: 'Performance JSON', css: 'json', locked: false, reason: 'performance json' };
-    if (isPerfRaw(f.path)) return { label: 'Performance RAW', css: 'excel', locked: false, reason: 'performance raw temp' };
-    return { label: 'Performance อื่น ๆ', css: 'json', locked: false, reason: 'performance file' };
+    if (state.protected.has(f.path) || isSystem(f.path)) return { label: 'กันลบ', css: 'locked', locked: true, type: 'protected', reason: 'active/latest/previous/system' };
+    if (isDoit(f.path)) return { label: 'DOIT', css: 'doit', locked: false, type: 'doit', reason: 'ลบได้เฉพาะแท็บ DOIT และต้องพิมพ์ DELETE DOIT' };
+    if (isPerfJson(f.path)) return { label: 'Performance JSON', css: 'json', locked: false, type: 'performance', reason: 'performance json' };
+    if (isPerfRaw(f.path)) return { label: 'Performance RAW', css: 'excel', locked: false, type: 'performance', reason: 'performance raw temp' };
+    return { label: 'Performance อื่น ๆ', css: 'json', locked: false, type: 'performance', reason: 'performance file' };
+  }
+  function canSelect(f) {
+    const c = classifyFile(f);
+    if (c.locked) return false;
+    if (c.type === 'performance') return modalFilter !== 'doit';
+    if (c.type === 'doit') return modalFilter === 'doit';
+    return false;
   }
   function cleanupCandidates() {
     const now = new Date();
@@ -117,7 +125,7 @@
     const out = new Map();
     const add = (f, reason) => {
       const c = classifyFile(f);
-      if (!c.locked && !isSystem(f.path) && isPerformance(f.path)) out.set(f.path, { ...f, cleanupReason: reason });
+      if (!c.locked && c.type === 'performance' && !isSystem(f.path)) out.set(f.path, { ...f, cleanupReason: reason });
     };
     state.files.forEach(f => {
       const d = f.date ? new Date(f.date) : (f.created_at ? new Date(f.created_at) : null);
@@ -142,11 +150,11 @@
     const isCandidate = cleanupCandidates().some(x => x.path === f.path);
     const filterOk = modalFilter === 'all'
       || (modalFilter === 'cleanup' && isCandidate)
-      || (modalFilter === 'selectable' && !c.locked)
+      || (modalFilter === 'selectable' && canSelect(f))
       || (modalFilter === 'protected' && c.locked)
       || (modalFilter === 'json' && isPerfJson(f.path))
       || (modalFilter === 'raw' && isPerfRaw(f.path))
-      || (modalFilter === 'doit' && !isPerformance(f.path));
+      || (modalFilter === 'doit' && c.type === 'doit');
     return filterOk && (!q || f.path.toLowerCase().includes(q) || String(f.name).toLowerCase().includes(q) || String(f.date).includes(q) || c.label.toLowerCase().includes(q));
   }
   function badgeHtml(f) {
@@ -154,7 +162,7 @@
     const cand = cleanupCandidates().find(x => x.path === f.path);
     return [
       `<span class="asBadge ${c.css}">${esc(c.label)}</span>`,
-      c.locked ? '<span class="asBadge locked">กันลบ</span>' : '<span class="asBadge free">ลบได้</span>',
+      canSelect(f) ? '<span class="asBadge free">ลบได้ในโหมดนี้</span>' : '<span class="asBadge locked">ล็อกในโหมดนี้</span>',
       cand ? `<span class="asBadge warn">${esc(cand.cleanupReason)}</span>` : ''
     ].join('');
   }
@@ -162,10 +170,10 @@
     const body = $('#storageFiles');
     if (!body) return;
     const total = state.files.length;
-    const can = state.files.filter(f => !classifyFile(f).locked).length;
-    const doit = state.files.filter(f => !isPerformance(f.path)).length;
+    const perf = state.files.filter(f => classifyFile(f).type === 'performance').length;
+    const doit = state.files.filter(f => classifyFile(f).type === 'doit').length;
     const cand = cleanupCandidates().length;
-    body.innerHTML = `<tr><td colspan="7" class="muted">โหลดแล้ว ${total.toLocaleString('th-TH')} ไฟล์ · Performance ลบได้ ${can.toLocaleString('th-TH')} ไฟล์ · DOIT ถูกกันลบ ${doit.toLocaleString('th-TH')} ไฟล์ · เข้าเงื่อนไขล้าง ${cand.toLocaleString('th-TH')} ไฟล์ — ใช้ popup เดียวเพื่อจัดการ</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="muted">โหลดแล้ว ${total.toLocaleString('th-TH')} ไฟล์ · Performance ${perf.toLocaleString('th-TH')} · DOIT ${doit.toLocaleString('th-TH')} · เข้าเงื่อนไขล้าง ${cand.toLocaleString('th-TH')} ไฟล์ — ทั้งสองตัวอยู่ popup เดียว แต่ลบแยกโหมด ไม่ลบปนกัน</td></tr>`;
     updateSelected();
   }
   function renderModalList() {
@@ -177,9 +185,9 @@
     list.innerHTML = files.length ? files.map(f => {
       const c = classifyFile(f);
       const checked = selected.has(f.path) ? 'checked' : '';
-      const disabled = c.locked ? 'disabled' : '';
+      const disabled = canSelect(f) ? '' : 'disabled';
       const meta = [fmtDate(f.created_at || f.date), fmtSize(f.size), f.date || '', candMap.get(f.path) || c.reason].filter(Boolean).join(' · ');
-      return `<label class="asItem ${c.locked ? 'lockedItem' : ''}">
+      return `<label class="asItem ${disabled ? 'lockedItem' : ''}">
         <input class="storagePick" type="checkbox" data-path="${esc(f.path)}" ${checked} ${disabled}>
         <div class="asInfo"><div class="asBadges">${badgeHtml(f)}</div><b>${esc(f.name || f.path.split('/').pop())}</b><small>${esc(meta)}</small><small class="asPath">${esc(f.path)}</small></div>
         <button type="button" class="asIconBtn storageDownload" data-path="${esc(f.path)}">โหลด</button>
@@ -213,7 +221,7 @@
       $('#storageLatest').textContent = fmtDate(files[0]?.created_at || files[0]?.date);
       $('#storageActive').textContent = active?.reportDate || active?.versionId || '—';
       renderFiles();
-      log({ ok: true, policy: { performance_json_days: PERF_RETENTION_DAYS, performance_raw_days: RAW_RETENTION_DAYS, keep_revisions_per_day: KEEP_REVISIONS_PER_DAY, doit_files: 'locked_by_default' }, files: files.length, protected: state.protected.size, cleanup_candidates: cleanupCandidates().length, active });
+      log({ ok: true, policy: { performance_json_days: PERF_RETENTION_DAYS, performance_raw_days: RAW_RETENTION_DAYS, keep_revisions_per_day: KEEP_REVISIONS_PER_DAY, doit_delete: 'manual_only_with_DELETE_DOIT', no_mixed_delete: true }, files: files.length, protected: state.protected.size, cleanup_candidates: cleanupCandidates().length, active });
     } catch (err) { log(err); }
   }
   function previewOld() {
@@ -222,24 +230,26 @@
     modalFilter = 'cleanup';
     renderFiles();
     openModal();
-    log({ ok: true, dry_run: true, selected_count: selected.size, selected_paths: [...selected].slice(0, 200), note: 'เลือกเฉพาะ Performance ที่เข้าเงื่อนไขล้างแล้ว DOIT ไม่ถูกเลือกและถูกกันลบ' });
+    log({ ok: true, dry_run: true, selected_count: selected.size, selected_paths: [...selected].slice(0, 200), note: 'เลือกเฉพาะ Performance ที่เข้าเงื่อนไขล้างแล้ว ไม่แตะ DOIT' });
   }
   async function deleteSelected(action) {
     try {
       const confirmText = String($('#storageModalConfirm')?.value || $('#storageConfirm')?.value || '').trim();
-      if (confirmText !== 'DELETE') { log({ ok: false, action, need_confirm: 'พิมพ์ DELETE ก่อนลบ' }); return; }
       const paths = action === 'old' ? cleanupCandidates().map(f => f.path) : [...selected];
-      const safe = paths.filter(p => {
-        const f = state.files.find(x => x.path === p) || { path: p };
-        return !classifyFile(f).locked && isPerformance(p) && !isSystem(p);
-      });
-      if (!safe.length) { log({ ok: false, action, note: 'ไม่มีไฟล์ Performance ที่ลบได้ / DOIT ถูกกันลบ' }); return; }
-      log({ ok: true, action, deleting: safe.length, paths: safe.slice(0, 200) });
+      const picked = paths.map(p => state.files.find(x => x.path === p) || { path: p }).filter(f => canSelect(f));
+      const perf = picked.filter(f => classifyFile(f).type === 'performance');
+      const doit = picked.filter(f => classifyFile(f).type === 'doit');
+      if (perf.length && doit.length) { log({ ok: false, action, note: 'ห้ามลบ Performance กับ DOIT ปนกัน ให้ลบทีละโหมดเพื่อกันทับ/ชน/ซ้อน' }); return; }
+      if (doit.length && confirmText !== 'DELETE DOIT') { log({ ok: false, action, need_confirm: 'ถ้าจะลบ DOIT ต้องพิมพ์ DELETE DOIT เท่านั้น' }); return; }
+      if (perf.length && confirmText !== 'DELETE') { log({ ok: false, action, need_confirm: 'ถ้าจะลบ Performance ต้องพิมพ์ DELETE' }); return; }
+      const safe = (doit.length ? doit : perf).map(f => f.path).filter(p => !isSystem(p));
+      if (!safe.length) { log({ ok: false, action, note: 'ไม่มีไฟล์ที่ลบได้ในโหมดนี้' }); return; }
+      log({ ok: true, action, mode: doit.length ? 'DOIT' : 'Performance', deleting: safe.length, paths: safe.slice(0, 200) });
       const res = await deleteObjects(safe);
       selected.clear();
       $('#storageModalConfirm') && ($('#storageModalConfirm').value = '');
       $('#storageConfirm') && ($('#storageConfirm').value = '');
-      log({ ok: true, action, deleted_count: safe.length, result: res });
+      log({ ok: true, action, mode: doit.length ? 'DOIT' : 'Performance', deleted_count: safe.length, result: res });
       await refresh();
       renderModalList();
     } catch (err) { log(err); }
@@ -257,7 +267,7 @@
   }
   function selectVisible() {
     const q = $('#storageModalFilter')?.value || '';
-    state.files.filter(f => fileMatches(f, q) && !classifyFile(f).locked).forEach(f => selected.add(f.path));
+    state.files.filter(f => fileMatches(f, q) && canSelect(f)).forEach(f => selected.add(f.path));
     renderFiles();
   }
   function openModal() {
@@ -274,15 +284,15 @@
   function ensurePopup() {
     if (!document.getElementById('storagePopupStyle')) {
       document.head.insertAdjacentHTML('beforeend', `<style id="storagePopupStyle">
-        body.storageModalOpen{overflow:hidden}.storageOpenBtn{height:46px;border:0;border-radius:14px;background:#087b34;color:#fff;font-weight:950;padding:0 18px;box-shadow:0 8px 18px #087b3430}.storageInlineTools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}.storageModalBackdrop{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;padding:14px;align-items:center;justify-content:center}.storageModalBackdrop.show{display:flex}.storageModalBox{background:#fff;border-radius:24px;box-shadow:0 24px 90px rgba(0,0,0,.32);width:min(680px,100%);max-height:min(88dvh,900px);display:flex;flex-direction:column;overflow:hidden}.storageModalTop{background:linear-gradient(90deg,#067a34,#078d3d);color:#fff;padding:14px 14px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}.storageModalTitle b{display:block;font-size:17px}.storageModalTitle small{display:block;opacity:.9;margin-top:2px}.storageCloseBtn{height:38px;border:0;border-radius:14px;background:#ffffff22;color:#fff;font-weight:950;padding:0 14px}.storageModalBody{background:#f8fafc;overflow:auto;flex:1}.storageModalSearch{position:sticky;top:0;background:#f8fafc;padding:10px 12px 8px;z-index:2;border-bottom:1px solid #e5e7eb}.storageModalSearch input{width:100%;height:44px;border:1px solid #d1d5db;border-radius:14px;padding:0 14px;font-weight:800}.asChips{display:flex;gap:6px;overflow-x:auto;padding-top:8px}.asChip{height:32px;border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:0 10px;font-weight:900;color:#374151;white-space:nowrap}.asChip.on{background:#087b34;border-color:#087b34;color:#fff}.storageModalList{padding:10px;display:grid;gap:8px}.asItem{display:grid;grid-template-columns:28px minmax(0,1fr) 58px;gap:8px;align-items:center;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px}.asItem.lockedItem{background:#f8fafc;opacity:.82}.asInfo b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.asInfo small{display:block;color:#6b7280;font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.asBadges{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px}.asBadge{font-size:10px;border-radius:999px;padding:2px 6px;font-weight:950;background:#e5e7eb;color:#374151}.asBadge.json{background:#dbeafe;color:#1d4ed8}.asBadge.excel{background:#dcfce7;color:#166534}.asBadge.locked{background:#fee2e2;color:#991b1b}.asBadge.free{background:#ecfdf5;color:#047857}.asBadge.warn{background:#ffedd5;color:#9a3412}.asIconBtn{height:34px;border:1px solid #d1d5db;border-radius:12px;background:#fff;font-weight:900}.asEmpty{border:1px dashed #d1d5db;border-radius:16px;color:#6b7280;padding:18px;text-align:center}.storageModalFoot{display:grid;grid-template-columns:minmax(0,1fr) 92px 96px 120px;gap:8px;align-items:center;padding:10px;background:#fff;border-top:1px solid #e5e7eb}.storageFootMeta{color:#374151;font-size:12px;font-weight:900}.storageModalConfirm{height:38px;border:1px solid #d1d5db;border-radius:12px;padding:0 10px;font-weight:900}.asClear,.asPickOld,.asConfirm{height:38px;border:0;border-radius:12px;font-weight:950;padding:0 10px}.asClear{background:#e5e7eb;color:#374151}.asPickOld{background:#dbeafe;color:#1d4ed8}.asConfirm{background:#dc2626;color:#fff}@media(max-width:560px){.storageModalBackdrop{padding:8px}.storageModalBox{border-radius:18px;max-height:92dvh}.storageModalFoot{grid-template-columns:1fr 1fr}.storageFootMeta{grid-column:1/-1}.storageModalConfirm{grid-column:1/-1}.asItem{grid-template-columns:24px minmax(0,1fr) 52px;padding:9px}.asPath{display:none!important}}
+        body.storageModalOpen{overflow:hidden}.storageOpenBtn{height:46px;border:0;border-radius:14px;background:#087b34;color:#fff;font-weight:950;padding:0 18px;box-shadow:0 8px 18px #087b3430}.storageInlineTools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}.storageModalBackdrop{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;padding:14px;align-items:center;justify-content:center}.storageModalBackdrop.show{display:flex}.storageModalBox{background:#fff;border-radius:24px;box-shadow:0 24px 90px rgba(0,0,0,.32);width:min(680px,100%);max-height:min(88dvh,900px);display:flex;flex-direction:column;overflow:hidden}.storageModalTop{background:linear-gradient(90deg,#067a34,#078d3d);color:#fff;padding:14px 14px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}.storageModalTitle b{display:block;font-size:17px}.storageModalTitle small{display:block;opacity:.9;margin-top:2px}.storageCloseBtn{height:38px;border:0;border-radius:14px;background:#ffffff22;color:#fff;font-weight:950;padding:0 14px}.storageModalBody{background:#f8fafc;overflow:auto;flex:1}.storageModalSearch{position:sticky;top:0;background:#f8fafc;padding:10px 12px 8px;z-index:2;border-bottom:1px solid #e5e7eb}.storageModalSearch input{width:100%;height:44px;border:1px solid #d1d5db;border-radius:14px;padding:0 14px;font-weight:800}.asChips{display:flex;gap:6px;overflow-x:auto;padding-top:8px}.asChip{height:32px;border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:0 10px;font-weight:900;color:#374151;white-space:nowrap}.asChip.on{background:#087b34;border-color:#087b34;color:#fff}.storageModalList{padding:10px;display:grid;gap:8px}.asItem{display:grid;grid-template-columns:28px minmax(0,1fr) 58px;gap:8px;align-items:center;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px}.asItem.lockedItem{background:#f8fafc;opacity:.82}.asInfo b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.asInfo small{display:block;color:#6b7280;font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.asBadges{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px}.asBadge{font-size:10px;border-radius:999px;padding:2px 6px;font-weight:950;background:#e5e7eb;color:#374151}.asBadge.json{background:#dbeafe;color:#1d4ed8}.asBadge.excel{background:#dcfce7;color:#166534}.asBadge.doit{background:#fef3c7;color:#92400e}.asBadge.locked{background:#fee2e2;color:#991b1b}.asBadge.free{background:#ecfdf5;color:#047857}.asBadge.warn{background:#ffedd5;color:#9a3412}.asIconBtn{height:34px;border:1px solid #d1d5db;border-radius:12px;background:#fff;font-weight:900}.asEmpty{border:1px dashed #d1d5db;border-radius:16px;color:#6b7280;padding:18px;text-align:center}.storageModalFoot{display:grid;grid-template-columns:minmax(0,1fr) 92px 96px 120px;gap:8px;align-items:center;padding:10px;background:#fff;border-top:1px solid #e5e7eb}.storageFootMeta{color:#374151;font-size:12px;font-weight:900}.storageModalConfirm{height:38px;border:1px solid #d1d5db;border-radius:12px;padding:0 10px;font-weight:900}.asClear,.asPickOld,.asConfirm{height:38px;border:0;border-radius:12px;font-weight:950;padding:0 10px}.asClear{background:#e5e7eb;color:#374151}.asPickOld{background:#dbeafe;color:#1d4ed8}.asConfirm{background:#dc2626;color:#fff}@media(max-width:560px){.storageModalBackdrop{padding:8px}.storageModalBox{border-radius:18px;max-height:92dvh}.storageModalFoot{grid-template-columns:1fr 1fr}.storageFootMeta{grid-column:1/-1}.storageModalConfirm{grid-column:1/-1}.asItem{grid-template-columns:24px minmax(0,1fr) 52px;padding:9px}.asPath{display:none!important}}
       </style>`);
     }
     if (!document.getElementById('storageModal')) {
       document.body.insertAdjacentHTML('beforeend', `<div id="storageModal" class="storageModalBackdrop" role="dialog" aria-modal="true">
         <div class="storageModalBox">
-          <div class="storageModalTop"><div class="storageModalTitle"><b>เลือกไฟล์ที่จะล้าง</b><small>DOIT ถูกกันลบไว้ เลือกลบได้เฉพาะ Performance</small></div><button type="button" class="storageCloseBtn" id="storageModalClose">ปิด</button></div>
-          <div class="storageModalBody"><div class="storageModalSearch"><input id="storageModalFilter" placeholder="ค้นหาไฟล์ / วันที่ / JSON / DOIT"><div class="asChips"><button class="asChip on" data-filter="all">ทั้งหมด</button><button class="asChip" data-filter="cleanup">เข้าเงื่อนไขล้าง</button><button class="asChip" data-filter="selectable">ลบได้</button><button class="asChip" data-filter="protected">กันลบ</button><button class="asChip" data-filter="json">JSON</button><button class="asChip" data-filter="raw">RAW Performance</button><button class="asChip" data-filter="doit">DOIT กันลบ</button></div></div><div id="storageModalList" class="storageModalList"></div></div>
-          <div class="storageModalFoot"><div class="storageFootMeta" id="storageModalSelectedCount">เลือกแล้ว 0 ไฟล์</div><input id="storageModalConfirm" class="storageModalConfirm" placeholder="พิมพ์ DELETE"><button class="asClear" id="storageModalClear">ล้าง</button><button class="asPickOld" id="storageModalPreviewOld">เลือกไฟล์เก่า</button><button class="asConfirm" id="storageModalDeleteSelected">ลบที่เลือก</button></div>
+          <div class="storageModalTop"><div class="storageModalTitle"><b>เลือกไฟล์ที่จะล้าง</b><small>ระบบเดียวกัน แต่ลบแยกโหมด: Performance ใช้ DELETE / DOIT ใช้ DELETE DOIT</small></div><button type="button" class="storageCloseBtn" id="storageModalClose">ปิด</button></div>
+          <div class="storageModalBody"><div class="storageModalSearch"><input id="storageModalFilter" placeholder="ค้นหาไฟล์ / วันที่ / JSON / DOIT"><div class="asChips"><button class="asChip on" data-filter="all">ทั้งหมด</button><button class="asChip" data-filter="cleanup">เข้าเงื่อนไขล้าง</button><button class="asChip" data-filter="selectable">ลบได้ในโหมดนี้</button><button class="asChip" data-filter="protected">กันลบ</button><button class="asChip" data-filter="json">JSON</button><button class="asChip" data-filter="raw">RAW Performance</button><button class="asChip" data-filter="doit">DOIT ลบเอง</button></div></div><div id="storageModalList" class="storageModalList"></div></div>
+          <div class="storageModalFoot"><div class="storageFootMeta" id="storageModalSelectedCount">เลือกแล้ว 0 ไฟล์</div><input id="storageModalConfirm" class="storageModalConfirm" placeholder="DELETE / DELETE DOIT"><button class="asClear" id="storageModalClear">ล้าง</button><button class="asPickOld" id="storageModalPreviewOld">เลือกไฟล์เก่า</button><button class="asConfirm" id="storageModalDeleteSelected">ลบที่เลือก</button></div>
         </div>
       </div>`);
     }
@@ -298,7 +308,7 @@
       filter.closest('.row')?.after(div);
     }
     const hint = $('#adminStoragePanel .safeBox');
-    if (hint) hint.innerHTML = `<b>Auto Cleanup Policy</b><br>ลบได้เฉพาะ Performance · JSON Performance เก็บ ${PERF_RETENTION_DAYS} วัน · RAW Performance เก็บ ${RAW_RETENTION_DAYS} วัน · revision วันเดียวกันเก็บ ${KEEP_REVISIONS_PER_DAY} ไฟล์ล่าสุด · DOIT ถูกกันลบ`;
+    if (hint) hint.innerHTML = `<b>Auto Cleanup Policy</b><br>ระบบเดียวกัน ไม่ซ้อนกัน · Performance cleanup อัตโนมัติใช้ DELETE · DOIT ลบเองเท่านั้นใช้ DELETE DOIT · ห้ามลบปนกันในรอบเดียว`;
   }
   function init() {
     if (!$('#adminStoragePanel')) return;
@@ -310,7 +320,7 @@
     $('#storageModal').onclick = e => { if (e.target.id === 'storageModal') closeModal(); };
     $('#storageFilter').oninput = () => { const mf = $('#storageModalFilter'); if (mf) mf.value = $('#storageFilter').value; renderModalList(); };
     $('#storageModalFilter').oninput = renderModalList;
-    $$('.asChip').forEach(btn => btn.onclick = () => { modalFilter = btn.dataset.filter || 'all'; renderModalList(); });
+    $$('.asChip').forEach(btn => btn.onclick = () => { selected.clear(); modalFilter = btn.dataset.filter || 'all'; renderFiles(); });
     $('#storageCheckAll').onchange = e => { selected.clear(); if (e.target.checked) selectVisible(); renderFiles(); };
     $('#storagePreviewOld').onclick = previewOld;
     $('#storageModalPreviewOld').onclick = previewOld;
