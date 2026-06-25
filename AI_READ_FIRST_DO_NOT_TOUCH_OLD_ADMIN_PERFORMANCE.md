@@ -76,7 +76,6 @@ Performance dashboard must keep these sections:
 
 ```text
 Data Status
-Storage Retention
 Smart Compare วันต่อวัน
 Cause Dashboard
 Problem Dashboard
@@ -88,6 +87,8 @@ Raw tab
 ```
 
 ## Storage retention rules
+
+Storage retention belongs in the Admin Storage Manager, not as a required section on `/performance`.
 
 Keep JSON as the long-term format. Do not keep raw Excel for long periods.
 
@@ -101,7 +102,7 @@ Never delete current active dataPath.
 Never delete previousDataPath used for compare.
 ```
 
-`dist/assets/admin-storage-manager-v1.js` owns the safe cleanup UI. It must preview first and require typing `DELETE` before deleting files.
+`dist/assets/admin-storage-manager-v1.js` owns the safe cleanup UI. It must preview first. Direct browser delete remains disabled until a server-side delete function is enabled.
 
 ## Old Vercel preview deployment
 
@@ -139,6 +140,7 @@ Do not bind Performance code to DOIT #file, #choose, or #uploadCloud.
 Do not claim the old Vercel deployment is deleted unless it is deleted from Vercel itself.
 Do not compare same reportDate revisions as yesterday.
 Do not store fake/mock Performance data.
+Do not put Storage Retention back as a required `/performance` dashboard section.
 ```
 
 ## Safe action for future AI agents
@@ -152,5 +154,5 @@ One visible Admin page only: /admin.html
 Old admin-performance page: abandoned / do not use
 Old preview deployment: delete if possible, otherwise ignore and warn
 Performance compare: reportDate-aware, revision-safe, JSON-first
-Storage retention: JSON 30 days, raw files 7 days, preview before delete
+Storage retention: Admin Storage Manager only, preview-only until server delete is enabled
 ```
