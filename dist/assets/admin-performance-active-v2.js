@@ -13,7 +13,7 @@ window.fetch=async(input,opt={})=>{
  const url=String(typeof input==='string'?input:input?.url||'');
  const method=String(opt?.method||'GET').toUpperCase();
  const path=objectPath(url);
- if(method==='POST'&&/^performance\/.test(path)&&/\.json$/.test(path)&&!/^performance\/(active|index)\.json$/.test(path)){
+ if(method==='POST'&&/^performance\//.test(path)&&/\.json$/.test(path)&&!/^performance\/(active|index)\.json$/.test(path)){
   const text=await bodyText(opt.body);
   try{const data=JSON.parse(text);const rd=reportDate(data,path);const hash=await digest(text);data.reportDate=rd;data.hash=hash;data.dataSchemaVersion=2;data.currentDataPath=path;lastPayload={path,reportDate:rd,hash,data};opt={...opt,body:new Blob([JSON.stringify(data)],{type:'application/json'})}}catch{}
  }
