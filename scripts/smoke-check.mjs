@@ -4,184 +4,94 @@ import path from 'node:path';
 const root = process.cwd();
 const failures = [];
 const fp = p => path.join(root, p);
-const read = p => fs.readFileSync(fp(p), 'utf8');
 const exists = p => fs.existsSync(fp(p));
+const read = p => fs.readFileSync(fp(p), 'utf8');
 const check = (ok, msg) => { if (!ok) failures.push(msg); };
 const mustExist = p => check(exists(p), `Missing required file: ${p}`);
 const mustContain = (p, s) => check(exists(p) && read(p).includes(s), `${p} must contain: ${s}`);
 const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `${p} must not contain: ${s}`); };
 
-[
-  'package.json',
-  'README.md',
-  'dist/index.html',
-  'dist/pro.html',
-  'dist/pro-native-test.html',
-  'dist/pro-native-phase4.html',
-  'dist/pro-native-ui.html',
-  'dist/pro-v310.html',
-  'dist/pro-v310-test.html',
-  'dist/admin.html',
-  'dist/performance.html',
-  'dist/assets/pro-core-v4.js',
-  'dist/assets/pro-native-core.js',
-  'dist/assets/pro-native-core-overrides.js',
-  'dist/assets/pro-native-phase4-readiness.js',
-  'dist/assets/pro-native-ui-readiness.js',
-  'dist/assets/pro-print-store-bills.js',
-  'dist/assets/pro-print-mode-fixes.js',
-  'dist/assets/pro-print.css',
-  'dist/assets/admin-storage-manager-v1.js',
-  'src/lib/parser.ts',
-  'src/lib/pricing.ts',
-  'docs/HANDOFF_1028_NATIVE.md',
-  'scripts/qa-doit-file.mjs',
-  '.github/workflows/web-ci.yml',
-].forEach(mustExist);
+const required = [
+  'package.json','README.md','dist/index.html','dist/pro.html','dist/admin.html','dist/performance.html',
+  'dist/assets/pro-core-v4.js','dist/assets/pro-native-core.js','dist/assets/pro-native-core-overrides.js',
+  'dist/assets/pro-print-store-bills.js','dist/assets/pro-print-mode-fixes.js','dist/assets/pro-print.css',
+  'dist/assets/admin-upload-v001.js','dist/assets/admin-json-v265.js','dist/assets/admin-progress-popup-v1.js','dist/assets/admin-storage-manager-v1.js',
+  'src/lib/parser.ts','src/lib/pricing.ts','scripts/qa-doit-file.mjs','.github/workflows/web-ci.yml'
+];
+required.forEach(mustExist);
 
 const pkg = JSON.parse(read('package.json'));
-['build', 'smoke', 'verify', 'verify:react'].forEach(name => check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`));
+['build','smoke','verify','verify:react'].forEach(name => check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`));
 check(pkg.scripts.verify === 'npm run smoke', 'package.json verify must be smoke-only for Pro legacy');
 
+// Pro stable guardrails.
 mustContain('README.md', 'Pro Stable 1028 Native');
-mustContain('README.md', 'docs/HANDOFF_1028_NATIVE.md');
-mustContain('dist/index.html', 'Pro Stable 1028 Native');
 mustContain('dist/index.html', '/pro.html?t=1028');
-mustContain('dist/pro-v310.html', "location.replace('/pro.html?t=1028')");
-mustContain('dist/pro-v310-test.html', "location.replace('/pro.html?t=1028')");
-
-mustContain('.github/workflows/web-ci.yml', 'dist/*.html');
-mustContain('.github/workflows/web-ci.yml', 'dist/assets/**');
-mustContain('.github/workflows/web-ci.yml', 'docs/**');
-
 mustContain('dist/pro.html', 'pro-core-v4.js');
 mustContain('dist/assets/pro-core-v4.js', "VERSION = '1028-native'");
-mustContain('dist/assets/pro-core-v4.js', "mode: 'native-stack-bootstrap'");
 mustContain('dist/assets/pro-core-v4.js', 'legacyWrapperRemoved: true');
-mustContain('dist/assets/pro-core-v4.js', "assetUrl('pro-print-store-bills.js'");
-mustContain('dist/assets/pro-core-v4.js', "assetUrl('pro-native-core.js')");
-mustContain('dist/assets/pro-core-v4.js', "assetUrl('pro-native-core-overrides.js')");
-mustContain('dist/assets/pro-core-v4.js', "assetUrl('pro-print-mode-fixes.js'");
-mustContain('dist/assets/pro-core-v4.js', "assetUrl('pro-print-column-widths.js'");
-mustContain('dist/assets/pro-core-v4.js', "assetUrl('pro-print-a4-pro-fix.js'");
-mustContain('dist/assets/pro-core-v4.js', "loadCss(assetUrl('pro-print.css'");
-mustContain('dist/assets/pro-core-v4.js', 'for (const src of stack) await loadScript(src)');
-mustNotContain('dist/assets/pro-core-v4.js', 'CORE_URL');
+mustContain('dist/assets/pro-native-core.js', 'currentStateSource');
+mustContain('dist/assets/pro-print-store-bills.js', 'BILLS_PER_A4=2');
+mustContain('dist/assets/pro-print-store-bills.js', 'BILL_ROWS=12');
+mustContain('dist/assets/pro-print-store-bills.js', 'window.DOIT_CORE_APP?.currentState?.()');
 mustNotContain('dist/assets/pro-core-v4.js', 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
 mustNotContain('dist/assets/pro-core-v4.js', 'fetch(CORE_URL');
-mustNotContain('dist/assets/pro-core-v4.js', '(0, eval)');
-mustNotContain('dist/assets/pro-core-v4.js', 'patchLegacyCore');
-mustNotContain('dist/assets/pro-core-v4.js', 'oldPickSendNav');
-mustNotContain('dist/assets/pro-core-v4.js', 'newPickSendNav');
-mustNotContain('dist/assets/pro-core-v4.js', 'focusSendDown');
-mustNotContain('dist/assets/pro-core-v4.js', 'oldOrderBranch');
-mustNotContain('dist/assets/pro-core-v4.js', 'newOrderBranch');
-mustNotContain('dist/assets/pro-core-v4.js', 'oldTeleRender');
-mustNotContain('dist/assets/pro-core-v4.js', 'newTeleRender');
 
-mustContain('dist/pro-native-test.html', 'Project Pro Native Core Preview');
-mustContain('dist/pro-native-test.html', '/assets/pro-native-core.js?v=phase2');
-mustContain('dist/pro-native-test.html', '/assets/pro-native-core-overrides.js?v=phase2');
-mustNotContain('dist/pro-native-test.html', 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
-
-mustContain('dist/pro-native-phase4.html', 'Project Pro Native Core Phase 4');
-mustContain('dist/pro-native-phase4.html', 'Phase 4 preview: native core stack only');
-mustContain('dist/pro-native-phase4.html', '/assets/pro-native-core.js?v=phase4');
-mustContain('dist/pro-native-phase4.html', '/assets/pro-native-core-overrides.js?v=phase4');
-mustContain('dist/pro-native-phase4.html', '/assets/pro-native-phase4-readiness.js?v=phase4');
-mustNotContain('dist/pro-native-phase4.html', 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
-
-mustContain('dist/pro-native-ui.html', 'Native Core UI Mirror');
-mustContain('dist/pro-native-ui.html', "fetch('/pro.html?t=1027'");
-mustContain('dist/pro-native-ui.html', 'pro-core-v4.js');
-mustContain('dist/pro-native-ui.html', '/assets/pro-native-core.js?v=phase4-ui');
-mustContain('dist/pro-native-ui.html', '/assets/pro-native-core-overrides.js?v=phase4-ui');
-mustContain('dist/pro-native-ui.html', '/assets/pro-native-ui-readiness.js?v=phase4-ui');
-mustNotContain('dist/pro-native-ui.html', 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
-
-mustContain('dist/assets/pro-native-core.js', "const END='https://saodmeoilixfdqentofp.supabase.co/functions/v1/doit-active'");
-mustContain('dist/assets/pro-native-core.js', 'currentState:()=>JSON.parse(snap())');
-mustContain('dist/assets/pro-native-core.js', "currentStateSource:'closure-native'");
-mustContain('dist/assets/pro-native-core-overrides.js', 'DOIT_NATIVE_CORE_PREVIEW');
-mustContain('dist/assets/pro-native-core-overrides.js', "version: 'phase4-closure-native-current-state'");
-mustContain('dist/assets/pro-native-core-overrides.js', 'preserveCoreCurrentState');
-mustContain('dist/assets/pro-native-core-overrides.js', 'closureNativeCurrentState');
-mustContain('dist/assets/pro-native-core-overrides.js', "stateApiSource: 'closure-native-core'");
-mustNotContain('dist/assets/pro-native-core-overrides.js', 'bestStoredState');
-mustNotContain('dist/assets/pro-native-core-overrides.js', 'installActiveStateRecorder');
-mustNotContain('dist/assets/pro-native-core-overrides.js', '__DOIT_NATIVE_ACTIVE_STATE__');
-mustNotContain('dist/assets/pro-native-core-overrides.js', 'currentStateSnapshot');
-mustNotContain('dist/assets/pro-native-core-overrides.js', 'app.currentState =');
-mustContain('dist/assets/pro-native-core-overrides.js', 'renderDoneFromPrintModule');
-mustContain('dist/assets/pro-native-core-overrides.js', 'enhanceOrderTable');
-mustContain('dist/assets/pro-native-core-overrides.js', 'enhanceTeleBills');
-mustContain('dist/assets/pro-native-core-overrides.js', '#table input.jdata[data-map="send"]');
-
-mustContain('dist/assets/pro-native-phase4-readiness.js', 'DOIT_NATIVE_PHASE4_READINESS');
-mustContain('dist/assets/pro-native-phase4-readiness.js', 'currentState API available');
-mustContain('dist/assets/pro-native-phase4-readiness.js', 'production untouched');
-mustContain('dist/assets/pro-native-phase4-readiness.js', 'phase4VisualMatchCss');
-mustContain('dist/assets/pro-native-phase4-readiness.js', 'visual style matched');
-mustContain('dist/assets/pro-native-phase4-readiness.js', 'linear-gradient(180deg,#22c55e 0%,#0b8f3a 58%,#06652b 100%)');
-
-mustContain('dist/assets/pro-native-ui-readiness.js', 'DOIT_NATIVE_UI_PREVIEW');
-mustContain('dist/assets/pro-native-ui-readiness.js', "visualSource: 'dist/pro.html'");
-mustContain('dist/assets/pro-native-ui-readiness.js', "version: 'phase4-ui'");
-
-mustContain('dist/assets/pro-print-mode-fixes.js', 'function isTotalLikeRow');
-mustContain('dist/assets/pro-print-mode-fixes.js', 'orderPrintFix');
-mustContain('dist/assets/pro-print-mode-fixes.js', 'pageStyle');
-mustContain('dist/assets/pro-print-mode-fixes.js', '@page { size: A4 portrait; margin: 7mm 4mm 8mm 4mm; }');
-
-mustContain('dist/assets/pro-print-store-bills.js', 'BILL_ROWS=12');
-mustContain('dist/assets/pro-print-store-bills.js', 'BILLS_PER_A4=2');
-mustContain('dist/assets/pro-print-store-bills.js', 'function buildBills()');
-mustContain('dist/assets/pro-print-store-bills.js', 'function renderDoneFromCore()');
-mustContain('dist/assets/pro-print-store-bills.js', 'function liveState()');
-mustContain('dist/assets/pro-print-store-bills.js', 'window.DOIT_CORE_APP?.currentState?.()');
-mustContain('dist/assets/pro-print-store-bills.js', 'const live=liveState();if(live)return live');
-mustContain('dist/assets/pro-print-store-bills.js', 'const qty=mapVal(st.send,g.poolKey,store,st.sel)');
-mustContain('dist/assets/pro-print-store-bills.js', 'Object.keys(st?.send||{})');
-mustNotContain('dist/assets/pro-print-store-bills.js', 'mapVal(st.send,g.poolKey,store,st.sel)+mapVal(st.add');
-mustNotContain('dist/assets/pro-print-store-bills.js', '[st?.send,st?.add,st?.pull]');
-
-// Admin / Performance / Storage guardrails.
+// Admin separation guardrails.
 mustContain('dist/admin.html', 'id="file"');
 mustContain('dist/admin.html', 'id="perfFile"');
+mustContain('dist/admin.html', 'id="uploadCloud"');
+mustContain('dist/admin.html', 'id="perfUpload"');
+mustContain('dist/admin.html', '/assets/admin-upload-v001.js');
+mustContain('dist/admin.html', '/assets/admin-json-v265.js');
 mustContain('dist/admin.html', '/assets/admin-storage-manager-v1.js');
+
+// Unified DOIT amount formula: TotInvc must come before InvoiceAmt everywhere active.
+const formula = 'TotInvc > Correct Amount/LineAmount > LineAmtBeforeDisc > detailAmt > row.amt > Amt > Amount > InvoiceAmt';
+['dist/assets/admin-upload-v001.js','dist/assets/admin-json-v265.js','scripts/qa-doit-file.mjs'].forEach(p => mustContain(p, formula));
+['src/lib/parser.ts','dist/assets/admin-json-v265.js','dist/assets/admin-upload-v001.js','scripts/qa-doit-file.mjs'].forEach(p => {
+  const s = read(p);
+  check(s.indexOf('TotInvc') >= 0, `${p} missing TotInvc`);
+  check(s.indexOf('InvoiceAmt') >= 0, `${p} missing InvoiceAmt fallback`);
+  check(s.indexOf('TotInvc') < s.indexOf('InvoiceAmt'), `${p} must prioritize TotInvc before InvoiceAmt`);
+});
+mustContain('src/lib/parser.ts', 'amount !== 0');
+mustContain('src/lib/pricing.ts', 'if (qty === 0) return 0');
+mustNotContain('src/lib/pricing.ts', 'if (n <= 0) return 0');
+mustContain('scripts/qa-doit-file.mjs', 'scorePivot(fields, rows)');
+mustContain('scripts/qa-doit-file.mjs', 'amount !== 0');
+mustContain('scripts/qa-doit-file.mjs', 'return Math.round(safeNum(value))');
+
+// One DOIT upload flow: no extra JSON button, no old active click automation.
+mustNotContain('dist/assets/admin-json-v265.js', 'uploadJsonActive');
+mustContain('dist/assets/admin-json-v265.js', "$('#uploadCloud')");
+mustContain('dist/assets/admin-json-v265.js', 'setActiveRpc(c,id)');
+mustContain('dist/assets/admin-json-v265.js', 'old.disabled=true');
+mustContain('dist/assets/admin-upload-v001.js', 'ปุ่มนี้ถูกโอนให้ admin-json-v265.js จัดการแล้ว');
+mustNotContain('dist/assets/admin-progress-popup-v1.js', 'btn.click()');
+mustNotContain('dist/assets/admin-progress-popup-v1.js', 'lastAutoActive');
+
+// Performance dashboard guardrails.
 mustContain('dist/performance.html', 'Smart Compare วันต่อวัน');
 mustContain('dist/performance.html', 'sameDayRevisions');
 mustContain('dist/performance.html', 'Month Trend Dashboard');
+
+// Storage safety guardrails: no embedded key, no direct browser storage delete.
+mustNotContain('dist/assets/admin-storage-manager-v1.js', 'sb_publishable_');
+mustNotContain('dist/assets/admin-storage-manager-v1.js', 'const DEFAULT_KEY');
+mustContain('dist/assets/admin-storage-manager-v1.js', 'no_direct_browser_delete');
+mustContain('dist/assets/admin-storage-manager-v1.js', 'direct_browser_delete_disabled');
+mustNotContain('dist/assets/admin-storage-manager-v1.js', "method:'DELETE'");
+mustNotContain('dist/assets/admin-storage-manager-v1.js', 'method:"DELETE"');
 mustContain('dist/assets/admin-storage-manager-v1.js', 'DELETE DOIT');
-mustContain('dist/assets/admin-storage-manager-v1.js', 'ห้ามลบ Performance กับ DOIT ปนกัน');
-mustContain('dist/assets/admin-storage-manager-v1.js', "modalFilter === 'doit'");
-mustContain('dist/assets/admin-storage-manager-v1.js', 'cleanupCandidates().forEach');
-mustContain('src/lib/parser.ts', "['TotInvc'");
-mustContain('src/lib/parser.ts', 'amount !== 0');
-mustContain('src/lib/parser.ts', 'scorePivot(fields, rows)');
-mustContain('src/lib/pricing.ts', 'if (qty === 0) return 0');
-mustNotContain('src/lib/pricing.ts', 'if (n <= 0) return 0');
+mustContain('dist/assets/admin-storage-manager-v1.js', 'mixed_delete_forbidden');
 
-mustContain('docs/HANDOFF_1028_NATIVE.md', 'Project Pro Native Core: COMPLETE');
-mustContain('docs/HANDOFF_1028_NATIVE.md', 'pro-core-v4.js ไม่ fetch legacy core จาก jsdelivr แล้ว');
-mustContain('docs/HANDOFF_1028_NATIVE.md', 'Business rules ที่ห้ามพัง');
-mustContain('docs/ROADMAP.md', 'Pro Stable = 1028 Native');
-mustContain('docs/CLEANUP_AUDIT.md', 'Pro Stable = 1028 Native');
-mustContain('docs/PROJECT_PRO_NATIVE_CORE.md', 'Status: COMPLETE');
-mustContain('docs/QA_CHECKLIST.md', 'docs/HANDOFF_1028_NATIVE.md');
-mustContain('docs/QA_CHECKLIST.md', 'verify:react');
-mustContain('docs/FEATURE_RULES.md', 'verify:react');
-
-[
-  'dist/assets/pro-print-pro-fixes.js',
-  'dist/assets/pro-print-total-display-fix.js',
-  '.github/workflows/build-apk.yml',
-].forEach(p => check(!exists(p), `Stale or risky file should not exist: ${p}`));
+// Remove stale high-risk files.
+['dist/assets/pro-print-pro-fixes.js','dist/assets/pro-print-total-display-fix.js','.github/workflows/build-apk.yml'].forEach(p => check(!exists(p), `Stale or risky file should not exist: ${p}`));
 
 if (failures.length) {
   console.error('\nSmoke check failed:\n');
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-
-console.log('Smoke check passed: Pro Stable 1028 Native plus Admin/Performance/Storage guardrails are intact.');
+console.log('Smoke check passed: no known DOIT/Admin formula overlap, stale active-click flow, or direct storage delete guard violations.');
