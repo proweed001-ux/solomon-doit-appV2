@@ -35,8 +35,10 @@
     }
     return '';
   };
+  const isPerformance = p => /^performance\//i.test(String(p || ''));
   const isRaw = p => /\.(xlsx|xlsm|xls|csv)$/i.test(p) || /(^|\/)(uploads|raw|parsed)\//i.test(p);
   const isPerfJson = p => /^performance\//i.test(p) && /\.json$/i.test(p);
+  const isPerfRaw = p => /^performance\//i.test(p) && isRaw(p);
   const isSystem = p => /^performance\/(active|index)\.json$/i.test(p);
   const log = v => { const box = $('#storageStatus'); if (box) box.textContent = typeof v === 'string' ? v : JSON.stringify(v, null, 2); };
 
@@ -102,22 +104,25 @@
     return p;
   }
   function classifyFile(f) {
-    if (state.protected.has(f.path)) return { label: 'กันลบ', css: 'locked', locked: true, reason: 'active/latest/previous/system' };
-    if (isSystem(f.path)) return { label: 'ระบบ', css: 'locked', locked: true, reason: 'system file' };
-    if (isPerfJson(f.path)) return { label: 'JSON', css: 'json', locked: false, reason: 'performance json' };
-    if (isRaw(f.path)) return { label: 'RAW', css: 'excel', locked: false, reason: 'raw/excel temp' };
-    return { label: 'อื่น ๆ', css: 'other', locked: false, reason: 'other' };
+    if (state.protected.has(f.path) || isSystem(f.path)) return { label: 'กันลบ', css: 'locked', locked: true, reason: 'active/latest/previous/system' };
+    if (!isPerformance(f.path)) return { label: 'DOIT กันลบ', css: 'locked', locked: true, reason: 'DOIT/raw/team file locked by default' };
+    if (isPerfJson(f.path)) return { label: 'Performance JSON', css: 'json', locked: false, reason: 'performance json' };
+    if (isPerfRaw(f.path)) return { label: 'Performance RAW', css: 'excel', locked: false, reason: 'performance raw temp' };
+    return { label: 'Performance อื่น ๆ', css: 'json', locked: false, reason: 'performance file' };
   }
   function cleanupCandidates() {
     const now = new Date();
     const perfCutoff = new Date(now); perfCutoff.setDate(now.getDate() - PERF_RETENTION_DAYS);
     const rawCutoff = new Date(now); rawCutoff.setDate(now.getDate() - RAW_RETENTION_DAYS);
     const out = new Map();
-    const add = (f, reason) => { if (!state.protected.has(f.path) && !isSystem(f.path)) out.set(f.path, { ...f, cleanupReason: reason }); };
+    const add = (f, reason) => {
+      const c = classifyFile(f);
+      if (!c.locked && !isSystem(f.path) && isPerformance(f.path)) out.set(f.path, { ...f, cleanupReason: reason });
+    };
     state.files.forEach(f => {
       const d = f.date ? new Date(f.date) : (f.created_at ? new Date(f.created_at) : null);
       if (isPerfJson(f.path) && d && d < perfCutoff) add(f, `JSON เกิน ${PERF_RETENTION_DAYS} วัน`);
-      if (isRaw(f.path) && d && d < rawCutoff) add(f, `ไฟล์ดิบเกิน ${RAW_RETENTION_DAYS} วัน`);
+      if (isPerfRaw(f.path) && d && d < rawCutoff) add(f, `RAW Performance เกิน ${RAW_RETENTION_DAYS} วัน`);
     });
     const byDay = new Map();
     state.files.filter(f => isPerfJson(f.path) && !isSystem(f.path) && f.date).forEach(f => {
@@ -136,11 +141,12 @@
     const c = classifyFile(f);
     const isCandidate = cleanupCandidates().some(x => x.path === f.path);
     const filterOk = modalFilter === 'all'
+      || (modalFilter === 'cleanup' && isCandidate)
       || (modalFilter === 'selectable' && !c.locked)
       || (modalFilter === 'protected' && c.locked)
       || (modalFilter === 'json' && isPerfJson(f.path))
-      || (modalFilter === 'raw' && isRaw(f.path))
-      || (modalFilter === 'cleanup' && isCandidate);
+      || (modalFilter === 'raw' && isPerfRaw(f.path))
+      || (modalFilter === 'doit' && !isPerformance(f.path));
     return filterOk && (!q || f.path.toLowerCase().includes(q) || String(f.name).toLowerCase().includes(q) || String(f.date).includes(q) || c.label.toLowerCase().includes(q));
   }
   function badgeHtml(f) {
@@ -157,8 +163,9 @@
     if (!body) return;
     const total = state.files.length;
     const can = state.files.filter(f => !classifyFile(f).locked).length;
+    const doit = state.files.filter(f => !isPerformance(f.path)).length;
     const cand = cleanupCandidates().length;
-    body.innerHTML = `<tr><td colspan="7" class="muted">โหลดแล้ว ${total.toLocaleString('th-TH')} ไฟล์ · ลบได้ ${can.toLocaleString('th-TH')} ไฟล์ · เข้าเงื่อนไขล้าง ${cand.toLocaleString('th-TH')} ไฟล์ — ใช้ปุ่ม “เลือกไฟล์ในหน้าต่าง” เพื่อจัดการทั้งหมดใน popup เดียว</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="muted">โหลดแล้ว ${total.toLocaleString('th-TH')} ไฟล์ · Performance ลบได้ ${can.toLocaleString('th-TH')} ไฟล์ · DOIT ถูกกันลบ ${doit.toLocaleString('th-TH')} ไฟล์ · เข้าเงื่อนไขล้าง ${cand.toLocaleString('th-TH')} ไฟล์ — ใช้ popup เดียวเพื่อจัดการ</td></tr>`;
     updateSelected();
   }
   function renderModalList() {
@@ -171,7 +178,7 @@
       const c = classifyFile(f);
       const checked = selected.has(f.path) ? 'checked' : '';
       const disabled = c.locked ? 'disabled' : '';
-      const meta = [fmtDate(f.created_at || f.date), fmtSize(f.size), f.date || '', candMap.get(f.path) || ''].filter(Boolean).join(' · ');
+      const meta = [fmtDate(f.created_at || f.date), fmtSize(f.size), f.date || '', candMap.get(f.path) || c.reason].filter(Boolean).join(' · ');
       return `<label class="asItem ${c.locked ? 'lockedItem' : ''}">
         <input class="storagePick" type="checkbox" data-path="${esc(f.path)}" ${checked} ${disabled}>
         <div class="asInfo"><div class="asBadges">${badgeHtml(f)}</div><b>${esc(f.name || f.path.split('/').pop())}</b><small>${esc(meta)}</small><small class="asPath">${esc(f.path)}</small></div>
@@ -206,7 +213,7 @@
       $('#storageLatest').textContent = fmtDate(files[0]?.created_at || files[0]?.date);
       $('#storageActive').textContent = active?.reportDate || active?.versionId || '—';
       renderFiles();
-      log({ ok: true, policy: { performance_json_days: PERF_RETENTION_DAYS, raw_days: RAW_RETENTION_DAYS, keep_revisions_per_day: KEEP_REVISIONS_PER_DAY }, files: files.length, protected: state.protected.size, cleanup_candidates: cleanupCandidates().length, active });
+      log({ ok: true, policy: { performance_json_days: PERF_RETENTION_DAYS, performance_raw_days: RAW_RETENTION_DAYS, keep_revisions_per_day: KEEP_REVISIONS_PER_DAY, doit_files: 'locked_by_default' }, files: files.length, protected: state.protected.size, cleanup_candidates: cleanupCandidates().length, active });
     } catch (err) { log(err); }
   }
   function previewOld() {
@@ -215,15 +222,18 @@
     modalFilter = 'cleanup';
     renderFiles();
     openModal();
-    log({ ok: true, dry_run: true, selected_count: selected.size, selected_paths: [...selected].slice(0, 200), note: 'เลือกไฟล์เข้าเงื่อนไขล้างแล้ว ยังไม่ลบจริง ต้องพิมพ์ DELETE ใน popup หรือช่องยืนยัน' });
+    log({ ok: true, dry_run: true, selected_count: selected.size, selected_paths: [...selected].slice(0, 200), note: 'เลือกเฉพาะ Performance ที่เข้าเงื่อนไขล้างแล้ว DOIT ไม่ถูกเลือกและถูกกันลบ' });
   }
   async function deleteSelected(action) {
     try {
       const confirmText = String($('#storageModalConfirm')?.value || $('#storageConfirm')?.value || '').trim();
       if (confirmText !== 'DELETE') { log({ ok: false, action, need_confirm: 'พิมพ์ DELETE ก่อนลบ' }); return; }
       const paths = action === 'old' ? cleanupCandidates().map(f => f.path) : [...selected];
-      const safe = paths.filter(p => !state.protected.has(p) && !isSystem(p));
-      if (!safe.length) { log({ ok: false, action, note: 'ไม่มีไฟล์ที่ลบได้' }); return; }
+      const safe = paths.filter(p => {
+        const f = state.files.find(x => x.path === p) || { path: p };
+        return !classifyFile(f).locked && isPerformance(p) && !isSystem(p);
+      });
+      if (!safe.length) { log({ ok: false, action, note: 'ไม่มีไฟล์ Performance ที่ลบได้ / DOIT ถูกกันลบ' }); return; }
       log({ ok: true, action, deleting: safe.length, paths: safe.slice(0, 200) });
       const res = await deleteObjects(safe);
       selected.clear();
@@ -270,8 +280,8 @@
     if (!document.getElementById('storageModal')) {
       document.body.insertAdjacentHTML('beforeend', `<div id="storageModal" class="storageModalBackdrop" role="dialog" aria-modal="true">
         <div class="storageModalBox">
-          <div class="storageModalTop"><div class="storageModalTitle"><b>เลือกไฟล์ที่จะล้าง</b><small>ทุกอย่างอยู่ใน popup เดียว เลือก/ค้นหา/preview/ลบ ได้ตรงนี้</small></div><button type="button" class="storageCloseBtn" id="storageModalClose">ปิด</button></div>
-          <div class="storageModalBody"><div class="storageModalSearch"><input id="storageModalFilter" placeholder="ค้นหาไฟล์ / วันที่ / JSON / RAW"><div class="asChips"><button class="asChip on" data-filter="all">ทั้งหมด</button><button class="asChip" data-filter="cleanup">เข้าเงื่อนไขล้าง</button><button class="asChip" data-filter="selectable">ลบได้</button><button class="asChip" data-filter="protected">กันลบ</button><button class="asChip" data-filter="json">JSON</button><button class="asChip" data-filter="raw">RAW</button></div></div><div id="storageModalList" class="storageModalList"></div></div>
+          <div class="storageModalTop"><div class="storageModalTitle"><b>เลือกไฟล์ที่จะล้าง</b><small>DOIT ถูกกันลบไว้ เลือกลบได้เฉพาะ Performance</small></div><button type="button" class="storageCloseBtn" id="storageModalClose">ปิด</button></div>
+          <div class="storageModalBody"><div class="storageModalSearch"><input id="storageModalFilter" placeholder="ค้นหาไฟล์ / วันที่ / JSON / DOIT"><div class="asChips"><button class="asChip on" data-filter="all">ทั้งหมด</button><button class="asChip" data-filter="cleanup">เข้าเงื่อนไขล้าง</button><button class="asChip" data-filter="selectable">ลบได้</button><button class="asChip" data-filter="protected">กันลบ</button><button class="asChip" data-filter="json">JSON</button><button class="asChip" data-filter="raw">RAW Performance</button><button class="asChip" data-filter="doit">DOIT กันลบ</button></div></div><div id="storageModalList" class="storageModalList"></div></div>
           <div class="storageModalFoot"><div class="storageFootMeta" id="storageModalSelectedCount">เลือกแล้ว 0 ไฟล์</div><input id="storageModalConfirm" class="storageModalConfirm" placeholder="พิมพ์ DELETE"><button class="asClear" id="storageModalClear">ล้าง</button><button class="asPickOld" id="storageModalPreviewOld">เลือกไฟล์เก่า</button><button class="asConfirm" id="storageModalDeleteSelected">ลบที่เลือก</button></div>
         </div>
       </div>`);
@@ -288,7 +298,7 @@
       filter.closest('.row')?.after(div);
     }
     const hint = $('#adminStoragePanel .safeBox');
-    if (hint) hint.innerHTML = `<b>Auto Cleanup Policy</b><br>JSON Performance เก็บ ${PERF_RETENTION_DAYS} วัน · Excel/Raw เก็บ ${RAW_RETENTION_DAYS} วัน · revision วันเดียวกันเก็บ ${KEEP_REVISIONS_PER_DAY} ไฟล์ล่าสุด · active/latest/previous/index ถูกกันลบ`;
+    if (hint) hint.innerHTML = `<b>Auto Cleanup Policy</b><br>ลบได้เฉพาะ Performance · JSON Performance เก็บ ${PERF_RETENTION_DAYS} วัน · RAW Performance เก็บ ${RAW_RETENTION_DAYS} วัน · revision วันเดียวกันเก็บ ${KEEP_REVISIONS_PER_DAY} ไฟล์ล่าสุด · DOIT ถูกกันลบ`;
   }
   function init() {
     if (!$('#adminStoragePanel')) return;
