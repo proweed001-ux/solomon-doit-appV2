@@ -13,7 +13,7 @@ const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `$
 
 const required = [
   'package.json','README.md','dist/index.html','dist/pro.html','dist/admin.html','dist/performance.html',
-  'dist/assets/pro-core-v4.js','dist/assets/pro-native-core.js','dist/assets/pro-native-core-overrides.js',
+  'dist/assets/pro-core-v4.js','dist/assets/pro-native-core.js','dist/assets/pro-native-core-overrides.js','dist/assets/pro-default-invc-v1.js',
   'dist/assets/pro-print-store-bills.js','dist/assets/pro-print-mode-fixes.js','dist/assets/pro-print.css',
   'dist/assets/admin-upload-v001.js','dist/assets/admin-json-v265.js','dist/assets/admin-progress-popup-v1.js','dist/assets/admin-storage-manager-v1.js','dist/assets/admin-performance-active-v2.js',
   'src/lib/parser.ts','src/lib/pricing.ts','scripts/qa-doit-file.mjs','.github/workflows/web-ci.yml'
@@ -30,6 +30,9 @@ mustContain('dist/index.html', '/pro.html?t=1028');
 mustContain('dist/pro.html', 'pro-core-v4.js');
 mustContain('dist/assets/pro-core-v4.js', "VERSION = '1028-native'");
 mustContain('dist/assets/pro-core-v4.js', 'legacyWrapperRemoved: true');
+mustContain('dist/assets/pro-core-v4.js', 'pro-default-invc-v1.js');
+mustContain('dist/assets/pro-core-v4.js', 'defaultInvcGuard: true');
+mustContain('dist/assets/pro-default-invc-v1.js', "s.sel.types=['INVC']");
 mustContain('dist/assets/pro-native-core.js', 'currentStateSource');
 mustContain('dist/assets/pro-print-store-bills.js', 'BILLS_PER_A4=2');
 mustContain('dist/assets/pro-print-store-bills.js', 'BILL_ROWS=12');
