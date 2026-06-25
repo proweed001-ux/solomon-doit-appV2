@@ -11,6 +11,14 @@ type AmountPick = {
   source: PriceSource;
 };
 
+type PivotData = {
+  fields: string[];
+  shared: string[][];
+  rows: ParsedRow[];
+  score: number;
+  path: string;
+};
+
 const QUANTITY_ALIASES = [
   'ShipQtyPCS',
   'ShipQtyPC',
@@ -26,14 +34,23 @@ const QUANTITY_ALIASES = [
 ];
 
 const AMOUNT_ALIASES: Array<[PriceSource, string[]]> = [
-  ['InvoiceAmt', ['InvoiceAmt', 'Invoice Amount', 'InvAmt']],
-  ['Amount', ['NetAmount', 'Net Amount', 'Amount']],
-  ['Correct Amount', ['Correct Amount', 'CorrectAmount', 'LineAmount', 'Line Amount']],
   ['TotInvc', ['TotInvc', 'TotalInvoice', 'Total Invoice']],
-  ['Amt', ['Amt', 'amt']],
+  ['Correct Amount', ['Correct Amount', 'CorrectAmount', 'LineAmount', 'Line Amount', 'LineAmt']],
+  ['LineAmtBeforeDisc', ['LineAmtBeforeDisc', 'Line Amount Before Disc']],
   ['detailAmt', ['detailAmt', 'DetailAmt']],
   ['row.amt', ['row.amt', 'row_amt']],
-  ['LineAmtBeforeDisc', ['LineAmtBeforeDisc', 'Line Amount Before Disc']],
+  ['Amt', ['Amt', 'amt']],
+  ['Amount', ['NetAmount', 'Net Amount', 'Amount']],
+  ['InvoiceAmt', ['InvoiceAmt', 'Invoice Amount', 'InvAmt']],
+];
+
+const DOIT_FIELD_GROUPS = [
+  QUANTITY_ALIASES,
+  AMOUNT_ALIASES.flatMap(([, aliases]) => aliases),
+  ['SOTypeID', 'SO Type', 'Type', 'Document Type'],
+  ['SalespersonID', 'SO_SalespersonID', 'Salesperson_Name', 'Salesperson Name'],
+  ['Customer Name', 'CustomerName', 'ShipName', 'c_Name', 'StoreName'],
+  ['SKU_Code', 'SKUCode', 'SKU Code', 'TAS_THName', 'SKU_Desc'],
 ];
 
 function normalizeKey(value: string): string {
@@ -106,7 +123,7 @@ function pickAmount(row: RawRow): AmountPick {
     if (!key) continue;
 
     const amount = safeNum(row[key]);
-    if (amount > 0) return { amount, source };
+    if (amount !== 0) return { amount, source };
   }
 
   return { amount: 0, source: 'missing' };
@@ -132,12 +149,10 @@ function parseRow(raw: RawRow, index: number, source: RowSource): ParsedRow | nu
   const qtyPcs = safeQty(number(raw, QUANTITY_ALIASES));
   const picked = pickAmount(raw);
   const skuCode = text(raw, ['SKU_Code', 'SKUCode', 'SKU Code', 'ItemCode', 'Item Code', 'ProductCode', 'Product Code', 'Material', 'Code']);
-  const product = cleanText(
-    text(raw, ['SKU_Desc', 'SKU Desc', 'TAS_THName', 'SKU / Product', 'SKU/Product', 'Product', 'ProductName', 'Product Name', 'Description', 'Item', 'ItemName', 'สินค้า', 'รายการสินค้า', 'SKU'], skuCode),
-    skuCode || 'ไม่ระบุสินค้า',
-  );
+  const productRaw = text(raw, ['SKU_Desc', 'SKU Desc', 'TAS_THName', 'SKU / Product', 'SKU/Product', 'Product', 'ProductName', 'Product Name', 'Description', 'Item', 'ItemName', 'สินค้า', 'รายการสินค้า', 'SKU'], skuCode);
+  const product = cleanText(productRaw, skuCode || 'ไม่ระบุสินค้า');
 
-  if (qtyPcs <= 0 && picked.amount <= 0 && !product) return null;
+  if (qtyPcs === 0 && picked.amount === 0 && !productRaw && !skuCode) return null;
 
   const salespersonId = text(raw, ['SalespersonID', 'SO_SalespersonID', 'Salesperson ID']);
   const salespersonName = text(raw, ['Salesperson_Name', 'Salesperson Name', 'SalespersonName']);
@@ -192,6 +207,18 @@ function attr(xml: string, name: string): string {
   return match ? decodeXml(match[1]) : '';
 }
 
+function hasField(fields: string[], aliases: string[]): boolean {
+  const normalized = fields.map(normalizeKey);
+  return aliases.some(alias => normalized.includes(normalizeKey(alias)));
+}
+
+function scorePivot(fields: string[], rows: ParsedRow[]): number {
+  const fieldScore = DOIT_FIELD_GROUPS.reduce((score, aliases) => score + (hasField(fields, aliases) ? 10 : 0), 0);
+  const amountScore = hasField(fields, ['TotInvc']) ? 15 : hasField(fields, ['Correct Amount', 'LineAmount', 'LineAmtBeforeDisc']) ? 10 : 0;
+  const rowScore = Math.min(rows.length, 2000) / 100;
+  return fieldScore + amountScore + rowScore;
+}
+
 export async function parseDataFile(file: File): Promise<ParsedRow[]> {
   const buffer = await file.arrayBuffer();
   const name = file.name.toLowerCase();
@@ -206,55 +233,59 @@ export async function parseDataFile(file: File): Promise<ParsedRow[]> {
 
 async function pivot(buffer: ArrayBuffer): Promise<ParsedRow[]> {
   const zip = await JSZip.loadAsync(buffer);
-  const definitionPath = Object.keys(zip.files).find(name => name.startsWith('xl/pivotCache/pivotCacheDefinition') && name.endsWith('.xml'));
-  if (!definitionPath) return [];
+  const definitionPaths = Object.keys(zip.files).filter(name => name.startsWith('xl/pivotCache/pivotCacheDefinition') && name.endsWith('.xml'));
+  const candidates: PivotData[] = [];
 
-  const recordsPath = definitionPath.replace('pivotCacheDefinition', 'pivotCacheRecords');
-  const definitionFile = zip.file(definitionPath);
-  const recordsFile = zip.file(recordsPath);
-  if (!definitionFile || !recordsFile) return [];
+  for (const definitionPath of definitionPaths) {
+    const recordsPath = definitionPath.replace('pivotCacheDefinition', 'pivotCacheRecords');
+    const definitionFile = zip.file(definitionPath);
+    const recordsFile = zip.file(recordsPath);
+    if (!definitionFile || !recordsFile) continue;
 
-  const definitionXml = await definitionFile.async('string');
-  const fields: string[] = [];
-  const shared: string[][] = [];
+    const definitionXml = await definitionFile.async('string');
+    const fields: string[] = [];
+    const shared: string[][] = [];
 
-  for (const fieldMatch of definitionXml.matchAll(/<cacheField\b([^>]*)>([\s\S]*?)<\/cacheField>/g)) {
-    fields.push(attr(fieldMatch[1], 'name'));
-    const values: string[] = [];
-    const sharedMatch = fieldMatch[2].match(/<sharedItems\b[^>]*>([\s\S]*?)<\/sharedItems>/);
+    for (const fieldMatch of definitionXml.matchAll(/<cacheField\b([^>]*)>([\s\S]*?)<\/cacheField>/g)) {
+      fields.push(attr(fieldMatch[1], 'name'));
+      const values: string[] = [];
+      const sharedMatch = fieldMatch[2].match(/<sharedItems\b[^>]*>([\s\S]*?)<\/sharedItems>/);
 
-    if (sharedMatch) {
-      for (const itemMatch of sharedMatch[1].matchAll(/<(s|n|d|b|e|m)\b([^>]*)\/>/g)) {
-        values.push(itemMatch[1] === 'm' ? '' : attr(itemMatch[2], 'v'));
+      if (sharedMatch) {
+        for (const itemMatch of sharedMatch[1].matchAll(/<(s|n|d|b|e|m)\b([^>]*)\/>/g)) {
+          values.push(itemMatch[1] === 'm' ? '' : attr(itemMatch[2], 'v'));
+        }
       }
-    }
-    shared.push(values);
-  }
-
-  const recordsXml = await recordsFile.async('string');
-  const out: ParsedRow[] = [];
-  let rowNumber = 0;
-
-  for (const rowMatch of recordsXml.matchAll(/<r>([\s\S]*?)<\/r>/g)) {
-    rowNumber += 1;
-    const obj: RawRow = {};
-    let columnIndex = 0;
-
-    for (const cellMatch of rowMatch[1].matchAll(/<(x|n|s|d|b|e|m)\b([^>]*)\/>/g)) {
-      const key = fields[columnIndex];
-      if (key) {
-        const tag = cellMatch[1];
-        const value = attr(cellMatch[2], 'v');
-        obj[key] = tag === 'x' ? (shared[columnIndex]?.[Number(value)] ?? '') : (tag === 'm' ? '' : value);
-      }
-      columnIndex += 1;
+      shared.push(values);
     }
 
-    const parsed = parseRow(obj, rowNumber, 'pivotCache');
-    if (parsed) out.push(parsed);
+    const recordsXml = await recordsFile.async('string');
+    const rows: ParsedRow[] = [];
+    let rowNumber = 0;
+
+    for (const rowMatch of recordsXml.matchAll(/<r>([\s\S]*?)<\/r>/g)) {
+      rowNumber += 1;
+      const obj: RawRow = {};
+      let columnIndex = 0;
+
+      for (const cellMatch of rowMatch[1].matchAll(/<(x|n|s|d|b|e|m)\b([^>]*)\/>/g)) {
+        const key = fields[columnIndex];
+        if (key) {
+          const tag = cellMatch[1];
+          const value = attr(cellMatch[2], 'v');
+          obj[key] = tag === 'x' ? (shared[columnIndex]?.[Number(value)] ?? '') : (tag === 'm' ? '' : value);
+        }
+        columnIndex += 1;
+      }
+
+      const parsed = parseRow(obj, rowNumber, 'pivotCache');
+      if (parsed) rows.push(parsed);
+    }
+
+    candidates.push({ fields, shared, rows, score: scorePivot(fields, rows), path: definitionPath });
   }
 
-  return out;
+  return candidates.sort((a, b) => b.score - a.score)[0]?.rows ?? [];
 }
 
 function sheet(buffer: ArrayBuffer): ParsedRow[] {
