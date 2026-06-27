@@ -174,6 +174,7 @@
   }
 
   async function injectDeveloperQr() {
+    if (window.__PRO_TEAM_QR_SINGLE__) return;
     const body = document.querySelector('.devBody');
     if (!body || devQrBusy) return;
     ensureDeveloperQrStyle();
