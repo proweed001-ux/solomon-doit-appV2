@@ -1,0 +1,65 @@
+name: Fix Pro Static Action Buttons
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-pro-static-action-buttons.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Move Pro action buttons into static layout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          pro = Path('dist/pro.html')
+          s = pro.read_text(encoding='utf-8')
+
+          css = ".sendActionButtons{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:0}.sendActionButtons button{width:100%;height:38px;min-width:0;padding:0 3px;font-size:11px;line-height:1.05;white-space:normal}@media(max-width:720px){.sendActionButtons{grid-template-columns:repeat(4,minmax(0,1fr))}.sendActionButtons button{height:38px;font-size:10.8px;padding:0 2px}}"
+          if '.sendActionButtons{' not in s:
+              s = s.replace('</style>', css + '</style>', 1)
+
+          old_actions = '<div class="summaryHead"><h3>สรุปยอดรวม</h3><div class="actions"><button id="teleBtn" class="teleBtn">บิล Telesale (0)</button><button id="insertBtn" class="outline">+ แทรกสินค้า</button><button id="prepPrint" class="outline">เตรียมปริ้น</button><button id="copySummary" class="outline">▣ Copy สรุป</button><button id="exportCsv" class="outline">⇩ Export CSV</button></div></div>'
+          new_actions = '<div class="summaryHead"><h3>สรุปยอดรวม</h3><div class="actions"><button id="copySummary" class="outline">▣ Copy สรุป</button><button id="exportCsv" class="outline">⇩ Export CSV</button></div></div>'
+          if old_actions in s:
+              s = s.replace(old_actions, new_actions, 1)
+          elif '<button id="teleBtn" class="teleBtn">บิล Telesale (0)</button>' in s and '<div id="sendActionButtons"' not in s:
+              raise SystemExit('tele button present but action block marker changed')
+
+          old_send = '<div class="sendBar"><div class="sendLabel"><span>ส่งให้ร้าน:</span><button class="pickBtn" data-pick="receivers"><b id="sendText">ยังไม่เลือก</b><span>▾</span></button></div><button id="showDetailBtn" class="outline">แสดงรายละเอียด</button></div>'
+          new_send = '<div class="sendBar"><div class="sendLabel"><span>ส่งให้ร้าน:</span><button class="pickBtn" data-pick="receivers"><b id="sendText">ยังไม่เลือก</b><span>▾</span></button></div><button id="showDetailBtn" class="outline">แสดงรายละเอียด</button><div id="sendActionButtons" class="sendActionButtons"><button id="teleBtn" class="teleBtn">บิล Telesale (0)</button><button id="insertBtn" class="outline">+ แทรกสินค้า</button><button id="prepPrint" class="outline">เตรียมปริ้น</button><button id="remainBtn" class="outline">สรุปของเหลือ</button></div></div>'
+          if '<div id="sendActionButtons"' not in s:
+              if old_send not in s:
+                  raise SystemExit('sendBar marker not found')
+              s = s.replace(old_send, new_send, 1)
+
+          if s.count('id="teleBtn"') != 1 or s.count('id="insertBtn"') != 1 or s.count('id="prepPrint"') != 1 or s.count('id="remainBtn"') != 1:
+              raise SystemExit('button id count is not one')
+          pro.write_text(s, encoding='utf-8')
+
+          core = Path('dist/assets/pro-native-core.js')
+          c = core.read_text(encoding='utf-8')
+          old = "if(!$('#remainBtn')){const b=document.createElement('button');b.id='remainBtn';b.className='outline';b.textContent='สรุปของเหลือ';$('#prepPrint')?.parentNode?.insertBefore(b,$('#prepPrint').nextSibling);b.onclick=()=>{push();mode='remain';page=1;render();msg('สรุปของเหลือ')}}function moveDisplayExport(){"
+          new = "{const b=$('#remainBtn');if(b&&!b.dataset.bound){b.dataset.bound='1';b.onclick=()=>{push();mode='remain';page=1;render();msg('สรุปของเหลือ')}}}function moveDisplayExport(){"
+          if old in c:
+              c = c.replace(old, new, 1)
+          elif "if(!$('#remainBtn'))" in c:
+              raise SystemExit('remainBtn marker changed')
+          core.write_text(c, encoding='utf-8')
+
+          Path('.github/workflows/fix-pro-static-action-buttons.yml').unlink()
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/pro.html dist/assets/pro-native-core.js .github/workflows/fix-pro-static-action-buttons.yml
+          git commit -m "Place Pro action buttons in static send bar [skip ci]" || exit 0
+          git push
