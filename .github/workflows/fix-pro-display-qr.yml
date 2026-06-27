@@ -1,0 +1,69 @@
+name: Fix Pro Display Buttons And QR
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-pro-display-qr.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch static display buttons and QR cache
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          pro=Path('dist/pro.html')
+          s=pro.read_text(encoding='utf-8')
+          css='.displayActionButtons{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center}.displayActionButtons button{width:100%;height:40px;white-space:nowrap}@media(max-width:720px){.displayActionButtons{grid-column:1/-1;grid-template-columns:1fr 1fr}}'
+          if '.displayActionButtons{' not in s:
+              s=s.replace('</style>',css+'</style>',1)
+          s=s.replace('<div class="summaryHead"><h3>สรุปยอดรวม</h3><div class="actions"><button id="copySummary" class="outline">▣ Copy สรุป</button><button id="exportCsv" class="outline">⇩ Export CSV</button></div></div>','<div class="summaryHead"><h3>สรุปยอดรวม</h3></div>',1)
+          s=s.replace('<button class="outline" id="displayBtn">ปรับจำนวนแสดง</button><div class="tabs">','<div id="displayActionButtons" class="displayActionButtons"><button class="outline" id="displayBtn">ปรับจำนวนแสดง</button><button id="exportCsv" class="outline">⇩ Export CSV</button></div><div class="tabs">',1)
+          if s.count('id="exportCsv"')!=1 or s.count('id="displayBtn"')!=1:
+              raise SystemExit('display/export id count failed')
+          # remove diagnostics produced while inspecting
+          for f in ['dist/assets/pro-action-dump.txt','dist/assets/pro-diagnostics.txt','dist/assets/pro-tail.txt']:
+              fp=Path(f)
+              if fp.exists(): fp.unlink()
+          pro.write_text(s,encoding='utf-8')
+
+          core=Path('dist/assets/pro-native-core.js')
+          c=core.read_text(encoding='utf-8')
+          start=c.find('function moveDisplayExport(){')
+          end=c.find('function moveProActions(){', start)
+          if start<0 or end<0:
+              raise SystemExit('moveDisplayExport boundaries not found')
+          replacement="function moveDisplayExport(){let st=$('#displayExportCss');if(!st){st=document.createElement('style');st.id='displayExportCss';st.textContent='.displayActionButtons{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center}.displayActionButtons button{width:100%;height:40px;white-space:nowrap}@media(max-width:720px){.displayActionButtons{grid-column:1/-1;grid-template-columns:1fr 1fr}}';document.head.appendChild(st)}}"
+          c=c[:start]+replacement+c[end:]
+          core.write_text(c,encoding='utf-8')
+
+          qr=Path('dist/assets/pro-team-single.js')
+          q=qr.read_text(encoding='utf-8')
+          q=q.replace("encodeURIComponent(x.updated_at||Date.now())","encodeURIComponent(x.updated_at||'stable')")
+          q=q.replace("const QR_IMAGE = 'https://saodmeoilixfdqentofp.supabase.co/functions/v1/dev-qr?action=image';","const QR_IMAGE = 'https://saodmeoilixfdqentofp.supabase.co/functions/v1/dev-qr?action=image';\n  const QR_STABLE = QR_IMAGE+'&t=stable';")
+          q=q.replace("if(!qrCache)qrCache=normalize({image_url:QR_IMAGE+'&t=stable'});","if(!qrCache)qrCache=normalize({image_url:QR_STABLE});")
+          q=q.replace("else if(!qrRendered)renderQr(normalize({image_url:QR_IMAGE+'&t=stable'}));","else if(!qrRendered)renderQr(normalize({image_url:QR_STABLE}));")
+          if 'function preloadQrFast' not in q:
+              q=q.replace("function qrBlock(){", "function preloadQrFast(url){try{const i=new Image();i.decoding='async';i.src=url||QR_STABLE}catch{}}\n  function qrBlock(){",1)
+              q=q.replace("function all(force=false){return Promise.all(ITEMS.map(x=>one(...x,force)))}", "function all(force=false){return Promise.all(ITEMS.map(x=>one(...x,force)))}\n  preloadQrFast(QR_STABLE);",1)
+              q=q.replace("if(cached)renderQr(cached);else", "if(cached){preloadQrFast(cached.image_url);renderQr(cached)}else",1)
+          qr.write_text(q,encoding='utf-8')
+
+          Path('.github/workflows/fix-pro-display-qr.yml').unlink()
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/pro.html dist/assets/pro-native-core.js dist/assets/pro-team-single.js .github/workflows/fix-pro-display-qr.yml
+          git add -u dist/assets/pro-action-dump.txt dist/assets/pro-diagnostics.txt dist/assets/pro-tail.txt || true
+          git commit -m "Place Pro display buttons statically and speed QR [skip ci]" || exit 0
+          git push
