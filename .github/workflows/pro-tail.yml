@@ -1,0 +1,31 @@
+name: Pro Tail Dump
+
+on:
+  push:
+    paths:
+      - '.github/workflows/pro-tail.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tail
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('dist/pro.html').read_text(encoding='utf-8')
+          Path('dist/assets/pro-tail.txt').write_text(s[-10000:], encoding='utf-8')
+          Path('.github/workflows/pro-tail.yml').unlink()
+          PY
+      - name: Commit tail
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/assets/pro-tail.txt .github/workflows/pro-tail.yml
+          git commit -m "Add Pro tail dump [skip ci]" || exit 0
+          git push
