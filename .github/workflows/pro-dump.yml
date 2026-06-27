@@ -1,0 +1,39 @@
+name: Pro Diagnostics Dump
+
+on:
+  push:
+    paths:
+      - '.github/workflows/pro-dump.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract snippets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path('dist/pro.html').read_text(encoding='utf-8')
+          keys = ['openDevTeamModal','closeDevTeamModal','devModal','devBody','qr','QR','refresh','loadCloud','Cloud','latest','render','msg','fileLabel']
+          out=[]
+          out.append('LEN='+str(len(s)))
+          for key in keys:
+              i=s.find(key)
+              out.append('\n===== '+key+' @ '+str(i)+' =====')
+              if i>=0:
+                  out.append(s[max(0,i-1800):min(len(s),i+4500)])
+          Path('dist/assets/pro-diagnostics.txt').write_text('\n'.join(out), encoding='utf-8')
+          Path('.github/workflows/pro-dump.yml').unlink()
+          PY
+      - name: Commit diagnostics
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/assets/pro-diagnostics.txt .github/workflows/pro-dump.yml
+          git commit -m "Add Pro diagnostics dump [skip ci]" || exit 0
+          git push
