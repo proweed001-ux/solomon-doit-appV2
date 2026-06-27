@@ -1,0 +1,39 @@
+name: Fix ADS Rank JS
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-ads-rank-js.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix ADS Rank function
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('dist/performance.html')
+          s = p.read_text(encoding='utf-8')
+          if "},OVER=[" not in s:
+              s = s.replace("const C={sales:'ยอดขาย',giv:'ยอด GIV',moq:'MOQ',dc1:'DC1 / CD1',dc2:'DC2 / CD2',dc3:'DC3 / CD3',cd13:'CD1+CD3',bills:'บิลซื้อ',gps:'GPS',dgp:'Golden Point'};", "const C={sales:'ยอดขาย',giv:'ยอด GIV',moq:'MOQ',dc1:'DC1 / CD1',dc2:'DC2 / CD2',dc3:'DC3 / CD3',cd13:'CD1+CD3',bills:'บิลซื้อ',gps:'GPS',dgp:'Golden Point'},OVER=['sales','giv','moq','dc1','dc2','dc3','cd13','bills','dgp'];", 1)
+          new_func = "function adsOverallRank(){const rows=[...(data.ads||[])].map(r=>{const used=OVER.filter(k=>N(r[k]?.index)>0),score=used.length?used.reduce((s,k)=>s+N(r[k]?.index),0)/used.length:0;return{r,score,count:used.length}}).sort((a,b)=>b.score-a.score);return \"<div class='rank'>\"+rows.map((x,i)=>\"<button class='row' data-mode='ps' data-ads='\"+E(x.r.ads||x.r.code)+\"'><div class='no'>\"+(i+1)+\"</div><div><b>\"+E(x.r.ads||x.r.code)+\" · \"+E(x.r.name||x.r.code||'')+\"</b><span>เฉลี่ยทุกเป้า \"+P(x.score)+\" / \"+x.count+\" เป้า / ยอดขาย \"+P(x.r.sales?.index)+\" / DGP \"+P(x.r.dgp?.index)+\"</span>\"+meter(x.score)+\"</div><div class='right'>\"+P(x.score)+\"</div></button>\").join('')+\"</div>\"}"
+          s = re.sub(r"function adsOverallRank\(\).*?function screenAds\(\)", new_func + "function screenAds()", s, count=1, flags=re.S)
+          if "adsOverallRank()" not in s:
+              raise SystemExit('screenAds did not reference adsOverallRank')
+          p.write_text(s, encoding='utf-8')
+          Path('.github/workflows/fix-ads-rank-js.yml').unlink()
+          PY
+      - name: Commit fix and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/performance.html .github/workflows/fix-ads-rank-js.yml
+          git commit -m "Fix ADS Rank overall target function [skip ci]" || exit 0
+          git push
