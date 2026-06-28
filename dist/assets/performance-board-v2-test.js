@@ -1,1 +1,0 @@
-console.log('performance asset placeholder');
