@@ -1,0 +1,39 @@
+name: Patch Perf Row X
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-perf-row-x.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch file
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('dist/performance.html')
+          s=p.read_text(encoding='utf-8')
+          add='.cmpRows{display:block;overflow-x:scroll;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding-bottom:4px}.cmpRows .row{width:650px;max-width:650px}.cmpRows .rowMain{overflow:visible}.cmpRows .right{max-width:140px}'
+          if '.cmpRows{' not in s:
+              s=s.replace('.cmpSlider{display:flex;', add+'.cmpSlider{display:flex;', 1)
+          s=s.replace("<section class='panel'><h3>DS Compare</h3>${cmpSlider()}<div class='rank'>", "<section class='panel'><h3>DS Compare</h3>${cmpSlider()}<div class='rank cmpRows'>", 1)
+          if '.cmpRows{' not in s or "rank cmpRows" not in s:
+              raise SystemExit('patch failed')
+          p.write_text(s,encoding='utf-8')
+          Path('.github/workflows/patch-perf-row-x.yml').unlink()
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/performance.html .github/workflows/patch-perf-row-x.yml
+          git commit -m "Make DS Compare rows horizontally scrollable [skip ci]" || exit 0
+          git push
+# run
