@@ -1,4 +1,0 @@
-.cmpRows{ = True
-rank cmpRows = True
-DS Compare</h3>${cmpSlider()} = True
-nst prev=oldLabel(p.pick),cat=state.cat in C?state.cat:'';if(!cat){app.innerHTML=nav()+hero('เทียบย้อนหลัง','ล่าสุด '+(data.meta?.reportKey||'')+' เทียบกับ '+prev,data.ds)+`<section class='panel'><h3>DS Compare</h3>${cmpSlider()}<div class='rank cmpRows'>${Object.keys(C).map((k,i)=>diffBtn(data.ds,p.old.ds||{},k,i)).join('')}</div></section>`;return}const adsRows=deltas(data.ads,p.old.ads,cat,'ads').sort((a,b)=>b.diff-a.diff),adsList=adsRows.map(x=>x.ads||x.code).filter(Boolean),sel=state.ads&&a
