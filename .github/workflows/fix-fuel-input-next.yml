@@ -1,0 +1,38 @@
+name: Add Fuel Input Next
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/fix-fuel-input-next.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch popup enter next behavior
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('dist/fuel.html')
+          s = p.read_text()
+          s = s.replace('inputmode="${type===\'number\'?\'decimal\':\'text\'}" autofocus', 'inputmode="${type===\'number\'?\'decimal\':\'text\'}" enterkeyhint="next" autocomplete="off" autofocus')
+          s = s.replace("setTimeout(()=>q('popInput')?.focus(),50)", "setTimeout(()=>{let pi=q('popInput');if(pi){pi.focus();try{pi.select()}catch(e){}pi.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();commitEdit(true)}}}},50)")
+          marker = "function nextEditPath(path)"
+          helper = "function nextEditPath(path){if(path==='start')return{path:'rows.0.km',type:'number'};let m=String(path||'').match(/^rows\\.(\\d+)\\.(.+)$/);if(m){let i=Number(m[1]),f=m[2];if(i<30){let type=(f==='route'||f==='fuel')?'select':(f==='dest'?'text':'number');return{path:'rows.'+(i+1)+'.'+f,type}}return null}return null}function commitEdit(moveNext){if(!editing)return;let input=q('popInput');if(input)tempVal=input.value;if(editing.path.includes('.fuel'))tempVal=String(tempVal).replace(/[^123]/g,'').slice(0,1);if(editing.path.includes('.price')){let [,i]=editing.path.split('.');row(+i).priceSourceDate=''}let current=editing.path;setPath(current,tempVal);if(current.includes('.route')){let i=Number(current.split('.')[1]);if(routeNumber(tempVal))cycleRoutesFrom(i,tempVal);else if(isSkipRoute(tempVal))recalcRoutesAfterSkip(i)}let nx=moveNext?nextEditPath(current):null;closePop();render();if(nx)setTimeout(()=>openPop(nx.type,nx.path,'กรอกข้อมูล'),120)}"
+          if marker not in s:
+              s = s.replace("q('popClose').onclick=q('popCancel').onclick=closePop;", helper + "q('popClose').onclick=q('popCancel').onclick=closePop;")
+          s = re.sub(r"q\('popOk'\)\.onclick=\(\)=>\{if\(!editing\)return;.*?\};q\('pop'\)\.onclick", "q('popOk').onclick=()=>commitEdit(true);q('pop').onclick", s, flags=re.S)
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/fuel.html
+          git commit -m "Add enter next behavior to fuel popup inputs" || exit 0
+          git push
