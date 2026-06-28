@@ -21,19 +21,15 @@ jobs:
           import re
           p=Path('dist/performance.html')
           s=p.read_text(encoding='utf-8')
-          # remove old/overlap systems
           s=s.replace(".cmpRows{display:block;overflow-x:scroll;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding-bottom:4px}.cmpRows .row{width:650px;max-width:650px}.cmpRows .rowMain{overflow:visible}.cmpRows .right{max-width:140px}","")
           s=s.replace("<div class='rank cmpRows'>","<div class='rank'>")
           s=s.replace(".rowMain{min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;white-space:nowrap}",".rowMain{min-width:0;overflow:hidden;white-space:nowrap}")
           s=s.replace("<section class='panel cmpSwipe'><h3>DS Compare</h3>${cmpSlider()}<div class='rank'>","<section class='panel cmpModeSwipe'><h3>DS Compare</h3>${cmpSlider()}<div class='rank cmpModeRows'>")
           s=s.replace("<section class='panel'><h3>DS Compare</h3>${cmpSlider()}<div class='rank'>","<section class='panel cmpModeSwipe'><h3>DS Compare</h3>${cmpSlider()}<div class='rank cmpModeRows'>")
-          # one CSS target only
           css=".cmpModeSwipe,.cmpModeRows .row,.cmpSlider,.cmpCard{touch-action:pan-y}"
           if '.cmpModeSwipe,.cmpModeRows' not in s:
               s=s.replace('@media(max-width:1100px)', css+'@media(max-width:1100px)', 1)
-          # remove external swipe script tag; inline into main app system instead
           s=re.sub(r"<script src=['\"]/assets/perf-compare-swipe\.js\?v=\d+['\"]></script>","",s)
-          # insert one inline gesture system before central click handler
           marker="document.addEventListener('click',e=>{const b=e.target.closest('[data-mode]');if(!b)return;e.preventDefault();go({mode:b.dataset.mode,cat:b.dataset.cat||'',ads:b.dataset.ads||'',ps:b.dataset.ps||'',cmp:b.dataset.cmp||state.cmp||'prev'})});"
           inline="const CMPS=['prev','same','avg3','pace'],CMP_ZONE='.cmpModeSwipe,.cmpModeSwipe .row,.cmpModeSwipe .rowMain,.cmpModeSwipe .rowHead,.cmpModeSwipe .rowSub,.cmpSlider,.cmpCard';let cmpSX=0,cmpSY=0,cmpActive=false,cmpBlock=0;function cmpStep(d){const i=Math.max(0,CMPS.indexOf(state.cmp||'prev')),n=CMPS[Math.max(0,Math.min(CMPS.length-1,i+d))];if(n&&n!==state.cmp)go({mode:'compare',cat:state.cat||'',ads:state.ads||'',ps:state.ps||'',cmp:n})}document.addEventListener('pointerdown',e=>{if(state.mode!=='compare')return;if(!e.target.closest(CMP_ZONE))return;cmpSX=e.clientX;cmpSY=e.clientY;cmpActive=true},{capture:true,passive:true});document.addEventListener('pointerup',e=>{if(!cmpActive)return;cmpActive=false;const dx=e.clientX-cmpSX,dy=e.clientY-cmpSY;if(Math.abs(dx)>36&&Math.abs(dx)>Math.abs(dy)*1.08){cmpBlock=Date.now()+700;cmpStep(dx<0?1:-1)}},{capture:true,passive:true});"
           newmarker="document.addEventListener('click',e=>{if(cmpBlock&&Date.now()<cmpBlock&&e.target.closest(CMP_ZONE)){e.preventDefault();e.stopImmediatePropagation();return}const b=e.target.closest('[data-mode]');if(!b)return;e.preventDefault();go({mode:b.dataset.mode,cat:b.dataset.cat||'',ads:b.dataset.ads||'',ps:b.dataset.ps||'',cmp:b.dataset.cmp||state.cmp||'prev'})});"
@@ -43,7 +39,6 @@ jobs:
               s=s.replace(marker, inline+newmarker, 1)
           else:
               s=s.replace(marker,newmarker,1)
-          # strict verification
           bad=['cmpRows{','rank cmpRows','cmpSwipe','perf-compare-swipe.js','overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;white-space:nowrap']
           for b in bad:
               if b in s:
@@ -61,3 +56,4 @@ jobs:
           git add dist/performance.html .github/workflows/perf-unify-mode.yml
           git commit -m "Unify Performance compare interaction system [skip ci]" || exit 0
           git push
+# run
