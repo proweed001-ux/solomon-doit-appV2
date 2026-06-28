@@ -29,6 +29,7 @@ import {
   toCsv,
   uniqueSorted,
 } from './lib/analytics';
+import FuelBillPage from './components/FuelBillPage';
 
 function Header({
   mode,
@@ -52,6 +53,7 @@ function Header({
     ['skus', 'SKU'],
     ['tod', 'TOD'],
     ['bill', 'ถอดบิล'],
+    ['fuel', 'บิลน้ำมัน'],
     ['issues', 'ตรวจผิดปกติ'],
   ];
 
@@ -245,6 +247,7 @@ function DashboardPage({ rows, setMode, setFilters, exportAgg }: {
       <section className="action-grid">
         <button className="primary-btn" onClick={() => setMode('people')}><Users size={16} /> ดูรายบุคคล</button>
         <button className="primary-btn" onClick={() => setMode('bill')}><Receipt size={16} /> ถอดบิล</button>
+        <button className="primary-btn" onClick={() => setMode('fuel')}><Receipt size={16} /> บิลน้ำมัน</button>
         <button className="secondary-btn" onClick={() => exportAgg('summary-by-person.csv', people)}><Download size={16} /> Export รายบุคคล</button>
         <button className="secondary-btn" onClick={() => exportAgg('summary-by-store.csv', stores)}><Download size={16} /> Export ร้าน</button>
       </section>
@@ -479,18 +482,17 @@ function BillPage({ lines }: { lines: BillLine[] }) {
   );
 }
 
-function UploadPage({ rows, fileName, error, loading, onUpload, onGoDashboard, onClear }: {
+function UploadPage({ rows, fileName, error, loading, onUpload, onGoDashboard, onGoFuel, onClear }: {
   rows: ParsedRow[];
   fileName: string;
   error: string;
   loading: boolean;
   onUpload: (file: File) => void;
   onGoDashboard: () => void;
+  onGoFuel: () => void;
   onClear: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const totalQty = rows.reduce((s, r) => s + r.qtyPcs, 0);
-  const totalAmount = rows.reduce((s, r) => s + r.correctAmount, 0);
 
   return (
     <main className="content">
@@ -505,9 +507,14 @@ function UploadPage({ rows, fileName, error, loading, onUpload, onGoDashboard, o
           if (file) onUpload(file);
           e.currentTarget.value = '';
         }} />
-        <button className="primary-btn" disabled={loading} onClick={() => inputRef.current?.click()}>
-          <UploadCloud size={18} /> {loading ? 'กำลังอ่านไฟล์...' : 'เลือกไฟล์ DOIT'}
-        </button>
+        <div className="button-row hero-actions">
+          <button className="primary-btn grow" disabled={loading} onClick={() => inputRef.current?.click()}>
+            <UploadCloud size={18} /> {loading ? 'กำลังอ่านไฟล์...' : 'เลือกไฟล์ DOIT'}
+          </button>
+          <button className="primary-btn grow" onClick={onGoFuel}>
+            <Receipt size={18} /> บิลน้ำมัน
+          </button>
+        </div>
         {fileName && <div className="file-name">ไฟล์: {fileName}</div>}
         {error && <div className="error-box">{error}</div>}
       </section>
@@ -569,16 +576,18 @@ export default function App() {
     downloadCsv(name, toCsv(data.map(aggregateToExport)));
   };
 
-  const subtitle = rows.length > 0
-    ? `${fmt(filteredRows.length)} / ${fmt(rows.length)} แถว · ${fmt(new Set(filteredRows.map(r => r.personKey)).size)} คน · ${fmt(new Set(filteredRows.map(r => r.store)).size)} ร้าน`
-    : 'ภาครวม → รายบุคคล → ร้าน → SKU → บิล';
+  const subtitle = mode === 'fuel'
+    ? 'ฟอร์มเลขไมล์ / รายงานค่าใช้จ่าย'
+    : rows.length > 0
+      ? `${fmt(filteredRows.length)} / ${fmt(rows.length)} แถว · ${fmt(new Set(filteredRows.map(r => r.personKey)).size)} คน · ${fmt(new Set(filteredRows.map(r => r.store)).size)} ร้าน`
+      : 'ภาครวม → รายบุคคล → ร้าน → SKU → บิล';
 
   return (
     <div className="page">
       <Header
         mode={mode}
         rows={rows}
-        title={mode === 'upload' ? 'Solomon DOIT App V2.1' : 'Solomon DOIT App V2.1'}
+        title={mode === 'fuel' ? 'บิลน้ำมัน' : 'Solomon DOIT App V2.1'}
         subtitle={subtitle}
         onBack={mode !== 'upload' ? () => setMode('upload') : undefined}
         onMode={setMode}
@@ -592,8 +601,13 @@ export default function App() {
           loading={loading}
           onUpload={handleUpload}
           onGoDashboard={() => setMode('dashboard')}
+          onGoFuel={() => setMode('fuel')}
           onClear={() => { setRows([]); setFileName(''); setError(''); setFilters(emptyFilters); }}
         />
+      ) : mode === 'fuel' ? (
+        <main className="content">
+          <FuelBillPage />
+        </main>
       ) : (
         <main className="content">
           <FilterBar rows={rows} filters={filters} setFilters={setFilters} onExport={exportFilteredRows} />
