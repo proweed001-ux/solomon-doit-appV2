@@ -1,0 +1,32 @@
+name: Inject Perf Swipe Asset
+on:
+  push:
+    paths:
+      - '.github/workflows/inject-perf-swipe-asset.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('dist/performance.html')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('.rowMain{min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;white-space:nowrap}', '.rowMain{min-width:0;overflow:hidden;white-space:nowrap}', 1)
+          s=s.replace("<section class='panel'><h3>DS Compare</h3>${cmpSlider()}", "<section class='panel cmpSwipe'><h3>DS Compare</h3>${cmpSlider()}", 1)
+          if 'perf-compare-swipe.js' not in s:
+              s=s.replace('</body></html>', "<script src='/assets/perf-compare-swipe.js?v=1'></script></body></html>", 1)
+          if 'perf-compare-swipe.js' not in s or 'cmpSwipe' not in s:
+              raise SystemExit('failed')
+          p.write_text(s,encoding='utf-8')
+          Path('.github/workflows/inject-perf-swipe-asset.yml').unlink()
+          PY
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/performance.html .github/workflows/inject-perf-swipe-asset.yml
+          git commit -m "Use swipe gesture to change DS Compare mode [skip ci]" || exit 0
+          git push
