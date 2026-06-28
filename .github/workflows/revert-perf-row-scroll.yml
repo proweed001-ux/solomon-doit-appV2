@@ -1,0 +1,28 @@
+name: Revert Perf Row Scroll
+on:
+  push:
+    paths:
+      - '.github/workflows/revert-perf-row-scroll.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('dist/performance.html')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('.cmpRows{display:block;overflow-x:scroll;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding-bottom:4px}.cmpRows .row{width:650px;max-width:650px}.cmpRows .rowMain{overflow:visible}.cmpRows .right{max-width:140px}','')
+          s=s.replace("<div class='rank cmpRows'>","<div class='rank'>")
+          p.write_text(s,encoding='utf-8')
+          Path('.github/workflows/revert-perf-row-scroll.yml').unlink()
+          PY
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/performance.html .github/workflows/revert-perf-row-scroll.yml
+          git commit -m "Revert DS Compare row horizontal scroll [skip ci]" || exit 0
+          git push
