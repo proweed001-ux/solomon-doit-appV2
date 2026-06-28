@@ -1,0 +1,58 @@
+name: Unify Perf Swipe HTML
+
+on:
+  push:
+    paths:
+      - '.github/workflows/unify-perf-swipe-html.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch performance html
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('dist/performance.html')
+          s=p.read_text(encoding='utf-8')
+          # remove older row horizontal scroll system if it exists
+          s=s.replace(".cmpRows{display:block;overflow-x:scroll;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding-bottom:4px}.cmpRows .row{width:650px;max-width:650px}.cmpRows .rowMain{overflow:visible}.cmpRows .right{max-width:140px}","")
+          s=s.replace("<div class='rank cmpRows'>","<div class='rank'>")
+          # normalize row text area: no separate row text scroller
+          s=s.replace(".rowMain{min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;white-space:nowrap}",".rowMain{min-width:0;overflow:hidden;white-space:nowrap}")
+          # mark only the DS Compare panel as the swipe zone for mode changing
+          s=s.replace("<section class='panel cmpSwipe'><h3>DS Compare</h3>${cmpSlider()}<div class='rank'>","<section class='panel cmpModeSwipe'><h3>DS Compare</h3>${cmpSlider()}<div class='rank cmpModeRows'>")
+          s=s.replace("<section class='panel'><h3>DS Compare</h3>${cmpSlider()}<div class='rank'>","<section class='panel cmpModeSwipe'><h3>DS Compare</h3>${cmpSlider()}<div class='rank cmpModeRows'>")
+          # ensure a single script load with cache bust v3
+          s=s.replace("/assets/perf-compare-swipe.js?v=1","/assets/perf-compare-swipe.js?v=3")
+          s=s.replace("/assets/perf-compare-swipe.js?v=2","/assets/perf-compare-swipe.js?v=3")
+          if "perf-compare-swipe.js" not in s:
+              s=s.replace("</body></html>","<script src='/assets/perf-compare-swipe.js?v=3'></script></body></html>")
+          # prevent duplicate script tags if previous patches inserted more than one
+          first=s.find("/assets/perf-compare-swipe.js")
+          if first>=0:
+              before=s[:first]
+              after=s[first:]
+              after=after.replace("/assets/perf-compare-swipe.js?v=3","__PERF_SWIPE_ASSET__",1)
+              after=after.replace("<script src='/assets/perf-compare-swipe.js?v=1'></script>","").replace("<script src='/assets/perf-compare-swipe.js?v=2'></script>","").replace("<script src='/assets/perf-compare-swipe.js?v=3'></script>","")
+              after=after.replace("__PERF_SWIPE_ASSET__","/assets/perf-compare-swipe.js?v=3",1)
+              s=before+after
+          if 'cmpRows{' in s or 'rank cmpRows' in s or 'cmpSwipe' in s:
+              raise SystemExit('old overlapping swipe/scroll system still present')
+          if 'cmpModeSwipe' not in s or 'cmpModeRows' not in s or 'perf-compare-swipe.js?v=3' not in s:
+              raise SystemExit('single swipe system not installed')
+          p.write_text(s,encoding='utf-8')
+          Path('.github/workflows/unify-perf-swipe-html.yml').unlink()
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/performance.html .github/workflows/unify-perf-swipe-html.yml
+          git commit -m "Unify DS Compare swipe mode system [skip ci]" || exit 0
+          git push
