@@ -28,7 +28,7 @@ function htmlToLines(html) {
     .replace(/<script[\s\S]*?<\/script>/gi, '\n')
     .replace(/<style[\s\S]*?<\/style>/gi, '\n')
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(tr|td|th|li|p|div|h\d)>/gi, '\n')
+    .replace(/<\/(tr|td|th|li|p|div|h\d|span)>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
     .split(/\n+/)
     .map(line => line.replace(/\s+/g, ' ').trim())
@@ -37,42 +37,39 @@ function htmlToLines(html) {
 
 function parseGasohol95Records(html, requestYear) {
   const lines = htmlToLines(html);
-  const start = Math.max(0, lines.findIndex(line => line === 'วันที่'));
-  const header = lines.findIndex((line, index) => index > start && line.includes('เบนซิน'));
-  if (start < 0 || header < 0) return [];
+  const priceStart = lines.findIndex(line => (line.match(/\d{1,3}\.\d{2}/g) || []).length >= 5);
+  if (priceStart < 0) return [];
 
-  const dates = [];
-  let currentThaiYear = requestYear + 543;
+  const dateLines = lines.slice(0, priceStart);
+  const priceLines = lines.slice(priceStart);
   const dateRe = /^(\d{1,2})\s+(ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.)$/;
 
-  for (let i = start + 1; i < header; i += 1) {
-    const line = lines[i];
+  let currentThaiYear = requestYear + 543;
+  const dates = [];
+  for (const line of dateLines) {
     if (/^25\d{2}$/.test(line)) {
       currentThaiYear = Number(line);
       continue;
     }
     const m = line.match(dateRe);
-    if (m) {
-      const day = Number(m[1]);
-      const month = TH_MONTHS[m[2]];
-      const year = currentThaiYear - 543;
-      dates.push({
-        day,
-        month,
-        year,
-        dateText: `${day} ${m[2]} ${currentThaiYear}`,
-        iso: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
-        ts: Date.UTC(year, month - 1, day),
-      });
-    }
+    if (!m) continue;
+    const day = Number(m[1]);
+    const month = TH_MONTHS[m[2]];
+    const year = currentThaiYear - 543;
+    dates.push({
+      day,
+      month,
+      year,
+      dateText: `${day} ${m[2]} ${currentThaiYear}`,
+      iso: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+      ts: Date.UTC(year, month - 1, day),
+    });
   }
 
   const priceRows = [];
-  for (let i = header + 1; i < lines.length; i += 1) {
-    const nums = [...lines[i].matchAll(/\d{1,3}\.\d{2}/g)].map(m => Number(m[0]));
-    if (nums.length >= 2) {
-      priceRows.push(nums);
-    }
+  for (const line of priceLines) {
+    const nums = [...line.matchAll(/\d{1,3}\.\d{2}/g)].map(m => Number(m[0]));
+    if (nums.length >= 5) priceRows.push(nums);
   }
 
   const records = [];
@@ -87,6 +84,7 @@ function parseGasohol95Records(html, requestYear) {
       });
     }
   }
+
   records.sort((a, b) => b.ts - a.ts);
   return records;
 }
@@ -105,7 +103,7 @@ export default async function handler(req, res) {
     const url = 'https://xn--42cah7d0cxcvbbb9x.com/%E0%B8%A3%E0%B8%B2%E0%B8%84%E0%B8%B2%E0%B8%99%E0%B9%89%E0%B8%B3%E0%B8%A1%E0%B8%B1%E0%B8%99%E0%B8%A2%E0%B9%89%E0%B8%AD%E0%B8%99%E0%B8%AB%E0%B8%A5%E0%B8%B1%E0%B8%87/';
     const upstream = await fetch(url, {
       headers: {
-        'user-agent': 'Mozilla/5.0 gasohol95-price-sync/1.0',
+        'user-agent': 'Mozilla/5.0 gasohol95-price-sync/1.1',
         accept: 'text/html,application/xhtml+xml',
       },
     });
