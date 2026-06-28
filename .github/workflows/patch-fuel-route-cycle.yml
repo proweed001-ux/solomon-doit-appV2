@@ -1,0 +1,56 @@
+name: Patch Fuel Route Auto Cycle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-fuel-route-cycle.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch route cycling behavior
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'dist/fuel.html';
+          let html = fs.readFileSync(p, 'utf8');
+
+          if (!html.includes('function routeNumber')) {
+            html = html.replace(
+              "function calc(){let cur=n(state.start);",
+              "function routeNumber(v){let m=String(v||'').match(/^R(\\d{1,2})$/i);if(!m)return 0;let x=Number(m[1]);return x>=1&&x<=12?x:0}function formatRoute(x){return 'R'+String(((x-1)%12)+1).padStart(2,'0')}function isSkipRoute(v){return ['หยุด','ประชุม canvass'].includes(String(v||''))}function cycleRoutesFrom(startIndex,startRoute){let r=routeNumber(startRoute);if(!r)return;for(let i=startIndex;i<31;i++){let item=row(i);if(i===startIndex){item.route=formatRoute(r);continue}if(isSkipRoute(item.route))continue;r=r>=12?1:r+1;item.route=formatRoute(r)}}function recalcRoutesAfterSkip(skipIndex){let prev=-1,prevRoute='';for(let i=skipIndex-1;i>=0;i--){let v=row(i).route;if(routeNumber(v)){prev=i;prevRoute=v;break}}if(prev>=0)cycleRoutesFrom(prev,prevRoute)}function calc(){let cur=n(state.start);"
+            );
+          }
+
+          html = html.replace(
+            "setPath(editing.path,tempVal);closePop();render()",
+            "setPath(editing.path,tempVal);if(editing.path.includes('.route')){let i=Number(editing.path.split('.')[1]);if(routeNumber(tempVal))cycleRoutesFrom(i,tempVal);else if(isSkipRoute(tempVal))recalcRoutesAfterSkip(i)}closePop();render()"
+          );
+
+          html = html.replace(
+            'ช่อง เริ่ม ของวันที่ 1 เป็นช่องใส่เลขไมล์ตั้งต้น จากนั้นระบบจะบวกต่ออัตโนมัติตามจำนวน กม. ที่กรอกในแต่ละวัน',
+            'เลือก R วันแรกวันเดียว ระบบเติม R ถัดไปให้อัตโนมัติแบบวน R01-R12 ถ้าวันไหนเลือกหยุดหรือประชุม canvass ระบบจะข้ามวันนั้นและต่อ R ให้เอง'
+          );
+          html = html.replace(
+            'ช่อง เริ่ม ของวันที่ 1 เป็นช่องใส่เลขไมล์ตั้งต้น เลือกจากป๊อบอัพแล้วระบบปิดให้อัตโนมัติ ไม่ต้องกดตกลง',
+            'เลือก R วันแรกวันเดียว ระบบเติม R ถัดไปให้อัตโนมัติแบบวน R01-R12 ถ้าวันไหนเลือกหยุดหรือประชุม canvass ระบบจะข้ามวันนั้นและต่อ R ให้เอง'
+          );
+
+          fs.writeFileSync(p, html);
+          NODE
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/fuel.html
+          git commit -m "Auto-cycle fuel routes and skip holidays [skip ci]" || exit 0
+          git push
