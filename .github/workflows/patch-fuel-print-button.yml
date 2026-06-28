@@ -1,0 +1,33 @@
+name: Add Fuel Print Button
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/patch-fuel-print-button.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('dist/fuel.html')
+          s=p.read_text()
+          s=s.replace('grid-template-columns:1fr 1fr 1fr 1fr;gap:8px','grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px')
+          old='<button class="btn orange" id="exportBtn">Export Excel</button>'
+          new='<button class="btn orange" onclick="location.href=\'/fuel-print.html?t=1052\'">เตรียมปริ้น</button>'+old
+          if 'fuel-print.html' not in s:
+              s=s.replace(old,new)
+          p.write_text(s)
+          PY
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/fuel.html
+          git commit -m "Add fuel print preview button" || exit 0
+          git push
