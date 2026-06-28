@@ -1,0 +1,27 @@
+name: Bump Perf Swipe V2
+on:
+  push:
+    paths:
+      - '.github/workflows/bump-perf-swipe-v2.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('dist/performance.html')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('/assets/perf-compare-swipe.js?v=1','/assets/perf-compare-swipe.js?v=2')
+          p.write_text(s,encoding='utf-8')
+          Path('.github/workflows/bump-perf-swipe-v2.yml').unlink()
+          PY
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/performance.html .github/workflows/bump-perf-swipe-v2.yml
+          git commit -m "Bump Performance swipe cache version [skip ci]" || exit 0
+          git push
