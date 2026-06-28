@@ -1,0 +1,78 @@
+name: Fuel Expense Editable Fields And Holiday Spans
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/fuel-expense-holiday-span.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch fuel form and print output
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          # -------- fuel.html --------
+          p=Path('dist/fuel.html')
+          s=p.read_text()
+
+          s=s.replace("{route:'',dest:'',km:'',fuel:'',price:'',priceSourceDate:''}", "{route:'',dest:'',km:'',fuel:'',price:'',priceSourceDate:'',stay:'',electric:'',water:'',trash:''}")
+
+          s=s.replace("let r=row(i),active=i<days(),km=active?n(r.km):0,st=cur,en=st+km,a=active?amt(r.fuel):0,p=active?n(r.price):0,lit=a&&p?a/p:0;cur=en;return {...r,day:i+1,active,km,st,en,a,p,lit}", "let r=row(i),active=i<days(),holiday=String(r.route)==='หยุด',km=active&&!holiday?n(r.km):0,st=cur,en=st+km,a=active&&!holiday?amt(r.fuel):0,p=active?n(r.price):0,lit=a&&p?a/p:0;cur=en;return {...r,day:i+1,active,holiday,km,st,en,a,p,lit}")
+
+          s=s.replace("return{km:d.reduce((s,r)=>s+r.km,0),fuel:d.reduce((s,r)=>s+r.a,0),lit:d.reduce((s,r)=>s+r.lit,0)}", "return{km:d.reduce((s,r)=>s+r.km,0),fuel:d.reduce((s,r)=>s+r.a,0),lit:d.reduce((s,r)=>s+r.lit,0),stay:d.reduce((s,r)=>s+n(r.stay),0),electric:d.reduce((s,r)=>s+n(r.electric),0),water:d.reduce((s,r)=>s+n(r.water),0),trash:d.reduce((s,r)=>s+n(r.trash),0)}")
+
+          old="d.forEach((r,i)=>{let priceNote=r.priceSourceDate?` (${r.priceSourceDate})`:'';let startTd=i===0?cell('number','start',state.start,'right'):ro(hasStart()?r.st:'','right');let endTd=ro(hasStart()?r.en:'','right');h+=`<tr>${ro(r.active?r.day:'')}${cell('select','rows.'+i+'.route',r.route)}${cell('text','rows.'+i+'.dest',r.dest)}${startTd}${endTd}${cell('number','rows.'+i+'.km',r.km||'','right')}${ro(r.lit?r.lit.toFixed(3):'','right')}${cell('number','rows.'+i+'.price',(r.price||'')+priceNote,'right')}${cell('select','rows.'+i+'.fuel',r.a||'','right')}${ro('','right')}</tr>`});h+=`<tr class=\"sumrow\">"
+          new="d.forEach((r,i)=>{if(String(r.route)==='หยุด'){h+=`<tr>${ro(r.active?r.day:'')}<td class=\"cell center bold red\" colspan=\"8\" data-type=\"select\" data-path=\"rows.${i}.route\">หยุด</td>${ro('','right')}</tr>`;return}let priceNote=r.priceSourceDate?` (${r.priceSourceDate})`:'';let startTd=i===0?cell('number','start',state.start,'right'):ro(hasStart()?r.st:'','right');let endTd=ro(hasStart()?r.en:'','right');h+=`<tr>${ro(r.active?r.day:'')}${cell('select','rows.'+i+'.route',r.route)}${cell('text','rows.'+i+'.dest',r.dest)}${startTd}${endTd}${cell('number','rows.'+i+'.km',r.km||'','right')}${ro(r.lit?r.lit.toFixed(3):'','right')}${cell('number','rows.'+i+'.price',(r.price||'')+priceNote,'right')}${cell('select','rows.'+i+'.fuel',r.a||'','right')}${ro('','right')}</tr>`});h+=`<tr class=\"sumrow\">"
+          if old in s:
+              s=s.replace(old,new)
+
+          old="for(let i=0;i<31;i++){let r=d[i];h+=`<tr>${ro(r.active?r.day:'')}${ro(r.route||'')}${ro('')}${ro('')}${ro('')}${ro('')}${ro(r.a||'','right')}${ro('')}</tr>`}h+=`<tr><td colspan=\"8\" class=\"noBorder\"></td></tr><tr class=\"sumrow\"><td></td><td class=\"center\">รวม</td><td></td><td></td><td></td><td></td><td class=\"right\">${t.fuel||''}</td><td></td></tr>"
+          new="for(let i=0;i<31;i++){let r=d[i],base='rows.'+i+'.';if(String(r.route)==='หยุด'){h+=`<tr>${ro(r.active?r.day:'')}<td class=\"cell center bold red\" colspan=\"7\" data-type=\"select\" data-path=\"rows.${i}.route\">หยุด</td></tr>`}else{h+=`<tr>${ro(r.active?r.day:'')}${ro(r.route||'')}${cell('number',base+'stay',r.stay||'','right')}${cell('number',base+'electric',r.electric||'','right')}${cell('number',base+'water',r.water||'','right')}${cell('number',base+'trash',r.trash||'','right')}${ro(r.a||'','right')}${ro('')}</tr>`}}h+=`<tr><td colspan=\"8\" class=\"noBorder\"></td></tr><tr class=\"sumrow\"><td></td><td class=\"center\">รวม</td><td class=\"right\">${t.stay||''}</td><td class=\"right\">${t.electric||''}</td><td class=\"right\">${t.water||''}</td><td class=\"right\">${t.trash||''}</td><td class=\"right\">${t.fuel||''}</td><td></td></tr>"
+          if old in s:
+              s=s.replace(old,new)
+
+          s=s.replace("...d.map(r=>[r.day,r.route,'','','','',r.a||'','']),[],['','รวม','','','','',t.fuel,'']", "...d.map(r=>[r.day,r.route,r.stay||'',r.electric||'',r.water||'',r.trash||'',r.a||'','']),[],['','รวม',t.stay||'',t.electric||'',t.water||'',t.trash||'',t.fuel,'']")
+
+          p.write_text(s)
+
+          # -------- fuel-print.html --------
+          p=Path('dist/fuel-print.html')
+          s=p.read_text()
+
+          s=s.replace("let rr=row(i),active=i<days,km=active?n(rr.km):0,start=cur,end=start+km,money=active?amt(rr.fuel):0,price=n(rr.price),lit=money&&price?money/price:0;cur=end;a.push({...rr,day:i+1,active,km,start,end,money,price,lit})", "let rr=row(i),active=i<days,holiday=String(rr.route)==='หยุด',km=active&&!holiday?n(rr.km):0,start=cur,end=start+km,money=active&&!holiday?amt(rr.fuel):0,price=n(rr.price),lit=money&&price?money/price:0;cur=end;a.push({...rr,day:i+1,active,holiday,km,start,end,money,price,lit})")
+
+          old="d.forEach((r,i)=>{h+='<tr class=\"'+(i===0?'first ':'')+(i===30?'last ':'')+'\"><td class=\"c\">'+(r.active?r.day:'')+'</td><td class=\"c '+(red(r.route)?'red':'')+'\">'+esc(r.route||'')+'</td><td>'+esc(r.dest||'')+'</td><td class=\"r\">'+(r.active&&st.start?r.start.toLocaleString('en-US'):'')+'</td><td class=\"r\">'+(r.active&&st.start?r.end.toLocaleString('en-US'):'')+'</td><td class=\"r\">'+(r.km||'')+'</td><td class=\"r\">'+(r.lit?r.lit.toFixed(3):'')+'</td><td class=\"r\">'+(r.price?r.price.toFixed(2):'')+'</td><td class=\"r\">'+(r.money||'')+'</td><td></td></tr>'});h+='"
+          new="d.forEach((r,i)=>{let cls=(i===0?'first ':'')+(i===30?'last ':'');if(String(r.route)==='หยุด'){h+='<tr class=\"'+cls+'\"><td class=\"c\">'+(r.active?r.day:'')+'</td><td colspan=\"8\" class=\"c red b\">หยุด</td><td></td></tr>';return}h+='<tr class=\"'+cls+'\"><td class=\"c\">'+(r.active?r.day:'')+'</td><td class=\"c '+(red(r.route)?'red':'')+'\">'+esc(r.route||'')+'</td><td>'+esc(r.dest||'')+'</td><td class=\"r\">'+(r.active&&st.start?r.start.toLocaleString('en-US'):'')+'</td><td class=\"r\">'+(r.active&&st.start?r.end.toLocaleString('en-US'):'')+'</td><td class=\"r\">'+(r.km||'')+'</td><td class=\"r\">'+(r.lit?r.lit.toFixed(3):'')+'</td><td class=\"r\">'+(r.price?r.price.toFixed(2):'')+'</td><td class=\"r\">'+(r.money||'')+'</td><td></td></tr>'});h+='"
+          if old in s:
+              s=s.replace(old,new)
+
+          old="let d=calc(),sumFuel=d.reduce((s,x)=>s+x.money,0),adv=n(st.advance||3000),short=String(st.name||'').replace(/^(นาย|นางสาว|นาง)\\s+/,'');"
+          new="let d=calc(),sumFuel=d.reduce((s,x)=>s+x.money,0),sumStay=d.reduce((s,x)=>s+n(x.stay),0),sumElectric=d.reduce((s,x)=>s+n(x.electric),0),sumWater=d.reduce((s,x)=>s+n(x.water),0),sumTrash=d.reduce((s,x)=>s+n(x.trash),0),sumAll=sumFuel+sumStay+sumElectric+sumWater+sumTrash,adv=n(st.advance||3000),short=String(st.name||'').replace(/^(นาย|นางสาว|นาง)\\s+/,'');"
+          if old in s:
+              s=s.replace(old,new)
+
+          old="d.forEach((r,i)=>{h+='<tr class=\"'+(i===0?'first ':'')+(i===30?'last ':'')+'\"><td class=\"c\">'+(r.active?r.day:'')+'</td><td class=\"c '+(red(r.route)?'red':'')+'\">'+esc(r.route||'')+'</td><td></td><td></td><td></td><td></td><td class=\"r\">'+(r.money||'')+'</td><td></td></tr>'});h+='<tr class=\"sum\"><td></td><td class=\"r b\">รวม</td><td class=\"c\">-</td><td class=\"c\">-</td><td class=\"c\">-</td><td class=\"c\">-</td><td class=\"c\">'+(sumFuel||'-')+'</td><td></td></tr></table><div class=\"bottomBox\"><table><tr><td>เงินโอน คชจ. ล่วงหน้า</td><td class=\"r\">'+adv.toLocaleString('en-US')+'</td></tr><tr><td>รวมยอดค่าใช้จ่าย</td><td class=\"r\">'+(sumFuel||'-')+'</td></tr><tr><td>เงินคงเหลือ/ยอดส่งเงิน</td><td class=\"r\">'+(adv-sumFuel).toLocaleString('en-US')+'</td></tr></table></div>"
+          new="d.forEach((r,i)=>{let cls=(i===0?'first ':'')+(i===30?'last ':'');if(String(r.route)==='หยุด'){h+='<tr class=\"'+cls+'\"><td class=\"c\">'+(r.active?r.day:'')+'</td><td colspan=\"7\" class=\"c red b\">หยุด</td></tr>';return}h+='<tr class=\"'+cls+'\"><td class=\"c\">'+(r.active?r.day:'')+'</td><td class=\"c '+(red(r.route)?'red':'')+'\">'+esc(r.route||'')+'</td><td class=\"r\">'+(r.stay||'')+'</td><td class=\"r\">'+(r.electric||'')+'</td><td class=\"r\">'+(r.water||'')+'</td><td class=\"r\">'+(r.trash||'')+'</td><td class=\"r\">'+(r.money||'')+'</td><td></td></tr>'});h+='<tr class=\"sum\"><td></td><td class=\"r b\">รวม</td><td class=\"r b\">'+(sumStay||'-')+'</td><td class=\"r b\">'+(sumElectric||'-')+'</td><td class=\"r b\">'+(sumWater||'-')+'</td><td class=\"r b\">'+(sumTrash||'-')+'</td><td class=\"r b\">'+(sumFuel||'-')+'</td><td></td></tr></table><div class=\"bottomBox\"><table><tr><td>เงินโอน คชจ. ล่วงหน้า</td><td class=\"r\">'+adv.toLocaleString('en-US')+'</td></tr><tr><td>รวมยอดค่าใช้จ่าย</td><td class=\"r\">'+(sumAll||'-')+'</td></tr><tr><td>เงินคงเหลือ/ยอดส่งเงิน</td><td class=\"r\">'+(adv-sumAll).toLocaleString('en-US')+'</td></tr></table></div>"
+          if old in s:
+              s=s.replace(old,new)
+
+          s=s.replace('เตรียมปริ้นบิลน้ำมัน • plate-fix-2</b>', 'เตรียมปริ้นบิลน้ำมัน • expense-holiday</b>')
+          s=s.replace('เตรียมปริ้นบิลน้ำมัน</b>', 'เตรียมปริ้นบิลน้ำมัน • expense-holiday</b>')
+
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/fuel.html dist/fuel-print.html
+          git commit -m "Add editable expense fields and holiday row spans" || exit 0
+          git push
