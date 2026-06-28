@@ -1,0 +1,58 @@
+name: Fix DS Compare Slider Placement
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-ds-compare-slider-placement.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Move compare slider into existing DS Compare panel
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('dist/performance.html')
+          s=p.read_text(encoding='utf-8')
+
+          old = re.search(r"function cmpSlider\(\)\{.*?\}function meter\(v\)", s, flags=re.S)
+          if not old:
+              raise SystemExit('cmpSlider block not found')
+          new = "function cmpSlider(){const m=data?.meta||{},wd=N(m.workdayNo),market=((wd-1)%12)+1,round=Math.floor((wd-1)/12)+1,items=[['prev','เทียบวันก่อน','ดูแรงขยับจาก WD ก่อนหน้า'],['same','เทียบตลาดเดิม','ตลาด '+market+' รอบ '+round+(wd>12?' เทียบรอบก่อน':' ยังไม่มีรอบก่อน')],['avg3','เฉลี่ย 3 วัน','เทียบกับค่าเฉลี่ยย้อนหลัง'],['pace','Pace เป้า','เพิ่มล่าสุดเทียบต้องทำ/วัน']];return `<div class='muted'>เลือกรูปแบบการเทียบ</div><div class='cmpSlider'>${items.map(([k,t,d])=>`<button class='cmpCard ${state.cmp===k?'on':''}' data-mode='compare' data-cmp='${k}' data-cat='${E(state.cat||'')}' data-ads='${E(state.ads||'')}'><b>${E(t)}</b><span>${E(d)}</span></button>`).join('')}</div>`}function meter(v)"
+          s = s[:old.start()] + new + s[old.end():]
+
+          # Remove the extra standalone DS Compare panel that was inserted before the real content.
+          s = s.replace("app.innerHTML=nav()+cmpSlider()+hero('เทียบย้อนหลัง'", "app.innerHTML=nav()+hero('เทียบย้อนหลัง'", 1)
+          s = s.replace("app.innerHTML=nav()+cmpSlider()+`<section class='panel fade'", "app.innerHTML=nav()+`<section class='panel fade'", 2)
+
+          # Put the slider inside the already-existing DS Compare panel.
+          s = s.replace("<section class='panel'><h3>DS Compare</h3><div class='rank'>", "<section class='panel'><h3>DS Compare</h3>${cmpSlider()}<div class='rank'>", 1)
+
+          # On compare detail screens, keep the selector inside the same detail panel rather than as a separate panel.
+          s = s.replace("</div>${chipCat(cat,sel)}${chipAds", "</div>${cmpSlider()}${chipCat(cat,sel)}${chipAds", 1)
+          s = s.replace("</div>${chipCat(cat,'')}<div class='kpis'>", "</div>${cmpSlider()}${chipCat(cat,'')}<div class='kpis'>", 1)
+
+          if "nav()+cmpSlider()+" in s:
+              raise SystemExit('standalone cmpSlider still present')
+          if "<div class='title'>DS Compare</div>" in s:
+              raise SystemExit('extra DS Compare title still present')
+          if "<h3>DS Compare</h3>${cmpSlider()}" not in s:
+              raise SystemExit('slider not placed in existing DS Compare panel')
+
+          p.write_text(s,encoding='utf-8')
+          Path('.github/workflows/fix-ds-compare-slider-placement.yml').unlink()
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/performance.html .github/workflows/fix-ds-compare-slider-placement.yml
+          git commit -m "Move DS Compare slider into existing panel [skip ci]" || exit 0
+          git push
