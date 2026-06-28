@@ -1,0 +1,30 @@
+name: Perf Current Dump
+on:
+  push:
+    paths:
+      - '.github/workflows/perf-dump-current.yml'
+permissions:
+  contents: write
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('dist/performance.html').read_text(encoding='utf-8')
+          out=[]
+          for k in ['function diffBtn','function cmpSlider','Object.keys(C).map','DS Compare</h3>','function screenCompare']:
+            i=s.find(k)
+            out.append('\n==== '+k+' @ '+str(i)+' ====')
+            if i>=0: out.append(s[max(0,i-800):min(len(s),i+1800)])
+          Path('dist/assets/perf-current-dump.txt').write_text('\n'.join(out),encoding='utf-8')
+          Path('.github/workflows/perf-dump-current.yml').unlink()
+          PY
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/assets/perf-current-dump.txt .github/workflows/perf-dump-current.yml
+          git commit -m "Add Performance current dump [skip ci]" || exit 0
+          git push
