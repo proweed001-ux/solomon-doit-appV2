@@ -1,0 +1,1 @@
+const SB='https://saodmeoilixfdqentofp.supabase.co';async function jf(p){return fetch(SB+'/storage/v1/object/public/doit-files/'+p,{cache:'no-store'}).then(r=>r.json())}
