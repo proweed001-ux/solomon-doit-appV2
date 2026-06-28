@@ -1,0 +1,54 @@
+name: Fix DS Compare Row Scroll
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-ds-compare-row-scroll.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make DS Compare rows horizontally scrollable and move pace to title
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('dist/performance.html')
+          s=p.read_text(encoding='utf-8')
+
+          css=".rowMain{min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;white-space:nowrap}.rowMain::-webkit-scrollbar{display:none}.rowHead{display:flex;align-items:center;gap:8px;min-width:max-content}.rowHead b{overflow:visible;text-overflow:clip}.paceMini{display:inline-block;font-style:normal;font-size:11px;font-weight:850;color:#b8c6d1;background:#18263a;border:1px solid #3a4f68;border-radius:999px;padding:2px 7px;white-space:nowrap}.rowSub{display:block;min-width:max-content;color:#b8c6d1;font-size:11px;white-space:nowrap;overflow:visible!important;text-overflow:clip!important}"
+          if '.rowMain{' not in s:
+              s=s.replace('.row>*{min-width:0}', '.row>*{min-width:0}'+css, 1)
+
+          old = "return `<button class='row' data-mode='compare' data-cat='${E(k)}' data-cmp='${E(state.cmp||'prev')}'><div class='no'>${i+1}</div><div><b>${E(C[k])}</b><span>${left} / ${pct(cur[k])}</span></div><div class='right ${cls}'>${r.d>=0?'+':''}${M(r.d)}</div></button>`}"
+          new = "return `<button class='row' data-mode='compare' data-cat='${E(k)}' data-cmp='${E(state.cmp||'prev')}'><div class='no'>${i+1}</div><div class='rowMain'><div class='rowHead'><b>${E(C[k])}</b><em class='paceMini'>${pct(cur[k])}</em></div><span class='rowSub'>${left}</span></div><div class='right ${cls}'>${r.d>=0?'+':''}${M(r.d)}</div></button>`}"
+          if old in s:
+              s=s.replace(old,new,1)
+          elif "<b>${E(C[k])}</b><span>${left} / ${pct(cur[k])}</span>" in s:
+              raise SystemExit('diffBtn marker changed unexpectedly')
+
+          old2 = "return `<${tag} class='row'${attr}><div class='no'>${i+1}</div><div><b>${E(r.ps||r.ads||r.code)} · ${E(r.name||'')}</b><span>${txt} / เหลือ ${M(r.remaining)} / วันละ ${M(r.perDay)} / Index ${P(r.indexNow)}</span></div><div class='right ${cls}'>${r.diff>=0?'+':''}${M(r.diff)}</div></${tag}>`}"
+          new2 = "return `<${tag} class='row'${attr}><div class='no'>${i+1}</div><div class='rowMain'><div class='rowHead'><b>${E(r.ps||r.ads||r.code)} · ${E(r.name||'')}</b><em class='paceMini'>เหลือ ${M(r.remaining)} / วันละ ${M(r.perDay)}</em></div><span class='rowSub'>${txt} / Index ${P(r.indexNow)}</span></div><div class='right ${cls}'>${r.diff>=0?'+':''}${M(r.diff)}</div></${tag}>`}"
+          if old2 in s:
+              s=s.replace(old2,new2,1)
+          elif "<span>${txt} / เหลือ ${M(r.remaining)} / วันละ ${M(r.perDay)} / Index ${P(r.indexNow)}</span>" in s:
+              raise SystemExit('drow marker changed unexpectedly')
+
+          if '.rowMain{' not in s or "class='paceMini'" not in s or "class='rowSub'" not in s:
+              raise SystemExit('row scroll patch incomplete')
+          p.write_text(s,encoding='utf-8')
+          Path('.github/workflows/fix-ds-compare-row-scroll.yml').unlink()
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/performance.html .github/workflows/fix-ds-compare-row-scroll.yml
+          git commit -m "Make DS Compare rows scroll and move pace beside titles [skip ci]" || exit 0
+          git push
