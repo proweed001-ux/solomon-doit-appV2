@@ -91,4 +91,4 @@ export type AggregateRow = {
   types: string[];
 };
 
-export type AppMode = 'upload' | 'dashboard' | 'people' | 'stores' | 'skus' | 'tod' | 'bill' | 'issues';
+export type AppMode = 'upload' | 'dashboard' | 'people' | 'stores' | 'skus' | 'tod' | 'bill' | 'fuel' | 'issues';
