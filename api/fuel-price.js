@@ -84,7 +84,7 @@ function parsePriceRows(lines) {
 function parseGasohol95Records(html, requestYear) {
   const lines = toLines(html);
   const firstPriceLine = lines.findIndex(line => (line.match(/\d{1,3}\.\d{2}/g) || []).length >= 5);
-  if (firstPriceLine < 0) return [];
+  if (firstPriceLine < 0) return { records: [], diagnostics: { linesCount: lines.length, firstPriceLine, linesSample: lines.slice(0, 80) } };
 
   const dates = parseDates(lines.slice(0, firstPriceLine), requestYear);
   const priceRows = parsePriceRows(lines.slice(firstPriceLine));
@@ -98,7 +98,18 @@ function parseGasohol95Records(html, requestYear) {
   }
 
   records.sort((a, b) => b.ts - a.ts);
-  return records;
+  return {
+    records,
+    diagnostics: {
+      linesCount: lines.length,
+      firstPriceLine,
+      dateCount: dates.length,
+      priceRowCount: priceRows.length,
+      firstDates: dates.slice(0, 10),
+      firstPriceRows: priceRows.slice(0, 5),
+      aroundPrice: lines.slice(Math.max(0, firstPriceLine - 10), firstPriceLine + 10),
+    },
+  };
 }
 
 export default async function handler(req, res) {
@@ -115,17 +126,30 @@ export default async function handler(req, res) {
     const url = 'https://xn--42cah7d0cxcvbbb9x.com/%E0%B8%A3%E0%B8%B2%E0%B8%84%E0%B8%B2%E0%B8%99%E0%B9%89%E0%B8%B3%E0%B8%A1%E0%B8%B1%E0%B8%99%E0%B8%A2%E0%B9%89%E0%B8%AD%E0%B8%99%E0%B8%AB%E0%B8%A5%E0%B8%B1%E0%B8%87/';
     const upstream = await fetch(url, {
       headers: {
-        'user-agent': 'Mozilla/5.0 gasohol95-price-sync/2.0',
+        'user-agent': 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/126 Safari/537.36',
         accept: 'text/html,application/xhtml+xml',
+        'accept-language': 'th-TH,th;q=0.9,en;q=0.8',
       },
     });
+
+    const html = await upstream.text();
+    const parsed = parseGasohol95Records(html, year);
+    const records = parsed.records;
+
+    if (req.query.debug === '1') {
+      return res.status(200).json({
+        ok: upstream.ok,
+        upstreamStatus: upstream.status,
+        htmlLength: html.length,
+        hasGasohol: html.includes('แก๊สโซฮอล์'),
+        hasPriceWord: html.includes('ราคาน้ำมัน'),
+        diagnostics: parsed.diagnostics,
+      });
+    }
 
     if (!upstream.ok) {
       return res.status(502).json({ ok: false, error: 'upstream_failed', status: upstream.status });
     }
-
-    const html = await upstream.text();
-    const records = parseGasohol95Records(html, year);
     if (!records.length) {
       return res.status(422).json({ ok: false, error: 'no_price_records_found' });
     }
