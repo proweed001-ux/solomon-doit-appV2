@@ -1,0 +1,37 @@
+name: Perf Compare Dump
+
+on:
+  push:
+    paths:
+      - '.github/workflows/perf-dump.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dump snippets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('dist/performance.html').read_text(encoding='utf-8')
+          keys=['async function oldPack','function diffBtn','async function screenCompare','function render()','state=st','function st()','function go']
+          out=['len='+str(len(s))]
+          for k in keys:
+              i=s.find(k)
+              out.append('\n==== '+k+' @ '+str(i)+' ====')
+              if i>=0: out.append(s[max(0,i-3500):min(len(s),i+9000)])
+          Path('dist/assets/perf-compare-dump.txt').write_text('\n'.join(out),encoding='utf-8')
+          Path('.github/workflows/perf-dump.yml').unlink()
+          PY
+      - name: Commit dump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/assets/perf-compare-dump.txt .github/workflows/perf-dump.yml
+          git commit -m "Add Performance compare dump [skip ci]" || exit 0
+          git push
