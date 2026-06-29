@@ -50,93 +50,7 @@
     main.prepend(box);
   }
 
-  function installFuelBillExactHitGuard() {
-    if (window.__fuelBillExactHitGuardInstalled) return;
-    window.__fuelBillExactHitGuardInstalled = true;
-
-    let exactUnlocked = false;
-    let count = 0;
-    let last = 0;
-
-    function hide() {
-      if (exactUnlocked) return;
-      count = 0;
-      last = 0;
-      document.body.classList.remove('fuelSecretOn');
-      const btn = document.getElementById('fuelBillBtn');
-      if (btn) btn.style.display = 'none';
-    }
-
-    function show() {
-      exactUnlocked = true;
-      document.body.classList.add('fuelSecretOn');
-      const btn = document.getElementById('fuelBillBtn');
-      if (btn) btn.style.display = '';
-    }
-
-    function textOf(el) {
-      return String(el?.innerText || el?.textContent || '').trim();
-    }
-
-    function getHitArea() {
-      const card = document.querySelector('.uploadCard');
-      if (!card) return null;
-      const title = [...card.querySelectorAll('h1,h2,h3,h4')].find(el => {
-        const t = textOf(el);
-        return t.includes('☁') && t.includes('อัปโหลด') && t.includes('DOIT');
-      });
-      if (!title) return null;
-      let hit = title.querySelector('#fuelSecretHitArea');
-      if (!hit) {
-        hit = document.createElement('span');
-        hit.id = 'fuelSecretHitArea';
-        hit.style.display = 'inline';
-        hit.style.cursor = 'pointer';
-        hit.textContent = title.textContent;
-        title.textContent = '';
-        title.appendChild(hit);
-      }
-      return hit;
-    }
-
-    function insideHitArea(event) {
-      const hit = getHitArea();
-      if (!hit || !event.target?.closest) return false;
-      return event.target.closest('#fuelSecretHitArea') === hit;
-    }
-
-    function handleClick(event) {
-      if (!insideHitArea(event)) {
-        if (!exactUnlocked) setTimeout(hide, 0);
-        return;
-      }
-      if (exactUnlocked) return;
-      const now = Date.now();
-      count = now - last < 2500 ? count + 1 : 1;
-      last = now;
-      if (count >= 5) show();
-    }
-
-    document.addEventListener('click', handleClick, true);
-    document.addEventListener('click', event => {
-      if (!exactUnlocked && !insideHitArea(event)) setTimeout(hide, 0);
-    }, false);
-
-    const boot = () => {
-      hide();
-      getHitArea();
-      if (document.body) {
-        new MutationObserver(() => {
-          if (!exactUnlocked && document.body.classList.contains('fuelSecretOn')) hide();
-        }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
-      }
-    };
-
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
-    else boot();
-  }
-
-  function boot() {
+  async function boot() {
     window.DOIT_PRO_CORE_BOOT = {
       version: VERSION,
       mode: 'native-stack-bootstrap',
@@ -145,22 +59,22 @@
       performanceRouteFastBoot: true
     };
 
-    installFuelBillExactHitGuard();
     loadCss(assetUrl('pro-print.css', LEGACY_SAFE_VERSION));
 
-    return loadScript(assetUrl('pro-results-mode.js'))
-      .then(() => {
-        if (IS_PERFORMANCE_ROUTE) return;
-        const stack = [
-          assetUrl('pro-print-store-bills.js', LEGACY_SAFE_VERSION),
-          assetUrl('pro-native-core.js'),
-          assetUrl('pro-native-core-overrides.js'),
-          assetUrl('pro-print-mode-fixes.js', LEGACY_SAFE_VERSION),
-          assetUrl('pro-print-column-widths.js', LEGACY_SAFE_VERSION),
-          assetUrl('pro-print-a4-pro-fix.js', LEGACY_SAFE_VERSION)
-        ];
-        return stack.reduce((promise, src) => promise.then(() => loadScript(src)), Promise.resolve());
-      });
+    await loadScript(assetUrl('pro-results-mode.js'));
+
+    if (IS_PERFORMANCE_ROUTE) return;
+
+    const stack = [
+      assetUrl('pro-print-store-bills.js', LEGACY_SAFE_VERSION),
+      assetUrl('pro-native-core.js'),
+      assetUrl('pro-native-core-overrides.js'),
+      assetUrl('pro-print-mode-fixes.js', LEGACY_SAFE_VERSION),
+      assetUrl('pro-print-column-widths.js', LEGACY_SAFE_VERSION),
+      assetUrl('pro-print-a4-pro-fix.js', LEGACY_SAFE_VERSION)
+    ];
+
+    for (const src of stack) await loadScript(src);
   }
 
   boot().catch(showBootError);
