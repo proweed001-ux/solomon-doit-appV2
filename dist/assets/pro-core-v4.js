@@ -101,10 +101,8 @@
 
     function insideHitArea(event) {
       const hit = getHitArea();
-      if (!hit) return false;
-      const x = event.clientX;
-      const y = event.clientY;
-      return [...hit.getClientRects()].some(rect => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom);
+      if (!hit || !event.target?.closest) return false;
+      return event.target.closest('#fuelSecretHitArea') === hit;
     }
 
     function handleClick(event) {
