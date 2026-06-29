@@ -120,8 +120,8 @@
     }
 
     document.addEventListener('click', handleClick, true);
-    document.addEventListener('click', () => {
-      if (!exactUnlocked) setTimeout(hide, 0);
+    document.addEventListener('click', event => {
+      if (!exactUnlocked && !insideHitArea(event)) setTimeout(hide, 0);
     }, false);
 
     const boot = () => {
