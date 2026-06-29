@@ -17,7 +17,7 @@ body{margin:0;background:#f6f7f8;color:#111827;font-family:system-ui,-apple-syst
 (function(){
   const sourceUrl='https://raw.githubusercontent.com/proweed001-ux/solomon-doit-appV2/6d6f6bbf139de2e62ab63195fb044393e820eca6/dist/pro.html';
   const fuelCss='#fuelBillBtn { display:none!important }body.fuelSecretOn #fuelBillBtn { display:block!important }';
-  const fuelScript=`<script id="fuel-secret-v2">
+  const fuelScript=`<script id="fuel-secret-v3">
 (function(){
   let unlocked=false;
   let count=0;
@@ -39,43 +39,41 @@ body{margin:0;background:#f6f7f8;color:#111827;font-family:system-ui,-apple-syst
     if(b) b.style.display='';
   }
 
-  function hasClassName(el,name){
-    if(!el||!el.classList) return false;
-    return Array.from(el.classList).some(c=>String(c).toLowerCase()===name);
-  }
-
-  function ownText(el){
-    if(!el) return '';
-    return ((el.value||'')+' '+Array.from(el.childNodes||[]).filter(n=>n.nodeType===3).map(n=>n.textContent||'').join(' ')).trim();
+  function textOf(el){
+    return ((el&&((el.innerText||el.textContent||el.value)||''))+'').trim();
   }
 
   function isUploadTap(el){
-    const card=el&&el.closest?el.closest('.uploadCard'):null;
+    if(!el||!el.closest) return false;
+    const card=el.closest('.uploadCard');
     if(!card) return false;
 
-    let n=el;
-    for(let i=0;n&&n!==card.parentElement&&i<6;i++,n=n.parentElement){
-      const txt=ownText(n);
-      const id=(n.id||'').toLowerCase();
-      const cls=(n.className||'').toString().toLowerCase();
-      const isContainer=hasClassName(n,'uploadcard')||id==='upload';
+    const uploadTitle=Array.from(card.querySelectorAll('h1,h2,h3,h4,button,span,label,div'))
+      .find(n=>textOf(n).includes('☁')&&textOf(n).includes('อัปโหลด')&&textOf(n).includes('DOIT'));
+    if(uploadTitle&&(el===uploadTitle||uploadTitle.contains(el))) return true;
 
-      if(txt.includes('☁')||txt.includes('อัปโหลด')||txt.includes('DOIT')) return true;
-      if(!isContainer&&(id.includes('upload')||id.includes('file')||cls.includes('upload')||cls.includes('file')||hasClassName(n,'filebtn'))) return true;
-    }
+    if(el.closest('#choose,#file,#fileLabel,.uploadRow')) return true;
+
     return false;
+  }
+
+  function onClick(e){
+    const ok=isUploadTap(e.target);
+    if(!ok){
+      if(!unlocked) setTimeout(hide,0);
+      return;
+    }
+    if(unlocked) return;
+    const now=Date.now();
+    count=(now-last<2500)?count+1:1;
+    last=now;
+    if(count>=5) show();
   }
 
   document.addEventListener('DOMContentLoaded',function(){
     hide();
-    document.addEventListener('click',function(e){
-      if(unlocked) return;
-      if(!isUploadTap(e.target)) return;
-      const now=Date.now();
-      count=(now-last<2500)?count+1:1;
-      last=now;
-      if(count>=5) show();
-    },true);
+    document.addEventListener('click',onClick,true);
+    document.addEventListener('click',function(e){if(!unlocked&&!isUploadTap(e.target)) setTimeout(hide,0);},false);
   });
 
   if(document.readyState!=='loading') hide();
