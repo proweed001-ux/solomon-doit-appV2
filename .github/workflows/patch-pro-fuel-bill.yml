@@ -1,4 +1,4 @@
-name: Patch Pro Fuel Bill Button
+name: Patch Pro Fuel Secret Unlock
 
 on:
   push:
@@ -17,27 +17,54 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
-      - name: Add fuel bill button and page
+      - name: Hide fuel button until upload tapped five times
         run: |
           node <<'NODE'
-          const fs = require('fs');
-          const proPath = 'dist/pro.html';
-          let html = fs.readFileSync(proPath, 'utf8');
-          if (!html.includes('id="fuelBillBtn"')) {
-            html = html.replace('<button id="resultsModeBtn"', '<button id="fuelBillBtn" type="button" class="fuelBillBtn" onclick="location.href=\'/fuel.html?t=1028\'">บิลน้ำมัน</button><button id="resultsModeBtn"');
+          const fs=require('fs');
+          const p='dist/pro.html';
+          let h=fs.readFileSync(p,'utf8');
+          if(!h.includes('fuel-secret-v1')){
+            h=h.replace('</style>','#fuelBillBtn{display:none!important}body.fuelSecretOn #fuelBillBtn{display:block!important}.fuelSecretHint{font-size:11px;color:#166534;margin-top:4px}</style>');
+            const js=`<script id="fuel-secret-v1">
+(function(){
+  const key='ayaFuelBillSecretUnlocked';
+  let count=0,last=0;
+  function setVisible(){
+    const unlocked=localStorage.getItem(key)==='1';
+    document.body.classList.toggle('fuelSecretOn',unlocked);
+    const b=document.getElementById('fuelBillBtn');
+    if(b){b.style.display=unlocked?'':'none';}
+  }
+  function isUploadTap(el){
+    let n=el;
+    for(let i=0;n&&i<5;i++,n=n.parentElement){
+      const txt=((n.innerText||n.textContent||n.value||'')+'').trim();
+      const id=(n.id||'').toLowerCase();
+      const cls=(n.className||'').toString().toLowerCase();
+      if(txt.includes('อัปโหลด')||txt.includes('DOIT')||txt.includes('☁')||id.includes('upload')||cls.includes('upload')||cls.includes('filebtn')) return true;
+    }
+    return false;
+  }
+  document.addEventListener('click',function(e){
+    if(localStorage.getItem(key)==='1') return;
+    if(!isUploadTap(e.target)) return;
+    const now=Date.now();
+    count=(now-last<2500)?count+1:1;
+    last=now;
+    if(count>=5){localStorage.setItem(key,'1');setVisible();}
+  },true);
+  document.addEventListener('DOMContentLoaded',setVisible);
+  setVisible();
+})();
+</script>`;
+            h=h.replace('</body>',js+'</body>');
           }
-          if (!html.includes('.fuelBillBtn{')) {
-            const css = `.fuelBillBtn{position:absolute;right:280px;top:12px;width:112px;height:42px;border:0;background:linear-gradient(180deg,#f59e0b 0%,#d97706 58%,#92400e 100%);color:#fff;border-radius:12px;font-size:17px;font-weight:950;box-shadow:0 3px 0 #78350f,0 6px 10px rgba(146,64,14,.26),inset 0 1px 0 rgba(255,255,255,.48);text-shadow:0 1px 2px rgba(0,0,0,.34);cursor:pointer}.uploadCard h3{padding-right:382px!important}@media(max-width:720px){.fuelBillBtn{right:244px;top:10px;width:96px;height:38px;font-size:15.5px}.uploadCard h3{padding-right:336px!important}}@media(max-width:390px){.fuelBillBtn{position:static!important;width:100%!important;margin:4px 0 8px!important}.uploadCard h3{padding-right:0!important}}`;
-            html = html.replace('</style>', css + '</style>');
-          }
-          fs.writeFileSync(proPath, html);
-          const fuelHtml = `<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta http-equiv="Cache-Control" content="no-store"><title>บิลน้ำมัน</title><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;background:#f6f7f8;color:#111827;font-family:system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif}.topbar{height:56px;background:linear-gradient(90deg,#075424,#087b34);color:#fff;display:flex;align-items:center;gap:12px;padding:0 14px;position:sticky;top:0;z-index:5}.back{color:#fff;text-decoration:none;font-weight:950}.title{font-weight:950}.wrap{padding:12px;max-width:920px;margin:auto}.card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:12px;margin-bottom:12px;box-shadow:0 2px 10px #0f172a0d}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.sum{border-radius:12px;padding:12px;text-align:center;border:1px solid #e5e7eb}.sum b{display:block;color:#6b7280;font-size:12px}.sum strong{font-size:20px}.field label{display:block;font-size:12px;font-weight:950;margin-bottom:5px}.field input,.field select{width:100%;height:40px;border:1px solid #d1d5db;border-radius:9px;padding:0 9px;font-weight:800;background:#fff}.row{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin-bottom:8px;background:#fff}.rowHead{display:flex;justify-content:space-between;font-weight:950;margin-bottom:8px}.rowGrid{display:grid;grid-template-columns:1fr 80px 70px 92px;gap:6px}.btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;position:sticky;bottom:0;background:#f6f7f8;padding:8px 0}.btn{height:42px;border:0;border-radius:12px;background:linear-gradient(180deg,#22c55e 0%,#0b8f3a 58%,#06652b 100%);color:#fff;font-weight:950;box-shadow:0 3px 0 #03451e}.btn.orange{background:linear-gradient(180deg,#f59e0b 0%,#d97706 58%,#92400e 100%);box-shadow:0 3px 0 #78350f}.tabs{display:flex;gap:8px;overflow:auto}.tab{height:36px;padding:0 14px;border:0;border-radius:999px;background:#e5e7eb;font-weight:950}.tab.on{background:#087b34;color:#fff}.table{width:100%;border-collapse:collapse;font-size:12px}.table th,.table td{border:1px solid #e5e7eb;padding:6px;text-align:left}.right{text-align:right!important}@media(max-width:560px){.grid,.summary{grid-template-columns:1fr}.rowGrid{grid-template-columns:1fr 70px 62px 82px}.wrap{padding:8px}}</style></head><body><header class="topbar"><a class="back" href="/pro.html?t=1028">← กลับ Pro</a><div class="title">บิลน้ำมัน / เลขไมล์</div></header><main class="wrap"><section class="summary"><div class="sum"><b>รวม กม.</b><strong id="sKm">0</strong></div><div class="sum"><b>รวมลิตร</b><strong id="sLit">0.00</strong></div><div class="sum"><b>รวมค่าน้ำมัน</b><strong id="sFuel">฿0</strong></div></section><section class="card"><div class="grid"><div class="field"><label>เดือน</label><select id="month"></select></div><div class="field"><label>พ.ศ.</label><input id="year" inputmode="numeric"></div><div class="field"><label>ชื่อ</label><select id="name"></select></div><div class="field"><label>ตำแหน่ง</label><input id="pos" value="ADS01"></div><div class="field"><label>ทะเบียนรถ</label><input id="plate"></div><div class="field"><label>เลขไมล์เริ่มต้นวันแรก</label><input id="start" inputmode="decimal"></div></div></section><div class="tabs"><button id="tabM" class="tab on">เลขไมล์</button><button id="tabE" class="tab">รายงานค่าใช้จ่าย</button><button id="tabN" class="tab">รายชื่อ</button></div><section id="mileage" class="card"></section><section id="expense" class="card" style="display:none"></section><section id="names" class="card" style="display:none"><div class="grid"><div class="field"><label>เพิ่มชื่อใหม่</label><input id="newName"></div><button class="btn" id="addName">+ เพิ่มชื่อ</button></div></section><div class="btns"><button class="btn" id="save">บันทึก</button><button class="btn" id="clear">ล้าง</button><button class="btn orange" id="export">Export Excel</button></div></main><script>const months=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];const routes=['','R01','R02','R03','R04','R05','R06','R07','R08','R09','R10','R11','R12','หยุด','ประชุม canvass','อื่นๆ'];let emp=['นาย นันทภพ ฐิตานุกูล','นาย บูรพา พานนิล','นาย ยุทธนา อ่ำกลาง','นางสาว ฉัตรชา สังข์เจริญ','นางสาว กรรวี มีแก้ว','นาย สันติภาพ ช้างจั่น','นาย ศุกิจ ปิ่นวิเศษ','นาย จารึก จัดกลาง','นาย รังสรรค์ เถาะรอด','นาย สรายุทธ ภู่หลักแก้ว','นางสาว พัทนันธ์ บุญธรรม','นางสาว กนกพร นิลพัตร์','นางสาว วันเพ็ญ กฤษเพชร์','นาย มณเฑียร ตะเคียนงาม','นางสาว ปพิชญา ทางาม','นาย คมสัน แก้วสาลี','นาย พลภัทร มีเอี่ยม','นาย ฉัตรชัย จันทร์กลิ่น','นางสาว วิรัตน์ ซืสเลอร์','นางสาว ชัญญ์ญาณ์ เจี๊ยะจิ๋ว','นางสาว นรีรัตน์ ผิวนิล','นางสาว ณัฐวดี พลีขันธ์'];const k='aya-fuel-v1';let rows=[];function qs(id){return document.getElementById(id)}function days(){return new Date((+qs('year').value||2568)-543,+qs('month').value,0).getDate()}function amt(c){return c==='1'?100:c==='2'?200:c==='3'?300:0}function n(v){v=+v;return isFinite(v)?v:0}function init(){qs('month').innerHTML=months.map((m,i)=>'<option value="'+(i+1)+'">'+m+'</option>').join('');let d=new Date;qs('month').value=d.getMonth()+1;qs('year').value=d.getFullYear()+543;load();render()}function load(){try{let s=JSON.parse(localStorage.getItem(k)||'{}');if(s.emp)emp=s.emp;if(s.p){for(let x in s.p)if(qs(x))qs(x).value=s.p[x]}rows=s.rows||[]}catch{}qs('name').innerHTML=emp.map(x=>'<option>'+x+'</option>').join('')}function data(){let cur=n(qs('start').value);return Array.from({length:days()},(_,i)=>{let r=rows[i]||{};let km=n(r.km),st=cur,en=st+km,a=amt(r.fuel),price=n(r.price),lit=a&&price?a/price:0;cur=en;return {...r,day:i+1,km,st,en,a,price,lit}})}function render(){let d=data();let km=d.reduce((s,r)=>s+r.km,0),fuel=d.reduce((s,r)=>s+r.a,0),lit=d.reduce((s,r)=>s+r.lit,0);qs('sKm').textContent=km.toLocaleString('th-TH');qs('sFuel').textContent='฿'+fuel.toLocaleString('th-TH');qs('sLit').textContent=lit.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});qs('mileage').innerHTML=d.map((r,i)=>'<div class="row"><div class="rowHead"><span>วันที่ '+r.day+'</span><span>'+(r.km? r.st+' → '+r.en:'ยังไม่กรอก กม.')+'</span></div><div class="rowGrid"><select data-i="'+i+'" data-f="route">'+routes.map(x=>'<option '+(x===(r.route||'')?'selected':'')+'>'+x+'</option>').join('')+'</select><input data-i="'+i+'" data-f="km" inputmode="decimal" placeholder="กม." value="'+(r.km||'')+'"><input data-i="'+i+'" data-f="fuel" inputmode="numeric" placeholder="1/2" value="'+(r.fuel||'')+'"><input data-i="'+i+'" data-f="price" inputmode="decimal" placeholder="33.09" value="'+(r.price||'')+'"></div><div style="font-size:11px;color:#6b7280;margin-top:6px">น้ำมัน '+(r.a||'-')+' บาท · ลิตร '+(r.lit?r.lit.toFixed(3):'-')+'</div></div>').join('');qs('expense').innerHTML='<table class="table"><thead><tr><th>บิลวันที่</th><th>รายละเอียด</th><th class="right">ค่าน้ำมัน</th></tr></thead><tbody>'+d.map(r=>'<tr><td>'+r.day+'</td><td>'+(r.route||'')+'</td><td class="right">'+(r.a||'')+'</td></tr>').join('')+'</tbody></table>';document.querySelectorAll('[data-i]').forEach(el=>el.oninput=el.onchange=e=>{let i=+e.target.dataset.i,f=e.target.dataset.f;rows[i]=rows[i]||{};rows[i][f]=e.target.value;if(f==='fuel')rows[i][f]=rows[i][f].replace(/[^123]/g,'').slice(0,1);render()})}function save(){localStorage.setItem(k,JSON.stringify({emp,rows,p:{month:qs('month').value,year:qs('year').value,name:qs('name').value,pos:qs('pos').value,plate:qs('plate').value,start:qs('start').value}}));alert('บันทึกแล้ว')}function exp(){let d=data();let wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ประจำเดือน',months[qs('month').value-1],'พ.ศ.',qs('year').value,'ทะเบียนรถ',qs('plate').value],['ชื่อ/สกุล',qs('name').value,'ตำแหน่ง',qs('pos').value],['วันที่','ตลาด / ที่หมาย','','เริ่ม','สิ้นสุด','จำนวน กม.','ลิตร','บาท/ลิตร','ยอดเงิน'],...d.map(r=>[r.day,r.route,'',r.km?r.st:'',r.km?r.en:'',r.km||'',r.lit?+r.lit.toFixed(3):'',r.price||'',r.a||''])]),'เลขไมค์');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['รายงานค่าใช้จ่าย ประจำเดือน '+months[qs('month').value-1]+' พ.ศ. '+qs('year').value],['ชื่อ-สกุล '+qs('name').value+' ตำแหน่ง '+qs('pos').value],['บิลวันที่','รายละเอียด','ค่าที่พัก','ค่าไฟ','ค่าน้ำ','ค่าขยะ','ค่าน้ำมัน','หมายเหตุ'],...d.map(r=>[r.day,r.route,'','','','',r.a||'',''])]),'รายงานค่าใช้จ่าย');XLSX.writeFile(wb,'บิลน้ำมัน-'+qs('name').value+'-'+months[qs('month').value-1]+'-'+qs('year').value+'.xlsx')}['month','year','name','pos','plate','start'].forEach(id=>addEventListener('input',render));qs('save').onclick=save;qs('export').onclick=exp;qs('clear').onclick=()=>confirm('ล้างข้อมูล?')&&(rows=[],render());qs('addName').onclick=()=>{let v=qs('newName').value.trim();if(v&&!emp.includes(v)){emp.push(v);qs('newName').value='';load();qs('name').value=v;render()}};[['tabM','mileage'],['tabE','expense'],['tabN','names']].forEach(([b,p])=>qs(b).onclick=()=>{['mileage','expense','names'].forEach(x=>qs(x).style.display=x===p?'block':'none');['tabM','tabE','tabN'].forEach(x=>qs(x).classList.remove('on'));qs(b).classList.add('on')});init()<\/script></body></html>`;
-          fs.writeFileSync('dist/fuel.html', fuelHtml);
+          fs.writeFileSync(p,h);
           NODE
-      - name: Commit patched Pro fuel bill files
+      - name: Commit patch
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dist/pro.html dist/fuel.html
-          git commit -m "Add Pro fuel bill button and page [skip ci]" || exit 0
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/pro.html
+          git commit -m "Hide fuel bill button behind upload secret" || exit 0
           git push
