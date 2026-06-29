@@ -1,0 +1,32 @@
+name: Fix Fuel Print Grid Lines
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/fix-fuel-grid-lines.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Restore grid lines in average row
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('dist/fuel-print.html')
+          s=p.read_text()
+          s=s.replace("h+='<tr class=\"sum\"><td colspan=\"2\"></td><td class=\"r b\">ค่าเฉลี่ยรถวิ่ง กม. / ลิตร</td><td></td><td></td><td class=\"r b\">'+(sumKm||'-')+'</td>", "h+='<tr class=\"sum\"><td></td><td></td><td class=\"r b\">ค่าเฉลี่ยรถวิ่ง กม. / ลิตร</td><td></td><td></td><td class=\"r b\">'+(sumKm||'-')+'</td>")
+          s=s.replace('เตรียมปริ้นบิลน้ำมัน • avg-row-fix</b>','เตรียมปริ้นบิลน้ำมัน • grid-line-fix</b>')
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add dist/fuel-print.html
+          git commit -m "Restore missing grid lines in fuel print average row" || exit 0
+          git push
