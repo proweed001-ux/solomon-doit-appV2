@@ -17,48 +17,76 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
-      - name: Hide fuel button until upload tapped five times
+      - name: Make fuel bill button temporary unlock
         run: |
           node <<'NODE'
           const fs=require('fs');
           const p='dist/pro.html';
           let h=fs.readFileSync(p,'utf8');
-          if(!h.includes('fuel-secret-v1')){
-            h=h.replace('</style>','#fuelBillBtn{display:none!important}body.fuelSecretOn #fuelBillBtn{display:block!important}.fuelSecretHint{font-size:11px;color:#166534;margin-top:4px}</style>');
-            const js=`<script id="fuel-secret-v1">
+
+          h=h.replace(/<script\s+id=["']fuel-secret-v[0-9]+["']>[\s\S]*?<\/script>/g,'');
+          h=h.replace(/#fuelBillBtn\s*\{\s*display\s*:\s*none\s*!important\s*\}\s*body\.fuelSecretOn\s+#fuelBillBtn\s*\{\s*display\s*:\s*block\s*!important\s*\}/g,'');
+          h=h.replace(/#fuelBillBtn\{display:none!important\}body\.fuelSecretOn #fuelBillBtn\{display:block!important\}(?:\.fuelSecretHint\{[^}]*\})?/g,'');
+
+          const css='#fuelBillBtn { display:none!important }body.fuelSecretOn #fuelBillBtn { display:block!important }';
+          if(!h.includes(css)) h=h.replace('</style>',css+'</style>');
+
+          const js=`<script id="fuel-secret-v2">
 (function(){
-  const key='ayaFuelBillSecretUnlocked';
-  let count=0,last=0;
-  function setVisible(){
-    const unlocked=localStorage.getItem(key)==='1';
-    document.body.classList.toggle('fuelSecretOn',unlocked);
+  let unlocked=false;
+  let count=0;
+  let last=0;
+
+  function hide(){
+    unlocked=false;
+    count=0;
+    last=0;
+    document.body.classList.remove('fuelSecretOn');
     const b=document.getElementById('fuelBillBtn');
-    if(b){b.style.display=unlocked?'':'none';}
+    if(b) b.style.display='none';
   }
+
+  function show(){
+    unlocked=true;
+    document.body.classList.add('fuelSecretOn');
+    const b=document.getElementById('fuelBillBtn');
+    if(b) b.style.display='';
+  }
+
+  function hasClassName(el,name){
+    if(!el||!el.classList) return false;
+    return Array.from(el.classList).some(c=>String(c).toLowerCase()===name);
+  }
+
   function isUploadTap(el){
     let n=el;
-    for(let i=0;n&&i<5;i++,n=n.parentElement){
+    for(let i=0;n&&i<6;i++,n=n.parentElement){
       const txt=((n.innerText||n.textContent||n.value||'')+'').trim();
       const id=(n.id||'').toLowerCase();
       const cls=(n.className||'').toString().toLowerCase();
-      if(txt.includes('อัปโหลด')||txt.includes('DOIT')||txt.includes('☁')||id.includes('upload')||cls.includes('upload')||cls.includes('filebtn')) return true;
+      if(txt.includes('☁')||txt.includes('อัปโหลด')||txt.includes('DOIT')) return true;
+      if(id.includes('upload')||id.includes('file')||cls.includes('upload')||cls.includes('file')||hasClassName(n,'filebtn')) return true;
     }
     return false;
   }
-  document.addEventListener('click',function(e){
-    if(localStorage.getItem(key)==='1') return;
-    if(!isUploadTap(e.target)) return;
-    const now=Date.now();
-    count=(now-last<2500)?count+1:1;
-    last=now;
-    if(count>=5){localStorage.setItem(key,'1');setVisible();}
-  },true);
-  document.addEventListener('DOMContentLoaded',setVisible);
-  setVisible();
+
+  document.addEventListener('DOMContentLoaded',function(){
+    hide();
+    document.addEventListener('click',function(e){
+      if(unlocked) return;
+      if(!isUploadTap(e.target)) return;
+      const now=Date.now();
+      count=(now-last<2500)?count+1:1;
+      last=now;
+      if(count>=5) show();
+    },true);
+  });
+
+  if(document.readyState!=='loading') hide();
 })();
 </script>`;
-            h=h.replace('</body>',js+'</body>');
-          }
+          if(!h.includes('fuel-secret-v2')) h=h.replace('</body>',js+'</body>');
+
           fs.writeFileSync(p,h);
           NODE
       - name: Commit patch
@@ -66,5 +94,5 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add dist/pro.html
-          git commit -m "Hide fuel bill button behind upload secret" || exit 0
+          git commit -m "Make fuel bill button temporary unlock" || exit 0
           git push
