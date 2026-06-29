@@ -1,6 +1,6 @@
 (()=>{'use strict';
 const app=document.getElementById('app'),SB='https://saodmeoilixfdqentofp.supabase.co',B='doit-files',STORE='perf-v4';
-const C={sales:'volume NIP',giv:'volume GIV',moq:'MOQ',dc1:'DC1 / CD1',dc2:'DC2 / CD2',dc3:'DC3 / CD3',cd13:'CD1+CD3',bills:'Productivity 50',gps:'GPS',dgp:'Golden Point'};
+const C={sales:'volume NIP',giv:'volume GIV',moq:'MOQ',dc1:'CD1 RJ SH RH JJ 70ML',dc2:'DC2 / CD2',dc3:'DC3 / CD3',cd13:'CD1+CD3',bills:'Productivity 50',gps:'GPS',dgp:'Golden Point'};
 let data=null,state=readState(),seq=0;
 const K=()=>Object.keys(C),N=x=>Number.isFinite(+x)?+x:0,M=x=>N(x).toLocaleString('th-TH',{maximumFractionDigits:0}),P=x=>N(x).toLocaleString('th-TH',{maximumFractionDigits:1,minimumFractionDigits:1})+'%',E=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll(String.fromCharCode(34),'&quot;');
 function label(x){const a=String(x?.ps||x?.ads||x?.code||'').trim(),b=String(x?.name||'').trim();return E(!b||b===a?a:(a+' · '+b))}
