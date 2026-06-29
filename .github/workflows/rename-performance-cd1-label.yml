@@ -13,27 +13,39 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
-      - name: Patch Performance CD1 label
+      - name: Patch Performance KPI calculator
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('dist/assets/performance-board-v4.js')
           s=p.read_text()
-          old="dc1:'DC1 / CD1'"
-          new="dc1:'CD1 RJ SH RH JJ 70ML'"
-          if new in s:
-              print('CD1 label already updated')
-          elif old in s:
-              s=s.replace(old,new,1)
-              p.write_text(s)
-              print('CD1 label updated')
-          else:
-              raise SystemExit('target dc1 label not found')
+          old_evt="window.onpopstate=()=>{state=readState();render()};document.addEventListener('click',e=>{const b=e.target.closest('[data-mode]');if(!b)return;e.preventDefault();go({mode:b.dataset.mode,cat:b.dataset.cat||'',ads:b.dataset.ads||'',ps:b.dataset.ps||'',cmp:b.dataset.cmp||state.cmp})});"
+          add_evt=old_evt+"document.addEventListener('change',e=>{const x=e.target.closest('[data-pct]');if(!x)return;localStorage.setItem(pctKey(x.dataset.pct),String(x.value||'').trim());render()});function pctOwner(){return state.ps||state.ads||'DS'}function pctKey(k){return 'perf-kpi-pct-v1:'+pctOwner()+':'+k}function pctVal(k){try{return localStorage.getItem(pctKey(k))||''}catch{return''}}"
+          if 'function pctOwner()' not in s:
+              if old_evt not in s: raise SystemExit('event block not found')
+              s=s.replace(old_evt,add_evt,1)
+          a=s.find('function kpis(r){')
+          b=s.find('function hero(',a)
+          if a<0 or b<0: raise SystemExit('kpis block not found')
+          block="""function calcCard(r,k){const v=r?.[k]||{},t=N(v.target),a=N(v.actual),idx=t?a/t*100:N(v.index),full=Math.max(t-a,0),d=Math.max(daysLeft(),1),pv=pctVal(k),has=String(pv??'').trim()!=='',pn=N(pv),goal=has?t*pn/100:0,need=has?Math.max(goal-a,0):0,per=has?need/d:0;return`<div class='kpi calcKpi'><span>${metric(k)}</span><div class='kv'><em>เป้าหมาย</em><b>${M(t)}</b></div><div class='kv'><em>ทำแล้ว</em><b>${M(a)}</b><i>${P(idx)}</i></div><div class='kv'><em>ขาด</em><b>${M(full)}</b></div><label class='pctBox'><input data-pct='${E(k)}' inputmode='decimal' type='number' min='0' max='150' step='1' value='${E(pv)}' placeholder='ใส่ %'><strong>%</strong></label><small>${has?'เป้า '+P(pn)+' = '+M(goal)+' · ต้องทำ '+M(need)+' · วันละ '+M(per)+' / '+M(d)+' วัน':'กรอก % เพื่อคำนวณเป้าและยอดที่ต้องทำ'}</small></div>`}
+function workCard(){const m=data?.meta||{},d=daysLeft(),wd=N(m.workdayNo),tw=N(m.totalWorkdays);return`<div class='kpi calcKpi workKpi'><span>วันทำงานที่ใช้หาร</span><div class='kv'><em>วันทำงานเหลือ</em><b>${M(d)}</b></div><div class='kv'><em>WD ปัจจุบัน</em><b>${wd?M(wd):'-'}</b><i>${tw?'จาก '+M(tw):''}</i></div><small>ทุกช่องที่กรอก % ใช้ ${M(Math.max(d,1))} วันเป็นตัวหาร ถ้าเหลือ 0 จะกันหารด้วย 1 เพื่อไม่ให้คำนวณพัง</small></div>`}
+function kpis(r){return`<div class='kpis calcGrid'>${calcCard(r,'sales')}${calcCard(r,'giv')}${calcCard(r,'moq')}${calcCard(r,'dc1')}${calcCard(r,'bills')}${calcCard(r,'dc2')}${workCard()}${calcCard(r,'dc3')}</div>`}
+"""
+          if 'function calcCard(r,k)' not in s:
+              s=s[:a]+block+s[b:]
+          p.write_text(s)
+          css=Path('dist/assets/performance-board-v2.css')
+          c=css.read_text()
+          marker='/* target-percent-kpis */'
+          if marker not in c:
+              c += "\n"+marker+"\n.calcGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.calcKpi{min-height:156px}.calcKpi span{font-size:18px;font-weight:950;color:#111827;margin-bottom:8px}.kv{display:grid;grid-template-columns:82px minmax(0,1fr) auto;gap:6px;align-items:baseline;margin:3px 0}.kv em{font-style:normal;color:#374151;font-size:12px;font-weight:950}.kv b{font-size:18px!important;margin:0!important}.kv i{font-style:normal;color:#0f766e;font-size:12px;font-weight:950}.pctBox{height:38px;display:flex;align-items:center;gap:6px;margin:8px 0}.pctBox input{width:100%;height:38px;border:1px solid #d1d5db;border-radius:10px;padding:0 10px;font-weight:950;font-size:16px;background:#fff;color:#111827}.pctBox strong{font-size:13px;color:#374151}.workKpi{background:#f0fdf4!important;border-color:#bbf7d0!important}.workKpi .kv{grid-template-columns:110px minmax(0,1fr) auto}@media(max-width:900px){.calcGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.calcKpi{padding:9px}.calcKpi span{font-size:15px}.kv{grid-template-columns:66px minmax(0,1fr) auto}.kv b{font-size:16px!important}.workKpi .kv{grid-template-columns:90px minmax(0,1fr) auto}}\n"
+              css.write_text(c)
           PY
       - name: Commit patch
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add dist/assets/performance-board-v4.js
-          git commit -m "Rename Performance CD1 label" || exit 0
+          git add dist/assets/performance-board-v4.js dist/assets/performance-board-v2.css
+          git commit -m "Add Performance target percent KPI calculator" || exit 0
           git push
+# trigger-kpi-calculator-20260629-1626
