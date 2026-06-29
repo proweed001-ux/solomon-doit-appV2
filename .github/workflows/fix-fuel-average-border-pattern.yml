@@ -17,7 +17,6 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
           p=Path('dist/fuel-print.html')
           s=p.read_text()
 
@@ -25,30 +24,17 @@ jobs:
           if 'tr.avgrow td.noLine' not in s:
               s=s.replace('.tbl tr.sum td{border-top:1.15px solid #111;border-bottom:1.15px solid #111;height:5.6mm;font-size:8.5px}', '.tbl tr.sum td{border-top:1.15px solid #111;border-bottom:1.15px solid #111;height:5.6mm;font-size:8.5px}'+css)
 
-          patterns=[
-            r"h\+='<tr class=\\\"sum\\\"><td colspan=\\\"2\\\"></td><td class=\\\"r b\\\">ค่าเฉลี่ยรถวิ่ง กม\. / ลิตร</td><td></td><td></td><td class=\\\"r b\\\">'\+\(sumKm\|\|'-'\)\+'</td><td class=\\\"r b\\\">'\+\(sumLit\?sumLit\.toFixed\(2\):'-'\)\+'</td><td class=\\\"r b\\\">'\+\(avg\?avg\.toFixed\(2\):'-'\)\+'</td><td class=\\\"r b\\\">'\+\(sumFuel\|\|'-'\)\+'</td><td class=\\\"c\\\">-</td></tr></table>",
-            r"h\+='<tr class=\\\"sum\\\"><td></td><td></td><td class=\\\"r b\\\">ค่าเฉลี่ยรถวิ่ง กม\. / ลิตร</td><td></td><td></td><td class=\\\"r b\\\">'\+\(sumKm\|\|'-'\)\+'</td><td class=\\\"r b\\\">'\+\(sumLit\?sumLit\.toFixed\(2\):'-'\)\+'</td><td class=\\\"r b\\\">'\+\(avg\?avg\.toFixed\(2\):'-'\)\+'</td><td class=\\\"r b\\\">'\+\(sumFuel\|\|'-'\)\+'</td><td class=\\\"c\\\">-</td></tr></table>"
-          ]
           repl="h+='<tr class=\"sum avgrow\"><td class=\"noLine\"></td><td class=\"noLine\"></td><td class=\"labelCell b\">ค่าเฉลี่ยรถวิ่ง กม. / ลิตร</td><td class=\"keepBox\"></td><td class=\"noLine\"></td><td class=\"keepBox r b\">'+(sumKm||'-')+'</td><td class=\"keepBox r b\">'+(sumLit?sumLit.toFixed(2):'-')+'</td><td class=\"keepBox r b\">'+(avg?avg.toFixed(2):'-')+'</td><td class=\"keepBox r b\">'+(sumFuel||'-')+'</td><td class=\"keepBox c\">-</td></tr></table>"
-          changed=False
-          for pat in patterns:
-              ns=re.sub(pat,repl,s)
-              if ns!=s:
-                  s=ns;changed=True
-          if not changed:
-              # fallback for actual one-line minified source
-              start=s.find("h+='<tr class=\\\"sum")
-              needle='ค่าเฉลี่ยรถวิ่ง กม. / ลิตร'
-              idx=s.find(needle,start)
-              if idx!=-1:
-                  a=s.rfind("h+='<tr",0,idx)
-                  b=s.find("</tr></table>",idx)
-                  if a!=-1 and b!=-1:
-                      b+=len("</tr></table>")
-                      s=s[:a]+repl+s[b:]
-                      changed=True
-          if not changed:
-              raise SystemExit('average row pattern not found')
+          needle='ค่าเฉลี่ยรถวิ่ง กม. / ลิตร'
+          idx=s.find(needle)
+          if idx==-1:
+              raise SystemExit('average row text not found')
+          a=s.rfind("h+='<tr",0,idx)
+          b=s.find("</tr></table>",idx)
+          if a==-1 or b==-1:
+              raise SystemExit('average row boundaries not found')
+          b+=len("</tr></table>")
+          s=s[:a]+repl+s[b:]
           s=s.replace('เตรียมปริ้นบิลน้ำมัน • grid-line-fix</b>','เตรียมปริ้นบิลน้ำมัน • border-pattern-fix</b>')
           s=s.replace('เตรียมปริ้นบิลน้ำมัน • avg-row-fix</b>','เตรียมปริ้นบิลน้ำมัน • border-pattern-fix</b>')
           s=s.replace('เตรียมปริ้นบิลน้ำมัน • expense-holiday</b>','เตรียมปริ้นบิลน้ำมัน • border-pattern-fix</b>')
@@ -61,3 +47,4 @@ jobs:
           git add dist/fuel-print.html
           git commit -m "Match original average row border pattern" || exit 0
           git push
+# trigger-20260629-0559
