@@ -58,14 +58,24 @@ jobs:
     return Array.from(el.classList).some(c=>String(c).toLowerCase()===name);
   }
 
+  function ownText(el){
+    if(!el) return '';
+    return ((el.value||'')+' '+Array.from(el.childNodes||[]).filter(n=>n.nodeType===3).map(n=>n.textContent||'').join(' ')).trim();
+  }
+
   function isUploadTap(el){
+    const card=el&&el.closest?el.closest('.uploadCard'):null;
+    if(!card) return false;
+
     let n=el;
-    for(let i=0;n&&i<6;i++,n=n.parentElement){
-      const txt=((n.innerText||n.textContent||n.value||'')+'').trim();
+    for(let i=0;n&&n!==card.parentElement&&i<6;i++,n=n.parentElement){
+      const txt=ownText(n);
       const id=(n.id||'').toLowerCase();
       const cls=(n.className||'').toString().toLowerCase();
+      const isContainer=hasClassName(n,'uploadcard')||id==='upload';
+
       if(txt.includes('☁')||txt.includes('อัปโหลด')||txt.includes('DOIT')) return true;
-      if(id.includes('upload')||id.includes('file')||cls.includes('upload')||cls.includes('file')||hasClassName(n,'filebtn')) return true;
+      if(!isContainer&&(id.includes('upload')||id.includes('file')||cls.includes('upload')||cls.includes('file')||hasClassName(n,'filebtn'))) return true;
     }
     return false;
   }
