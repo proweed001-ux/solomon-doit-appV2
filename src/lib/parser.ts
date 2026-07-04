@@ -61,6 +61,12 @@ function textValue(value: unknown): string {
   return String(value ?? '').trim();
 }
 
+function hasRawValue(value: unknown): boolean {
+  if (value == null) return false;
+  const s = textValue(value);
+  return s !== '' && s !== '-' && s !== '—';
+}
+
 function cleanText(value: unknown, fallback = ''): string {
   return textValue(value) || fallback;
 }
@@ -121,9 +127,9 @@ function pickAmount(row: RawRow): AmountPick {
   for (const [source, aliases] of AMOUNT_ALIASES) {
     const key = findColumn(row, aliases);
     if (!key) continue;
+    if (!hasRawValue(row[key])) continue;
 
-    const amount = safeNum(row[key]);
-    if (amount !== 0) return { amount, source };
+    return { amount: safeNum(row[key]), source };
   }
 
   return { amount: 0, source: 'missing' };
