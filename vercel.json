@@ -14,6 +14,14 @@
     {
       "source": "/performance",
       "destination": "/performance.html"
+    },
+    {
+      "source": "/promo",
+      "destination": "/promo.html"
+    },
+    {
+      "source": "/promo-admin",
+      "destination": "/promo-admin.html"
     }
   ]
 }
