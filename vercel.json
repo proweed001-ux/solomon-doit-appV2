@@ -22,6 +22,14 @@
     {
       "source": "/promo-admin",
       "destination": "/promo-admin.html"
+    },
+    {
+      "source": "/promo-card",
+      "destination": "/promo-card.html"
+    },
+    {
+      "source": "/promo-card-admin",
+      "destination": "/promo-card-admin.html"
     }
   ]
 }
