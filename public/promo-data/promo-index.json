@@ -1,0 +1,5 @@
+{
+  "current": "",
+  "files": [],
+  "note": "Production data is loaded from Supabase. Local JSON fallback can be added here for offline testing."
+}
