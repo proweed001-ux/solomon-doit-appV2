@@ -30,6 +30,10 @@
     {
       "source": "/promo-card-admin",
       "destination": "/promo-card-admin.html"
+    },
+    {
+      "source": "/promo-live",
+      "destination": "/promo-live.html"
     }
   ]
 }
