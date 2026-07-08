@@ -1,5 +1,6 @@
 (()=>{'use strict';
 const oldFetch=window.fetch.bind(window);
+try{sessionStorage.removeItem('perf-v4')}catch{}
 const CD_KEYS=['dc1','dc2','dc3','cd13'];
 const N=v=>{if(v==null)return 0;if(typeof v==='number')return Number.isFinite(v)?v:0;const s=String(v).replace(/,/g,'').replace(/%/g,'').replace(/[()]/g,'').trim();const n=Number(s);return Number.isFinite(n)?n:0};
 const norm=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -7,7 +8,7 @@ const compact=s=>norm(s).replace(/\s+/g,'').toUpperCase();
 function hasCdName(text,key){const t=compact(text);if(key==='cd13')return t.includes('CD1+CD3');const n=key.replace('dc','');if(t.includes('CD1+CD3'))return false;return new RegExp('(^|[^A-Z0-9])CD'+n+'([^0-9]|$)').test(t)||new RegExp('(^|[^A-Z0-9])DC'+n+'([^0-9]|$)').test(t)}
 function findVal(o,key,kind){const keys=Object.keys(o||{});const thai=kind==='target'?'เป้าหมาย':kind==='actual'?'การกระจาย':'INDEX';const eng=kind==='target'?'TARGET':kind==='actual'?'ACTUAL':'INDEX';for(const k of keys){const n=compact(k);if(!hasCdName(k,key))continue;if(n.includes(compact(thai))||n.includes(eng))return N(o[k])}return 0}
 function cdMetric(row,key){const direct=row?.[key]||{};let target=N(direct.target),actual=N(direct.actual),index=N(direct.index);const src=row?.sellerReport||row?.cd||{};if(!target)target=findVal(src,key,'target');if(!actual)actual=findVal(src,key,'actual');if(!index)index=findVal(src,key,'index');if(target&&actual)index=actual/target*100;else if(index&&index<=1.5)index*=100;return{target,actual,index}}
-function addLabels(pack){const labels=pack.labels=pack.labels||{},first=(pack.ps||[]).find(r=>r?.sellerReport)||{};const sr=first.sellerReport||{};for(const k of CD_KEYS){if(labels[k])continue;const hit=Object.keys(sr).find(x=>hasCdName(x,k)&&compact(x).includes('INDEX'));if(hit){labels[k]=k==='cd13'?'CD1+CD3':norm(hit).replace(/^Index\s*/i,'')}}}
+function addLabels(pack){const labels=pack.labels=pack.labels||{},first=(pack.ps||[]).find(r=>r?.sellerReport)||{};const sr=first.sellerReport||{};for(const k of CD_KEYS){const hit=Object.keys(sr).find(x=>hasCdName(x,k)&&compact(x).includes('INDEX'));if(hit){labels[k]=k==='cd13'?'CD1+CD3':norm(hit).replace(/^Index\s*/i,'')}}}
 }
 function sum(rows,key){let target=0,actual=0;(rows||[]).forEach(r=>{const v=cdMetric(r,key);target+=N(v.target);actual+=N(v.actual)});return{target,actual,index:target?actual/target*100:0}}
 function patchPack(pack){if(!pack||!Array.isArray(pack.ps))return pack;addLabels(pack);pack.ps.forEach(r=>{CD_KEYS.forEach(k=>{r[k]=cdMetric(r,k)});r.ads=r.ads||r.adsCode;r.ps=r.ps||r.psCode;r.name=r.name||r.psName});const rowsByAds=new Map();pack.ps.forEach(r=>{const id=r.ads||r.adsCode;if(!id)return;if(!rowsByAds.has(id))rowsByAds.set(id,[]);rowsByAds.get(id).push(r)});(pack.ads||[]).forEach(a=>{const id=a.ads||a.adsCode||a.code;const rows=rowsByAds.get(id)||[];CD_KEYS.forEach(k=>{a[k]=sum(rows,k)});a.ads=a.ads||a.adsCode||a.code;a.name=a.name||a.adsName});const all=pack.ps||[];pack.ds=pack.ds||{};CD_KEYS.forEach(k=>{pack.ds[k]=sum(all,k)});pack.__cdAdapter='performance-cd-adapter-v1';return pack}
