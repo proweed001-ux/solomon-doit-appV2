@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Promo PDF Admin Upload</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f4f6fb;color:#152033}.hero{padding:18px 14px;background:linear-gradient(135deg,#111827,#0756c8);color:#fff;position:sticky;top:0;z-index:5;box-shadow:0 10px 28px #0002}.hero h1{margin:0;font-size:24px}.hero p{margin:5px 0 0;color:#dbe8ff;font-size:13px}.wrap{max-width:980px;margin:auto;padding:14px}.card{background:#fff;border:1px solid #e6e9f2;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 6px 20px #13213d0d}.grid{display:grid;gap:10px;grid-template-columns:1fr}@media(min-width:720px){.grid{grid-template-columns:repeat(3,1fr)}}label span{display:block;font-size:12px;font-weight:850;color:#5d677a;margin-bottom:5px}input,textarea,select{width:100%;border:1px solid #d8deeb;border-radius:12px;padding:11px;font:inherit;background:#fbfcff}textarea{min-height:160px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}button{border:0;border-radius:14px;padding:12px 14px;font-weight:900;background:#0756c8;color:#fff}button.secondary{background:#eef4ff;color:#0756c8}button.warn{background:#9b1c1c}.btns{display:flex;gap:8px;flex-wrap:wrap}.progress{height:12px;background:#e8edf7;border-radius:999px;overflow:hidden}.bar{height:100%;width:0;background:linear-gradient(90deg,#0f9c68,#22c55e)}#log{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:#0b1020;color:#d6e4ff;border-radius:14px;padding:12px;max-height:260px;overflow:auto}.preview{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}@media(min-width:720px){.preview{grid-template-columns:repeat(4,minmax(0,1fr))}}.preview img{width:100%;border-radius:12px;border:1px solid #e5e7eb;background:#fff}.notice{padding:10px 12px;border-radius:14px;background:#fff6db;border:1px solid #f5d37c;color:#704600;font-size:13px}.ok{background:#ebfff5;border-color:#b7efd2;color:#075b37}.danger{background:#fff0f0;border-color:#ffc8c8;color:#8a1d1d}.small{font-size:12px;color:#6b7280}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
+</head>
+<body>
+<header class="hero">
+  <h1>Admin Upload PDF โปรรายเดือน</h1>
+  <p>PDF → ตัดการ์ดใน browser → อัปภาพเข้า Supabase Storage → สร้าง promo_cards เป็น need_review</p>
+</header>
+<main class="wrap">
+  <section class="card notice">
+    ระบบนี้ไม่ได้ฝังรูปใน HTML แล้ว รูปจะถูกอัปเข้า bucket <b>promo-cards</b> และตาราง <b>promo_cards.image_url</b> จะเก็บ URL จาก Supabase Storage
+  </section>
+
+  <section class="card">
+    <div class="grid">
+      <label><span>Admin key</span><input id="adminKey" type="password" placeholder="ใส่ key ที่ให้ไว้" autocomplete="off"></label>
+      <label><span>Promo month id</span><input id="monthId" value="AUG26"></label>
+      <label><span>Year month</span><input id="yearMonth" value="2026-08"></label>
+      <label><span>Label</span><input id="monthLabel" value="โปรโมชัน สิงหาคม 2026"></label>
+      <label><span>ไฟล์ PDF</span><input id="pdfFile" type="file" accept="application/pdf"></label>
+      <label><span>คุณภาพรูป WEBP</span><input id="quality" type="number" min="0.4" max="0.95" step="0.05" value="0.82"></label>
+    </div>
+    <div class="btns" style="margin-top:12px">
+      <button onclick="createMonth()">1) สร้างเดือน draft</button>
+      <button class="secondary" onclick="uploadPdf()">2) อัป PDF ต้นฉบับ</button>
+      <button onclick="cropAndUpload()">3) ตัดรูป + อัปการ์ด</button>
+      <button class="warn" onclick="clearLog()">ล้าง log</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <b>Crop template</b>
+    <p class="small">ค่าเริ่มต้นคือ layout แบบไฟล์ Jul26 18 หน้า ถ้าเดือนหน้าหน้า/จำนวนการ์ดเปลี่ยน ให้แก้ JSON นี้ก่อนกดตัดรูป</p>
+    <textarea id="template"></textarea>
+  </section>
+
+  <section class="card">
+    <div class="progress"><div class="bar" id="bar"></div></div>
+    <p id="status" class="small">พร้อมทำงาน</p>
+    <div id="log"></div>
+  </section>
+
+  <section class="card">
+    <b>Preview รูปที่ตัดล่าสุด</b>
+    <div id="preview" class="preview" style="margin-top:10px"></div>
+  </section>
+</main>
+
+<script type="module">
+const PDFJS = globalThis.pdfjsLib;
+PDFJS.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+const ENDPOINT = "https://saodmeoilixfdqentofp.supabase.co/functions/v1/promo-ingest-upload";
+const BASE = { w: 2667, h: 1500 };
+const wide = { xs:[105,723,1341,1958], ys:[331,710,1089], w:612, h:374 };
+const small = { xs:[105,598,1091,1584,2077], w:488, h:374 };
+const defaultTemplate = [
+  {class_id:"HFSS",class_name:"HFS-S",pages:[{page:1,type:"wide12",from:1},{page:2,type:"wide12",from:13},{page:3,type:"p3_6",from:25}]},
+  {class_id:"HFSM",class_name:"HFS-M",pages:[{page:4,type:"wide12",from:1},{page:5,type:"wide12",from:13},{page:6,type:"wide8",from:25}]},
+  {class_id:"HFSL",class_name:"HFS-L",pages:[{page:7,type:"wide12",from:1},{page:8,type:"wide12",from:13},{page:9,type:"wide12",from:25}]},
+  {class_id:"HFSXL",class_name:"HFS-XL",pages:[{page:10,type:"xl10",from:1},{page:11,type:"xl11",from:15},{page:12,type:"xl12",from:28}]},
+  {class_id:"HFSWSS",class_name:"HFS-WS-S",pages:[{page:13,type:"wide12",from:1},{page:14,type:"wide12",from:13},{page:15,type:"wide12",from:25}]},
+  {class_id:"HFSWSL",class_name:"HFS-WS-L",pages:[{page:16,type:"wide12",from:1},{page:17,type:"wide12",from:13},{page:18,type:"wide12",from:25}]}
+];
+document.getElementById("template").value = JSON.stringify(defaultTemplate,null,2);
+
+function $(id){return document.getElementById(id)}
+function log(x){$("log").textContent += x + "\n"; $("log").scrollTop = $("log").scrollHeight}
+function clearLog(){$("log").textContent=""}
+globalThis.clearLog = clearLog;
+function setProgress(done,total){$("bar").style.width = total ? Math.round(done*100/total)+"%" : "0%"; $("status").textContent = total ? `${done}/${total}` : "พร้อมทำงาน"}
+function fileToDataURL(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result));r.onerror=rej;r.readAsDataURL(file)})}
+async function callEdge(payload){
+  const key = $("adminKey").value.trim();
+  if(!key) throw new Error("missing admin key");
+  const res = await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","x-promo-admin-key":key},body:JSON.stringify(payload)});
+  const data = await res.json().catch(()=>({ok:false,error:"invalid_json_response"}));
+  if(!res.ok || !data.ok) throw new Error(data.error + (data.detail ? ": "+data.detail : ""));
+  return data;
+}
+async function createMonth(){
+  const payload = {action:"create_month", promo_month_id:$("monthId").value, year_month:$("yearMonth").value, label:$("monthLabel").value, source_pdf:$("pdfFile").files[0]?.name || ""};
+  log("สร้างเดือน draft...");
+  const r = await callEdge(payload);
+  log("OK: " + JSON.stringify(r.month));
+}
+globalThis.createMonth = createMonth;
+async function uploadPdf(){
+  const file = $("pdfFile").files[0];
+  if(!file) throw new Error("เลือก PDF ก่อน");
+  log("อัป PDF ต้นฉบับ...");
+  const dataUrl = await fileToDataURL(file);
+  const r = await callEdge({action:"upload_pdf", promo_month_id:$("monthId").value, file_name:file.name, data_url:dataUrl});
+  log("OK PDF: " + r.public_url);
+}
+globalThis.uploadPdf = uploadPdf;
+
+function boxesFor(type){
+  const out=[];
+  const addWide=(row,col)=>out.push({x:wide.xs[col],y:wide.ys[row],w:wide.w,h:wide.h});
+  const addSmall=(y,col)=>out.push({x:small.xs[col],y,w:small.w,h:wide.h});
+  if(type==="wide12"){for(let r=0;r<3;r++)for(let c=0;c<4;c++)addWide(r,c)}
+  if(type==="wide8"){for(let r=0;r<2;r++)for(let c=0;c<4;c++)addWide(r,c)}
+  if(type==="p3_6"){for(let c=0;c<4;c++)addWide(0,c); addWide(1,0); addWide(1,1)}
+  if(type==="xl10"){for(let c=0;c<4;c++)addWide(0,c); for(let c=0;c<5;c++)addSmall(710,c); for(let c=0;c<5;c++)addSmall(1089,c)}
+  if(type==="xl11"){for(let c=0;c<5;c++)addSmall(331,c); for(let c=0;c<4;c++)addWide(1,c); for(let c=0;c<4;c++)addWide(2,c)}
+  if(type==="xl12"){for(let c=0;c<4;c++)addWide(0,c); for(let c=0;c<4;c++)addWide(1,c); for(let c=0;c<5;c++)addSmall(1089,c)}
+  return out;
+}
+function specs(){
+  const cfg = JSON.parse($("template").value);
+  const list=[];
+  for(const cls of cfg){
+    for(const p of cls.pages){
+      const boxes = boxesFor(p.type);
+      boxes.forEach((b,i)=>list.push({...b,page_no:p.page,card_no:p.from+i,class_id:cls.class_id,class_name:cls.class_name}));
+    }
+  }
+  return list;
+}
+function canvasToDataURL(canvas, q){
+  return canvas.toDataURL("image/webp", q);
+}
+async function renderPage(pdf,pageNo){
+  const page = await pdf.getPage(pageNo);
+  const vp1 = page.getViewport({scale:1});
+  const scale = BASE.w / vp1.width;
+  const viewport = page.getViewport({scale});
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  const ctx = canvas.getContext("2d", {alpha:false});
+  await page.render({canvasContext:ctx,viewport}).promise;
+  return canvas;
+}
+async function cropAndUpload(){
+  const file = $("pdfFile").files[0];
+  if(!file) throw new Error("เลือก PDF ก่อน");
+  await createMonth();
+  try{ await uploadPdf(); }catch(e){ log("WARN PDF: "+e.message); }
+  const quality = Math.max(0.4,Math.min(0.95,Number($("quality").value || 0.82)));
+  const arr = new Uint8Array(await file.arrayBuffer());
+  const pdf = await PDFJS.getDocument({data:arr}).promise;
+  const all = specs().filter(s => s.page_no <= pdf.numPages);
+  setProgress(0,all.length);
+  const rendered = new Map();
+  $("preview").innerHTML="";
+  let done=0;
+  for(const s of all){
+    if(!rendered.has(s.page_no)) {
+      log("render page " + s.page_no);
+      rendered.set(s.page_no, await renderPage(pdf, s.page_no));
+    }
+    const pageCanvas = rendered.get(s.page_no);
+    const sx = s.x * pageCanvas.width / BASE.w;
+    const sy = s.y * pageCanvas.height / BASE.h;
+    const sw = s.w * pageCanvas.width / BASE.w;
+    const sh = s.h * pageCanvas.height / BASE.h;
+    const c = document.createElement("canvas");
+    c.width = Math.round(sw);
+    c.height = Math.round(sh);
+    c.getContext("2d").drawImage(pageCanvas, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    const dataUrl = canvasToDataURL(c, quality);
+    if(done < 8){
+      const img = new Image();
+      img.src = dataUrl;
+      $("preview").appendChild(img);
+    }
+    const r = await callEdge({
+      action:"upload_card",
+      promo_month_id:$("monthId").value,
+      class_id:s.class_id,
+      class_name:s.class_name,
+      page_no:s.page_no,
+      card_no:s.card_no,
+      source_file:file.name,
+      data_url:dataUrl
+    });
+    done++;
+    setProgress(done,all.length);
+    log("OK " + r.card_id + " -> " + r.path);
+    if(done % 20 === 0) await new Promise(r=>setTimeout(r,150));
+  }
+  log("DONE: uploaded " + done + " cards");
+}
+globalThis.cropAndUpload = cropAndUpload;
+</script>
+</body>
+</html>
