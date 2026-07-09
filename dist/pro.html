@@ -8,14 +8,17 @@
 <style>
 #fuelBillBtn { display:none!important }
 body.fuelSecretOn #fuelBillBtn { display:block!important }
-body{margin:0;background:#f6f7f8;color:#111827;font-family:system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif}.loader{min-height:100vh;display:flex;align-items:center;justify-content:center;font-weight:950;color:#087b34}.err{padding:16px;color:#b91c1c;font-weight:900;line-height:1.6}
+body{margin:0;background:#f6f7f8;color:#111827;font-family:system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif}.loader{min-height:100vh;display:flex;align-items:center;justify-content:center;font-weight:950;color:#087b34}.err{padding:16px;color:#b91c1c;font-weight:900;line-height:1.6}.err button{margin-top:12px;height:38px;border:0;border-radius:10px;background:#087b34;color:#fff;font-weight:900;padding:0 14px}
 </style>
 </head>
 <body>
 <div id="proLoader" class="loader">กำลังโหลดหน้า Pro...</div>
 <script>
 (function(){
-  const sourceUrl='https://raw.githubusercontent.com/proweed001-ux/solomon-doit-appV2/6d6f6bbf139de2e62ab63195fb044393e820eca6/dist/pro.html';
+  const sourceUrls=[
+    'https://cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2@6d6f6bbf139de2e62ab63195fb044393e820eca6/dist/pro.html',
+    'https://raw.githubusercontent.com/proweed001-ux/solomon-doit-appV2/6d6f6bbf139de2e62ab63195fb044393e820eca6/dist/pro.html'
+  ];
   const fuelCss='#fuelBillBtn { display:none!important }body.fuelSecretOn #fuelBillBtn { display:block!important }';
   const fuelScript=`<script id="fuel-secret-v3">
 (function(){
@@ -80,24 +83,41 @@ body{margin:0;background:#f6f7f8;color:#111827;font-family:system-ui,-apple-syst
 })();
 <\/script>`;
 
-  fetch(sourceUrl,{cache:'no-store'})
-    .then(function(r){
-      if(!r.ok) throw new Error('โหลดหน้า Pro ไม่สำเร็จ');
-      return r.text();
-    })
-    .then(function(html){
-      html=html.replace(/<script\s+id=["']fuel-secret-v[0-9]+["']>[\s\S]*?<\/script>/g,'');
-      html=html.replace(/#fuelBillBtn\s*\{\s*display\s*:\s*none\s*!important\s*\}\s*body\.fuelSecretOn\s+#fuelBillBtn\s*\{\s*display\s*:\s*block\s*!important\s*\}/g,'');
-      html=html.replace(/#fuelBillBtn\{display:none!important\}body\.fuelSecretOn #fuelBillBtn\{display:block!important\}(?:\.fuelSecretHint\{[^}]*\})?/g,'');
-      html=html.replace('</style>',fuelCss+'</style>');
-      html=html.replace('</body>',fuelScript+'</body>');
-      document.open();
-      document.write(html);
-      document.close();
-    })
-    .catch(function(err){
-      document.body.innerHTML='<div class="err">โหลดหน้า Pro ไม่สำเร็จ<br>'+String(err.message||err)+'</div>';
-    });
+  function fetchWithTimeout(url,ms){
+    const controller=new AbortController();
+    const timer=setTimeout(function(){controller.abort();},ms||9000);
+    return fetch(url,{cache:'no-store',signal:controller.signal})
+      .then(function(r){
+        clearTimeout(timer);
+        if(!r.ok) throw new Error('HTTP '+r.status+' จาก '+url);
+        return r.text();
+      })
+      .catch(function(err){clearTimeout(timer);throw err;});
+  }
+
+  function load(i,lastErr){
+    const url=sourceUrls[i];
+    if(!url){
+      document.body.innerHTML='<div class="err">โหลดหน้า Pro ไม่สำเร็จ<br>'+String(lastErr&&lastErr.message||lastErr||'ไม่ทราบสาเหตุ')+'<br><button onclick="location.reload()">ลองโหลดใหม่</button></div>';
+      return;
+    }
+    fetchWithTimeout(url,9000)
+      .then(function(html){
+        html=html.replace(/<script\s+id=["']fuel-secret-v[0-9]+["']>[\s\S]*?<\/script>/g,'');
+        html=html.replace(/#fuelBillBtn\s*\{\s*display\s*:\s*none\s*!important\s*\}\s*body\.fuelSecretOn\s+#fuelBillBtn\s*\{\s*display\s*:\s*block\s*!important\s*\}/g,'');
+        html=html.replace(/#fuelBillBtn\{display:none!important\}body\.fuelSecretOn #fuelBillBtn\{display:block!important\}(?:\.fuelSecretHint\{[^}]*\})?/g,'');
+        html=html.replace('</style>',fuelCss+'</style>');
+        html=html.replace('</body>',fuelScript+'</body>');
+        document.open();
+        document.write(html);
+        document.close();
+      })
+      .catch(function(err){
+        load(i+1,err);
+      });
+  }
+
+  load(0,null);
 })();
 </script>
 </body>
