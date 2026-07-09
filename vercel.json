@@ -14,6 +14,30 @@
     {
       "source": "/performance",
       "destination": "/performance.html"
+    },
+    {
+      "source": "/promo",
+      "destination": "/promo.html"
+    },
+    {
+      "source": "/promo-admin",
+      "destination": "/promo-admin.html"
+    },
+    {
+      "source": "/promo-card",
+      "destination": "/promo-card.html"
+    },
+    {
+      "source": "/promo-card-admin",
+      "destination": "/promo-card-admin.html"
+    },
+    {
+      "source": "/promo-live",
+      "destination": "/promo-live.html"
+    },
+    {
+      "source": "/promo-pdf-admin",
+      "destination": "/promo-pdf-admin.html"
     }
   ]
 }
