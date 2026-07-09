@@ -9,32 +9,60 @@
   </style>
 </head>
 <body>
-<header class="hero"><div class="row"><div><div class="eyebrow">โปรโมชัน กรกฎาคม 2569</div><h1>คุ้มเวอร์!</h1><div class="sub">หน้า live ดึงรูป + ฟังก์ชันโปรโมชั่นจาก Supabase</div></div><div class="badge" id="badge">HFS-S</div></div><nav class="tabs" id="tabs"></nav></header>
-<main class="wrap"><div class="notice"><b id="head">กำลังโหลด</b><span id="sum">รอสักครู่</span></div><div class="filters"><input id="q" placeholder="ค้นหาชื่อโปร / ฟังก์ชัน / รหัสการ์ด"><button id="clear">ล้าง</button></div><section id="content">กำลังโหลด...</section></main>
+<header class="hero"><div class="row"><div><div class="eyebrow">โปรโมชัน กรกฎาคม 2569</div><h1>คุ้มเวอร์!</h1><div class="sub">หน้า live ดึงรูป + เงื่อนไขโปรจาก Supabase</div></div><div class="badge" id="badge">HFS-S</div></div><nav class="tabs" id="tabs"></nav></header>
+<main class="wrap"><div class="notice"><b id="head">กำลังโหลด</b><span id="sum">รอสักครู่</span></div><div class="filters"><input id="q" placeholder="ค้นหาชื่อโปร / เงื่อนไข / รหัสการ์ด"><button id="clear">ล้าง</button></div><section id="content">กำลังโหลด...</section></main>
 <div class="sheet" id="sheet"><div class="panel"><div id="detail"></div></div></div>
 <script>
 const URL='https://saodmeoilixfdqentofp.supabase.co';
 const KEY='sb_publishable_JThYwAl_-askk_cIaCd75w_TCWK2BTT';
 const CL=[['HFSS','HFS-S'],['HFSM','HFS-M'],['HFSL','HFS-L'],['HFSXL','HFS-XL'],['HFSWSS','HFS-WS-S'],['HFSWSL','HFS-WS-L']];
-let active='HFSS',counts={},cards=[],sel=null;
+let active='HFSS',counts={},cards=[],tiersByCard={},sel=null;
 const el=id=>document.getElementById(id);const money=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
 function esc(s){return String(s||'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]));}
 async function api(q){const r=await fetch(URL+'/rest/v1/'+q,{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});if(!r.ok)throw Error(await r.text());return r.json();}
 function label(id){return (CL.find(x=>x[0]===id)||CL[0])[1]}
 function tabs(){el('tabs').innerHTML=CL.map(c=>`<button class="tab ${c[0]===active?'on':''}" onclick="setClass('${c[0]}')">${c[1]} ${counts[c[0]]?'<small>'+counts[c[0]]+'</small>':''}</button>`).join('');el('badge').textContent=label(active)}
 window.setClass=async id=>{active=id;tabs();await load()}
-async function init(){const rows=await api('promo_cards_with_functions?promo_month_id=eq.JUL26&select=class_id');counts={};rows.forEach(r=>counts[r.class_id]=(counts[r.class_id]||0)+1);tabs();await load()}
-async function load(){el('content').className='';el('content').innerHTML='กำลังโหลด...';el('head').textContent='กำลังโหลด '+label(active);el('sum').textContent='แสดงทุกใบ ทั้ง ready และ need_review';cards=await api(`promo_cards_with_functions?promo_month_id=eq.JUL26&class_id=eq.${active}&select=card_id,class_id,page_no,card_no,promo_title,status,image_url,image_name,base_unit_price,unit_label,function_label,function_type,function_payload,function_review_status&order=card_no.asc`);render()}
+async function init(){
+  const [rows,tiers]=await Promise.all([
+    api('promo_cards_with_functions?promo_month_id=eq.JUL26&select=class_id'),
+    api('promo_tiers?select=*')
+  ]);
+  counts={};rows.forEach(r=>counts[r.class_id]=(counts[r.class_id]||0)+1);
+  tiersByCard={};(tiers||[]).filter(t=>String(t.card_id||'').startsWith('JUL26-')).forEach(t=>{(tiersByCard[t.card_id] ||= []).push(t)});
+  Object.values(tiersByCard).forEach(a=>a.sort((x,y)=>Number(x.tier_no||0)-Number(y.tier_no||0)));
+  tabs();await load()
+}
+async function load(){el('content').className='';el('content').innerHTML='กำลังโหลด...';el('head').textContent='กำลังโหลด '+label(active);el('sum').textContent='แสดงทุกใบ ทั้ง ready และ need_review';cards=await api(`promo_cards_with_functions?promo_month_id=eq.JUL26&class_id=eq.${active}&select=card_id,class_id,page_no,card_no,promo_title,status,image_url,image_name,base_unit_price,unit_label,function_label,function_type,function_payload,function_review_status&order=card_no.asc`);cards.forEach(c=>c.tiers=tiersByCard[c.card_id]||[]);render()}
 function statusText(c){if(c.status==='ready'&&Number(c.base_unit_price)>0)return ['พร้อมคำนวณ','ok'];if(c.image_url)return ['มีรูป/รอราคา','wait'];return ['ยังไม่มีรูป','bad']}
-function render(){const q=el('q').value.trim().toLowerCase();let rows=cards.filter(c=>!q||[c.card_id,c.promo_title,c.function_label,c.status].join(' ').toLowerCase().includes(q));if(!rows.length){el('head').textContent=label(active)+' ไม่มีรายการ';el('sum').textContent='ลองล้างคำค้นหา';el('content').className='';el('content').innerHTML='<div class="empty"><h2>ไม่พบรายการ</h2></div>';return}const ready=rows.filter(c=>c.status==='ready'&&Number(c.base_unit_price)>0).length,img=rows.filter(c=>c.image_url).length;el('head').textContent=`${label(active)} แสดง ${rows.length} ใบ`;el('sum').textContent=`มีรูป ${img}/${rows.length} | คำนวณได้ ${ready}/${rows.length}`;el('content').className='grid';el('content').innerHTML=rows.map((c)=>{const st=statusText(c);return `<button class="card" onclick="openCard('${c.card_id}')">${c.image_url?`<img class="cardImg" src="${c.image_url}" loading="lazy" alt="${esc(c.card_id)}">`:`<div class="noImg">ยังไม่มีรูป</div>`}<div class="body"><h3>${esc(c.promo_title||c.card_id)}</h3><span class="pill ${st[1]}">${st[0]}</span><span class="pill">${esc(c.card_id)}</span><div class="func">${esc(c.function_label||'ยังไม่มีฟังก์ชัน')}</div><div class="price">${Number(c.base_unit_price)>0?'ฐาน ฿'+money(c.base_unit_price)+' / '+esc(c.unit_label||'หน่วย'):'รอใส่ราคา จึงยังคำนวณไม่ได้'}</div></div></button>`}).join('')}
-function tiersFrom(c){let p=c.function_payload;if(typeof p==='string'){try{p=JSON.parse(p)}catch{p=null}}return Array.isArray(p?.tiers)?p.tiers:[]}
-function tierLabel(t){if(t.type==='discount'){let q=t.qty?`${t.qty} `:t.qty_min?`${t.qty_min}-${t.qty_max} `:'';return `${q}${t.unit||''} ลด ${t.discount_percent}%`.trim()}if(t.type==='free_goods')return `${t.buy_qty} ${t.unit||''} ฟรี ${t.free_qty} ${t.unit||''} (${t.effective_percent||Math.round(t.free_qty/(t.buy_qty+t.free_qty)*100)}%)`.trim();return t.text||'-'}
-function tierDiscount(t){if(t.type==='discount')return Number(t.discount_percent||0);if(t.type==='free_goods')return Number(t.effective_percent||0);return 0}
-function tierMin(t){if(t.qty_min)return Number(t.qty_min);if(t.qty)return Number(t.qty);if(t.buy_qty)return Number(t.buy_qty);return 1}
-function pick(q,tiers){const s=[...tiers].sort((a,b)=>tierMin(a)-tierMin(b));let a=null,n=null;for(const t of s){const min=tierMin(t),max=t.qty_max?Number(t.qty_max):Infinity;if(q>=min&&q<=max)a=t;else if(q<min&&!n)n=t}return{a,n,s}}
+function hasBenefitText(t){return /ลด|ฟรี|%/.test(String(t||''))}
+function tierMin(t){return Number(t.min_qty||t.qty_min||t.qty||t.buy_qty||1)}
+function tierMax(t){return t.max_qty!=null?Number(t.max_qty):(t.qty_max!=null?Number(t.qty_max):Infinity)}
+function tierDiscount(t){return Number(t.discount_percent||t.effective_percent||0)}
+function tierLabel(t,unitLabel){
+  const text=String(t.min_qty_text||t.text||'').trim();
+  const min=tierMin(t),max=tierMax(t),unit=t.unit||unitLabel||'ชิ้น',d=tierDiscount(t),free=Number(t.free_qty||t.free||0);
+  if(text){
+    if(/^ลด\s*\d/.test(text)&&min>1)return `เมื่อซื้อ ${min} ${unit} ${text}`;
+    if(/^ฟรี/.test(text)&&min>1)return `เมื่อซื้อ ${min} ${unit} ${text}`;
+    return text;
+  }
+  if(free>0&&min>0)return `เมื่อซื้อ ${min} ${unit} ฟรี ${free} ${unit}${d?` (${d}%)`:''}`;
+  if(d>0&&min>1)return `เมื่อซื้อ ${min}${max!==Infinity?'-'+max:''} ${unit} ลด ${d}%`;
+  if(d>0)return `ลด ${d}%`;
+  return '-';
+}
+function tiersFrom(c){
+  if(Array.isArray(c.tiers)&&c.tiers.length)return c.tiers;
+  let p=c.function_payload;if(typeof p==='string'){try{p=JSON.parse(p)}catch{p=null}}
+  return Array.isArray(p?.tiers)?p.tiers:[];
+}
+function promoText(c){const ts=tiersFrom(c);if(ts.length)return ts.map(t=>tierLabel(t,c.unit_label)).filter(Boolean).join('; ');return c.function_label||'ยังไม่มีเงื่อนไขโปร'}
+function render(){const q=el('q').value.trim().toLowerCase();let rows=cards.filter(c=>!q||[c.card_id,c.promo_title,promoText(c),c.status].join(' ').toLowerCase().includes(q));if(!rows.length){el('head').textContent=label(active)+' ไม่มีรายการ';el('sum').textContent='ลองล้างคำค้นหา';el('content').className='';el('content').innerHTML='<div class="empty"><h2>ไม่พบรายการ</h2></div>';return}const ready=rows.filter(c=>c.status==='ready'&&Number(c.base_unit_price)>0).length,img=rows.filter(c=>c.image_url).length;el('head').textContent=`${label(active)} แสดง ${rows.length} ใบ`;el('sum').textContent=`มีรูป ${img}/${rows.length} | คำนวณได้ ${ready}/${rows.length}`;el('content').className='grid';el('content').innerHTML=rows.map((c)=>{const st=statusText(c);return `<button class="card" onclick="openCard('${c.card_id}')">${c.image_url?`<img class="cardImg" src="${c.image_url}" loading="lazy" alt="${esc(c.card_id)}">`:`<div class="noImg">ยังไม่มีรูป</div>`}<div class="body"><h3>${esc(c.promo_title||c.card_id)}</h3><span class="pill ${st[1]}">${st[0]}</span><span class="pill">${esc(c.card_id)}</span><div class="func">${esc(promoText(c))}</div><div class="price">${Number(c.base_unit_price)>0?'ฐาน ฿'+money(c.base_unit_price)+' / '+esc(c.unit_label||'หน่วย'):'รอใส่ราคา จึงยังคำนวณไม่ได้'}</div></div></button>`}).join('')}
+function pick(q,tiers){const s=[...tiers].sort((a,b)=>tierMin(a)-tierMin(b));let a=null,n=null;for(const t of s){const min=tierMin(t),max=tierMax(t);if(q>=min&&q<=max)a=t;else if(q<min&&!n)n=t}return{a,n,s}}
 function calc(c,q){const base=Number(c.base_unit_price||0);const p=pick(q,tiersFrom(c));const d=tierDiscount(p.a||{});const unit=base*(1-d/100);return{...p,base,d,unit,total:unit*q,save:(base-unit)*q}}
 window.openCard=id=>{sel=cards.find(c=>c.card_id===id);draw(1);el('sheet').classList.add('on')}
-window.draw=q=>{q=Math.max(1,Math.floor(q||1));const c=sel,r=calc(c,q),u=c.unit_label||'หน่วย',can=Number(c.base_unit_price)>0;el('detail').innerHTML=`${c.image_url?`<img src="${c.image_url}" alt="${esc(c.card_id)}">`:'<div class="noImg">ยังไม่มีรูป</div>'}<h2>${esc(c.promo_title||c.card_id)}</h2><span class="pill">${esc(c.card_id)}</span> <span class="pill ${statusText(c)[1]}">${statusText(c)[0]}</span><div class="func">${esc(c.function_label||'ยังไม่มีฟังก์ชัน')}</div><div class="metrics"><div class="m"><span>ฐาน</span><b>${can?'฿'+money(r.base):'-'}</b></div><div class="m"><span>หน่วย</span><b>${esc(u)}</b></div><div class="m"><span>ส่วนลด</span><b>${r.a?r.d+'%':'-'}</b></div></div>${can?`<div class="qty"><button onclick="draw(${q-1})">−</button><input type="number" min="1" value="${q}" oninput="draw(Number(this.value||1))"><button onclick="draw(${q+1})">+</button></div>`:''}${r.s.map(t=>`<div class="tier ${r.a&&tierLabel(r.a)===tierLabel(t)?'on':''}"><span>${esc(tierLabel(t))}</span><b>${tierDiscount(t)}%</b></div>`).join('')}${!can?'<div class="warn">ใบนี้ยังไม่มีราคาฐาน จึงยังคำนวณยอดไม่ได้ แต่รูปและฟังก์ชันโปรแสดงได้แล้ว</div>':(!r.a&&r.n?`<div class="warn">ซื้ออีก ${Math.max(0,tierMin(r.n)-q)} ${esc(u)} ถึงขั้น ${esc(tierLabel(r.n))}</div>`:'')}${can?`<div class="result"><span>ยอดหลังส่วนลด</span><b>฿${money(r.total)}</b><span>ประหยัด ฿${money(r.save)} | ราคา/${esc(u)} ฿${money(r.unit)}</span></div>`:''}<button class="close" onclick="closeSheet()">ปิด</button>`}
+window.draw=q=>{q=Math.max(1,Math.floor(q||1));const c=sel,r=calc(c,q),u=c.unit_label||'หน่วย',can=Number(c.base_unit_price)>0;el('detail').innerHTML=`${c.image_url?`<img src="${c.image_url}" alt="${esc(c.card_id)}">`:'<div class="noImg">ยังไม่มีรูป</div>'}<h2>${esc(c.promo_title||c.card_id)}</h2><span class="pill">${esc(c.card_id)}</span> <span class="pill ${statusText(c)[1]}">${statusText(c)[0]}</span><div class="func">${esc(promoText(c))}</div><div class="metrics"><div class="m"><span>ฐาน</span><b>${can?'฿'+money(r.base):'-'}</b></div><div class="m"><span>หน่วย</span><b>${esc(u)}</b></div><div class="m"><span>ส่วนลด</span><b>${r.a?r.d+'%':'-'}</b></div></div>${can?`<div class="qty"><button onclick="draw(${q-1})">−</button><input type="number" min="1" value="${q}" oninput="draw(Number(this.value||1))"><button onclick="draw(${q+1})">+</button></div>`:''}${r.s.map(t=>`<div class="tier ${r.a&&tierLabel(r.a,u)===tierLabel(t,u)?'on':''}"><span>${esc(tierLabel(t,u))}</span><b>${tierDiscount(t)}%</b></div>`).join('')}${!can?'<div class="warn">ใบนี้ยังไม่มีราคาฐาน จึงยังคำนวณยอดไม่ได้ แต่รูปและเงื่อนไขโปรแสดงได้แล้ว</div>':(!r.a&&r.n?`<div class="warn">ซื้ออีก ${Math.max(0,tierMin(r.n)-q)} ${esc(u)} ถึงขั้น ${esc(tierLabel(r.n,u))}</div>`:'')}${can?`<div class="result"><span>ยอดหลังส่วนลด</span><b>฿${money(r.total)}</b><span>ประหยัด ฿${money(r.save)} | ราคา/${esc(u)} ฿${money(r.unit)}</span></div>`:''}<button class="close" onclick="closeSheet()">ปิด</button>`}
 window.closeSheet=()=>el('sheet').classList.remove('on');el('sheet').onclick=e=>{if(e.target.id==='sheet')closeSheet()};el('q').oninput=render;el('clear').onclick=()=>{el('q').value='';render()};init().catch(e=>{el('content').className='err';el('content').textContent='โหลดข้อมูลไม่สำเร็จ: '+e.message});
 </script>
 </body>
