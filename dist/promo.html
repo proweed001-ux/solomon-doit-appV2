@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ระบบโปรโมชัน</title>
+<style>*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#f3f4f6}iframe{display:block;width:100%;height:100%;border:0}</style>
+</head>
+<body>
+<iframe id="app" src="/promo-admin.html" title="ระบบโปรโมชัน"></iframe>
+<script>
+const app=document.getElementById('app');
+function patchEngine(){
+  try{
+    const a=app.contentDocument,engine=a.getElementById('engine'),run=a.getElementById('run');
+    if(!engine)return;
+    if(run){run.disabled=true;run.textContent='กำลังเตรียมระบบ...'}
+    const inject=()=>{
+      try{
+        const d=engine.contentDocument;
+        if(!d||d.documentElement.dataset.fixed==='1')return;
+        const old=d.querySelector('script[type="module"]');
+        if(!old)return;
+        const bad=String.raw`const tokens=s.split(/(?=\d+\s*(?:ขวด|ชิ้น|แพ็ค|กล่อง|ลัง|ซอง)|(?=ลด\s*\d)|(?=ฟรี\s*\d)/);`;
+        const good=String.raw`const tokens=s.split(/(?=\d+\s*(?:ขวด|ชิ้น|แพ็ค|กล่อง|ลัง|ซอง))|(?=ลด\s*\d)|(?=ฟรี\s*\d)/);`;
+        let code=old.textContent.replace(bad,good)+'\nwindow.__PROMO_ENGINE_READY__=true;';
+        const s=d.createElement('script');s.type='module';s.textContent=code;d.head.appendChild(s);d.documentElement.dataset.fixed='1';
+        const started=Date.now(),timer=setInterval(()=>{
+          if(engine.contentWindow.__PROMO_ENGINE_READY__){clearInterval(timer);if(run){run.disabled=false;run.textContent='อัปโหลดและอัปเดตทั้งหมด'}const st=a.getElementById('status');if(st)st.textContent='พร้อมใช้งาน'}
+          else if(Date.now()-started>60000){clearInterval(timer);const st=a.getElementById('status');if(st)st.textContent='โหลดระบบตรวจ PDF ไม่สำเร็จ กรุณารีเฟรชหน้า'}
+        },300);
+      }catch(e){const st=a.getElementById('status');if(st)st.textContent='เตรียมระบบไม่สำเร็จ: '+e.message}
+    };
+    if(engine.contentDocument?.readyState==='complete')setTimeout(inject,200);else engine.addEventListener('load',()=>setTimeout(inject,200),{once:true});
+  }catch(e){}
+}
+app.addEventListener('load',()=>setTimeout(patchEngine,300));
+</script>
+</body>
+</html>
