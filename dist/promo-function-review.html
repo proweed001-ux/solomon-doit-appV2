@@ -1,151 +1,51 @@
 <!doctype html>
 <html lang="th">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <title>Review ฟังก์ชันโปรโมชั่น</title>
-  <style>
-    *{box-sizing:border-box}body{margin:0;background:#f3f4f6;color:#111827;font-family:system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif}.head{background:linear-gradient(135deg,#be123c,#7c2d12);color:#fff;padding:18px 14px}.head h1{margin:0;font-size:21px}.head p{margin:6px 0 0;color:#ffe4e6;font-weight:800}.wrap{padding:12px;max-width:1180px;margin:auto}.card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;margin:12px 0;box-shadow:0 6px 18px rgba(15,23,42,.06)}label{display:block;font-weight:900;margin:10px 0 5px}input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:9px 10px;font-weight:800;font-family:inherit}input,select{height:42px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.btn{height:42px;border:0;border-radius:12px;background:#be123c;color:#fff;font-weight:950;padding:0 16px;box-shadow:0 3px 0 #881337}.btn.gray{background:#475569;box-shadow:0 3px 0 #334155}.btn.green{background:#16a34a;box-shadow:0 3px 0 #166534}.btn:disabled{opacity:.45}.note{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:10px;color:#7c2d12;font-weight:800;line-height:1.55}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.sum{border:1px solid #e5e7eb;border-radius:12px;padding:10px;background:#f8fafc}.sum b{display:block;font-size:22px}.status{font-weight:900;margin-top:10px}.log{font-family:ui-monospace,Consolas,monospace;background:#0f172a;color:#e5e7eb;border-radius:12px;padding:10px;min-height:80px;max-height:240px;overflow:auto;font-size:12px;white-space:pre-wrap}.list{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.tpl{border:1px solid #e5e7eb;border-radius:14px;background:#fafafa;padding:10px}.tpl.confirmed{border:2px solid #22c55e}.tpl.need{border:2px solid #f59e0b}.sample{display:grid;grid-template-columns:130px 1fr;gap:10px}.sample img{width:130px;max-height:160px;object-fit:contain;border:1px solid #e5e7eb;border-radius:10px;background:#fff}.meta{font-size:12px;line-height:1.55;color:#334155}.tag{display:inline-block;margin:0 5px 5px 0;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:900}.green{background:#dcfce7;color:#166534}.blue{background:#dbeafe;color:#1d4ed8}.orange{background:#ffedd5;color:#9a3412}.red{background:#fee2e2;color:#991b1b}.link{color:#fff;font-weight:900}.small{font-size:12px;color:#64748b;font-weight:800}.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.pill{border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:900;cursor:pointer}@media(max-width:860px){.grid,.summary,.list{grid-template-columns:1fr}.sample{grid-template-columns:1fr}.sample img{width:100%;max-height:220px}.head h1{font-size:19px}}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ตรวจฟังก์ชันโปรโมชั่น</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f4f6;color:#111827;font-family:system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif}.head{background:linear-gradient(135deg,#be123c,#7c2d12);color:#fff;padding:18px 14px}.head h1{margin:0;font-size:21px}.head p{margin:6px 0 0;color:#ffe4e6;font-weight:800}.wrap{padding:12px;max-width:1280px;margin:auto}.card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;margin:12px 0;box-shadow:0 6px 18px rgba(15,23,42,.06)}label{display:block;font-weight:900;margin:10px 0 5px}input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:9px 10px;font-weight:800;font-family:inherit}input,select{height:42px}textarea{min-height:64px;resize:vertical}.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.btn{height:42px;border:0;border-radius:12px;background:#be123c;color:#fff;font-weight:950;padding:0 16px;box-shadow:0 3px 0 #881337}.btn.gray{background:#475569;box-shadow:0 3px 0 #334155}.btn.green{background:#16a34a;box-shadow:0 3px 0 #166534}.btn:disabled{opacity:.45}.note{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:10px;color:#7c2d12;font-weight:800;line-height:1.55}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.sum{border:1px solid #e5e7eb;border-radius:12px;padding:10px;background:#f8fafc}.sum b{display:block;font-size:22px}.status{font-weight:900;margin-top:10px}.log{font-family:ui-monospace,Consolas,monospace;background:#0f172a;color:#e5e7eb;border-radius:12px;padding:10px;min-height:80px;max-height:220px;overflow:auto;font-size:12px;white-space:pre-wrap}.list{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.item{border:1px solid #e5e7eb;border-radius:14px;background:#fafafa;padding:10px}.item.confirmed{border:2px solid #22c55e}.item.need{border:2px solid #f59e0b}.sample{display:grid;grid-template-columns:150px 1fr;gap:10px}.imgs{display:grid;gap:7px}.imgs img{width:100%;max-height:180px;object-fit:contain;border:1px solid #e5e7eb;border-radius:10px;background:#fff}.dual{display:grid;grid-template-columns:1fr 1fr;gap:7px}.meta{font-size:12px;line-height:1.55;color:#334155}.tag{display:inline-block;margin:0 5px 5px 0;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:900}.green{background:#dcfce7;color:#166534}.blue{background:#dbeafe;color:#1d4ed8}.orange{background:#ffedd5;color:#9a3412}.red{background:#fee2e2;color:#991b1b}.small{font-size:12px;color:#64748b;font-weight:800}.hide{display:none!important}@media(max-width:900px){.grid,.summary,.list{grid-template-columns:1fr}.sample{grid-template-columns:1fr}.dual{grid-template-columns:1fr 1fr}.head h1{font-size:19px}}
+</style>
 </head>
 <body>
-  <header class="head">
-    <h1>Review ฟังก์ชันโปรโมชั่นกรอบแดง</h1>
-    <p>ตรวจ 39 กลุ่ม แล้วผูกกลับ 212 การ์ด</p>
-  </header>
-  <main class="wrap">
-    <section class="card">
-      <div class="note">
-        หน้านี้ใช้หลังจากตัดการ์ดสำเร็จแล้ว สำหรับตรวจ/แก้ชื่อโปรโมชั่นในกรอบแดง เช่น ลด %, ซื้อกี่ชิ้นฟรีกี่ชิ้น แล้วบันทึกกลับฐานข้อมูลจริง
-      </div>
-      <div class="grid">
-        <div><label>รหัสอัปโหลด</label><input id="key" type="password" placeholder="ใส่รหัสเดียวกับหน้าอัป PDF"></div>
-        <div><label>Promo Month</label><input id="month" value="JUL26"></div>
-        <div><label>สถานะ</label><select id="filter"><option value="all">ทั้งหมด</option><option value="confirmed">confirmed</option><option value="need_review">need_review</option></select></div>
-        <div><label>ค้นหา</label><input id="search" placeholder="เช่น ลด 10 หรือ HFSS"></div>
-      </div>
-      <div class="btns">
-        <button class="btn" id="load">โหลดกลุ่มฟังก์ชัน</button>
-        <button class="btn green" id="save">บันทึกที่แก้ทั้งหมด</button>
-        <button class="btn gray" id="reload">รีโหลด</button>
-        <a class="btn gray" style="display:inline-flex;align-items:center;text-decoration:none" href="/promo-pdf-upload.html">กลับหน้าอัป PDF</a>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="summary">
-        <div class="sum">กลุ่มฟังก์ชัน<b id="sTpl">0</b></div>
-        <div class="sum">การ์ดที่ผูกแล้ว<b id="sMatch">0</b></div>
-        <div class="sum">confirmed<b id="sOk">0</b></div>
-        <div class="sum">ต้องตรวจ<b id="sNeed">0</b></div>
-      </div>
-      <div class="status" id="status">ยังไม่ได้โหลด</div>
-      <div class="log" id="log"></div>
-    </section>
-
-    <section class="card">
-      <b>สูตรที่ใช้บ่อย</b>
-      <div class="tools" id="presets"></div>
-    </section>
-
-    <section class="card">
-      <b>รายการกลุ่มฟังก์ชัน</b>
-      <div id="list" class="list"></div>
-    </section>
-  </main>
-
+<header class="head"><h1>ตรวจฟังก์ชันโปรโมชั่น</h1><p>ตรวจรายใบจากข้อความพื้นขาว + พื้นแดง/ขาว แล้วบันทึกเป็นฟังก์ชันจริง</p></header>
+<main class="wrap">
+<section class="card">
+<div class="note">เลือก <b>ตรวจ OCR รายใบ</b> หลังอัป PDF ระบบจะแสดงรูปการ์ด รูปเงื่อนไขพื้นขาว และรูปสิทธิประโยชน์แยกกัน แก้ข้อความให้ตรงแล้วกดบันทึก การ์ดนั้นจึงถูกยืนยันและนำไปใช้ในหน้า live</div>
+<div class="grid">
+<div><label>รหัสอัปโหลด</label><input id="key" type="password" placeholder="รหัสเดียวกับหน้าอัป PDF"></div>
+<div><label>Promo Month</label><input id="month" value="JUL26"></div>
+<div><label>โหมดตรวจ</label><select id="mode"><option value="detections">ตรวจ OCR รายใบ</option><option value="templates">ตรวจกลุ่มพื้นแดงเดิม</option></select></div>
+<div><label>สถานะ</label><select id="filter"><option value="need_review">ต้องตรวจ</option><option value="all">ทั้งหมด</option><option value="confirmed">ยืนยันแล้ว</option><option value="auto_ok">AUTO OK</option></select></div>
+<div><label>คลาส</label><select id="classFilter"><option value="all">ทุกคลาส</option><option>HFSS</option><option>HFSM</option><option>HFSL</option><option>HFSXL</option><option>HFSWSS</option><option>HFSWSL</option></select></div>
+</div>
+<label>ค้นหา</label><input id="search" placeholder="รหัสการ์ด ชื่อสินค้า หรือข้อความโปร">
+<div class="btns"><button class="btn" id="load">โหลดข้อมูล</button><button class="btn green" id="save">บันทึกที่แก้ทั้งหมด</button><button class="btn gray" id="reload">รีโหลด</button><a class="btn gray" style="display:inline-flex;align-items:center;text-decoration:none" href="/promo-pdf-upload.html">กลับหน้าอัป PDF</a><a class="btn gray" style="display:inline-flex;align-items:center;text-decoration:none" href="/promo-live.html">ดูหน้า live</a></div>
+</section>
+<section class="card"><div class="summary"><div class="sum">ทั้งหมด<b id="sTotal">0</b></div><div class="sum">AUTO OK<b id="sAuto">0</b></div><div class="sum">ต้องตรวจ<b id="sNeed">0</b></div><div class="sum">ยืนยันแล้ว<b id="sOk">0</b></div></div><div class="status" id="status">ยังไม่ได้โหลด</div><div class="log" id="log"></div></section>
+<section class="card"><b id="listTitle">รายการตรวจ OCR รายใบ</b><div id="list" class="list"></div></section>
+</main>
 <script>
 const ENDPOINT='https://saodmeoilixfdqentofp.supabase.co/functions/v1/promo-function-review';
-const PRESETS=[
-'ลด 5%','ลด 7%','ลด 8%','ลด 10%','ลด 12%','ลด 15%','ลด 20%','ลด 25%','ลด 27%',
-'1 ขวด ลด 8%; 6 ขวด ฟรี 1 ขวด (14%)',
-'2 ขวด ลด 8%; 6 ขวด ฟรี 1 ขวด (14%); 10 ขวด ฟรี 2 ขวด (17%)',
-'6 ขวด ลด 10%; 24 ขวด ลด 14%',
-'6 ขวด ลด 10%; 12 ขวด ลด 17%; 24 ขวด ลด 20%',
-'12 ขวด ลด 12%; 1 ลัง ลด 17%',
-'3 ชิ้น ฟรี 1 ชิ้น (25%)','6 ชิ้น ฟรี 2 ชิ้น (25%)','ซื้อ 6 ชิ้น ฟรี 1 ชิ้น (14%)',
-'3 ชิ้น ลด 10%; 5 ชิ้น ฟรี 1 ชิ้น (17%)','3 ชิ้น ลด 12%; 5 ชิ้น ฟรี 1 ชิ้น (17%)',
-'2 ชิ้น ลด 5%; 9 ชิ้น ลด 8%','2 ชิ้น ลด 8%; 4 ชิ้น ลด 11%','12 ชิ้น ลด 8%; 24 ชิ้น ลด 12%',
-'1 แพ็ค ลด 8%; 2 แพ็ค ลด 12%; 4 แพ็ค ลด 17%','1 แพ็ค ลด 20%; 2 แพ็ค ลด 25%',
-'1 กล่อง ลด 10%; 3 กล่อง ลด 17%','18 ชิ้น ลด 12%; 60 ชิ้น ลด 15%; 120 ชิ้น ลด 18%'
-];
-let templates=[];
+let detections=[],templates=[],counts={total:0,auto_ok:0,need_review:0,confirmed:0};
 const $=id=>document.getElementById(id);
-function log(m,c){const d=document.createElement('div'); if(c)d.className=c; d.textContent=m; $('log').appendChild(d); $('log').scrollTop=$('log').scrollHeight;}
-function status(m){$('status').textContent=m;}
+function esc(s){return String(s||'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]));}
+function log(m,c){const d=document.createElement('div');if(c)d.className=c;d.textContent=m;$('log').appendChild(d);$('log').scrollTop=$('log').scrollHeight}
+function status(m){$('status').textContent=m}
 function month(){return $('month').value.trim().toUpperCase()||'JUL26'}
 function key(){return $('key').value.trim()}
-function inferType(v){if(v.includes(';'))return 'tiered'; if(v.includes('ฟรี'))return 'free_goods'; if(v.includes('ลด'))return 'discount'; return 'unknown'}
-async function api(body){
-  if(!key()) throw Error('ต้องใส่รหัสอัปโหลดก่อน');
-  const r=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','x-promo-admin-key':key()},body:JSON.stringify(body)});
-  const j=await r.json().catch(()=>({ok:false,error:'bad_json'}));
-  if(!r.ok||!j.ok) throw Error((j.error||'request_failed')+(j.detail?': '+j.detail:''));
-  return j;
-}
-function renderPresets(){
-  const box=$('presets'); box.textContent='';
-  for(const p of PRESETS){const b=document.createElement('button'); b.className='pill'; b.textContent=p; b.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(p); box.appendChild(b)}
-}
-function updateSummary(){
-  $('sTpl').textContent=templates.length;
-  $('sMatch').textContent=window.matchCount||0;
-  $('sOk').textContent=templates.filter(t=>t.review_status==='confirmed'||t.review_status==='confirmed_seed').length;
-  $('sNeed').textContent=templates.filter(t=>!(t.review_status==='confirmed'||t.review_status==='confirmed_seed')).length;
-}
-function render(){
-  const q=$('search').value.trim().toLowerCase(), f=$('filter').value, box=$('list'); box.textContent='';
-  const rows=templates.filter(t=>{
-    const st=t.review_status||'';
-    if(f!=='all'&&st!==f)return false;
-    const s=[t.template_id,t.cluster_id,t.function_label,t.sample_card_id,t.sample_card?.class_id].join(' ').toLowerCase();
-    return !q||s.includes(q);
-  });
-  for(const t of rows){
-    const div=document.createElement('div');
-    const ok=t.review_status==='confirmed'||t.review_status==='confirmed_seed';
-    div.className='tpl '+(ok?'confirmed':'need');
-    const img=t.sample_card?.image_url?`<img src="${t.sample_card.image_url}" loading="lazy" alt="sample">`:'<div class="small">ยังไม่มีรูปตัวอย่างใน storage</div>';
-    div.innerHTML=`
-      <div class="sample">
-        <div>${img}</div>
-        <div>
-          <span class="tag blue">${t.template_id}</span>
-          <span class="tag orange">C${String(t.cluster_id).padStart(2,'0')}</span>
-          <span class="tag green">${t.card_count||0} ใบ</span>
-          <span class="tag ${ok?'green':'red'}">${t.review_status||'-'}</span>
-          <div class="meta">ตัวอย่าง: ${t.sample_card_id||'-'} | หน้า ${t.sample_card?.page_no||'-'} | ${t.sample_card?.class_id||'-'}-${String(t.sample_card?.card_no||'').padStart(3,'0')}</div>
-          <label>ฟังก์ชันโปรโมชั่น</label>
-          <input class="label" list="presetList" data-id="${t.template_id}" value="${String(t.function_label||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">
-          <div class="meta">type: <b>${t.function_type||inferType(t.function_label||'')}</b></div>
-        </div>
-      </div>`;
-    box.appendChild(div);
-  }
-}
-async function load(){
-  $('log').textContent=''; status('กำลังโหลด...');
-  const j=await api({action:'load',promo_month_id:month()});
-  templates=j.templates||[]; window.matchCount=j.match_count||0;
-  updateSummary(); render();
-  status(`โหลดแล้ว: ${j.template_count} กลุ่ม / ผูกการ์ด ${j.match_count} ใบ`);
-  log(`OK load ${j.template_count} templates, ${j.match_count} matches`,'ok');
-}
-async function save(){
-  const inputs=[...document.querySelectorAll('input.label')];
-  const map=Object.fromEntries(inputs.map(i=>[i.dataset.id,i.value.trim()]));
-  const changed=templates.map(t=>({template_id:t.template_id,function_label:map[t.template_id]||t.function_label,function_type:inferType(map[t.template_id]||t.function_label)}));
-  status('กำลังบันทึก...');
-  const j=await api({action:'save_templates',promo_month_id:month(),templates:changed});
-  log(`OK saved ${j.saved} templates`,'ok');
-  await load();
-}
-$('load').onclick=()=>load().catch(e=>{status('โหลดไม่สำเร็จ');log('ERROR: '+e.message,'bad')});
-$('reload').onclick=$('load').onclick;
-$('save').onclick=()=>save().catch(e=>{status('บันทึกไม่สำเร็จ');log('ERROR: '+e.message,'bad')});
-$('search').oninput=render;$('filter').onchange=render;
-renderPresets();
-const dl=document.createElement('datalist');dl.id='presetList';PRESETS.forEach(p=>{const o=document.createElement('option');o.value=p;dl.appendChild(o)});document.body.appendChild(dl);
+async function api(body){if(!key())throw Error('ต้องใส่รหัสอัปโหลดก่อน');const r=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','x-promo-admin-key':key()},body:JSON.stringify(body)}),j=await r.json().catch(()=>({ok:false,error:'bad_json'}));if(!r.ok||!j.ok)throw Error((j.error||'request_failed')+(j.detail?': '+j.detail:''));return j}
+function benefitHasOwnQty(s){return /\d+\s*(ขวด|ชิ้น|แพ็ค|ลัง|กล่อง|ซอง|ด้าม)/.test(String(s||''))}
+function joinFunction(condition,benefit){condition=String(condition||'').trim();benefit=String(benefit||'').trim();if(!condition)return benefit;if(!benefit)return condition;if(benefitHasOwnQty(benefit)||benefit.includes('เมื่อซื้อ'))return benefit;if(benefit.includes(condition)||condition.includes(benefit))return condition.length>=benefit.length?condition:benefit;return`${condition} ${benefit}`.replace(/\s+/g,' ').trim()}
+function updateSummary(){const c=$('mode').value==='detections'?counts:{total:templates.length,auto_ok:0,need_review:templates.filter(t=>!['confirmed','confirmed_seed'].includes(t.review_status)).length,confirmed:templates.filter(t=>['confirmed','confirmed_seed'].includes(t.review_status)).length};$('sTotal').textContent=c.total||0;$('sAuto').textContent=c.auto_ok||0;$('sNeed').textContent=c.need_review||0;$('sOk').textContent=c.confirmed||0}
+function detectionStatus(d){if(d.review_status==='confirmed')return['ยืนยันแล้ว','green'];if(d.detection_status==='auto_ok')return['AUTO OK','blue'];return['ต้องตรวจ','orange']}
+function renderDetections(){const q=$('search').value.trim().toLowerCase(),f=$('filter').value,cf=$('classFilter').value,box=$('list');box.textContent='';$('listTitle').textContent='รายการตรวจ OCR รายใบ';let rows=detections.filter(d=>{if(cf!=='all'&&d.class_id!==cf)return false;if(f==='need_review'&&d.review_status==='confirmed')return false;if(f==='confirmed'&&d.review_status!=='confirmed')return false;if(f==='auto_ok'&&d.detection_status!=='auto_ok')return false;const s=[d.card_id,d.card?.promo_title,d.condition_text,d.benefit_text,d.detected_function_label,d.reviewed_function_label].join(' ').toLowerCase();return!q||s.includes(q)});for(const d of rows){const st=detectionStatus(d),div=document.createElement('div'),condition=d.reviewed_condition_text??d.condition_text??'',benefit=d.reviewed_benefit_text??d.benefit_text??'',label=d.reviewed_function_label??d.detected_function_label??joinFunction(condition,benefit);div.className='item '+(d.review_status==='confirmed'?'confirmed':'need');const full=d.card?.image_url?`<img src="${d.card.image_url}" loading="lazy" alt="card">`:'<div class="small">ไม่มีรูปเต็ม</div>',ci=d.condition_image_url?`<img src="${d.condition_image_url}" loading="lazy" alt="condition">`:'<div class="small">ไม่มีรูปพื้นขาว</div>',bi=d.benefit_image_url?`<img src="${d.benefit_image_url}" loading="lazy" alt="benefit">`:'<div class="small">ไม่มีรูปสิทธิประโยชน์</div>';div.innerHTML=`<div class="sample"><div class="imgs">${full}<div class="dual">${ci}${bi}</div></div><div><span class="tag blue">${esc(d.card_id)}</span><span class="tag ${st[1]}">${st[0]}</span><span class="tag orange">${esc(d.class_id)} หน้า ${d.page_no||'-'}</span><div class="meta">${esc(d.card?.promo_title||'')}<br>ความมั่นใจ พื้นขาว ${Math.round(Number(d.condition_confidence||0))}% | สิทธิประโยชน์ ${Math.round(Number(d.benefit_confidence||0))}%</div><label>ข้อความพื้นขาว / เงื่อนไข</label><textarea class="condition" data-id="${esc(d.card_id)}">${esc(condition)}</textarea><label>ข้อความสิทธิประโยชน์</label><textarea class="benefit" data-id="${esc(d.card_id)}">${esc(benefit)}</textarea><label>ฟังก์ชันที่ใช้จริง</label><textarea class="functionLabel" data-id="${esc(d.card_id)}">${esc(label)}</textarea><div class="meta">ตรวจเทียบรูปทั้ง 3 ช่องก่อนบันทึก</div></div></div>`;const ciEl=div.querySelector('.condition'),biEl=div.querySelector('.benefit'),flEl=div.querySelector('.functionLabel');const sync=()=>{flEl.value=joinFunction(ciEl.value,biEl.value)};ciEl.addEventListener('input',sync);biEl.addEventListener('input',sync);box.appendChild(div)}if(!rows.length)box.innerHTML='<div class="small">ยังไม่มีผลตรวจตามตัวกรองนี้ หากไม่เคยอัปด้วยระบบใหม่ ให้กลับหน้าอัป PDF แล้วตรวจจับและอัปโหลดอีกครั้ง</div>'}
+function renderTemplates(){const q=$('search').value.trim().toLowerCase(),f=$('filter').value,box=$('list');box.textContent='';$('listTitle').textContent='รายการกลุ่มฟังก์ชันพื้นแดงเดิม';let rows=templates.filter(t=>{const ok=['confirmed','confirmed_seed'].includes(t.review_status);if(f==='need_review'&&ok)return false;if(f==='confirmed'&&!ok)return false;const s=[t.template_id,t.cluster_id,t.function_label,t.sample_card_id,t.sample_card?.class_id].join(' ').toLowerCase();return!q||s.includes(q)});for(const t of rows){const ok=['confirmed','confirmed_seed'].includes(t.review_status),div=document.createElement('div');div.className='item '+(ok?'confirmed':'need');const img=t.sample_card?.image_url?`<img src="${t.sample_card.image_url}" loading="lazy" alt="sample">`:'<div class="small">ไม่มีรูปตัวอย่าง</div>';div.innerHTML=`<div class="sample"><div class="imgs">${img}</div><div><span class="tag blue">${esc(t.template_id)}</span><span class="tag orange">C${String(t.cluster_id).padStart(2,'0')}</span><span class="tag green">${t.card_count||0} ใบ</span><label>ฟังก์ชันกลุ่ม</label><textarea class="templateLabel" data-id="${esc(t.template_id)}">${esc(t.function_label||'')}</textarea></div></div>`;box.appendChild(div)}if(!rows.length)box.innerHTML='<div class="small">ไม่พบกลุ่มตามตัวกรอง</div>'}
+function render(){if($('mode').value==='detections')renderDetections();else renderTemplates();updateSummary()}
+async function load(){ $('log').textContent='';status('กำลังโหลด...');if($('mode').value==='detections'){const j=await api({action:'load_detections',promo_month_id:month()});detections=j.detections||[];counts=j.counts||{};status(`โหลดผลตรวจ ${counts.total||0} ใบ | ต้องตรวจ ${counts.need_review||0} | ยืนยันแล้ว ${counts.confirmed||0}`);log(`OK detections ${counts.total||0}`,'green')}else{const j=await api({action:'load',promo_month_id:month()});templates=j.templates||[];status(`โหลด ${j.template_count||0} กลุ่ม / ผูก ${j.match_count||0} ใบ`);log(`OK templates ${j.template_count||0}`,'green')}render()}
+async function save(){status('กำลังบันทึก...');if($('mode').value==='detections'){const rows=[...document.querySelectorAll('.functionLabel')].map(fl=>{const id=fl.dataset.id,root=fl.closest('.item');return{card_id:id,condition_text:root.querySelector('.condition').value.trim(),benefit_text:root.querySelector('.benefit').value.trim(),function_label:fl.value.trim()}}).filter(x=>x.function_label);if(!rows.length)throw Error('ไม่มีรายการให้บันทึก');const j=await api({action:'save_detections',promo_month_id:month(),detections:rows});log(`บันทึกรายใบ ${j.saved} ใบ`,'green')}else{const rows=[...document.querySelectorAll('.templateLabel')].map(x=>({template_id:x.dataset.id,function_label:x.value.trim()})).filter(x=>x.function_label);if(!rows.length)throw Error('ไม่มีรายการให้บันทึก');const j=await api({action:'save_templates',promo_month_id:month(),templates:rows});log(`บันทึกกลุ่ม ${j.saved} กลุ่ม`,'green')}await load()}
+$('load').onclick=()=>load().catch(e=>{status('โหลดไม่สำเร็จ');log('ERROR: '+e.message,'red')});$('reload').onclick=$('load').onclick;$('save').onclick=()=>save().catch(e=>{status('บันทึกไม่สำเร็จ');log('ERROR: '+e.message,'red')});$('search').oninput=render;$('filter').onchange=render;$('classFilter').onchange=render;$('mode').onchange=()=>{render();load().catch(e=>{status('โหลดไม่สำเร็จ');log('ERROR: '+e.message,'red')})};
 </script>
 </body>
 </html>
