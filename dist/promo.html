@@ -10,6 +10,16 @@
 <iframe id="app" src="/promo-admin.html" title="ระบบโปรโมชัน"></iframe>
 <script>
 const app=document.getElementById('app');
+function patchPrices(){
+  try{
+    const a=app.contentDocument;
+    if(!a||a.getElementById('promo-price-controls-script'))return;
+    const s=a.createElement('script');
+    s.id='promo-price-controls-script';
+    s.src='/promo-price-controls.js?v=c540771d';
+    a.body.appendChild(s);
+  }catch(e){}
+}
 function patchEngine(){
   try{
     const a=app.contentDocument,engine=a.getElementById('engine'),run=a.getElementById('run');
@@ -34,7 +44,7 @@ function patchEngine(){
     if(engine.contentDocument?.readyState==='complete')setTimeout(inject,200);else engine.addEventListener('load',()=>setTimeout(inject,200),{once:true});
   }catch(e){}
 }
-app.addEventListener('load',()=>setTimeout(patchEngine,300));
+app.addEventListener('load',()=>setTimeout(()=>{patchPrices();patchEngine()},300));
 </script>
 </body>
 </html>
