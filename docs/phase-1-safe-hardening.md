@@ -34,3 +34,15 @@ Apply the migration to a Supabase development branch, run `supabase/tests/phase_
 - expected denial of direct privileged RPC calls.
 
 Nothing is merged to `main` or promoted to Production until the owner approves it.
+
+## Free validation mode
+
+When a paid Supabase development branch is not approved, run:
+
+```sh
+node scripts/validate-phase1-hardening.mjs
+```
+
+This validates scope, required permission statements, rollback coverage, test
+assertions, and the absence of destructive or production application changes.
+It does not execute the migration against any database.
