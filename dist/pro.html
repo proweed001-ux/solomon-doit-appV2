@@ -15,10 +15,7 @@ body{margin:0;background:#f6f7f8;color:#111827;font-family:system-ui,-apple-syst
 <div id="proLoader" class="loader">กำลังโหลดหน้า Pro...</div>
 <script>
 (function(){
-  const sourceUrls=[
-    'https://cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2@6d6f6bbf139de2e62ab63195fb044393e820eca6/dist/pro.html',
-    'https://raw.githubusercontent.com/proweed001-ux/solomon-doit-appV2/6d6f6bbf139de2e62ab63195fb044393e820eca6/dist/pro.html'
-  ];
+  const sourceUrl='/pro-shell-v1028.html';
   const fuelCss='#fuelBillBtn { display:none!important }body.fuelSecretOn #fuelBillBtn { display:block!important }';
   const fuelScript=`<script id="fuel-secret-v3">
 (function(){
@@ -95,13 +92,8 @@ body{margin:0;background:#f6f7f8;color:#111827;font-family:system-ui,-apple-syst
       .catch(function(err){clearTimeout(timer);throw err;});
   }
 
-  function load(i,lastErr){
-    const url=sourceUrls[i];
-    if(!url){
-      document.body.innerHTML='<div class="err">โหลดหน้า Pro ไม่สำเร็จ<br>'+String(lastErr&&lastErr.message||lastErr||'ไม่ทราบสาเหตุ')+'<br><button onclick="location.reload()">ลองโหลดใหม่</button></div>';
-      return;
-    }
-    fetchWithTimeout(url,9000)
+  function load(){
+    fetchWithTimeout(sourceUrl,9000)
       .then(function(html){
         html=html.replace(/<script\s+id=["']fuel-secret-v[0-9]+["']>[\s\S]*?<\/script>/g,'');
         html=html.replace(/#fuelBillBtn\s*\{\s*display\s*:\s*none\s*!important\s*\}\s*body\.fuelSecretOn\s+#fuelBillBtn\s*\{\s*display\s*:\s*block\s*!important\s*\}/g,'');
@@ -113,11 +105,11 @@ body{margin:0;background:#f6f7f8;color:#111827;font-family:system-ui,-apple-syst
         document.close();
       })
       .catch(function(err){
-        load(i+1,err);
+        document.body.innerHTML='<div class="err">โหลดหน้า Pro ไม่สำเร็จ<br>'+String(err&&err.message||err||'ไม่ทราบสาเหตุ')+'<br><button onclick="location.reload()">ลองโหลดใหม่</button></div>';
       });
   }
 
-  load(0,null);
+  load();
 })();
 </script>
 </body>
