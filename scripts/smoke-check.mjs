@@ -12,7 +12,7 @@ const mustContain = (p, s) => check(exists(p) && read(p).includes(s), `${p} must
 const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `${p} must not contain: ${s}`); };
 
 const required = [
-  'package.json','README.md','dist/index.html','dist/pro.html','dist/admin.html','dist/performance.html',
+  'package.json','README.md','dist/index.html','dist/pro.html','dist/pro-shell-v1028.html','dist/admin.html','dist/performance.html',
   'dist/assets/pro-core-v4.js','dist/assets/pro-native-core.js','dist/assets/pro-native-core-overrides.js',
   'dist/assets/pro-print-store-bills.js','dist/assets/pro-print-mode-fixes.js','dist/assets/pro-print.css',
   'dist/assets/admin-upload-v001.js','dist/assets/admin-json-v265.js','dist/assets/admin-progress-popup-v1.js','dist/assets/admin-storage-manager-v1.js','dist/assets/admin-performance-active-v2.js',
@@ -27,7 +27,8 @@ check(pkg.scripts.verify === 'npm run smoke', 'package.json verify must be smoke
 // Pro stable guardrails.
 mustContain('README.md', 'Pro Stable 1028 Native');
 mustContain('dist/index.html', '/pro.html?t=1028');
-mustContain('dist/pro.html', 'pro-core-v4.js');
+mustContain('dist/pro.html', "const sourceUrl='/pro-shell-v1028.html'");
+mustContain('dist/pro-shell-v1028.html', '/assets/pro-core-v4.js');
 mustContain('dist/assets/pro-core-v4.js', "VERSION = '1028-native'");
 mustContain('dist/assets/pro-core-v4.js', 'legacyWrapperRemoved: true');
 mustContain('dist/assets/pro-native-core.js', 'currentStateSource');
@@ -36,6 +37,10 @@ mustContain('dist/assets/pro-print-store-bills.js', 'BILL_ROWS=12');
 mustContain('dist/assets/pro-print-store-bills.js', 'window.DOIT_CORE_APP?.currentState?.()');
 mustNotContain('dist/assets/pro-core-v4.js', 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
 mustNotContain('dist/assets/pro-core-v4.js', 'fetch(CORE_URL');
+['dist/pro.html','dist/pro-shell-v1028.html'].forEach(p => {
+  mustNotContain(p, 'raw.githubusercontent.com');
+  mustNotContain(p, 'cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2');
+});
 
 // Admin separation guardrails.
 mustContain('dist/admin.html', 'id="file"');
@@ -55,7 +60,7 @@ const formula = 'TotInvc > Correct Amount/LineAmount > LineAmtBeforeDisc > detai
   check(s.indexOf('InvoiceAmt') >= 0, `${p} missing InvoiceAmt fallback`);
   check(s.indexOf('TotInvc') < s.indexOf('InvoiceAmt'), `${p} must prioritize TotInvc before InvoiceAmt`);
 });
-mustContain('src/lib/parser.ts', 'amount !== 0');
+mustContain('src/lib/parser.ts', 'if (!hasRawValue(row[key])) continue;');
 mustContain('src/lib/pricing.ts', 'if (qty === 0) return 0');
 mustNotContain('src/lib/pricing.ts', 'if (n <= 0) return 0');
 mustContain('scripts/qa-doit-file.mjs', 'scorePivot(fields, rows)');
@@ -72,11 +77,12 @@ mustNotContain('dist/assets/admin-progress-popup-v1.js', 'btn.click()');
 mustNotContain('dist/assets/admin-progress-popup-v1.js', 'lastAutoActive');
 
 // Performance dashboard and active metadata guardrails.
-mustContain('dist/performance.html', 'Smart Compare วันต่อวัน');
-mustContain('dist/performance.html', 'sameDayRevisions');
-mustContain('dist/performance.html', 'Month Trend Dashboard');
+mustContain('dist/performance.html', '/assets/performance-board-v4.js');
+mustContain('dist/assets/performance-board-v4.js', 'Smart Compare วันต่อวัน');
+mustContain('dist/assets/performance-board-v4.js', 'sameDayRevisions');
+mustContain('dist/assets/performance-board-v4.js', 'Month Trend Dashboard');
 mustContain('dist/assets/admin-storage-manager-v1.js', 'admin-performance-active-v2.js');
-mustContain('dist/assets/admin-performance-active-v2.js', 'performance-active-v2');
+mustContain('dist/assets/admin-performance-active-v2.js', "schema:'performance-active-v5'");
 mustContain('dist/assets/admin-performance-active-v2.js', 'reportDate');
 mustContain('dist/assets/admin-performance-active-v2.js', 'previousDataPath');
 mustContain('dist/assets/admin-performance-active-v2.js', 'revision');
@@ -91,6 +97,10 @@ mustContain('dist/assets/admin-storage-manager-v1.js', 'direct_browser_delete_di
 mustNotContain('dist/assets/admin-storage-manager-v1.js', "method:'DELETE'");
 mustNotContain('dist/assets/admin-storage-manager-v1.js', 'method:"DELETE"');
 mustContain('dist/assets/admin-storage-manager-v1.js', 'mixed_delete_forbidden');
+['async function readJson','async function listPrefix','async function refresh','async function download','function previewOld'].forEach(s => {
+  mustContain('dist/assets/admin-storage-manager-v1.js', s);
+});
+['deleteObject','deletePaths','confirmDelete'].forEach(s => mustNotContain('dist/assets/admin-storage-manager-v1.js', s));
 
 // Remove stale high-risk files.
 ['dist/assets/pro-print-pro-fixes.js','dist/assets/pro-print-total-display-fix.js','.github/workflows/build-apk.yml'].forEach(p => check(!exists(p), `Stale or risky file should not exist: ${p}`));
