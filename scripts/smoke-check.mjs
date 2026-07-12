@@ -12,10 +12,10 @@ const mustContain = (p, s) => check(exists(p) && read(p).includes(s), `${p} must
 const mustNotContain = (p, s) => { if (exists(p)) check(!read(p).includes(s), `${p} must not contain: ${s}`); };
 
 const required = [
-  'package.json','README.md','dist/index.html','dist/pro.html','dist/pro-shell-v1028.html','dist/admin.html','dist/performance.html',
+  'package.json','README.md','dist/index.html','dist/pro.html','dist/pro-shell-v1028.html','dist/admin.html','dist/admin-login.html','dist/performance.html',
   'dist/assets/pro-core-v4.js','dist/assets/pro-native-core.js','dist/assets/pro-native-core-overrides.js',
   'dist/assets/pro-print-store-bills.js','dist/assets/pro-print-mode-fixes.js','dist/assets/pro-print.css',
-  'dist/assets/admin-upload-v001.js','dist/assets/admin-json-v265.js','dist/assets/admin-progress-popup-v1.js','dist/assets/admin-storage-manager-v1.js','dist/assets/admin-performance-active-v2.js',
+  'dist/assets/admin-upload-v001.js','dist/assets/admin-json-v265.js','dist/assets/admin-auth-v1.js','dist/assets/admin-progress-popup-v1.js','dist/assets/admin-storage-manager-v1.js','dist/assets/admin-performance-active-v2.js','api/admin-storage.js','scripts/test-admin-storage-guards.mjs',
   'src/lib/parser.ts','src/lib/pricing.ts','scripts/qa-doit-file.mjs','.github/workflows/web-ci.yml'
 ];
 required.forEach(mustExist);
@@ -49,6 +49,9 @@ mustContain('dist/admin.html', 'id="uploadCloud"');
 mustContain('dist/admin.html', 'id="perfUpload"');
 mustContain('dist/admin.html', '/assets/admin-upload-v001.js');
 mustContain('dist/admin.html', '/assets/admin-json-v265.js');
+mustContain('dist/admin.html', '/assets/admin-auth-v1.js');
+mustContain('dist/admin.html', 'id="adminLogout"');
+mustContain('dist/admin-login.html', 'type="password"');
 mustContain('dist/admin.html', '/assets/admin-storage-manager-v1.js');
 
 // Unified DOIT amount formula: TotInvc must come before InvoiceAmt everywhere active.
@@ -81,7 +84,7 @@ mustContain('dist/performance.html', '/assets/performance-board-v4.js');
 mustContain('dist/assets/performance-board-v4.js', 'Smart Compare วันต่อวัน');
 mustContain('dist/assets/performance-board-v4.js', 'sameDayRevisions');
 mustContain('dist/assets/performance-board-v4.js', 'Month Trend Dashboard');
-mustContain('dist/assets/admin-storage-manager-v1.js', 'admin-performance-active-v2.js');
+mustContain('dist/admin.html', '/assets/admin-performance-active-v2.js');
 mustContain('dist/assets/admin-performance-active-v2.js', "schema:'performance-active-v5'");
 mustContain('dist/assets/admin-performance-active-v2.js', 'reportDate');
 mustContain('dist/assets/admin-performance-active-v2.js', 'previousDataPath');
@@ -89,18 +92,21 @@ mustContain('dist/assets/admin-performance-active-v2.js', 'revision');
 mustContain('dist/assets/admin-performance-active-v2.js', 'hash');
 mustContain('dist/assets/admin-performance-active-v2.js', 'history');
 
-// Storage safety guardrails: no embedded key, no direct browser storage delete.
+// Storage safety guardrails: authenticated server route owns guarded DELETE; browser never calls Storage DELETE directly.
 mustNotContain('dist/assets/admin-storage-manager-v1.js', 'sb_publishable_');
 mustNotContain('dist/assets/admin-storage-manager-v1.js', 'const DEFAULT_KEY');
-mustContain('dist/assets/admin-storage-manager-v1.js', 'no_direct_browser_delete');
-mustContain('dist/assets/admin-storage-manager-v1.js', 'direct_browser_delete_disabled');
 mustNotContain('dist/assets/admin-storage-manager-v1.js', "method:'DELETE'");
 mustNotContain('dist/assets/admin-storage-manager-v1.js', 'method:"DELETE"');
-mustContain('dist/assets/admin-storage-manager-v1.js', 'mixed_delete_forbidden');
-['async function readJson','async function listPrefix','async function refresh','async function download','function previewOld'].forEach(s => {
+['async function refresh','async function download','async function previewOld','async function deleteSelected'].forEach(s => {
   mustContain('dist/assets/admin-storage-manager-v1.js', s);
 });
-['deleteObject','deletePaths','confirmDelete'].forEach(s => mustNotContain('dist/assets/admin-storage-manager-v1.js', s));
+mustContain('dist/assets/admin-storage-manager-v1.js', "api('delete'");
+mustContain('api/admin-storage.js', 'const MAX_DELETE = 20');
+mustContain('api/admin-storage.js', "active_guard_unavailable");
+mustContain('api/admin-storage.js', "path_traversal");
+mustContain('api/admin-storage.js', "method: 'DELETE'");
+mustNotContain('api/admin-storage.js', 'SUPABASE_SERVICE_ROLE_KEY');
+mustNotContain('api/admin-storage.js', 'service_role key');
 
 // Remove stale high-risk files.
 ['dist/assets/pro-print-pro-fixes.js','dist/assets/pro-print-total-display-fix.js','.github/workflows/build-apk.yml'].forEach(p => check(!exists(p), `Stale or risky file should not exist: ${p}`));
