@@ -33,6 +33,20 @@ Scope: branch `codex/promo-fast-accurate-v2`, Draft PR #63 only. No Production r
 
 The improved policy is deliberately conservative. It only marks a card `auto_ok` when a Function Template match is exact and confidence/agreement guards pass. Ambiguous results remain `need_review`.
 
+Of the 142 cards marked `need_review`, 91 already matched the visual ground truth but were held for safety, and 51 were incorrect. No incorrect result was marked `auto_ok`.
+
+## Read-only comparison with stored V1 results
+
+A read-only query of the existing JUL26 `promo_card_function_matches` rows found:
+
+- Total: 212
+- Stored V1 `auto_ok`: 39
+- Stored V1 `need_review`: 173
+- Percentage-signature correct: 45/212 = 21.23%
+- V1 `auto_ok` rows with a percentage-signature mismatch: 11
+
+The V1 percentage-signature check is more lenient than the improved V2 exact Function Template metric. Improved V2 reached 75.94% exact template accuracy with zero false auto in the local benchmark, so the measured accuracy is not below V1 on this JUL26 dataset. The two metrics are not identical and must still be repeated on the same mobile device before Merge.
+
 ## Controlled V1 versus improved V2 workload
 
 A controlled local V1-style workload performed two OCR calls for every card: 424 calls total. It took 138.305 seconds on the same machine and dataset. Improved V2 took 107.385 seconds, a 22.4% reduction.
@@ -123,7 +137,7 @@ Passed locally:
 - Exact class counts
 - GRID FAIL = 0
 - false auto = 0
-- Improved OCR/template accuracy above the current V2 baseline
+- Improved OCR/template accuracy above the current V2 baseline and the stored V1 percentage-signature lower bound
 - Controlled OCR workload faster than V1-style 424 calls
 - Failed batches retry without restarting successful batches
 
