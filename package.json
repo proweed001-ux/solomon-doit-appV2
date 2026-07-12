@@ -17,6 +17,7 @@
     "verify:react": "npm run build && npm run smoke",
     "test:pro-lazy": "node scripts/test-pro-telesale-pagination.mjs",
     "test:fuel-warning": "node scripts/test-fuel-warning.mjs",
+    "test:local-xlsx": "node scripts/test-local-xlsx.mjs",
     "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\""
   },
   "dependencies": {
