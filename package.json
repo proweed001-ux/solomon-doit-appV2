@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "npm@10.9.4",
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
@@ -15,6 +15,9 @@
     "smoke": "node scripts/smoke-check.mjs",
     "verify": "npm run smoke",
     "verify:react": "npm run build && npm run smoke",
+    "test:pro-lazy": "node scripts/test-pro-telesale-pagination.mjs",
+    "test:fuel-warning": "node scripts/test-fuel-warning.mjs",
+    "test:local-xlsx": "node scripts/test-local-xlsx.mjs",
     "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\""
   },
   "dependencies": {
