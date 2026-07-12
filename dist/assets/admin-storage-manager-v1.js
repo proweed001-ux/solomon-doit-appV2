@@ -1,46 +1,110 @@
 (()=>{
 'use strict';
-if(!window.__ADMIN_PERF_ACTIVE_V2_LOADER__){window.__ADMIN_PERF_ACTIVE_V2_LOADER__=true;document.write('<script src="/assets/admin-performance-active-v2.js?v=1"><\/script>')}
-const DEFAULT_URL='https://saodmeoilixfdqentofp.supabase.co';
-const BUCKET='doit-files';
-const PREFIXES=['performance','doit','uploads','raw','parsed','team'];
-const DOIT_KEEP_DAYS=2;
-const MAX_DEPTH=6;
-const DELETE_POLICY=Object.freeze({policy:'no_direct_browser_delete',state:'direct_browser_delete_disabled',mixed:'mixed_delete_forbidden'});
-const $=s=>document.querySelector(s);
+const MAX_DELETE=20;
+const $=selector=>document.querySelector(selector);
 const selected=new Set();
-let files=[],active=null,modalFilter='all';
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const n=v=>Number(v||0)||0;
-const size=v=>{v=n(v);if(!v)return'—';const u=['B','KB','MB','GB'];let i=0;while(v>=1024&&i<u.length-1){v/=1024;i++}return(i?v.toFixed(2):Math.round(v))+' '+u[i]};
-const dateOf=v=>{const s=String(v||''),m=s.match(/(20\d{2}-\d{2}-\d{2})/);if(m)return m[1];const d=new Date(s);return Number.isNaN(d.getTime())?'':d.toISOString().slice(0,10)};
-const currentMonth=()=>new Date().toISOString().slice(0,7);
-const hasExt=s=>/\.[A-Za-z0-9]{1,12}$/.test(String(s||''));
-const isImage=p=>/\.(png|jpe?g|webp|gif|svg)$/i.test(String(p||''));
-const isPerf=p=>/^performance\//i.test(String(p||''));
-const isDoit=p=>/^(doit|uploads|raw|parsed)\//i.test(String(p||''));
-const isTeam=p=>/^team\//i.test(String(p||''));
-const isSystem=p=>/^performance\/(active|index|current\.min|history-index)\.json$/i.test(String(p||''));
-const isPerfJson=p=>/^performance\//i.test(p)&&/\.json$/i.test(p);
-function log(v){const box=$('#storageStatus');if(box)box.textContent=typeof v==='string'?v:JSON.stringify(v,null,2)}
-function cfg(){let saved={};try{saved=JSON.parse(localStorage.getItem('doit-cloud-cfg')||'{}')}catch{}const url=String($('#sbUrl')?.value||saved.url||DEFAULT_URL).trim().replace(/\/$/,'');const key=String($('#sbKey')?.value||saved.key||'').trim();return{url,key}}
-function headers(extra={}){const c=cfg();return{apikey:c.key,authorization:'Bearer '+c.key,...extra}}
-async function req(path,opt={}){const c=cfg();if(!c.key)throw{ok:false,error:'missing_key',note:'ต้องกรอก Supabase key ก่อน'};const r=await fetch(c.url+path,{...opt,headers:headers(opt.headers||{})}),t=await r.text();let data;try{data=JSON.parse(t)}catch{data={raw:t}}if(!r.ok)throw data;return data}
-async function readJson(path){return req('/storage/v1/object/'+BUCKET+'/'+encodeURIComponent(path).replace(/%2F/g,'/'))}
-function fileRow(prefix,x){const name=String(x.name||''),path=name.startsWith(prefix+'/')?name:prefix+'/'+name,created=x.updated_at||x.created_at||'';return{path,name,size:n(x.metadata?.size||x.size),created_at:created,date:dateOf(path)||dateOf(created),id:x.id||'',meta:x.metadata||null}}
-function isFolderEntry(x){const name=String(x?.name||'');if(!name||/\/$/.test(name))return true;const meta=x?.metadata||null,hasFileFlag=!!(x?.id||x?.updated_at||x?.created_at||x?.size||meta?.size||meta?.mimetype||meta?.cacheControl);return !hasFileFlag&&!hasExt(name)}
-async function listPrefix(prefix,depth=0){try{const rows=await req('/storage/v1/object/list/'+BUCKET,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prefix,limit:1000,offset:0,sortBy:{column:'updated_at',order:'desc'}})}),out=[];for(const x of Array.isArray(rows)?rows:[]){const name=String(x.name||'');if(!name)continue;const path=name.startsWith(prefix+'/')?name:prefix+'/'+name;if(isFolderEntry(x)&&depth<MAX_DEPTH&&path!==prefix){const child=await listPrefix(path,depth+1);out.push(...child);continue}if(!isFolderEntry(x))out.push(fileRow(prefix,x))}return out.filter(x=>x.path&&!/\/$/.test(x.path))}catch{return[]}}
-function doitProtectedDates(){return[...new Set(files.filter(f=>isDoit(f.path)).map(f=>f.date||dateOf(f.created_at)).filter(Boolean))].sort((a,b)=>b.localeCompare(a)).slice(0,DOIT_KEEP_DAYS)}
-function protectedSet(){const p=new Set(['performance/active.json','performance/index.json','performance/current.min.json','performance/history-index.json']);const add=v=>{if(v)p.add(String(v).replace(/^\/+/,''))};add(active?.dataPath);add(active?.currentDataPath);add(active?.latestPath);add(active?.previousDataPath);add(active?.prevDataPath);add(active?.current?.dataPath);add(active?.previous?.dataPath);(active?.history||[]).slice(0,2).forEach(x=>add(x?.dataPath||x?.latestPath||x?.path));const keepDoit=new Set(doitProtectedDates()),cm=currentMonth();files.forEach(f=>{const d=f.date||dateOf(f.created_at),m=String(d||'').slice(0,7);if(isDoit(f.path)&&keepDoit.has(d))add(f.path);if(isPerf(f.path)&&m===cm)add(f.path)});return p}
-function typeOf(f){const ps=protectedSet();if(ps.has(f.path)||isSystem(f.path))return{type:'protected',label:'กันลบ'};if(isTeam(f.path)||isImage(f.path))return{type:'team',label:'เตือน: รูป/ทีม'};if(isDoit(f.path))return{type:'doit',label:'DOIT'};if(isPerf(f.path))return{type:'performance',label:isPerfJson(f.path)?'Performance JSON':'Performance'};return{type:'other',label:'Other'}}
-function cleanupCandidates(){return files.filter(f=>typeOf(f).type!=='protected')}
-function canSelect(f){return typeOf(f).type!=='protected'}
-function match(f,q){q=String(q||'').toLowerCase();const t=typeOf(f).type,c=cleanupCandidates().some(x=>x.path===f.path);const ok=modalFilter==='all'||(modalFilter==='cleanup'&&c)||(modalFilter==='doit'&&t==='doit')||(modalFilter==='protected'&&t==='protected')||(modalFilter==='selectable'&&canSelect(f))||(modalFilter==='json'&&isPerfJson(f.path))||(modalFilter==='team'&&t==='team');return ok&&(!q||f.path.toLowerCase().includes(q)||String(f.date).includes(q))}
-function render(){const body=$('#storageFiles');if(!body)return;const q=$('#storageFilter')?.value||'';const rows=files.filter(f=>match(f,q)).slice(0,500);body.innerHTML=rows.map(f=>{const t=typeOf(f),can=canSelect(f);return`<tr><td><input class="storagePick" type="checkbox" data-path="${esc(f.path)}" ${selected.has(f.path)?'checked':''} ${can?'':'disabled'}></td><td>${esc(t.label)}${can?' · เลือกได้':' · ล็อก'}</td><td>${esc(f.path)}</td><td>${size(f.size)}</td><td>${esc(f.date||f.created_at||'')}</td><td>${esc(t.type)}</td><td><button class="btn2 storageDownload" data-path="${esc(f.path)}">โหลด</button></td></tr>`}).join('')||'<tr><td colspan="7" class="muted">ไม่พบไฟล์จริงใน prefix นี้</td></tr>';document.querySelectorAll('.storagePick').forEach(x=>x.onchange=e=>{if(e.target.checked)selected.add(e.target.dataset.path);else selected.delete(e.target.dataset.path)});document.querySelectorAll('.storageDownload').forEach(x=>x.onclick=()=>download(x.dataset.path));}
-async function refresh(){try{log('กำลังโหลด Storage แบบ recursive เพื่อหาไฟล์จริง โดยไม่มีการลบ...');try{active=await readJson('performance/active.json')}catch{active=null}const lists=await Promise.all(PREFIXES.map(p=>listPrefix(p,0)));files=lists.flat().sort((a,b)=>String(b.created_at||b.path).localeCompare(String(a.created_at||a.path)));selected.clear();$('#storageCount').textContent=files.length.toLocaleString('th-TH');$('#storageSize').textContent=size(files.reduce((s,f)=>s+n(f.size),0));$('#storageLatest').textContent=files[0]?.date||'—';$('#storageActive').textContent=active?.reportDate||active?.versionId||'—';render();log({ok:true,policy:'อ่านและแสดงรายการเท่านั้น · การเลือก candidate เป็น dry-run · ปิดการลบจากเบราว์เซอร์',...DELETE_POLICY,doit_protected_dates:doitProtectedDates(),performance_protected_month:currentMonth(),protected:[...protectedSet()].slice(0,200),types:{protected:files.filter(f=>typeOf(f).type==='protected').length,doit:files.filter(f=>typeOf(f).type==='doit').length,performance:files.filter(f=>typeOf(f).type==='performance').length,team:files.filter(f=>typeOf(f).type==='team').length,other:files.filter(f=>typeOf(f).type==='other').length},files:files.length,cleanup_candidates:cleanupCandidates().length})}catch(e){log(e)}}
-function previewOld(){selected.clear();cleanupCandidates().forEach(f=>selected.add(f.path));modalFilter='cleanup';render();log({ok:true,dry_run:true,policy:'แสดง candidate แบบอ่านอย่างเดียว ไม่มีการลบจากเบราว์เซอร์',selected:[...selected].slice(0,200),...DELETE_POLICY})}
-function showDeleteDisabled(){log({ok:false,error:'browser_storage_delete_disabled',note:'ปิดการลบ Supabase Storage จากเบราว์เซอร์แล้ว การลบต้องผ่านบริการฝั่ง server ที่ตรวจสิทธิ์',...DELETE_POLICY})}
-async function download(path){try{const c=cfg();const r=await fetch(`${c.url}/storage/v1/object/${BUCKET}/${encodeURIComponent(path).replace(/%2F/g,'/')}`,{headers:headers()});if(!r.ok)throw await r.text();const b=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=path.split('/').pop()||'file';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}catch(e){log(e)}}
-function init(){if(!$('#adminStoragePanel'))return;const hint=$('#adminStoragePanel .safeBox');if(hint)hint.innerHTML='<b>โหมดอ่านอย่างเดียว</b><br>อ่าน แสดงรายการ ดาวน์โหลด และ Preview candidate ได้ · ปิดการลบ Supabase Storage จากเบราว์เซอร์';$('#storageRefresh').onclick=refresh;$('#storageFilter').oninput=render;$('#storagePreviewOld').onclick=previewOld;const oldBtn=$('#storageDeleteOld'),selectedBtn=$('#storageDeleteSelected'),confirm=$('#storageConfirm');if(oldBtn){oldBtn.disabled=true;oldBtn.textContent='ปิดการลบจากเบราว์เซอร์';oldBtn.onclick=showDeleteDisabled}if(selectedBtn){selectedBtn.disabled=true;selectedBtn.textContent='ปิดการลบจากเบราว์เซอร์';selectedBtn.onclick=showDeleteDisabled}if(confirm){confirm.disabled=true;confirm.value='';confirm.placeholder='ปิดการลบจากเบราว์เซอร์'}$('#storageCheckAll').onchange=e=>{selected.clear();if(e.target.checked)files.filter(canSelect).forEach(f=>selected.add(f.path));render()};setTimeout(refresh,500)}
+let files=[],modalFilter='all',activeGuardLoaded=false;
+const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const number=value=>Number(value||0)||0;
+const size=value=>{let n=number(value);if(!n)return'—';const units=['B','KB','MB','GB'];let i=0;while(n>=1024&&i<units.length-1){n/=1024;i++}return(i?n.toFixed(2):Math.round(n))+' '+units[i]};
+const days=()=>Math.max(1,Math.min(3650,Number($('#storageDays')?.value||30)||30));
+function log(value){const box=$('#storageStatus');if(box)box.textContent=typeof value==='string'?value:JSON.stringify(value,null,2)}
+function supabaseKey(){return String(window.__ADMIN_SUPABASE_KEY__||$('#sbKey')?.value||'').trim()}
+function apiHeaders(extra={}){return{...window.AdminAuth.headers(),'x-supabase-anon-key':supabaseKey(),...extra}}
+async function api(action,options={}){
+  await window.AdminAuth.ready;
+  const query=new URLSearchParams({action,days:String(days()),...(options.query||{})});
+  const response=await fetch('/api/admin-storage?'+query,{...options,headers:apiHeaders(options.headers||{}),cache:'no-store'});
+  if(response.status===401){window.AdminAuth.logout();throw Error('session_expired')}
+  const type=response.headers.get('content-type')||'';
+  if(options.raw)return response;
+  const result=type.includes('application/json')?await response.json():{ok:false,error:await response.text()};
+  if(!response.ok)throw result;
+  return result;
+}
+function reasonLabel(reason){return({system_file:'ไฟล์ระบบ',reserved_current_path:'ชื่อไฟล์ Current/Latest/Previous',active_reference:'ไฟล์ Active/Current',latest_two_doit_dates:'DOIT 2 วันล่าสุด',current_performance_month:'Performance เดือนปัจจุบัน',folder_locked:'Folder ล็อก',not_older_than_cutoff:'ยังไม่เก่าตามกำหนด',path_traversal:'Path ไม่ปลอดภัย',invalid_path:'Path ไม่ถูกต้อง'}[reason]||reason)}
+function statusOf(file){
+  if(file.deletable&&activeGuardLoaded)return{type:'deletable',label:'ลบได้'};
+  const reasons=(file.reasons||[]).filter(reason=>reason!=='not_older_than_cutoff');
+  if(reasons.length)return{type:'protected',label:reasons.map(reasonLabel).join(', ')};
+  return{type:'recent',label:'ยังไม่เก่ากว่า '+days()+' วัน'};
+}
+function matches(file,query){
+  const q=String(query||'').trim().toLowerCase(),status=statusOf(file);
+  const filterOk=modalFilter==='all'||(modalFilter==='cleanup'&&status.type==='deletable')||(modalFilter==='protected'&&status.type==='protected')||(modalFilter==='selectable'&&status.type==='deletable');
+  return filterOk&&(!q||file.path.toLowerCase().includes(q)||String(file.date||'').toLowerCase().includes(q));
+}
+function updateDeleteCount(){
+  const button=$('#storageDeleteSelected');if(button){button.textContent=`ลบไฟล์ที่เลือกจริง (${selected.size}/${MAX_DELETE})`;button.disabled=!selected.size||!activeGuardLoaded}
+}
+function render(){
+  const body=$('#storageFiles');if(!body)return;
+  const query=$('#storageFilter')?.value||'';
+  const rows=files.filter(file=>matches(file,query)).slice(0,500);
+  body.innerHTML=rows.map(file=>{const status=statusOf(file),can=status.type==='deletable'&&activeGuardLoaded;return`<tr><td><input class="storagePick" type="checkbox" data-path="${esc(file.path)}" ${selected.has(file.path)?'checked':''} ${can?'':'disabled'}></td><td>${esc(status.label)}${can?' · เลือกได้':' · ล็อก'}</td><td>${esc(file.path)}</td><td>${size(file.size)}</td><td>${esc(file.date||file.updated_at||file.created_at||'')}</td><td>${esc((file.reasons||[]).map(reasonLabel).join(', ')||'ไฟล์เก่า')}</td><td><button class="btn2 storageDownload" data-path="${esc(file.path)}">ดาวน์โหลด</button></td></tr>`}).join('')||'<tr><td colspan="7" class="muted">ไม่พบไฟล์ตามตัวกรอง</td></tr>';
+  document.querySelectorAll('.storagePick').forEach(input=>input.onchange=event=>{
+    const path=event.target.dataset.path;
+    if(event.target.checked){if(selected.size>=MAX_DELETE){event.target.checked=false;log({ok:false,error:'delete_limit',max:MAX_DELETE,note:'เลือกได้สูงสุด 20 ไฟล์ต่อครั้ง'});return}selected.add(path)}else selected.delete(path);
+    updateDeleteCount();
+  });
+  document.querySelectorAll('.storageDownload').forEach(button=>button.onclick=()=>download(button.dataset.path));
+  updateDeleteCount();
+}
+async function refresh(filter='all'){
+  try{
+    log('กำลังทำ dry-run และตรวจ guard จาก Storage จริง...');
+    const result=await api('dry-run');
+    files=Array.isArray(result.files)?result.files:[];
+    activeGuardLoaded=Boolean(result.activeGuardLoaded)&&!result.truncated;
+    selected.clear();modalFilter=filter;
+    $('#storageCount').textContent=number(result.total).toLocaleString('th-TH');
+    $('#storageSize').textContent=size(files.reduce((sum,file)=>sum+number(file.size),0));
+    $('#storageLatest').textContent=files[0]?.date||'—';
+    $('#storageActive').textContent=activeGuardLoaded?'โหลด guard แล้ว':'ไม่พร้อมลบ';
+    render();
+    log({ok:true,dry_run:true,bucket:result.bucket,older_than_days:result.days,files:result.total,delete_candidates:result.candidateCount,protected:result.protectedCount,delete_limit:result.deleteLimit,active_guard_loaded:result.activeGuardLoaded,truncated:result.truncated,note:activeGuardLoaded?'ตรวจรายการแล้ว เลือกได้สูงสุด 20 ไฟล์ต่อครั้ง':'ปิดการลบ เพราะโหลด Active guard ไม่ครบ'});
+  }catch(error){activeGuardLoaded=false;render();log(error)}
+}
+async function previewOld(){return refresh('cleanup')}
+function selectOld(){
+  selected.clear();
+  files.filter(file=>statusOf(file).type==='deletable').slice(0,MAX_DELETE).forEach(file=>selected.add(file.path));
+  modalFilter='cleanup';render();
+  log({ok:true,dry_run:true,selected_count:selected.size,delete_limit:MAX_DELETE,older_than_days:days(),paths:[...selected],note:'ยังไม่ได้ลบ กดปุ่มลบไฟล์ที่เลือกจริงเพื่อดำเนินการ'});
+}
+async function deleteSelected(){
+  if(!selected.size)return log({ok:false,error:'no_file_selected'});
+  if(selected.size>MAX_DELETE)return log({ok:false,error:'delete_limit',max:MAX_DELETE});
+  const paths=[...selected];
+  try{
+    log({ok:true,action:'delete_start',count:paths.length,paths});
+    const result=await api('delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',days:days(),paths})});
+    await refresh('cleanup');
+    log(result);
+  }catch(error){log(error);await refresh('cleanup').catch(()=>{})}
+}
+async function download(path){
+  try{
+    const response=await api('download',{query:{path},raw:true});
+    if(!response.ok)throw Error('download_failed_'+response.status);
+    const blob=await response.blob(),link=document.createElement('a');
+    link.href=URL.createObjectURL(blob);link.download=path.split('/').pop()||'file';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1500);
+  }catch(error){log({ok:false,error:String(error?.message||error),path})}
+}
+async function init(){
+  if(!$('#adminStoragePanel'))return;
+  await window.AdminAuth.ready;
+  const hint=$('#adminStoragePanel .safeBox');if(hint)hint.innerHTML='<b>ลบจริงผ่าน server-side guard</b><br>ลบเฉพาะ performance/doit/uploads/raw/parsed ที่เก่าตามกำหนด · ป้องกันไฟล์ระบบ Active/Current, DOIT 2 วันล่าสุด และ Performance เดือนปัจจุบัน · สูงสุด 20 ไฟล์ต่อครั้ง';
+  const confirm=$('#storageConfirm');if(confirm)confirm.style.display='none';
+  const old=$('#storageDeleteOld');if(old)old.textContent='เลือกไฟล์เก่า (สูงสุด 20)';
+  $('#storageRefresh').onclick=()=>refresh('all');
+  $('#storageFilter').oninput=render;
+  $('#storagePreviewOld').onclick=previewOld;
+  $('#storageDeleteOld').onclick=selectOld;
+  $('#storageDeleteSelected').onclick=deleteSelected;
+  $('#storageDays').onchange=()=>refresh(modalFilter);
+  $('#storageCheckAll').onchange=event=>{selected.clear();if(event.target.checked)files.filter(file=>statusOf(file).type==='deletable').slice(0,MAX_DELETE).forEach(file=>selected.add(file.path));render()};
+  await refresh('all');
+}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
