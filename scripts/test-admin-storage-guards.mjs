@@ -66,5 +66,7 @@ assert.equal(_test.MAX_DELETE, 20);
 const fakeJwt = payload => `${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.${'x'.repeat(80)}`;
 assert.equal(_test.validAnonKey(fakeJwt({ iss: 'supabase', role: 'anon', ref: 'saodmeoilixfdqentofp' })), true);
 assert.equal(_test.validAnonKey(fakeJwt({ iss: 'supabase', role: 'service_role', ref: 'saodmeoilixfdqentofp' })), false);
+assert.equal(_test.validAnonKey('sb_publishable_abcdefghijklmnopqrstuvwxyz1234567890'), true);
+assert.equal(_test.validAnonKey('sb_secret_abcdefghijklmnopqrstuvwxyz1234567890'), false);
 
 console.log('admin storage guard regression: PASS');

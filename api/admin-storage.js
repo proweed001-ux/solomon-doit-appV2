@@ -78,7 +78,9 @@ function decodeJwtPayload(token) {
 
 function validAnonKey(value) {
   const key = text(value);
-  if (key.length < 80 || key.length > 2000) return false;
+  if (key.length > 2000) return false;
+  if (/^sb_publishable_[A-Za-z0-9_-]{20,}$/.test(key)) return true;
+  if (key.length < 80) return false;
   const claims = decodeJwtPayload(key);
   return Boolean(claims && claims.iss === 'supabase' && claims.role === 'anon' && claims.ref === PROJECT_REF);
 }

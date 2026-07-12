@@ -26,7 +26,7 @@ async function provisionCloud(){
   if(!response.ok)throw Error('public_config_unavailable');
   const source=await response.text();
   const key=source.match(/const\s+KEY\s*=\s*['"]([^'"]+)['"]/i)?.[1]||'';
-  if(!/^eyJ[A-Za-z0-9_-]+\./.test(key))throw Error('public_anon_key_unavailable');
+  if(!(/^sb_publishable_[A-Za-z0-9_-]{20,}$/.test(key)||/^eyJ[A-Za-z0-9_-]+\./.test(key)))throw Error('public_anon_key_unavailable');
   window.__ADMIN_SUPABASE_KEY__=key;
   const apply=()=>{
     const url=document.querySelector('#sbUrl'),input=document.querySelector('#sbKey');
