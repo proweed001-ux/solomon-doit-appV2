@@ -42,12 +42,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: Foundation smoke check
         run: node scripts/smoke-check.mjs
       - name: Promo dynamic grid and OCR safety regression
         run: node scripts/test-promo-dynamic-grid-price-safety.mjs
       - name: Promo product master and publish safety regression
         run: node scripts/test-promo-master-consensus.mjs
+      - name: Promo browser runtime and objective release gate regression
+        run: node scripts/test-promo-runtime-release-gate.mjs
       - name: Promo latest-only backend regression
         run: node scripts/test-promo-latest-only.mjs
