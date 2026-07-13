@@ -1,44 +1,85 @@
-# Promo dynamic grid + price OCR safety — 2026-07-13
+# Promo dynamic grid, Product Master, price consensus and publish safety — 2026-07-13
 
 ## Scope
 
-Branch/Preview only. No Production merge. The SEP25 file was tested as a local dry-run, without Supabase writes, Storage upload, publish, or cleanup.
+Branch/Preview only. No Production merge. The SEP25 file was tested as a local dry-run without Supabase writes, Storage upload, publish, or cleanup.
 
-## Changes
+## Confirmed source-file facts
 
-- Detect `%PDF-` from file content instead of trusting the extension.
-- Count cards from the actual PDF instead of requiring 212.
-- Detect 3–8 grid columns and map each white card anchor to exactly one cell.
-- Detect Class from the page header, with the existing page map only as fallback.
-- Read product title and average/base-unit price.
-- Read the normal pack price separately and use it as an arithmetic cross-check.
-- Require two independent price OCR passes to agree before price data can be `auto_ok`.
-- Require two independent promo OCR passes to agree exactly before the promotion can be `auto_ok`.
-- Structured red badges must agree with the general OCR result; a badge match alone is no longer sufficient.
-- Use a fixed lower-left price-panel fallback when color detection misses the panel.
-- Use a dedicated title OCR pass and require agreement with the full-card title evidence.
-- Block suspicious percentages, duplicate tiers, missing tiers, wrong order, and inconsistent price/title metadata.
-- Require image, title, base price, unit, function, and tiers before final publish.
+- The test file has a `.PNG` filename but contains a PDF 1.7 document.
+- Pages: 18.
+- Actual cards: 258.
+- Layouts observed: 4, 5 and 6 columns.
+- The original JUL26-specific implementation expected 212 cards and could not process all SEP25 pages.
 
-## SEP25 dry-run evidence
+## Implemented changes
 
-- PDF pages: 18
-- Dynamic grid: 18/18 pages
-- Rows: 54/54
-- Cards: 258/258
-- Layouts observed: 4, 5, and 6 columns
-- Every output cell contained exactly one card anchor.
-- The first color-only price-panel detector found only 39/258 cards. The previous statement that it found 258/258 was incorrect.
-- Version 2 adds a fixed lower-left price-panel fallback because the panel position is consistent even when its color is not detected.
-- Dedicated price-digit OCR sample: 12/12 cards produced a plausible normal price and average price with the arithmetic guard passing.
-- The earlier full metadata sample did not validate title and unit reliably; therefore 12/12 is evidence for price digits only, not proof that complete metadata is correct.
-- Regression for previous false-auto patterns rejects missing tiers, duplicate tiers, wrong percentages, suspicious 87%, and structured badge/general OCR disagreement.
+### Dynamic grid
 
-## Remaining proof
+- Validate the `%PDF-` magic header instead of trusting the extension.
+- Count pages, rows and cards from the actual file.
+- Detect 3–8 columns.
+- Map every white-card anchor to exactly one blue-grid cell.
+- Stop when a cell has zero or multiple anchors.
 
-- Run Tesseract.js on all 258 cards in the deployed Preview.
-- Confirm title, unit and price for every card from the Browser Dry-run report.
-- Test memory, processing time and worker failure on the target Android phone.
-- Test the complete upload/finalize/old-month cleanup flow in an isolated Supabase branch or project. This last test must not use the production data project.
+### Promotion OCR
 
-The publish button remains blocked while any card is `need_review`. The system is not approved for Production until the remaining proof is complete.
+- Require two OCR variants to produce the same complete Tier structure.
+- Reject missing Tiers, duplicate Tiers, wrong order, unit disagreement and suspicious percentages.
+- Structured red badges must agree with general OCR; the badge alone cannot approve a multi-step promotion.
+
+### Product title and Product Master
+
+- Read the title from the full-card OCR and from a dedicated title crop.
+- Match both pieces of evidence against the reviewed Product Master snapshot.
+- Require a minimum match score and a non-ambiguous margin.
+- Use the canonical Product Master name in the database instead of raw OCR text.
+- A genuinely new product can receive a deterministic UUID only when both title OCR sources strongly agree, numeric size evidence agrees, and the price evidence is valid.
+- The backend independently verifies the deterministic ID and rejects weak novel-product evidence.
+
+### Average/base-unit price
+
+- Read the price panel using two image transformations.
+- Require the normal price, average price and inferred pack quantity to agree.
+- Compare repeated cards linked to the same Product Master.
+- Rescue a missing price only when at least two matching cards support one price cluster.
+- A tie, conflicting unit, or outlier price changes the affected cards to `need_review`.
+
+### Upload and publish
+
+- Published months are locked against ordinary batch re-upload.
+- Each upload requires an active Product Master or strongly verified deterministic new master.
+- The backend creates/links monthly product groups and one group price.
+- Finalize requires the expected dynamic Card IDs plus image, title, price, unit, Function, Tier, Product Master link and valid group price for every card.
+- The Live page selects only a `published` month and never falls back to a draft.
+- Cleanup now includes old group prices, card-group links and monthly product groups as well as cards, functions, detections, tiers and Storage files.
+
+## Confirmed test evidence
+
+- SEP25 dynamic grid: 18/18 pages.
+- Rows: 54/54.
+- Cards: 258/258.
+- Every output cell contains exactly one card anchor.
+- Dedicated local price OCR sample: 12/12 produced a usable normal price and average price with the arithmetic guard passing.
+- Previous confirmed false-auto patterns are rejected by regression tests.
+- Product Master matching regression distinguishes similar products and sizes.
+- GitHub Web CI passes:
+  - foundation smoke;
+  - dynamic grid and OCR safety;
+  - Product Master, grouped price and publish safety;
+  - latest-only backend safety.
+- Preview Edge Function `promo-image-upload-v2-preview` version 5 is ACTIVE.
+- JUL26 remains the only published month and retains 212 cards, 212 function matches, 212 detections and 212 cards with Tiers.
+
+## Corrected evidence
+
+The first color-only price-panel detector found 39/258 cards, not 258/258. A fixed-position fallback and dual price OCR were added. This correction must remain visible in the record.
+
+## Remaining proof before Production
+
+- Run browser Tesseract.js across all 258 SEP25 cards on the deployed Preview.
+- Audit the browser result card by card for title, Product Master, unit, price and promotion.
+- Measure Android runtime, memory use, browser freeze/reload and Worker failure.
+- Test upload → finalize → old-month cleanup in an isolated Supabase branch/project. Creating a Supabase branch may incur cost and requires separate approval.
+
+Until those checks pass, PR #63 must remain Draft and must not be merged to Production.
