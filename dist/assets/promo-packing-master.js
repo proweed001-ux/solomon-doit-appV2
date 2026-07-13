@@ -1,1 +1,1 @@
-window.PROMO_PACKING_MASTER={OLAY:{brand:'OLAY',brand_th:'โอเลย์',case_unit:'ลัง',base_unit:'กล่อง',base_per_case:24,confirmed_at:'2026-07-13'}};
+window.PROMO_PACKING_MASTER={OLAY:{brand:'OLAY',brand_th:'โอเลย์',case_unit:'ลัง',box_unit:'กล่อง',piece_unit:'ชิ้น',boxes_per_case:24,pieces_per_box:6,pieces_per_case:144,confirmed_at:'2026-07-13'}};
