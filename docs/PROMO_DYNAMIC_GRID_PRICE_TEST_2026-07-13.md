@@ -4,6 +4,8 @@
 
 Branch/Preview only. No Production merge. The SEP25 file was tested as a local dry-run without Supabase writes, Storage upload, publish, or cleanup.
 
+The objective release checklist is `docs/PROMO_RELEASE_GATE.md`. A percentage estimate does not override that checklist.
+
 ## Confirmed source-file facts
 
 - The test file has a `.PNG` filename but contains a PDF 1.7 document.
