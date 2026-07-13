@@ -10,10 +10,10 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
-<header class="head"><h1>PDF โปรโมชัน V2 — เดือนล่าสุดเท่านั้น</h1><p>กริดอัตโนมัติ • OCR สองทาง • อ่านชื่อสินค้าและราคากลาง • ผ่านครบแล้วจึงเผยแพร่</p></header>
+<header class="head"><h1>PDF โปรโมชัน V2 — เดือนล่าสุดเท่านั้น</h1><p>กริดอัตโนมัติ • OCR หลายหลักฐาน • Product Master • ราคากลางแบบกลุ่ม</p></header>
 <main class="wrap">
 <section class="card">
-<div class="note"><b>การทำงาน:</b> ระบบตรวจชนิดไฟล์จากเนื้อจริง หา Class และกริดจาก PDF นับจำนวนการ์ดจริง รองรับจำนวนช่องที่เปลี่ยน อ่านชื่อสินค้า ราคากลางต่อหน่วย และเงื่อนไขโปรด้วยหลักฐานสองทาง หากผลไม่ตรงกันแม้จุดเดียวจะขึ้น “ต้องตรวจ” และไม่เปลี่ยนเดือนหรือลบข้อมูลเดือนปัจจุบัน</div>
+<div class="note"><b>การทำงาน:</b> ระบบตรวจเนื้อไฟล์ PDF หา Class และกริดจริง อ่านเงื่อนไขโปร ชื่อสินค้า และราคากลางหลายรอบ จากนั้นเทียบ Product Master และตรวจราคาซ้ำระหว่างการ์ดสินค้าชนิดเดียวกัน สินค้าใหม่จะสร้าง Master ได้เฉพาะเมื่อ OCR ชื่อสองทางตรงกันชัดเจน หากหลักฐานไม่ครบหรือขัดแย้งแม้จุดเดียวจะขึ้น “ต้องตรวจ” และจะไม่เปลี่ยนเดือนหรือลบข้อมูลปัจจุบัน</div>
 <label>รหัสอัปโหลด</label><input id="key" type="password" placeholder="ใส่รหัสอัปโหลด">
 <div class="grid">
 <div><label>Promo Month</label><input id="month" value="" placeholder="เช่น AUG26"></div>
@@ -27,17 +27,17 @@
 <div class="summary">
 <div class="sum">การ์ดเจอ<b id="sTotal">0</b></div><div class="sum">กรอบผ่าน<b id="sPass">0</b></div><div class="sum">กรอบผิด<b id="sFail">0</b></div><div class="sum">AUTO OK<b id="sAuto">0</b></div><div class="sum">ต้องตรวจ<b id="sReview">0</b></div><div class="sum">จำนวนจริง<b id="sExpected">0</b></div><div class="sum">พร้อมอัป<b id="sUpload">0</b></div>
 </div>
-<div class="legend"><span class="tag green">AUTO OK = กริด ชื่อ ราคา และโปรตรงกันสองทาง</span><span class="tag orange">ต้องตรวจ = หลักฐานไม่ครบหรือสองรอบไม่ตรง</span><span class="tag redtag">FAIL = กริดหรือจำนวนผิด</span></div>
+<div class="legend"><span class="tag green">AUTO OK = กริด โปร ชื่อ Product Master และราคากลางตรงครบ</span><span class="tag orange">ต้องตรวจ = หลักฐานไม่ครบหรือผลขัดแย้ง</span><span class="tag redtag">FAIL = กริดหรือจำนวนผิด</span></div>
 <div class="status" id="status">ยังไม่ได้เริ่ม</div><div class="bar"><i id="bar"></i></div><div class="log" id="log"></div>
 </section>
-<section class="card"><b>ตัวอย่างผลตรวจ (แสดงรายการต้องตรวจทั้งหมด และรายการผ่านบางส่วน)</b><div id="crops" class="crops"></div></section>
+<section class="card"><b>ผลตรวจ — แสดงรายการต้องตรวจทั้งหมดและตัวอย่างรายการผ่าน</b><div id="crops" class="crops"></div></section>
 </main>
 <script type="module">
 const pdfjsLib=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
 window.pdfjsLib=pdfjsLib;
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
-for(const src of ['/assets/promo-packing-master.js','/assets/promo-pdf-upload-v2-v3-1.js','/assets/promo-pdf-upload-v2-v3-2.js','/assets/promo-pdf-upload-v2-v3-3.js','/assets/promo-pdf-upload-v2-v3-4a.js','/assets/promo-pdf-upload-v2-v3-4d.js','/assets/promo-pdf-upload-v2-v3-4b.js','/assets/promo-pdf-upload-v2-v3-4c.js','/assets/promo-pdf-upload-v2-v3-5a.js','/assets/promo-pdf-upload-v2-v3-6a.js','/assets/promo-pdf-upload-v2-v3-6b.js','/assets/promo-pdf-upload-v2-v3-6c.js','/assets/promo-pdf-upload-v2-v3-6d.js','/assets/promo-pdf-upload-v2-v3-6e.js','/assets/promo-pdf-upload-v2-v3-5b.js']){
-  await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src+'?v=20260713-7';s.onload=resolve;s.onerror=()=>reject(new Error(`โหลด ${src} ไม่สำเร็จ`));document.body.appendChild(s)});
+for(const src of ['/assets/promo-packing-master.js','/assets/promo-product-master-snapshot-v1.js','/assets/promo-pdf-upload-v2-v3-1.js','/assets/promo-pdf-upload-v2-v3-2.js','/assets/promo-pdf-upload-v2-v3-3.js','/assets/promo-pdf-upload-v2-v3-4a.js','/assets/promo-pdf-upload-v2-v3-4d.js','/assets/promo-pdf-upload-v2-v3-4b.js','/assets/promo-pdf-upload-v2-v3-4c.js','/assets/promo-pdf-upload-v2-v3-5a.js','/assets/promo-pdf-upload-v2-v3-6a.js','/assets/promo-pdf-upload-v2-v3-6b.js','/assets/promo-pdf-upload-v2-v3-6c.js','/assets/promo-pdf-upload-v2-v3-6d.js','/assets/promo-pdf-upload-v2-v3-6e.js','/assets/promo-pdf-upload-v2-v3-6f.js','/assets/promo-pdf-upload-v2-v3-5b.js']){
+  await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src+'?v=20260713-8';s.onload=resolve;s.onerror=()=>reject(new Error(`โหลด ${src} ไม่สำเร็จ`));document.body.appendChild(s)});
 }
 </script>
 </body>
