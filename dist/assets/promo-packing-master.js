@@ -1,1 +1,30 @@
-window.PROMO_PACKING_MASTER={OLAY:{brand:'OLAY',brand_th:'โอเลย์',case_unit:'ลัง',box_unit:'กล่อง',piece_unit:'ชิ้น',boxes_per_case:24,pieces_per_box:6,pieces_per_case:144,confirmed_at:'2026-07-13'}};
+window.PROMO_PACKING_MASTER={
+  OLAY:{
+    brand:'OLAY',
+    brand_th:'โอเลย์',
+    case_unit:'ลัง',
+    box_unit:'กล่อง',
+    piece_unit:'ชิ้น',
+    boxes_per_case:24,
+    pieces_per_box:6,
+    pieces_per_case:144,
+    confirmed_at:'2026-07-13'
+  },
+  SHAMPOO_CONDITIONER:{
+    category_th:'แชมพูและครีมนวด',
+    package_unit:'ขวด',
+    size_rules:[
+      {min_ml:60,max_ml:70,bottles_per_case:48},
+      {min_ml:105,max_ml:140,bottles_per_case:24}
+    ],
+    confirmed_at:'2026-07-13'
+  },
+  FABRIC_SOFTENER:{
+    category_th:'ผลิตภัณฑ์ปรับผ้านุ่ม',
+    size_rules:[
+      {size_ml:20,case_unit:'ลัง',pack_unit:'แพ็ค',sachet_unit:'ซอง',packs_per_case:20,sachets_per_pack:24,sachets_per_case:480},
+      {size_ml:100,case_unit:'ลัง',bag_unit:'ถุง',bags_per_case:60}
+    ],
+    confirmed_at:'2026-07-13'
+  }
+};
