@@ -86,6 +86,8 @@ assert.match(upload,/master_status/);
 assert.match(upload,/master_is_new/);
 assert.match(upload,/promo_card_product_groups/);
 assert.match(upload,/promo_group_prices/);
+assert.match(masterSync,/published_month_locked/);
+assert.ok(masterSync.indexOf('published_month_locked') < masterSync.indexOf('novelById.set'));
 assert.match(masterSync,/novel_master_evidence_too_weak/);
 assert.match(masterSync,/novel_master_identity_mismatch/);
 assert.match(masterSync,/promo_product_master_aliases/);
