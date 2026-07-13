@@ -6,11 +6,15 @@ const templates=[
  '6 ขวด ลด 10%; 12 ขวด ลด 17%; 1 ลัง ลด 20%',
  '6 ขวด ลด 10%; 12 ขวด ลด 17%; 24 ขวด ลด 20%',
  '12 ขวด ลด 12%; 1 ลัง ลด 17%',
+ '12 ขวด ลด 12%; 1 ลัง ลด 17%; 3 ลัง ลด 25%',
+ '3 กล่อง ลด 12%; 1 ลัง ลด 17%',
+ '3 กล่อง ลด 15%; 1 ลัง ลด 17%',
+ '6 กล่อง ลด 15%; 1 ลัง ลด 17%',
  '3 ชิ้น ลด 12%; 5 ชิ้น ฟรี 1 ชิ้น (17%)',
  '60 ชิ้น ลด 15%; 120 ชิ้น ลด 18%',
  '1-2 ชิ้น ลด 24%',
  '12 ชิ้น ลด 25%',
- 'ลด 24%','ลด 25%','ลด 12%','ลด 27%'
+ 'ลด 24%','ลด 25%','ลด 12%','ลด 17%','ลด 27%'
 ];
 const allowed=new Set([5,7,8,10,12,14,15,16,17,18,19,20,21,22,23,24,25,27,28,30,33,37]);
 const thaiDigits={'๐':'0','๑':'1','๒':'2','๓':'3','๔':'4','๕':'5','๖':'6','๗':'7','๘':'8','๙':'9'};
@@ -24,6 +28,10 @@ function best(raw){return [...templates].sort((a,b)=>score(raw,b)-score(raw,a))[
 function autoValid(raw,label,confidence=90,margin=.2){const exact=parseTiers(raw).length&&JSON.stringify(parseTiers(raw))===JSON.stringify(parseTiers(label));const complete=JSON.stringify(pctSig(raw))===JSON.stringify(pctSig(label));const strong=score(raw,label)>=.90&&margin>=.08&&confidence>=72;return !!(complete&&(exact||strong))}
 function parseBadgePercent(raw){const nums=String(raw||'').match(/\d{1,4}/g)||[];if(!nums.length)return null;const n=nums[0],cand=[];for(let i=0;i<n.length;i++)for(let j=i+1;j<=Math.min(n.length,i+2);j++){const v=Number(n.slice(i,j));if(allowed.has(v))cand.push({len:j-i,pos:i,v})}cand.sort((a,b)=>b.len-a.len||a.pos-b.pos);return cand[0]?.v??null}
 function badgePick(pct,topRaw){const same=templates.filter(t=>pctSig(t).at(-1)===pct),top=[...topRaw.matchAll(/\d+/g)].map(m=>Number(m[0]));if(!top.length){const s=`ลด ${pct}%`;return templates.includes(s)?s:''}const sc=t=>{const q=quantitySig(t),tiers=parseTiers(t);let n=0;if(topRaw.includes('-')&&tiers[0]?.[0]==='range')n+=3;n+=2*lcs(top,q)/Math.max(1,top.length,q.length)-.2*Math.abs(top.length-q.length);if(pctSig(t).length===1)n++;return n};return same.sort((a,b)=>sc(b)-sc(a))[0]||''}
+function tierSame(a,b){return JSON.stringify(a)===JSON.stringify(b)}
+function orderedTierSubset(observed,full){let i=0;for(const tier of full)if(i<observed.length&&tierSame(observed[i],tier))i++;return i===observed.length}
+function promoPairSig(s){return[...cleanOcr(s).matchAll(/(\d{1,3})\s*(ขวด|ชิ้น|แพ็ค|กล่อง|ลัง|ซอง|ถุง)/g)].map(m=>[Number(m[1]),m[2]])}
+function completePartialTemplate(raws,lineCount){const cleaned=raws.map(cleanOcr).filter(Boolean),observed=[];for(const raw of cleaned)for(const tier of parseTiers(raw))if(tier[0]!=='simple'&&!observed.some(x=>tierSame(x,tier)))observed.push(tier);if(!observed.length)return null;const observedPairs=observed.map(t=>[t[1],t[2]]),hints=[];for(const raw of cleaned)for(const pair of promoPairSig(raw))if(!hints.some(x=>tierSame(x,pair)))hints.push(pair);const missingHints=hints.filter(h=>!observedPairs.some(x=>tierSame(x,h)));if(!missingHints.length)return null;const candidates=templates.filter(label=>{const tiers=parseTiers(label);if(!tiers.length||tiers.length<=observed.length)return false;if(lineCount&&tiers.length!==lineCount)return false;if(!orderedTierSubset(observed,tiers))return false;const pairs=promoPairSig(label);return missingHints.some(h=>pairs.some(p=>tierSame(p,h)))});return candidates.length===1?candidates[0]:null}
 
 assert.deepEqual(parseTiers('2 Bu aA 8% ๒ 4 BU aA 11%'),[['discount',2,'ชิ้น',8],['discount',4,'ชิ้น',11]]);
 assert.equal(best('6 ขวด ล ด 10% 12 UOA aA 17% 1 a0 aA 20%'),'6 ขวด ลด 10%; 12 ขวด ลด 17%; 1 ลัง ลด 20%');
@@ -39,7 +47,11 @@ assert.equal(parseBadgePercent('24%'),24);
 assert.equal(badgePick(24,'1-2-'),'1-2 ชิ้น ลด 24%');
 assert.equal(badgePick(25,'12'),'12 ชิ้น ลด 25%');
 assert.equal(badgePick(25,''),'ลด 25%');
+assert.equal(completePartialTemplate(['เพ 4: 1 ลัง ลด 17%','เมื่อซื้อ 12 ขวด'],2),'12 ขวด ลด 12%; 1 ลัง ลด 17%');
+assert.equal(completePartialTemplate(['1 ลัง ลด 17%','เมื่อซื้อ 12 ขวด'],3),'12 ขวด ลด 12%; 1 ลัง ลด 17%; 3 ลัง ลด 25%');
+assert.equal(completePartialTemplate(['1 ลัง ลด 17%','เมื่อซื้อ 3 กล่อง'],2),null);
+assert.equal(completePartialTemplate(['1 ลัง ลด 17%','เมื่อซื้อ 6 กล่อง'],2),'6 กล่อง ลด 15%; 1 ลัง ลด 17%');
 
 async function retryResumeMock(){const batches=Array.from({length:22},(_,i)=>i),failOnce=new Set([3,11]),attempts=new Map(),completed=new Set();async function run(batch){const n=(attempts.get(batch)||0)+1;attempts.set(batch,n);if(failOnce.has(batch)&&n===1)throw Error('planned');completed.add(batch)}let pending=[...batches];for(let round=0;round<3&&pending.length;round++){const next=[];for(let i=0;i<pending.length;i+=2){const pair=pending.slice(i,i+2),results=await Promise.allSettled(pair.map(run));results.forEach((r,j)=>{if(r.status==='rejected')next.push(pair[j])})}pending=next}assert.equal(completed.size,22);assert.deepEqual(pending,[]);assert.equal(attempts.get(3),2);assert.equal(attempts.get(11),2);for(const batch of batches)if(batch!==3&&batch!==11)assert.equal(attempts.get(batch),1);return[...attempts.values()].reduce((a,b)=>a+b,0)}
 assert.equal(await retryResumeMock(),24);
-console.log(JSON.stringify({ok:true,parserAndBadgeCases:14,retryRequests:24},null,2));
+console.log(JSON.stringify({ok:true,parserBadgeAndCompletionCases:18,retryRequests:24},null,2));
