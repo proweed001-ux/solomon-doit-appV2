@@ -15,6 +15,8 @@ Branch/Preview only. No Production merge. The SEP25 file was tested as a local d
 - Require two independent price OCR passes to agree before price data can be `auto_ok`.
 - Require two independent promo OCR passes to agree exactly before the promotion can be `auto_ok`.
 - Structured red badges must agree with the general OCR result; a badge match alone is no longer sufficient.
+- Use a fixed lower-left price-panel fallback when color detection misses the panel.
+- Use a dedicated title OCR pass and require agreement with the full-card title evidence.
 - Block suspicious percentages, duplicate tiers, missing tiers, wrong order, and inconsistent price/title metadata.
 - Require image, title, base price, unit, function, and tiers before final publish.
 
