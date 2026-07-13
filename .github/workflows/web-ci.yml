@@ -9,6 +9,7 @@ on:
       - "docs/**"
       - "dist/*.html"
       - "dist/assets/**"
+      - "supabase/functions/promo-latest-upload-preview/**"
       - "package.json"
       - "package-lock.json"
       - "tsconfig*.json"
@@ -22,6 +23,7 @@ on:
       - "docs/**"
       - "dist/*.html"
       - "dist/assets/**"
+      - "supabase/functions/promo-latest-upload-preview/**"
       - "package.json"
       - "package-lock.json"
       - "tsconfig*.json"
@@ -35,7 +37,7 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,3 +47,7 @@ jobs:
         run: node scripts/smoke-check.mjs
       - name: Promo dynamic grid and OCR safety regression
         run: node scripts/test-promo-dynamic-grid-price-safety.mjs
+      - name: Promo product master and publish safety regression
+        run: node scripts/test-promo-master-consensus.mjs
+      - name: Promo latest-only backend regression
+        run: node scripts/test-promo-latest-only.mjs
