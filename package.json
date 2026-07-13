@@ -22,6 +22,7 @@
     "test:promo-packing": "node scripts/test-promo-packing-master.mjs",
     "test:promo-function-sync": "node scripts/test-promo-function-sync.mjs",
     "test:promo-latest": "node scripts/test-promo-latest-only.mjs",
+    "test:promo-dynamic": "node scripts/test-promo-dynamic-grid-price-safety.mjs",
     "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\""
   },
   "dependencies": {
