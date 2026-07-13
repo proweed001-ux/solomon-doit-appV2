@@ -60,6 +60,7 @@ export function parseFunctionLabel(value) {
 }
 
 export function promoTierRows(cardId, parsed) {
+  if (parsed.payload.tiers.some(tier => tier.type === 'free_goods')) return [];
   return parsed.payload.tiers.map((tier, index) => ({
     tier_id: `${cardId}-T${index + 1}`,
     card_id: cardId,
@@ -68,8 +69,8 @@ export function promoTierRows(cardId, parsed) {
     min_qty: tier.min_qty ?? tier.qty ?? tier.buy_qty ?? 1,
     max_qty: tier.max_qty ?? null,
     unit: tier.unit ?? null,
-    discount_percent: tier.discount_percent ?? tier.effective_percent ?? null,
-    free_qty: tier.free_qty ?? 0,
+    discount_percent: tier.discount_percent ?? null,
+    free_qty: 0,
     note: null,
   }));
 }
