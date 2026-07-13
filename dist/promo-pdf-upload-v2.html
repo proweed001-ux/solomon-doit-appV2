@@ -3,31 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>PDF โปรโมชัน V2 — เร็วขึ้นและอ่านข้อความแม่นขึ้น</title>
+<title>PDF โปรโมชัน V2 — เดือนล่าสุดเท่านั้น</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f3f4f6;color:#111827;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}.head{background:linear-gradient(135deg,#0f766e,#1d4ed8);color:#fff;padding:18px 14px}.head h1{margin:0;font-size:21px}.head p{margin:6px 0 0;color:#dbeafe;font-weight:800}.wrap{padding:12px;max-width:1280px;margin:auto}.card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;margin:12px 0;box-shadow:0 6px 18px rgba(15,23,42,.06)}label{display:block;font-weight:900;margin:10px 0 5px}input,select{width:100%;height:42px;border:1px solid #cbd5e1;border-radius:10px;padding:0 10px;font-weight:800}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.btn{height:42px;border:0;border-radius:12px;background:#4f46e5;color:#fff;font-weight:950;padding:0 16px;box-shadow:0 3px 0 #3730a3}.btn.gray{background:#475569;box-shadow:0 3px 0 #334155}.btn.red{background:#dc2626;box-shadow:0 3px 0 #991b1b}.btn.green{background:#16a34a;box-shadow:0 3px 0 #166534}.btn:disabled{opacity:.45}.drop{border:2px dashed #0f766e;border-radius:16px;background:#ecfeff;padding:16px;text-align:center;margin-top:12px}.note{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:10px;color:#1e3a8a;font-weight:800;line-height:1.55}.bar{height:14px;border-radius:999px;background:#e5e7eb;overflow:hidden;margin:10px 0}.bar i{display:block;height:100%;width:0;background:#22c55e}.status{font-weight:900}.log{font-family:ui-monospace,Consolas,monospace;background:#0f172a;color:#e5e7eb;border-radius:12px;padding:10px;min-height:150px;max-height:360px;overflow:auto;font-size:12px;white-space:pre-wrap}.ok{color:#22c55e}.bad{color:#f87171}.warn{color:#fbbf24}.summary{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}.sum{border:1px solid #e5e7eb;border-radius:12px;padding:10px;background:#f8fafc}.sum b{display:block;font-size:20px}.crops{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.box{border:1px solid #e5e7eb;border-radius:12px;padding:8px;background:#fafafa}.box.fail{border:2px solid #ef4444}.box.pass{border:2px solid #22c55e}.box.review{box-shadow:inset 0 0 0 2px #f59e0b}.box img{width:100%;height:auto;border-radius:8px;border:1px solid #e5e7eb;background:#fff}.meta{font-size:12px;line-height:1.55;color:#334155;margin-top:6px}.tag{display:inline-block;margin:0 5px 5px 0;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:900}.green{background:#dcfce7;color:#166534}.orange{background:#ffedd5;color:#9a3412}.redtag{background:#fee2e2;color:#991b1b}.blue{background:#dbeafe;color:#1d4ed8}.graytag{background:#e5e7eb;color:#374151}.ocr{font-size:11px;color:#7c2d12;font-weight:800;margin-top:4px}.legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px;font-weight:800}@media(max-width:900px){.grid,.summary,.crops{grid-template-columns:1fr}.head h1{font-size:19px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
-<header class="head"><h1>PDF โปรโมชัน V2</h1><p>คง Blue Grid Lock เดิม • อ่านป้ายเปอร์เซ็นต์แยกจากโปรหลายขั้น • อัปโหลดแบบ Batch</p></header>
+<header class="head"><h1>PDF โปรโมชัน V2 — เดือนล่าสุดเท่านั้น</h1><p>OCR โปรใหม่ทุกใบ • ผ่านครบแล้วสลับเป็นเดือนล่าสุด • ลบเดือนเก่าอัตโนมัติ</p></header>
 <main class="wrap">
 <section class="card">
-<div class="note"><b>หลักการใหม่:</b> ระบบแยกอ่านป้ายเปอร์เซ็นต์ตัวใหญ่ด้วย OCR ตัวเลขโดยเฉพาะ ส่วนโปรหลายขั้นอ่านด้วย OCR ภาษาไทยและเทียบลำดับจำนวนซื้อร่วมกับเปอร์เซ็นต์ หากหลักฐานไม่พอจะเป็น “ต้องตรวจ” และไม่อนุญาตให้อัปโหลด</div>
+<div class="note"><b>การทำงาน:</b> ระบบอัปโหลดเดือนใหม่เป็นชุดชั่วคราวก่อน ตรวจกรอบและฟังก์ชันครบ 212 ใบ จากนั้นจึงเผยแพร่เดือนใหม่และลบรูปกับข้อมูลเดือนเก่า หากตรวจไม่ครบ ระบบจะไม่ลบเดือนปัจจุบัน</div>
 <label>รหัสอัปโหลด</label><input id="key" type="password" placeholder="ใส่รหัสอัปโหลด">
 <div class="grid">
-<div><label>Promo Month</label><input id="month" value="JUL26"></div>
+<div><label>Promo Month</label><input id="month" value="" placeholder="เช่น AUG26"></div>
 <div><label>OCR Workers</label><select id="workers"><option value="auto">อัตโนมัติ</option><option value="1">1 — ประหยัด RAM</option><option value="2">2 — เร็วขึ้น</option></select></div>
 <div><label>Batch size</label><select id="batch"><option value="8">8</option><option value="10" selected>10</option><option value="12">12</option><option value="16">16</option></select></div>
 <div><label>Batch พร้อมกัน</label><select id="concurrency"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></div>
 </div>
-<div class="drop"><b>เลือก PDF ทั้งไฟล์</b><p><input id="pdf" type="file" accept="application/pdf"></p><div class="btns"><button id="detect" class="btn">1) ตรวจกรอบ + อ่านโปร</button><button id="upload" class="btn green">2) อัปโหลดแบบเร็ว</button><button id="clear" class="btn red">ล้าง</button><a class="btn gray" style="display:inline-flex;align-items:center;text-decoration:none" href="/promo-pdf-upload.html">กลับเวอร์ชันเดิม</a></div></div>
+<div class="drop"><b>เลือก PDF ทั้งไฟล์</b><p><input id="pdf" type="file" accept="application/pdf"></p><div class="btns"><button id="detect" class="btn">1) ตรวจกรอบ + อ่านโปร</button><button id="upload" class="btn green">2) เผยแพร่เป็นเดือนล่าสุด</button><button id="clear" class="btn red">ล้าง</button><a class="btn gray" style="display:inline-flex;align-items:center;text-decoration:none" href="/promo-pdf-upload.html">กลับเวอร์ชันเดิม</a></div></div>
 </section>
 <section class="card">
 <div class="summary">
-<div class="sum">การ์ดเจอ<b id="sTotal">0</b></div><div class="sum">กรอบผ่าน<b id="sPass">0</b></div><div class="sum">กรอบผิด<b id="sFail">0</b></div><div class="sum">AUTO OK<b id="sAuto">0</b></div><div class="sum">ต้องตรวจ<b id="sReview">0</b></div><div class="sum">ฐานข้อมูล<b>212</b></div><div class="sum">พร้อมอัป<b id="sUpload">0</b></div>
+<div class="sum">การ์ดเจอ<b id="sTotal">0</b></div><div class="sum">กรอบผ่าน<b id="sPass">0</b></div><div class="sum">กรอบผิด<b id="sFail">0</b></div><div class="sum">AUTO OK<b id="sAuto">0</b></div><div class="sum">ต้องตรวจ<b id="sReview">0</b></div><div class="sum">ต้องครบ<b>212</b></div><div class="sum">พร้อมอัป<b id="sUpload">0</b></div>
 </div>
-<div class="legend"><span class="tag green">AUTO OK = หลักฐานตรง Template</span><span class="tag orange">ต้องตรวจ = ไม่เดา</span><span class="tag redtag">FAIL = จำนวน/กรอบผิด</span></div>
+<div class="legend"><span class="tag green">AUTO OK = อ่านโครงสร้างโปรครบ</span><span class="tag orange">ต้องตรวจ = ไม่เดาและไม่เผยแพร่</span><span class="tag redtag">FAIL = จำนวน/กรอบผิด</span></div>
 <div class="status" id="status">ยังไม่ได้เริ่ม</div><div class="bar"><i id="bar"></i></div><div class="log" id="log"></div>
 </section>
 <section class="card"><b>ตัวอย่างผลตรวจ (แสดงรายการต้องตรวจทั้งหมด และรายการผ่านบางส่วน)</b><div id="crops" class="crops"></div></section>
@@ -36,7 +36,7 @@
 const pdfjsLib=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
 window.pdfjsLib=pdfjsLib;
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
-for(const src of ['/assets/promo-packing-master.js','/assets/promo-pdf-upload-v2-v3-1.js','/assets/promo-pdf-upload-v2-v3-2.js','/assets/promo-pdf-upload-v2-v3-3.js','/assets/promo-pdf-upload-v2-v3-4a.js','/assets/promo-pdf-upload-v2-v3-4b.js','/assets/promo-pdf-upload-v2-v3-4c.js','/assets/promo-pdf-upload-v2-v3-5a.js','/assets/promo-pdf-upload-v2-v3-5b.js']){
+for(const src of ['/assets/promo-packing-master.js','/assets/promo-pdf-upload-v2-v3-1.js','/assets/promo-pdf-upload-v2-v3-2.js','/assets/promo-pdf-upload-v2-v3-3.js','/assets/promo-pdf-upload-v2-v3-4a.js','/assets/promo-pdf-upload-v2-v3-4d.js','/assets/promo-pdf-upload-v2-v3-4b.js','/assets/promo-pdf-upload-v2-v3-4c.js','/assets/promo-pdf-upload-v2-v3-5a.js','/assets/promo-pdf-upload-v2-v3-5b.js']){
   await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=()=>reject(new Error(`โหลด ${src} ไม่สำเร็จ`));document.body.appendChild(s)});
 }
 </script>
