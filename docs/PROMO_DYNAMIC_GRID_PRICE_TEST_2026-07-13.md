@@ -10,9 +10,11 @@ Branch/Preview only. No Production merge. The SEP25 file was tested as a local d
 - Count cards from the actual PDF instead of requiring 212.
 - Detect 3–8 grid columns and map each white card anchor to exactly one cell.
 - Detect Class from the page header, with the existing page map only as fallback.
-- Read product title and the yellow average/base-unit price.
-- Read the normal pack price separately and use it as a broad arithmetic cross-check.
-- Require two independent promo OCR passes to agree exactly before `auto_ok`.
+- Read product title and average/base-unit price.
+- Read the normal pack price separately and use it as an arithmetic cross-check.
+- Require two independent price OCR passes to agree before price data can be `auto_ok`.
+- Require two independent promo OCR passes to agree exactly before the promotion can be `auto_ok`.
+- Structured red badges must agree with the general OCR result; a badge match alone is no longer sufficient.
 - Block suspicious percentages, duplicate tiers, missing tiers, wrong order, and inconsistent price/title metadata.
 - Require image, title, base price, unit, function, and tiers before final publish.
 
@@ -24,10 +26,17 @@ Branch/Preview only. No Production merge. The SEP25 file was tested as a local d
 - Cards: 258/258
 - Layouts observed: 4, 5, and 6 columns
 - Every output cell contained exactly one card anchor.
-- Price-panel color box found: 258/258 cards.
-- Dedicated price-digit OCR sample: 12/12 cards produced a usable normal price and average price with the arithmetic guard passing.
-- Regression for the previous false-auto patterns passed; missing tiers, duplicate tiers, wrong percentages, and suspicious 87% are rejected.
+- The first color-only price-panel detector found only 39/258 cards. The previous statement that it found 258/258 was incorrect.
+- Version 2 adds a fixed lower-left price-panel fallback because the panel position is consistent even when its color is not detected.
+- Dedicated price-digit OCR sample: 12/12 cards produced a plausible normal price and average price with the arithmetic guard passing.
+- The earlier full metadata sample did not validate title and unit reliably; therefore 12/12 is evidence for price digits only, not proof that complete metadata is correct.
+- Regression for previous false-auto patterns rejects missing tiers, duplicate tiers, wrong percentages, suspicious 87%, and structured badge/general OCR disagreement.
 
 ## Remaining proof
 
-A full 258-card Tesseract.js run must still be executed in the deployed browser Preview. Local OCR is not proof that mobile/browser Tesseract.js will produce identical results. The publish button remains blocked while any card is `need_review`.
+- Run Tesseract.js on all 258 cards in the deployed Preview.
+- Confirm title, unit and price for every card from the Browser Dry-run report.
+- Test memory, processing time and worker failure on the target Android phone.
+- Test the complete upload/finalize/old-month cleanup flow in an isolated Supabase branch or project. This last test must not use the production data project.
+
+The publish button remains blocked while any card is `need_review`. The system is not approved for Production until the remaining proof is complete.
