@@ -8,7 +8,7 @@
 </style>
 </head>
 <body>
-<header class="hero"><div class="row"><div><div class="eyebrow" id="monthLabel">กำลังหาเดือนล่าสุด</div><h1>คุ้มเวอร์!</h1><div class="sub">แสดงเฉพาะโปรโมชันเดือนล่าสุด</div></div><div class="badge" id="badge">HFS-S</div></div><nav class="tabs" id="tabs"></nav></header>
+<header class="hero"><div class="row"><div><div class="eyebrow" id="monthLabel">กำลังหาเดือนล่าสุด</div><h1>คุ้มเวอร์!</h1><div class="sub">แสดงเฉพาะโปรโมชันเดือนล่าสุดที่เผยแพร่แล้ว</div></div><div class="badge" id="badge">HFS-S</div></div><nav class="tabs" id="tabs"></nav></header>
 <main class="wrap"><div class="notice"><b id="head">กำลังโหลด</b><span id="sum">รอสักครู่</span></div><div class="filters"><input id="q" placeholder="ค้นหาชื่อโปร / เงื่อนไข / รหัสการ์ด"><button id="clear">ล้าง</button></div><section id="content">กำลังโหลด...</section></main>
 <div class="sheet" id="sheet"><div class="panel"><div id="detail"></div></div></div>
 <script src="/assets/promo-packing-master.js?v=20260713-2"></script>
@@ -26,7 +26,7 @@ async function api(q){const r=await fetch(URL+'/rest/v1/'+q,{headers:{apikey:KEY
 function label(id){return (CL.find(x=>x[0]===id)||CL[0])[1]}
 function tabs(){el('tabs').innerHTML=CL.map(c=>`<button class="tab ${c[0]===active?'on':''}" onclick="setClass('${c[0]}')">${c[1]} ${counts[c[0]]?'<small>'+counts[c[0]]+'</small>':''}</button>`).join('');el('badge').textContent=label(active)}
 window.setClass=async id=>{active=id;tabs();await load()}
-async function latestMonth(){let rows=await api('promo_months?status=eq.published&select=id,label,year_month,status,published_at,updated_at&order=published_at.desc.nullslast,updated_at.desc&limit=1');if(!rows.length)rows=await api('promo_months?select=id,label,year_month,status,published_at,updated_at&order=updated_at.desc&limit=1');if(!rows.length)throw Error('ยังไม่มีเดือนโปรโมชั่น');return rows[0]}
+async function latestMonth(){const rows=await api('promo_months?status=eq.published&select=id,label,year_month,status,published_at,updated_at&order=published_at.desc.nullslast,updated_at.desc&limit=1');if(!rows.length)throw Error('ยังไม่มีเดือนโปรโมชั่นที่เผยแพร่แล้ว');return rows[0]}
 async function init(){
   if(!PACK)throw Error('โหลดค่าบรรจุกลางไม่สำเร็จ');
   const month=await latestMonth();activeMonth=month.id;activeMonthLabel=month.label||month.id;el('monthLabel').textContent=activeMonthLabel;
