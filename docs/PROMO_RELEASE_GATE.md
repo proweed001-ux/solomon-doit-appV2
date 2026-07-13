@@ -10,7 +10,7 @@ PR #63 may move from Draft only when every required gate is PASS.
 - [x] Product title uses reviewed Product Master or strongly verified deterministic new master.
 - [x] Price requires dual OCR and arithmetic validation.
 - [x] Repeated Product Master cards use group price consensus and reject conflicts.
-- [x] Published-month batch writes are locked.
+- [x] Published-month batch writes and Product Master writes are locked.
 - [x] Finalize requires every Card ID, image, title, price, unit, Function, Tier, Product Master link and group price.
 - [x] Live page reads only a published month.
 - [x] GitHub Web CI passes all Promo safety regressions.
@@ -19,15 +19,15 @@ PR #63 may move from Draft only when every required gate is PASS.
 ## Real-file and device proof
 
 - [ ] Deployed browser completes all 258 SEP25 cards.
-- [ ] Card-by-card audit confirms zero false `AUTO OK` for promotion.
-- [ ] Card-by-card audit confirms zero false `AUTO OK` for title/Product Master.
-- [ ] Card-by-card audit confirms zero false `AUTO OK` for price and unit.
+- [ ] Card-by-card audit confirms zero false AUTO OK for promotion.
+- [ ] Card-by-card audit confirms zero false AUTO OK for title and Product Master.
+- [ ] Card-by-card audit confirms zero false AUTO OK for price and unit.
 - [ ] Android run completes without browser reload, freeze or OCR Worker loss.
 - [ ] Runtime and peak memory are recorded.
 
 ## Isolated end-to-end proof
 
-- [ ] Upload all test cards to an isolated Supabase branch/project.
+- [ ] Upload all test cards to an isolated environment.
 - [ ] Incomplete upload leaves the current published month unchanged.
 - [ ] Failed final validation leaves the current published month unchanged.
 - [ ] Successful finalize publishes the new test month.
@@ -37,7 +37,7 @@ PR #63 may move from Draft only when every required gate is PASS.
 ## Production decision
 
 - [ ] User explicitly authorizes Ready for review.
-- [ ] User explicitly authorizes merge to `main`.
+- [ ] User explicitly authorizes merge to main.
 - [ ] Production deployment is READY.
 - [ ] Production smoke test passes.
 
