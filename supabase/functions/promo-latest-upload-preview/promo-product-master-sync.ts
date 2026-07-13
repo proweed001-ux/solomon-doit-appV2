@@ -22,6 +22,10 @@ export async function masterIdentity(normalizedKey) {
 }
 
 export async function resolveProductMasters(supabase, prelim, promoMonthId, now) {
+  const { data: month, error: monthError } = await supabase.from("promo_months").select("status").eq("id", promoMonthId).maybeSingle();
+  if (monthError) throw new Error(`product_master_month_read_failed:${monthError.message}`);
+  if (month?.status === "published") throw new Error(`published_month_locked:${promoMonthId}`);
+
   const requestedIds = [...new Set(prelim.map(item => item.masterProductId).filter(Boolean))];
   const { data: existingRows, error: readError } = await supabase.from("promo_product_master").select("master_product_id,canonical_name,normalized_key,unit_label,status").in("master_product_id", requestedIds);
   if (readError) throw new Error(`product_master_read_failed:${readError.message}`);
