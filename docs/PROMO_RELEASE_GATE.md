@@ -1,0 +1,44 @@
+# Promo V2 release gate
+
+PR #63 may move from Draft only when every required gate is PASS.
+
+## Code and static safety
+
+- [x] Dynamic PDF count; no fixed 212-card requirement.
+- [x] Grid supports observed 4/5/6-column layouts and validates one anchor per cell.
+- [x] Promotion OCR requires exact multi-evidence Tier agreement.
+- [x] Product title uses reviewed Product Master or strongly verified deterministic new master.
+- [x] Price requires dual OCR and arithmetic validation.
+- [x] Repeated Product Master cards use group price consensus and reject conflicts.
+- [x] Published-month batch writes are locked.
+- [x] Finalize requires every Card ID, image, title, price, unit, Function, Tier, Product Master link and group price.
+- [x] Live page reads only a published month.
+- [x] GitHub Web CI passes all Promo safety regressions.
+- [x] Preview Edge Function version 5 is ACTIVE.
+
+## Real-file and device proof
+
+- [ ] Deployed browser completes all 258 SEP25 cards.
+- [ ] Card-by-card audit confirms zero false `AUTO OK` for promotion.
+- [ ] Card-by-card audit confirms zero false `AUTO OK` for title/Product Master.
+- [ ] Card-by-card audit confirms zero false `AUTO OK` for price and unit.
+- [ ] Android run completes without browser reload, freeze or OCR Worker loss.
+- [ ] Runtime and peak memory are recorded.
+
+## Isolated end-to-end proof
+
+- [ ] Upload all test cards to an isolated Supabase branch/project.
+- [ ] Incomplete upload leaves the current published month unchanged.
+- [ ] Failed final validation leaves the current published month unchanged.
+- [ ] Successful finalize publishes the new test month.
+- [ ] Successful finalize removes old test-month rows, group links, group prices and Storage files.
+- [ ] Live page displays only the newly published test month.
+
+## Production decision
+
+- [ ] User explicitly authorizes Ready for review.
+- [ ] User explicitly authorizes merge to `main`.
+- [ ] Production deployment is READY.
+- [ ] Production smoke test passes.
+
+No percentage estimate overrides this checklist.
