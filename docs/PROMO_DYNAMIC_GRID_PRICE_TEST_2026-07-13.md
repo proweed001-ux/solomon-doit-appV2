@@ -36,6 +36,7 @@ Branch/Preview only. No Production merge. The SEP25 file was tested as a local d
 - Use the canonical Product Master name in the database instead of raw OCR text.
 - A genuinely new product can receive a deterministic UUID only when both title OCR sources strongly agree, numeric size evidence agrees, and the price evidence is valid.
 - The backend independently verifies the deterministic ID and rejects weak novel-product evidence.
+- Product Master creation is blocked before any write when the requested month is already published.
 
 ### Average/base-unit price
 
