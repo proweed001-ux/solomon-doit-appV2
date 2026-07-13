@@ -19,7 +19,8 @@ for (const [label, functionType, tierCount] of cases) {
   const parsed = parseFunctionLabel(label);
   assert.equal(parsed.functionType, functionType);
   assert.equal(parsed.payload.tiers.length, tierCount);
-  assert.equal(promoTierRows('JUL26-TEST-001', parsed).length, tierCount);
+  const hasFreeGoods = parsed.payload.tiers.some(tier => tier.type === 'free_goods');
+  assert.equal(promoTierRows('JUL26-TEST-001', parsed).length, hasFreeGoods ? 0 : tierCount);
 }
 
 const target = parseFunctionLabel('36 ขวด ลด 16%; 2 ลัง ลด 20%; 6 ลัง ลด 25%');
@@ -27,6 +28,11 @@ assert.deepEqual(
   target.payload.tiers.map(tier => [tier.min_qty, tier.unit, tier.discount_percent]),
   [[36, 'ขวด', 16], [2, 'ลัง', 20], [6, 'ลัง', 25]],
 );
+assert.equal(promoTierRows('JUL26-HFSWSL-005', target).length, 3);
+
+const freeGoods = parseFunctionLabel('1 ขวด ลด 8%; 6 ขวด ฟรี 1 ขวด (14%)');
+assert.equal(promoTierRows('JUL26-HFSS-001', freeGoods).length, 0);
+assert.equal(freeGoods.payload.tiers[1].effective_percent, 14);
 
 const identity1 = await templateIdentity('JUL26', target.label);
 const identity2 = await templateIdentity('JUL26', target.label);
@@ -51,6 +57,7 @@ console.log(JSON.stringify({
   ok: true,
   parser_cases: cases.length,
   target_tiers: target.payload.tiers.length,
+  free_goods_payload_fallback: true,
   deterministic_template: identity1,
   backend_sync_guards: true,
 }, null, 2));
