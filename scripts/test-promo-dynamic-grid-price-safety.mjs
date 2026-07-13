@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const browserPaths = (process.argv[2] || 'dist/assets/promo-pdf-upload-v2-v3-6a.js,dist/assets/promo-pdf-upload-v2-v3-6b.js,dist/assets/promo-pdf-upload-v2-v3-6c.js,dist/assets/promo-pdf-upload-v2-v3-6d.js').split(',');
+const browserPaths = (process.argv[2] || 'dist/assets/promo-pdf-upload-v2-v3-6a.js,dist/assets/promo-pdf-upload-v2-v3-6b.js,dist/assets/promo-pdf-upload-v2-v3-6c.js,dist/assets/promo-pdf-upload-v2-v3-6d.js,dist/assets/promo-pdf-upload-v2-v3-6e.js').split(',');
 const htmlPath = process.argv[3] || 'dist/promo-pdf-upload-v2.html';
 const backendPath = process.argv[4] || 'supabase/functions/promo-latest-upload-preview/promo-latest-core.ts';
 const browser = browserPaths.map(p=>fs.readFileSync(p, 'utf8')).join('\n');
@@ -28,8 +28,8 @@ const context = {
   window: {}, console,
   thaiDigits:{'๐':'0','๑':'1','๒':'2','๓':'3','๔':'4','๕':'5','๖':'6','๗':'7','๘':'8','๙':'9'},
   parseTiers, pctSig, cleanOcr,
-  PAGES:{}, FUNCTION_TEMPLATES:[],
-  load:null, stableGridBoxes:null, recognizeBadge:null, recognizeGeneral:null, recognize:null, renderPreview:null, reportObject:null, detect:null, resumeKey:null, postBatch:null, upload:null,
+  PAGES:{}, FUNCTION_TEMPLATES:[], document:{createElement(){return {getContext(){return {drawImage(){},getImageData(){return {data:new Uint8ClampedArray(4)}},putImageData(){}}}}}},
+  load:null, stableGridBoxes:null, recognizeBadge:async()=>({}), recognizeGeneral:async()=>({}), recognize:async()=>({}), renderPreview:null, reportObject:null, detect:null, resumeKey:null, postBatch:null, upload:null,
 };
 vm.createContext(context);
 for (const p of browserPaths) vm.runInContext(fs.readFileSync(p,'utf8'), context, {filename:p});
@@ -56,6 +56,15 @@ assert.equal(badMath.priceValid, false);
 const noTitle = api.parseMetadataText({title_raw:'', normal_raw:'33/ชุด', average_raw:'16.5/ขวด'}, 'ลด 8%');
 assert.equal(noTitle.titleValid, false);
 
+const noisyPrice=api.pricePairFromRaw('33/40\n16.6/99');
+assert.equal(noisyPrice.normalPrice,33);
+assert.equal(noisyPrice.baseUnitPrice,16.6);
+assert.equal(noisyPrice.buyQty,2);
+assert.equal(api.pricePairsAgree(noisyPrice,api.pricePairFromRaw('33.00/ชุด\n16.60/ขวด')),true);
+assert.equal(api.pricePairsAgree(noisyPrice,api.pricePairFromRaw('33/ชุด\n15/ขวด')),false);
+assert.ok(api.titleSimilarity('แพนทีน แชมพู','แพน ทีน แชมพู ทุกสูตร')>=.3);
+assert.ok(api.titleSimilarity('แพนทีน แชมพู','รีจอยส์ ครีมนวด')<.3);
+
 assert.equal(api.exactTierEvidence('3 ขวด ลด 8%; 6 ขวด ฟรี 1 ขวด (14%)','3 ขวด ลด 8%; 6 ขวด ฟรี 1 ขวด (14%)',2), true);
 assert.equal(api.exactTierEvidence('6 ขวด ฟรี 1 ขวด (14%)','3 ขวด ลด 8%; 6 ขวด ฟรี 1 ขวด (14%)',2), false);
 assert.equal(api.exactTierEvidence('ลด 87%','ลด 87%',1), false);
@@ -80,9 +89,12 @@ assert.match(browser, /for\(let n=Math\.max\(3,actual\);n<=8;n\+\+\)/);
 assert.match(browser, /rowCell:ci\+1/);
 assert.match(browser, /price_status/);
 assert.match(browser, /title_status/);
+assert.match(browser, /priceAgreement/);
+assert.match(browser, /badge_structured_dual_crosscheck/);
+assert.match(browser, /x:w\*\.045,y:h\*\.49/);
 assert.doesNotMatch(browser, /items\.length!==212|completed\.size!==212/);
 assert.match(html, /id="sExpected"/);
-for (const suffix of ['6a','6b','6c','6d']) assert.match(html, new RegExp(`promo-pdf-upload-v2-v3-${suffix}\\.js`));
+for (const suffix of ['6a','6b','6c','6d','6e']) assert.match(html, new RegExp(`promo-pdf-upload-v2-v3-${suffix}\\.js`));
 assert.doesNotMatch(html, /ต้องครบ<b>212<\/b>/);
 assert.match(backend, /const expected = Number\(body\.expected_cards\)/);
 assert.match(backend, /base_unit_price: item\.baseUnitPrice/);
@@ -91,4 +103,4 @@ assert.match(backend, /status: "ready"/);
 assert.match(backend, /invalidCards/);
 assert.doesNotMatch(backend, /EXPECTED_CARDS/);
 
-console.log('PASS dynamic grid + price/title + promo safety regression');
+console.log('PASS dynamic grid + dual price/title + promo safety regression');
