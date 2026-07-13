@@ -19,6 +19,7 @@
     "test:fuel-warning": "node scripts/test-fuel-warning.mjs",
     "test:local-xlsx": "node scripts/test-local-xlsx.mjs",
     "test:admin-storage": "node scripts/test-admin-storage-guards.mjs",
+    "test:promo-packing": "node scripts/test-promo-packing-master.mjs",
     "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\""
   },
   "dependencies": {
