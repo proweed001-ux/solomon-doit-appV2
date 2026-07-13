@@ -10,10 +10,10 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
-<header class="head"><h1>PDF โปรโมชัน V2 — เดือนล่าสุดเท่านั้น</h1><p>OCR โปรใหม่ทุกใบ • ผ่านครบแล้วสลับเป็นเดือนล่าสุด • ลบเดือนเก่าอัตโนมัติ</p></header>
+<header class="head"><h1>PDF โปรโมชัน V2 — เดือนล่าสุดเท่านั้น</h1><p>กริดอัตโนมัติ • อ่านโปร + ชื่อสินค้า + ราคากลาง • ผ่านครบแล้วจึงเผยแพร่</p></header>
 <main class="wrap">
 <section class="card">
-<div class="note"><b>การทำงาน:</b> ระบบอัปโหลดเดือนใหม่เป็นชุดชั่วคราวก่อน ตรวจกรอบและฟังก์ชันครบ 212 ใบ จากนั้นจึงเผยแพร่เดือนใหม่และลบรูปกับข้อมูลเดือนเก่า หากตรวจไม่ครบ ระบบจะไม่ลบเดือนปัจจุบัน</div>
+<div class="note"><b>การทำงาน:</b> ระบบตรวจชนิดไฟล์จากเนื้อจริง หา Class และกริดจาก PDF นับจำนวนการ์ดจริง รองรับแถวที่มีจำนวนช่องต่างกัน อ่านชื่อสินค้า ราคากลางต่อหน่วย และเงื่อนไขโปร หากรายการใดไม่ชัดจะขึ้น “ต้องตรวจ” และจะไม่เปลี่ยนเดือนหรือลบข้อมูลเดือนปัจจุบัน</div>
 <label>รหัสอัปโหลด</label><input id="key" type="password" placeholder="ใส่รหัสอัปโหลด">
 <div class="grid">
 <div><label>Promo Month</label><input id="month" value="" placeholder="เช่น AUG26"></div>
@@ -21,13 +21,13 @@
 <div><label>Batch size</label><select id="batch"><option value="8">8</option><option value="10" selected>10</option><option value="12">12</option><option value="16">16</option></select></div>
 <div><label>Batch พร้อมกัน</label><select id="concurrency"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></div>
 </div>
-<div class="drop"><b>เลือก PDF ทั้งไฟล์</b><p><input id="pdf" type="file" accept="application/pdf"></p><div class="btns"><button id="detect" class="btn">1) ตรวจกรอบ + อ่านโปร</button><button id="upload" class="btn green">2) เผยแพร่เป็นเดือนล่าสุด</button><button id="clear" class="btn red">ล้าง</button><a class="btn gray" style="display:inline-flex;align-items:center;text-decoration:none" href="/promo-pdf-upload.html">กลับเวอร์ชันเดิม</a></div></div>
+<div class="drop"><b>เลือกไฟล์โปรโมชั่น</b><p><input id="pdf" type="file" accept="application/pdf,.pdf,.png"></p><div class="btns"><button id="detect" class="btn">1) ตรวจอัตโนมัติทั้งหมด</button><button id="upload" class="btn green">2) เผยแพร่เป็นเดือนล่าสุด</button><button id="clear" class="btn red">ล้าง</button><a class="btn gray" style="display:inline-flex;align-items:center;text-decoration:none" href="/promo-pdf-upload.html">กลับเวอร์ชันเดิม</a></div></div>
 </section>
 <section class="card">
 <div class="summary">
-<div class="sum">การ์ดเจอ<b id="sTotal">0</b></div><div class="sum">กรอบผ่าน<b id="sPass">0</b></div><div class="sum">กรอบผิด<b id="sFail">0</b></div><div class="sum">AUTO OK<b id="sAuto">0</b></div><div class="sum">ต้องตรวจ<b id="sReview">0</b></div><div class="sum">ต้องครบ<b>212</b></div><div class="sum">พร้อมอัป<b id="sUpload">0</b></div>
+<div class="sum">การ์ดเจอ<b id="sTotal">0</b></div><div class="sum">กรอบผ่าน<b id="sPass">0</b></div><div class="sum">กรอบผิด<b id="sFail">0</b></div><div class="sum">AUTO OK<b id="sAuto">0</b></div><div class="sum">ต้องตรวจ<b id="sReview">0</b></div><div class="sum">จำนวนจริง<b id="sExpected">0</b></div><div class="sum">พร้อมอัป<b id="sUpload">0</b></div>
 </div>
-<div class="legend"><span class="tag green">AUTO OK = อ่านโครงสร้างโปรครบ</span><span class="tag orange">ต้องตรวจ = ไม่เดาและไม่เผยแพร่</span><span class="tag redtag">FAIL = จำนวน/กรอบผิด</span></div>
+<div class="legend"><span class="tag green">AUTO OK = กริด ชื่อ ราคา และโปรตรงครบ</span><span class="tag orange">ต้องตรวจ = หลักฐานไม่ครบหรือสองรอบไม่ตรง</span><span class="tag redtag">FAIL = กริดหรือจำนวนผิด</span></div>
 <div class="status" id="status">ยังไม่ได้เริ่ม</div><div class="bar"><i id="bar"></i></div><div class="log" id="log"></div>
 </section>
 <section class="card"><b>ตัวอย่างผลตรวจ (แสดงรายการต้องตรวจทั้งหมด และรายการผ่านบางส่วน)</b><div id="crops" class="crops"></div></section>
@@ -36,8 +36,8 @@
 const pdfjsLib=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
 window.pdfjsLib=pdfjsLib;
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
-for(const src of ['/assets/promo-packing-master.js','/assets/promo-pdf-upload-v2-v3-1.js','/assets/promo-pdf-upload-v2-v3-2.js','/assets/promo-pdf-upload-v2-v3-3.js','/assets/promo-pdf-upload-v2-v3-4a.js','/assets/promo-pdf-upload-v2-v3-4d.js','/assets/promo-pdf-upload-v2-v3-4b.js','/assets/promo-pdf-upload-v2-v3-4c.js','/assets/promo-pdf-upload-v2-v3-5a.js','/assets/promo-pdf-upload-v2-v3-5b.js']){
-  await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=()=>reject(new Error(`โหลด ${src} ไม่สำเร็จ`));document.body.appendChild(s)});
+for(const src of ['/assets/promo-packing-master.js','/assets/promo-pdf-upload-v2-v3-1.js','/assets/promo-pdf-upload-v2-v3-2.js','/assets/promo-pdf-upload-v2-v3-3.js','/assets/promo-pdf-upload-v2-v3-4a.js','/assets/promo-pdf-upload-v2-v3-4d.js','/assets/promo-pdf-upload-v2-v3-4b.js','/assets/promo-pdf-upload-v2-v3-4c.js','/assets/promo-pdf-upload-v2-v3-5a.js','/assets/promo-pdf-upload-v2-v3-6a.js','/assets/promo-pdf-upload-v2-v3-6b.js','/assets/promo-pdf-upload-v2-v3-6c.js','/assets/promo-pdf-upload-v2-v3-6d.js','/assets/promo-pdf-upload-v2-v3-5b.js']){
+  await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src+'?v=20260713-6';s.onload=resolve;s.onerror=()=>reject(new Error(`โหลด ${src} ไม่สำเร็จ`));document.body.appendChild(s)});
 }
 </script>
 </body>
