@@ -36,7 +36,7 @@
 const pdfjsLib=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
 window.pdfjsLib=pdfjsLib;
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
-for(const src of ['/assets/promo-pdf-upload-v2-v3-1.js','/assets/promo-pdf-upload-v2-v3-2.js','/assets/promo-pdf-upload-v2-v3-3.js','/assets/promo-pdf-upload-v2-v3-4a.js','/assets/promo-pdf-upload-v2-v3-4b.js','/assets/promo-pdf-upload-v2-v3-4c.js','/assets/promo-pdf-upload-v2-v3-5a.js','/assets/promo-pdf-upload-v2-v3-5b.js']){
+for(const src of ['/assets/promo-packing-master.js','/assets/promo-pdf-upload-v2-v3-1.js','/assets/promo-pdf-upload-v2-v3-2.js','/assets/promo-pdf-upload-v2-v3-3.js','/assets/promo-pdf-upload-v2-v3-4a.js','/assets/promo-pdf-upload-v2-v3-4b.js','/assets/promo-pdf-upload-v2-v3-4c.js','/assets/promo-pdf-upload-v2-v3-5a.js','/assets/promo-pdf-upload-v2-v3-5b.js']){
   await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=()=>reject(new Error(`โหลด ${src} ไม่สำเร็จ`));document.body.appendChild(s)});
 }
 </script>
