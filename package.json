@@ -25,7 +25,8 @@
     "test:promo-dynamic": "node scripts/test-promo-dynamic-grid-price-safety.mjs",
     "test:promo-master": "node scripts/test-promo-master-consensus.mjs",
     "test:promo-runtime": "node scripts/test-promo-runtime-release-gate.mjs",
-    "test:promo-safe": "npm run test:promo-dynamic && npm run test:promo-master && npm run test:promo-runtime && npm run test:promo-latest",
+    "test:promo-ui": "node scripts/test-promo-simple-ui.mjs",
+    "test:promo-safe": "npm run test:promo-dynamic && npm run test:promo-master && npm run test:promo-runtime && npm run test:promo-ui && npm run test:promo-latest",
     "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\""
   },
   "dependencies": {
