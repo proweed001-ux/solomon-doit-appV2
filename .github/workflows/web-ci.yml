@@ -51,5 +51,7 @@ jobs:
         run: node scripts/test-promo-master-consensus.mjs
       - name: Promo browser runtime and objective release gate regression
         run: node scripts/test-promo-runtime-release-gate.mjs
+      - name: Promo one-button UI regression
+        run: node scripts/test-promo-simple-ui.mjs
       - name: Promo latest-only backend regression
         run: node scripts/test-promo-latest-only.mjs
