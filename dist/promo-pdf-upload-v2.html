@@ -36,7 +36,7 @@ const primary=document.getElementById('primaryAction');
 const hint=document.getElementById('modeHint');
 function syncPrimary(){const hasFile=!!fileInput.files?.[0];primary.textContent=!hasFile?'เลือกไฟล์ก่อน':isProduction?'อัปโหลดและอัปเดตทั้งหมด':'ตรวจอัตโนมัติทั้งหมด';hint.textContent=isProduction?'ระบบจะเผยแพร่เฉพาะเมื่อทุกใบผ่านครบ':'หน้า Preview จะตรวจอย่างเดียวและไม่เผยแพร่ข้อมูลจริง'}
 fileInput.addEventListener('change',syncPrimary);
-primary.addEventListener('click',async()=>{if(!fileInput.files?.[0]){fileInput.click();return}primary.disabled=true;try{await window.detect();if(!isProduction)return;if(!window.lastReport||Number(window.lastReport.need_review)>0)throw new Error(`ยังมีรายการต้องตรวจ ${window.lastReport?.need_review??'-'} ใบ`);await window.upload()}catch(e){const msg=e?.message||String(e);document.getElementById('status').textContent='หยุด: '+msg;document.querySelector('details.card')?.setAttribute('open','')}finally{primary.disabled=false;syncPrimary()}});
+primary.addEventListener('click',async()=>{if(!fileInput.files?.[0]){fileInput.click();return}primary.disabled=true;try{const report=await window.detect();if(!isProduction)return;if(!report||Number(report.need_review)>0)throw new Error(`ยังมีรายการต้องตรวจ ${report?.need_review??'-'} ใบ`);await window.upload()}catch(e){const msg=e?.message||String(e);document.getElementById('status').textContent='หยุด: '+msg;document.querySelector('details.card')?.setAttribute('open','')}finally{primary.disabled=false;syncPrimary()}});
 syncPrimary();
 </script>
 </body>
