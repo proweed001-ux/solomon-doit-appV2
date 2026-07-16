@@ -112,6 +112,47 @@ async function pageOcr(worker: Worker, canvas: HTMLCanvasElement): Promise<Posit
   return collectOcrItems((result.data as unknown as { blocks?: unknown }).blocks);
 }
 
+function preparedHeaderCanvas(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const header = cropCanvas(canvas, {
+    x: canvas.width * 0.035,
+    y: canvas.height * 0.075,
+    width: canvas.width * 0.42,
+    height: canvas.height * 0.12,
+  });
+  const output = document.createElement('canvas');
+  output.width = header.width * 3;
+  output.height = header.height * 6;
+  const context = output.getContext('2d', { alpha: false, willReadFrequently: true });
+  if (!context) throw new Error('canvas_context_unavailable');
+  const rowHeight = output.height / 2;
+  context.drawImage(header, 0, 0, output.width, rowHeight);
+  context.drawImage(header, 0, rowHeight, output.width, rowHeight);
+  const image = context.getImageData(0, rowHeight, output.width, rowHeight);
+  for (let offset = 0; offset < image.data.length; offset += 4) {
+    const luminance = image.data[offset] * 0.299 + image.data[offset + 1] * 0.587 + image.data[offset + 2] * 0.114;
+    const value = luminance >= 178 ? 255 : 0;
+    image.data[offset] = value;
+    image.data[offset + 1] = value;
+    image.data[offset + 2] = value;
+    image.data[offset + 3] = 255;
+  }
+  context.putImageData(image, 0, rowHeight);
+  header.width = 1;
+  header.height = 1;
+  return output;
+}
+
+async function headerClassOcr(worker: Worker, canvas: HTMLCanvasElement): Promise<string> {
+  const header = preparedHeaderCanvas(canvas);
+  try {
+    const result = await worker.recognize(header);
+    return clean(result.data.text);
+  } finally {
+    header.width = 1;
+    header.height = 1;
+  }
+}
+
 async function canvasFromPage(page: any): Promise<{ canvas: HTMLCanvasElement; viewport: any }> {
   const base = page.getViewport({ scale: 1 });
   const scale = Math.max(1.25, Math.min(2, 1800 / Math.max(1, base.width)));
@@ -158,9 +199,16 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
         textItems = await pageOcr(worker, canvas);
         textMethod = textItems.length ? 'page_ocr' : 'none';
       }
-      const headerText = textIn(textItems, pageHeaderZone(canvas.width, canvas.height));
-      const classId = normalizeClassId(headerText);
-      if (!classId) warnings.push(`page:${pageNumber}:class_missing`);
+      let headerText = textIn(textItems, pageHeaderZone(canvas.width, canvas.height));
+      let classId = normalizeClassId(headerText);
+      if (!classId && grid.regions.length && options.enableOcr) {
+        progress('ocr', pageNumber, `หน้า ${pageNumber}: อ่าน Class จากหัวหน้า`);
+        worker ||= await createWorker('eng+tha');
+        const classText = await headerClassOcr(worker, canvas);
+        classId = normalizeClassId(classText);
+        headerText = clean(`${headerText} ${classText}`);
+      }
+      if (!classId && grid.regions.length) warnings.push(`page:${pageNumber}:class_missing`);
       if (grid.diagnostics.status !== 'ok') warnings.push(...grid.diagnostics.reasons.map(reason => `page:${pageNumber}:${reason}`));
       for (const [index, bounds] of grid.regions.entries()) {
         const sequence = index + 1;

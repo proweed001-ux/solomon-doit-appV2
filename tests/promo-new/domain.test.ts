@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import type { PromoCard, ProductGroup, PromotionFamily, Sku } from '../../src/promo-new/domain/types';
 import type { ImportedCardCandidate } from '../../src/promo-new/import/pdf-importer';
 import { makeCardId } from '../../src/promo-new/import/card-id';
+import { normalizeClassId } from '../../src/promo-new/import/class-id';
 import { parsePromotionMatrix } from '../../src/promo-new/import/workbook-parser';
 import { parsePromotionTiers } from '../../src/promo-new/import/promotion-parser';
+import { evaluateGrid } from '../../src/promo-new/import/grid-detector';
 import { calculatePromotion } from '../../src/promo-new/domain/calculator';
 import { applyPromotionFamily, groupImportedCards } from '../../src/promo-new/domain/grouping';
 import { applyPriceToGroup, inheritedSkuPrice, setCentralPrice, type StoredPrice } from '../../src/promo-new/domain/pricing';
@@ -233,6 +235,23 @@ test('Promotion parser รองรับช่วงจำนวนและห
   assert.deepEqual(range.tiers.map(tier => [tier.minQuantity, tier.maxQuantity, tier.discountPercent]), [[1, 2, 24]]);
   const packs = parsePromotionTiers('ขั้นต่ำ 1 แพ็ค (3 ชิ้น) ลด 20%, 32 แพ็ค (96 ชิ้น) ลด 25%');
   assert.deepEqual(packs.tiers.map(tier => [tier.minQuantity, tier.purchaseUnit, tier.discountPercent]), [[1, 'แพ็ค', 20], [32, 'แพ็ค', 25]]);
+});
+
+test('PDF grid รองรับจำนวนคอลัมน์ต่างกันในแต่ละแถวโดยไม่ hardcode', () => {
+  const regions = [
+    ...Array.from({ length: 4 }, (_, column) => ({ x: 60 + column * 348, y: 190, width: 330, height: 200 })),
+    ...Array.from({ length: 5 }, (_, column) => ({ x: 60 + column * 279, y: 405, width: 264, height: 200 })),
+    ...Array.from({ length: 5 }, (_, column) => ({ x: 60 + column * 279, y: 620, width: 264, height: 200 })),
+  ];
+  const result = evaluateGrid(regions, 10, 1500, 844);
+  assert.deepEqual(result.diagnostics.rowCounts, [4, 5, 5]);
+  assert.equal(result.diagnostics.status, 'ok');
+});
+
+test('Class parser ให้ HFS ที่มีหลักฐานครบมาก่อน OCR noise และไม่เดาค่าที่ขาด', () => {
+  assert.equal(normalizeClassId('PANTENE PROMOTION สำหรับร้าน HFS-XL'), 'HFSXL');
+  assert.equal(normalizeClassId('noise HFS-WS-S'), 'HFSWS-S');
+  assert.equal(normalizeClassId('HFS-'), null);
 });
 
 test('Calculator เลือก Tier สูงสุดที่จำนวนซื้อถึงและปัด 0.01 บาท', () => {

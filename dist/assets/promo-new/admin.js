@@ -439,8 +439,8 @@ function Ys() {
       F(!0), M(""), P(null), O([]), q(!1), L(null);
       try {
         const [{ importPromotionPdf: a }, { parsePromotionWorkbook: d }] = await Promise.all([
-          import("./chunks/pdf-importer-Da7RzsLd.js"),
-          import("./chunks/workbook-parser-DRbe8Nf4.js")
+          import("./chunks/pdf-importer-CzzpKWLn.js"),
+          import("./chunks/workbook-parser-CW_JeI2d.js")
         ]), N = await d(l), u = await a(i, { monthKey: g, enableOcr: k, onProgress: p }), y = Bs(g, u.cards), I = Vs(g, [], (r == null ? void 0 : r.user.id) || null);
         I.status = "need_review", I.source = { pdfName: i.name, workbookName: l.name, pdfHash: null, workbookHash: null };
         const h = {

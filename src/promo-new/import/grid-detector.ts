@@ -157,7 +157,9 @@ export function evaluateGrid(regions: Rect[], page: number, pageWidth: number, p
   if (!regions.length) reasons.push('card_grid_not_found');
   if (detectedColumns > 0 && detectedColumns < 2) reasons.push('too_few_columns');
   if (detectedColumns > 10) reasons.push('too_many_columns');
-  if (rows.slice(0, -1).some(row => row.length !== detectedColumns)) reasons.push('irregular_middle_row');
+  // A source page may intentionally mix four- and five-column rows. Card shape
+  // and size diagnostics below detect malformed components without assuming a
+  // fixed grid for every row.
   if (regions.some(region => region.width / Math.max(1, region.height) < 0.45 || region.width / Math.max(1, region.height) > 2.2)) reasons.push('card_aspect_outlier');
   const widthMedian = median(regions.map(region => region.width));
   const heightMedian = median(regions.map(region => region.height));
