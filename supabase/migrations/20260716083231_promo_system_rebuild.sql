@@ -131,10 +131,10 @@ create table if not exists public.promo_new_cards (
   image_path text,
   sku_id uuid not null references public.promo_new_skus(id) on delete restrict,
   product_group_id uuid not null references public.promo_new_product_groups(id) on delete restrict,
-  promotion_family_id uuid not null references public.promo_new_promotion_families(id) on delete restrict,
+  promotion_family_id uuid references public.promo_new_promotion_families(id) on delete restrict,
   pdf_source_price numeric(12,2),
   central_override_price numeric(12,2),
-  effective_price numeric(12,2) not null check (effective_price > 0),
+  effective_price numeric(12,2) check (effective_price is null or effective_price > 0),
   status text not null check (status in ('ready','need_review','quarantine')),
   evidence jsonb not null default '{}'::jsonb,
   failure_reasons jsonb not null default '[]'::jsonb,
@@ -298,7 +298,7 @@ begin
   for v_item in select value from jsonb_array_elements(coalesce(p_payload->'productGroups', '[]'::jsonb)) loop
     select id into v_sku_id from public.promo_new_skus where external_id = v_item->>'skuId' or identity_key = (v_item #>> '{sku,identityKey}') limit 1;
     select id into v_family_id from public.promo_new_promotion_families where version_id = v_version_id and external_id = v_item->>'promotionFamilyId';
-    if v_sku_id is null or v_family_id is null then raise exception 'group_reference_missing'; end if;
+    if v_sku_id is null then raise exception 'group_sku_missing'; end if;
     insert into public.promo_new_product_groups(
       version_id, external_id, month_id, sku_id, promotion_family_id, status, failure_reasons
     ) values (
@@ -311,7 +311,7 @@ begin
     if upper(v_item->>'monthKey') <> v_month_key then raise exception 'card_crosses_month'; end if;
     select id into v_sku_id from public.promo_new_skus where external_id = v_item->>'skuId' limit 1;
     select id, promotion_family_id into v_group_id, v_family_id from public.promo_new_product_groups where version_id = v_version_id and external_id = v_item->>'productGroupId';
-    if v_sku_id is null or v_group_id is null or v_family_id is null then raise exception 'card_reference_missing'; end if;
+    if v_sku_id is null or v_group_id is null then raise exception 'card_reference_missing'; end if;
     insert into public.promo_new_cards(
       version_id, card_id, month_id, page_number, sequence_number, class_id, image_path,
       sku_id, product_group_id, promotion_family_id, pdf_source_price, central_override_price,
@@ -321,7 +321,7 @@ begin
       v_item->>'classId', nullif(v_item->>'imageUrl',''), v_sku_id, v_group_id, v_family_id,
       nullif(v_item #>> '{price,pdfSourcePrice,amount}','')::numeric,
       nullif(v_item #>> '{price,centralOverridePrice,amount}','')::numeric,
-      (v_item #>> '{price,effectivePrice,amount}')::numeric,
+      nullif(v_item #>> '{price,effectivePrice,amount}','')::numeric,
       v_item->>'status', coalesce(v_item->'evidence','{}'::jsonb), coalesce(v_item->'failureReasons','[]'::jsonb)
     );
   end loop;

@@ -15,6 +15,8 @@
     "smoke": "node scripts/smoke-check.mjs",
     "verify": "npm run smoke",
     "verify:react": "npm run build && npm run smoke",
+    "build:promo-new": "vite build --config vite.promo-new.config.ts",
+    "typecheck:promo-new": "tsc --noEmit",
     "test:pro-lazy": "node scripts/test-pro-telesale-pagination.mjs",
     "test:fuel-warning": "node scripts/test-fuel-warning.mjs",
     "test:local-xlsx": "node scripts/test-local-xlsx.mjs",
