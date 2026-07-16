@@ -72,7 +72,7 @@ export function createDemoDataset(status: 'draft' | 'published' = 'published'): 
       name: productIndex < 3 ? 'Hair Care 60–70 ml' : `${brand} ${productType}`,
       scopeText: productIndex < 3 ? 'H&S / Pantene / Rejoice 60–70 ml' : `${brand} ${productType}`,
       sourceRows: [productIndex + 2],
-      tiersByClass: Object.fromEntries(CLASSES.map(classId => [classId, tiers(classId, productIndex === 2)])),
+      tiersByClass: Object.fromEntries(CLASSES.map(classId => [classId, tiers(classId, productIndex === 3)])),
       failureReasons: [],
     };
     const groupId = `group:demo:${productIndex + 1}`;

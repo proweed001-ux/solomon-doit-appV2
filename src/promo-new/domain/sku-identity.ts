@@ -10,14 +10,15 @@ const BRAND_NAMES = [
 const PRODUCT_TYPES: Array<{ canonical: string; patterns: RegExp[] }> = [
   { canonical: 'แชมพู', patterns: [/แชมพู/iu, /SHAMPOO/iu] },
   { canonical: 'ครีมนวด', patterns: [/ครีมนวด/iu, /CONDITIONER/iu] },
-  { canonical: 'ผลิตภัณฑ์ซักผ้า', patterns: [/ผงซักฟอก|น้ำยาซักผ้า/iu, /DETERGENT|LAUNDRY/iu] },
+  { canonical: 'ผงซักฟอก', patterns: [/ผงซักฟอก/iu, /POWDER\s*DETERGENT/iu] },
+  { canonical: 'น้ำยาซักผ้า', patterns: [/น้ำยาซักผ้า/iu, /LIQUID\s*DETERGENT|LAUNDRY\s*LIQUID/iu] },
   { canonical: 'ปรับผ้านุ่ม', patterns: [/ปรับผ้านุ่ม/iu, /FABRIC\s*SOFTENER/iu] },
   { canonical: 'ผลิตภัณฑ์ล้างจาน', patterns: [/ล้างจาน/iu, /DISHWASH/iu] },
   { canonical: 'สบู่', patterns: [/สบู่/iu, /SOAP|BODY\s*WASH/iu] },
   { canonical: 'ยาสีฟัน', patterns: [/ยาสีฟัน/iu, /TOOTHPASTE/iu] },
   { canonical: 'แปรงสีฟัน', patterns: [/แปรงสีฟัน/iu, /TOOTHBRUSH/iu] },
   { canonical: 'มีดโกน', patterns: [/มีดโกน|ใบมีดโกน/iu, /RAZOR|BLADES?/iu] },
-  { canonical: 'สกินแคร์', patterns: [/ครีมบำรุง|เซรั่ม|มอยส์เจอไรเซอร์/iu, /SERUM|CREAM|MOISTURI[ZS]ER/iu] },
+  { canonical: 'สกินแคร์', patterns: [/ครีมบ[ำํ]ารุง|เซรั่ม|มอยส์เจอไรเซอร์/iu, /SERUM|CREAM|MOISTURI[ZS]ER/iu] },
   { canonical: 'ผ้าอ้อม', patterns: [/ผ้าอ้อม/iu, /DIAPERS?/iu] },
   { canonical: 'ยาอม', patterns: [/ยาอม/iu, /LOZENGES?/iu] },
   { canonical: 'ยาดม', patterns: [/ยาดม/iu, /INHALER/iu] },
@@ -54,8 +55,14 @@ function detectBrand(text: string): string | null {
   return first || null;
 }
 
-function detectProductType(text: string): string | null {
-  return PRODUCT_TYPES.find(type => type.patterns.some(pattern => pattern.test(text)))?.canonical || null;
+function detectProductType(text: string): { canonical: string; raw: string } | null {
+  for (const type of PRODUCT_TYPES) {
+    for (const pattern of type.patterns) {
+      const match = text.match(pattern);
+      if (match) return { canonical: type.canonical, raw: match[0] };
+    }
+  }
+  return null;
 }
 
 function detectSize(text: string): { value: number | null; unit: string | null; raw: string | null } {
@@ -107,12 +114,13 @@ export function buildSkuIdentityKey(identity: SkuIdentity): string {
   ].join('|');
 }
 
-function variantText(text: string, brand: string | null, productType: string | null, sizeRaw: string | null, packRaw: string | null): string | null {
+function variantText(text: string, brand: string | null, productTypeRaw: string | null, sizeRaw: string | null, packRaw: string | null): string | null {
   let value = text;
-  for (const remove of [brand, productType, sizeRaw, packRaw].filter((item): item is string => Boolean(item))) {
+  for (const remove of [brand, productTypeRaw, sizeRaw, packRaw].filter((item): item is string => Boolean(item))) {
     value = value.replace(new RegExp(remove.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu'), ' ');
   }
-  value = value.replace(new RegExp(`\\b(?:${SALES_UNITS.join('|')})\\b`, 'giu'), ' ').replace(/\s+/g, ' ').trim();
+  for (const unit of SALES_UNITS) value = value.replace(new RegExp(unit, 'giu'), ' ');
+  value = value.replace(/\s+/g, ' ').trim();
   return value || null;
 }
 
@@ -123,7 +131,7 @@ export function createSkuCandidate(productEvidence: string): Sku {
   const size = detectSize(source);
   const pack = detectPack(source);
   const salesUnit = detectSalesUnit(source);
-  const variant = variantText(source, brand, productType, size.raw, pack.raw);
+  const variant = variantText(source, brand, productType?.raw || null, size.raw, pack.raw);
   const failureReasons = [
     ...(!brand ? ['brand_missing'] : []),
     ...(!productType ? ['product_type_missing'] : []),
@@ -132,7 +140,7 @@ export function createSkuCandidate(productEvidence: string): Sku {
   ];
   const identity: SkuIdentity = {
     brand: brand || '',
-    productType: productType || '',
+    productType: productType?.canonical || '',
     variant,
     sizeValue: size.value || 0,
     sizeUnit: size.unit || '',

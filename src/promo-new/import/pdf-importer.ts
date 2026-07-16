@@ -2,6 +2,11 @@ import { createWorker, type Worker } from 'tesseract.js';
 import * as pdfjs from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { cropCanvas, detectCardGrid, type GridDiagnostics, type Rect } from './grid-detector';
+import { normalizeClassId } from './class-id';
+import { makeCardId } from './card-id';
+
+export { normalizeClassId } from './class-id';
+export { makeCardId } from './card-id';
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -52,29 +57,6 @@ interface ImportOptions {
 }
 
 const clean = (value: unknown) => String(value || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
-const safeToken = (value: string) => clean(value).toUpperCase().replace(/[^A-Z0-9ก-๙_-]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 48);
-
-export function normalizeClassId(value: string): string | null {
-  const text = clean(value).toUpperCase();
-  const contextual = text.match(/(?:CLASS|กลุ่ม|ระดับ|ร้าน)\s*[:=-]?\s*([A-Z0-9][A-Z0-9/_ -]{1,30})/u)?.[1];
-  const candidates = (contextual || text).match(/[A-Z]+(?:[-/]?[A-Z0-9]+){1,5}/g) || [];
-  const noise = new Set(['PROMOTION', 'PROMOTIONS', 'PRICE', 'MONTH', 'CLASS', 'PAGE', 'CANVASS']);
-  for (const candidate of candidates) {
-    const compact = candidate.replace(/[^A-Z0-9]/g, '');
-    if (noise.has(compact) || compact.length < 3 || compact.length > 20) continue;
-    if (compact === 'HFSWH') return 'HFSM';
-    return compact;
-  }
-  return null;
-}
-
-export function makeCardId(monthKey: string, classId: string | null, page: number, sequence: number): string {
-  const month = safeToken(monthKey);
-  const classPart = classId ? safeToken(classId) : '';
-  const location = `P${String(page).padStart(3, '0')}-C${String(sequence).padStart(3, '0')}`;
-  return ['CARD', month, classPart, location].filter(Boolean).join('-');
-}
-
 function inside(item: PositionedText, rect: Rect): boolean {
   const centerX = item.x + item.width / 2;
   const centerY = item.y + item.height / 2;
@@ -145,7 +127,7 @@ async function canvasFromPage(page: any): Promise<{ canvas: HTMLCanvasElement; v
 
 export async function importPromotionPdf(file: File, options: ImportOptions): Promise<PdfImportResult> {
   const started = performance.now();
-  const monthKey = safeToken(options.monthKey);
+  const monthKey = String(options.monthKey || '').normalize('NFKC').trim().toUpperCase().replace(/[^A-Z0-9ก-๙_-]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 48);
   if (!monthKey) throw new Error('month_key_required');
   const bytes = new Uint8Array(await file.arrayBuffer());
   const document = await pdfjs.getDocument({ data: bytes }).promise;

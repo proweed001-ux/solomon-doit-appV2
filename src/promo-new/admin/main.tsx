@@ -8,7 +8,7 @@ import { confirmSkuCandidate } from '../domain/sku-identity';
 import { nextDraftVersion } from '../domain/versioning';
 import type { ImportedCardCandidate, PdfImportProgress } from '../import/pdf-importer';
 import { createDemoDataset } from '../shared/demo-data';
-import { loadSession, login, logout, saveDraft, validateSession } from '../shared/api';
+import { loadSession, login, logout, publishVersion, saveDraft, uploadCardImage, validateSession } from '../shared/api';
 import './admin.css';
 
 type Session = NonNullable<ReturnType<typeof loadSession>>;
@@ -91,6 +91,8 @@ function AdminApp() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [previewChecked, setPreviewChecked] = useState(false);
+  const [savedVersionId, setSavedVersionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) { setChecking(false); return; }
@@ -99,7 +101,7 @@ function AdminApp() {
 
   const processFiles = async () => {
     if (!pdf || !workbook) return;
-    setBusy(true); setError(''); setDataset(null); setQuarantine([]);
+    setBusy(true); setError(''); setDataset(null); setQuarantine([]); setPreviewChecked(false); setSavedVersionId(null);
     try {
       const [{ importPromotionPdf }, { parsePromotionWorkbook }] = await Promise.all([
         import('../import/pdf-importer'),
@@ -130,6 +132,7 @@ function AdminApp() {
       const sku = confirmSkuCandidate(target.sku);
       const groups = current.productGroups.map(group => group.id === groupId ? { ...group, sku, failureReasons: group.failureReasons.filter(reason => reason !== 'new_sku_requires_confirmation') } : group);
       const skus = current.skus.map(item => item.id === sku.id ? sku : item);
+      setPreviewChecked(false); setSavedVersionId(null);
       return { ...current, skus, productGroups: groups };
     } catch (caught) { setError(String((caught as Error).message || caught)); return current; }
   });
@@ -145,6 +148,7 @@ function AdminApp() {
       const promoted = applyPromotionFamily(priced.group, priced.cards, family);
       if (promoted.blockedClasses.length) setError(`Block: CSV ไม่มี Class ${promoted.blockedClasses.join(', ')} สำหรับ ${group.sku.canonicalName}`);
       else setError('');
+      setPreviewChecked(false); setSavedVersionId(null);
       return {
         ...current,
         prices: [...current.prices.filter(item => item.skuId !== price.skuId), price],
@@ -163,13 +167,42 @@ function AdminApp() {
   const save = async () => {
     if (!dataset || !session || demo) return;
     setBusy(true); setError('');
-    try { const result = await saveDraft(dataset, session); setMessage(`บันทึก Draft แล้ว revision ${result.data.revision}`); } catch (caught) { setError(String((caught as Error).message || caught)); } finally { setBusy(false); }
+    try {
+      const draftVersionId = dataset.version.status === 'draft' ? crypto.randomUUID() : dataset.version.id;
+      const cards = [];
+      for (let index = 0; index < dataset.cards.length; index += 1) {
+        const card = dataset.cards[index];
+        setMessage(`กำลังอัปโหลดรูป ${index + 1}/${dataset.cards.length}`);
+        const imageUrl = card.imageUrl?.startsWith('data:')
+          ? await uploadCardImage(draftVersionId, card.id, card.imageUrl, session)
+          : card.imageUrl;
+        cards.push({ ...card, imageUrl });
+      }
+      const prepared = { ...dataset, cards, version: { ...dataset.version, id: draftVersionId } };
+      const result = await saveDraft(prepared, session);
+      const versionId = String(result.data.version_id || draftVersionId);
+      setDataset({ ...prepared, version: { ...prepared.version, id: versionId, revision: result.data.revision, status: 'draft' } });
+      setSavedVersionId(versionId);
+      setPreviewChecked(false);
+      setMessage(`บันทึก Draft แล้ว revision ${result.data.revision} — ตรวจ Preview ก่อน Publish`);
+    } catch (caught) { setError(String((caught as Error).message || caught)); } finally { setBusy(false); }
+  };
+
+  const publish = async () => {
+    if (!dataset || !session || demo || !savedVersionId || !previewChecked) return;
+    setBusy(true); setError('');
+    try {
+      await publishVersion(savedVersionId, session);
+      setDataset({ ...dataset, version: { ...dataset.version, status: 'published', publishedAt: new Date().toISOString() } });
+      setMessage(`Published revision ${dataset.version.revision} แล้ว`);
+    } catch (caught) { setError(String((caught as Error).message || caught)); } finally { setBusy(false); }
   };
 
   if (checking) return <main className="login-page"><section className="login-card">กำลังตรวจ session...</section></main>;
   if (!session && !demo) return <LoginPage onLogin={value => setSession(value)} onDemo={() => { setDemo(true); setDataset(createDemoDataset('draft')); }} />;
   const ready = dataset?.productGroups.filter(group => group.status === 'ready').length || 0;
   const blocked = dataset?.productGroups.filter(group => group.status === 'blocked').length || 0;
+  const publishable = Boolean(dataset && savedVersionId && previewChecked && !busy && !demo && ready === dataset.productGroups.length && blocked === 0 && quarantine.length === 0 && dataset.version.status !== 'published');
   return <div className="admin-shell">
     <header className="admin-hero"><div className="hero-inner"><div className="hero-row"><div><div className="eyebrow">PROMO SYSTEM REBUILD · {demo ? 'DEMO READ-ONLY' : 'AUTHENTICATED ADMIN'}</div><h1>จัดโปรโมชั่นเป็นกลุ่ม ไม่ไล่ติ๊กทีละการ์ด</h1><p>นำเข้า PDF + CSV/XLSM แล้วจัด SKU, Product Group, โปรราย Class และราคากลางในหน้าจอเดียว</p></div><div className="hero-actions"><a className="btn ghost" href="/promo-new.html?demo=1">ดูหน้าลูกค้า</a>{session && <button className="btn ghost" onClick={() => logout(session).finally(() => setSession(null))}><LogOut size={16} /> ออกจากระบบ</button>}</div></div></div></header>
     <main className="admin-main">
@@ -187,7 +220,7 @@ function AdminApp() {
         <div className="group-list">{dataset ? visibleGroups.map(group => <GroupEditor key={group.id} group={group} dataset={dataset} priceDraft={priceDrafts[group.id] ?? String(group.price.effectivePrice?.amount || '')} onPriceDraft={value => setPriceDrafts(current => ({ ...current, [group.id]: value }))} onConfirmSku={() => confirmSku(group.id)} onApply={(familyId, amount) => applyGroup(group.id, familyId, amount)} />) : <div className="empty">เลือกไฟล์แล้วกดประมวลผล ระบบจะแสดง Product Group ที่นี่</div>}</div>
       </section>
       {!!quarantine.length && <section className="panel"><div className="section-head"><div><h2>รายการที่ต้องแก้กลุ่มเฉพาะจุด</h2><small>ระบบไม่สร้าง SKU ให้เมื่อหลักฐานชื่อ/ชนิด/ขนาด/หน่วยไม่ครบ</small></div><span className="tag bad">{quarantine.length}</span></div><div className="quarantine">{quarantine.map(card => <article className="quarantine-card" key={card.cardId}><img src={card.imageUrl} alt={card.cardId} /><b>{card.productText || 'อ่านชื่อสินค้าไม่ได้'}</b><div className="failure">{card.failureReasons.join(' · ')}</div></article>)}</div></section>}
-      <div className="footer-actions"><button className="btn soft" disabled={!dataset} onClick={() => dataset && setMessage(`Preview พร้อม: ${ready}/${dataset.productGroups.length} กลุ่ม ready`)}><CheckCircle2 size={16} /> ตรวจ Preview</button><button className="btn primary" disabled={!dataset || !session || demo || busy} onClick={save}><Save size={16} /> บันทึก Draft</button><button className="btn dark" disabled>Publish ภายหลัง (ไม่ทำอัตโนมัติ)</button></div>
+      <div className="footer-actions"><button className="btn soft" disabled={!dataset || !savedVersionId || busy} onClick={() => { if (!dataset) return; setPreviewChecked(true); setMessage(`Preview ผ่านการยืนยัน: ${ready}/${dataset.productGroups.length} กลุ่ม ready`); }}><CheckCircle2 size={16} /> {previewChecked ? 'Preview ตรวจแล้ว' : 'ตรวจ Preview'}</button><button className="btn primary" disabled={!dataset || !session || demo || busy || Boolean(savedVersionId) || dataset.version.status === 'published'} onClick={save}><Save size={16} /> {savedVersionId ? 'Draft บันทึกแล้ว' : 'บันทึก Draft'}</button><button className="btn dark" disabled={!publishable} onClick={publish}>Publish เวอร์ชันนี้</button></div>
     </main>
   </div>;
 }

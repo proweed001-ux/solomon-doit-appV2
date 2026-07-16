@@ -208,7 +208,7 @@ set search_path = public, pg_temp
 as $$
 declare
   v_month_id uuid;
-  v_version_id uuid := gen_random_uuid();
+  v_version_id uuid := nullif(p_payload #>> '{version,id}', '')::uuid;
   v_revision integer;
   v_previous uuid;
   v_item jsonb;
@@ -218,6 +218,7 @@ declare
   v_month_key text := upper(trim(p_payload #>> '{version,monthKey}'));
 begin
   if p_payload->>'schema' <> 'promo-system-rebuild-v1' then raise exception 'dataset_schema_invalid'; end if;
+  if v_version_id is null then raise exception 'version_id_invalid'; end if;
   if v_month_key is null or v_month_key <> upper(trim(p_expected_month_key)) or v_month_key !~ '^[A-Z0-9][A-Z0-9_-]{2,31}$' then raise exception 'month_key_invalid'; end if;
   if not exists (select 1 from public.promo_new_admins where user_id = p_actor_id and active) then raise exception 'promo_admin_required'; end if;
 
@@ -250,6 +251,8 @@ begin
     on conflict (identity_key) do update set
       canonical_name = excluded.canonical_name, sku_code = excluded.sku_code, evidence = excluded.evidence,
       failure_reasons = excluded.failure_reasons, updated_by = p_actor_id, updated_at = now();
+    insert into public.promo_new_audit_log(actor_id, action, entity_type, entity_id, after_value)
+    values (p_actor_id, 'sku_upserted', 'sku', v_item->>'id', v_item);
   end loop;
 
   for v_item in select value from jsonb_array_elements(coalesce(p_payload->'prices', '[]'::jsonb)) loop
@@ -270,6 +273,8 @@ begin
       source_reference = excluded.source_reference,
       updated_by = p_actor_id,
       updated_at = now();
+    insert into public.promo_new_audit_log(actor_id, action, entity_type, entity_id, after_value)
+    values (p_actor_id, 'sku_price_changed', 'sku_price', v_sku_id::text, v_item);
   end loop;
 
   for v_item in select value from jsonb_array_elements(coalesce(p_payload->'promotionFamilies', '[]'::jsonb)) loop
@@ -305,6 +310,10 @@ begin
       v_version_id, v_item->>'id', v_month_id, v_sku_id, v_family_id,
       v_item->>'status', coalesce(v_item->'failureReasons','[]'::jsonb)
     );
+    insert into public.promo_new_audit_log(actor_id, action, entity_type, entity_id, after_value)
+    values (p_actor_id, 'promotion_assigned', 'product_group', v_item->>'id', jsonb_build_object(
+      'promotion_family_id', v_item->>'promotionFamilyId', 'status', v_item->>'status'
+    ));
   end loop;
 
   for v_item in select value from jsonb_array_elements(coalesce(p_payload->'cards', '[]'::jsonb)) loop

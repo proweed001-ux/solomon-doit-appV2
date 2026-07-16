@@ -1,46 +1,46 @@
-import { d as M, e as es, c as as, j as s, R as ts, r as m, l as ns, b as K, v as is, h as rs, S as cs, a as ls, s as os, g as ds } from "./chunks/api-BfaJ-rQJ.js";
+import { d as D, e as le, c as ce, j as e, R as oe, r as m, l as de, b as Q, v as ue, h as he, S as pe, a as me, u as xe, s as fe, p as je, g as ve } from "./chunks/api-C6gqF9Y8.js";
 /**
  * @license lucide-react v0.546.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */
-const us = [
+const ye = [
   ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
   ["path", { d: "m9 12 2 2 4-4", key: "dzmm74" }]
-], hs = M("circle-check", us);
+], ke = D("circle-check", ye);
 /**
  * @license lucide-react v0.546.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */
-const ps = [
+const ge = [
   ["path", { d: "M12 13v8", key: "1l5pq0" }],
   ["path", { d: "M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242", key: "1pljnt" }],
   ["path", { d: "m8 17 4-4 4 4", key: "1quai1" }]
-], ms = M("cloud-upload", ps);
+], be = D("cloud-upload", ge);
 /**
  * @license lucide-react v0.546.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */
-const xs = [
+const Ne = [
   ["path", { d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z", key: "1rqfz7" }],
   ["path", { d: "M14 2v4a2 2 0 0 0 2 2h4", key: "tnqrlb" }],
   ["path", { d: "M8 13h2", key: "yr2amv" }],
   ["path", { d: "M14 13h2", key: "un5t4a" }],
   ["path", { d: "M8 17h2", key: "2yhykz" }],
   ["path", { d: "M14 17h2", key: "10kma7" }]
-], fs = M("file-spreadsheet", xs);
+], Se = D("file-spreadsheet", Ne);
 /**
  * @license lucide-react v0.546.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */
-const js = [
+const we = [
   [
     "path",
     {
@@ -62,25 +62,25 @@ const js = [
       key: "kqbvx6"
     }
   ]
-], ys = M("layers", js);
+], Ce = D("layers", we);
 /**
  * @license lucide-react v0.546.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */
-const vs = [
+const Pe = [
   ["path", { d: "m16 17 5-5-5-5", key: "1bji2h" }],
   ["path", { d: "M21 12H9", key: "dn1m92" }],
   ["path", { d: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", key: "1uf3rs" }]
-], ks = M("log-out", vs);
+], Ie = D("log-out", Pe);
 /**
  * @license lucide-react v0.546.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */
-const gs = [
+const _e = [
   [
     "path",
     {
@@ -90,14 +90,14 @@ const gs = [
   ],
   ["path", { d: "M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7", key: "1ydtos" }],
   ["path", { d: "M7 3v4a1 1 0 0 0 1 1h7", key: "t51u73" }]
-], Ns = M("save", gs);
+], Me = D("save", _e);
 /**
  * @license lucide-react v0.546.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */
-const bs = [
+const Re = [
   [
     "path",
     {
@@ -106,14 +106,14 @@ const bs = [
     }
   ],
   ["path", { d: "m9 12 2 2 4-4", key: "dzmm74" }]
-], Ss = M("shield-check", bs);
+], $e = D("shield-check", Re);
 /**
  * @license lucide-react v0.546.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */
-const ws = [
+const De = [
   [
     "path",
     {
@@ -123,91 +123,91 @@ const ws = [
   ],
   ["path", { d: "M12 9v4", key: "juzpu7" }],
   ["path", { d: "M12 17h.01", key: "p32p05" }]
-], Cs = M("triangle-alert", ws), z = (e) => ({ amount: Number(e.toFixed(2)), currency: "THB" });
-function Ps(e, n = null) {
-  const t = n && n > 0 ? z(n) : null;
+], Fe = D("triangle-alert", De), V = (s) => ({ amount: Number(s.toFixed(2)), currency: "THB" });
+function Ue(s, n = null) {
+  const i = n && n > 0 ? V(n) : null;
   return {
-    skuId: e,
-    pdfSourcePrice: t,
+    skuId: s,
+    pdfSourcePrice: i,
     centralOverridePrice: null,
-    effectivePrice: t,
-    source: t ? "pdf" : "missing",
-    sourceReference: t ? "pdf_source_price" : null,
+    effectivePrice: i,
+    source: i ? "pdf" : "missing",
+    sourceReference: i ? "pdf_source_price" : null,
     updatedAt: null
   };
 }
-function _s(e, n) {
-  const t = n.find((x) => x.skuIdentityKey === e.identityKey);
-  return t ? {
-    skuId: e.id,
+function Ge(s, n) {
+  const i = n.find((f) => f.skuIdentityKey === s.identityKey);
+  return i ? {
+    skuId: s.id,
     pdfSourcePrice: null,
-    centralOverridePrice: z(t.amount),
-    effectivePrice: z(t.amount),
+    centralOverridePrice: V(i.amount),
+    effectivePrice: V(i.amount),
     source: "central_override",
-    sourceReference: t.sourceReference,
-    updatedAt: t.updatedAt
-  } : Ps(e.id);
+    sourceReference: i.sourceReference,
+    updatedAt: i.updatedAt
+  } : Ue(s.id);
 }
-function Is(e, n, t = "admin_input") {
+function Oe(s, n, i = "admin_input") {
   if (!Number.isFinite(n) || n <= 0) throw new Error("central_price_invalid");
-  const x = z(n);
+  const f = V(n);
   return {
-    ...e,
-    centralOverridePrice: x,
-    effectivePrice: x,
+    ...s,
+    centralOverridePrice: f,
+    effectivePrice: f,
     source: "central_override",
-    sourceReference: t,
+    sourceReference: i,
     updatedAt: (/* @__PURE__ */ new Date()).toISOString()
   };
 }
-function Ms(e, n, t) {
-  if (t.skuId !== e.skuId) throw new Error("price_sku_mismatch");
-  const x = {
-    ...e,
-    price: t,
-    status: t.effectivePrice && e.promotionFamilyId && !e.failureReasons.length ? "ready" : e.status
-  }, f = n.map((d) => e.cardIds.includes(d.id) ? {
-    ...d,
-    price: t,
-    status: t.effectivePrice && d.promotionFamilyId && d.promotionTiers.length && !d.failureReasons.length ? "ready" : d.status
-  } : d);
-  return { group: x, cards: f };
+function Te(s, n, i) {
+  if (i.skuId !== s.skuId) throw new Error("price_sku_mismatch");
+  const f = {
+    ...s,
+    price: i,
+    status: i.effectivePrice && s.promotionFamilyId && !s.failureReasons.length ? "ready" : s.status
+  }, j = n.map((u) => s.cardIds.includes(u.id) ? {
+    ...u,
+    price: i,
+    status: i.effectivePrice && u.promotionFamilyId && u.promotionTiers.length && !u.failureReasons.length ? "ready" : u.status
+  } : u);
+  return { group: f, cards: j };
 }
-function Rs(e) {
+function qe(s) {
   let n = 2166136261;
-  for (let t = 0; t < e.length; t += 1)
-    n ^= e.charCodeAt(t), n = Math.imul(n, 16777619);
+  for (let i = 0; i < s.length; i += 1)
+    n ^= s.charCodeAt(i), n = Math.imul(n, 16777619);
   return (n >>> 0).toString(36).toUpperCase().padStart(7, "0");
 }
-function $s(e, n, t = [], x = []) {
-  const f = new Map(t.map((o) => [o.identityKey, o])), d = n.map((o) => {
-    const b = es(o.productText), r = f.get(b.identityKey) || b;
-    return f.has(r.identityKey) || f.set(r.identityKey, r), { source: o, sku: r };
-  }), v = d.filter((o) => o.sku.status === "quarantine" || !o.source.classId).map((o) => o.source), c = d.filter((o) => o.sku.status !== "quarantine" && o.source.classId), j = /* @__PURE__ */ new Map();
-  c.forEach((o) => {
-    const b = `${e}|${o.sku.identityKey}`, r = j.get(b) || [];
-    r.push(o), j.set(b, r);
+function Ee(s, n, i = [], f = []) {
+  const j = new Map(i.map((d) => [d.identityKey, d])), u = n.map((d) => {
+    const w = le(d.productText), a = j.get(w.identityKey) || w;
+    return j.has(a.identityKey) || j.set(a.identityKey, a), { source: d, sku: a };
+  }), x = u.filter((d) => d.sku.status === "quarantine" || !d.source.classId).map((d) => d.source), p = u.filter((d) => d.sku.status !== "quarantine" && d.source.classId), y = /* @__PURE__ */ new Map();
+  p.forEach((d) => {
+    const w = `${s}|${d.sku.identityKey}`, a = y.get(w) || [];
+    a.push(d), y.set(w, a);
   });
-  const y = /* @__PURE__ */ new Map(), N = [], i = [], w = [];
-  for (const [o, b] of j) {
-    const r = b[0].sku, P = `group:${Rs(o)}`, C = _s(r, x);
-    y.set(r.id, C);
-    const F = b.map((l) => l.source.classId), g = F.filter((l, T) => F.indexOf(l) !== T), U = [.../* @__PURE__ */ new Set([
-      ...r.status !== "active" ? ["new_sku_requires_confirmation"] : [],
-      ...g.length ? g.map((l) => `duplicate_class:${l}`) : [],
-      ...C.effectivePrice ? [] : ["central_price_missing"]
-    ])], D = b.map((l) => ({
+  const v = /* @__PURE__ */ new Map(), S = [], r = [], P = [];
+  for (const [d, w] of y) {
+    const a = w[0].sku, I = `group:${qe(d)}`, _ = Ge(a, f);
+    v.set(a.id, _);
+    const U = w.map((l) => l.source.classId), N = U.filter((l, q) => U.indexOf(l) !== q), T = [.../* @__PURE__ */ new Set([
+      ...a.status !== "active" ? ["new_sku_requires_confirmation"] : [],
+      ...N.length ? N.map((l) => `duplicate_class:${l}`) : [],
+      ..._.effectivePrice ? [] : ["central_price_missing"]
+    ])], $ = w.map((l) => ({
       id: l.source.cardId,
-      monthKey: e,
+      monthKey: s,
       page: l.source.page,
       sequence: l.source.sequence,
       classId: l.source.classId,
       imageUrl: l.source.imageUrl,
-      skuId: r.id,
-      productGroupId: P,
+      skuId: a.id,
+      productGroupId: I,
       promotionFamilyId: null,
       promotionTiers: [],
-      price: C,
+      price: _,
       status: "need_review",
       evidence: {
         rawText: l.source.rawText,
@@ -222,440 +222,463 @@ function $s(e, n, t = [], x = []) {
           height: l.source.bounds.height
         }
       },
-      failureReasons: [...l.source.failureReasons.filter((G) => !["product_text_missing", "class_missing"].includes(G))]
+      failureReasons: [...l.source.failureReasons.filter((F) => !["product_text_missing", "class_missing"].includes(F))]
     }));
-    N.push(...D), i.push({
-      id: P,
-      monthKey: e,
-      skuId: r.id,
-      sku: r,
-      cardIds: D.map((l) => l.id),
-      classIds: [...new Set(F)].sort(),
+    S.push(...$), r.push({
+      id: I,
+      monthKey: s,
+      skuId: a.id,
+      sku: a,
+      cardIds: $.map((l) => l.id),
+      classIds: [...new Set(U)].sort(),
       promotionFamilyId: null,
-      price: C,
-      status: U.some((l) => l.startsWith("duplicate_class")) ? "blocked" : "need_review",
-      failureReasons: U
+      price: _,
+      status: T.some((l) => l.startsWith("duplicate_class")) ? "blocked" : "need_review",
+      failureReasons: T
     });
   }
-  return v.forEach((o) => w.push(`card:${o.cardId}:${o.failureReasons.join(",") || "sku_quarantine"}`)), {
-    skus: [...new Map(d.map((o) => [o.sku.id, o.sku])).values()],
-    prices: [...y.values()],
-    cards: N,
-    groups: i,
-    quarantineCards: v,
-    warnings: w
+  return x.forEach((d) => P.push(`card:${d.cardId}:${d.failureReasons.join(",") || "sku_quarantine"}`)), {
+    skus: [...new Map(u.map((d) => [d.sku.id, d.sku])).values()],
+    prices: [...v.values()],
+    cards: S,
+    groups: r,
+    quarantineCards: x,
+    warnings: P
   };
 }
-function Fs(e, n, t) {
-  const x = e.classIds.filter((c) => {
-    var j;
-    return !((j = t.tiersByClass[c]) != null && j.length);
+function ze(s, n, i) {
+  const f = s.classIds.filter((p) => {
+    var y;
+    return !((y = i.tiersByClass[p]) != null && y.length);
   });
-  if (x.length) {
-    const c = x.map((j) => `promotion_class_missing:${j}`);
+  if (f.length) {
+    const p = f.map((y) => `promotion_class_missing:${y}`);
     return {
-      group: { ...e, promotionFamilyId: null, status: "blocked", failureReasons: [.../* @__PURE__ */ new Set([...e.failureReasons, ...c])] },
+      group: { ...s, promotionFamilyId: null, status: "blocked", failureReasons: [.../* @__PURE__ */ new Set([...s.failureReasons, ...p])] },
       cards: n,
-      blockedClasses: x
+      blockedClasses: f
     };
   }
-  const f = t.failureReasons.length ? [`promotion_family_needs_review:${t.id}`] : [], d = {
-    ...e,
-    promotionFamilyId: t.id,
-    status: e.price.effectivePrice && !e.failureReasons.length && !f.length ? "ready" : "need_review",
-    failureReasons: [.../* @__PURE__ */ new Set([...e.failureReasons.filter((c) => !c.startsWith("promotion_class_missing:")), ...f])]
-  }, v = n.map((c) => {
-    if (!e.cardIds.includes(c.id) || !c.classId) return c;
-    const j = t.tiersByClass[c.classId], y = c.failureReasons.filter((N) => !N.startsWith("promotion_"));
+  const j = i.failureReasons.length ? [`promotion_family_needs_review:${i.id}`] : [], u = {
+    ...s,
+    promotionFamilyId: i.id,
+    status: s.price.effectivePrice && !s.failureReasons.length && !j.length ? "ready" : "need_review",
+    failureReasons: [.../* @__PURE__ */ new Set([...s.failureReasons.filter((p) => !p.startsWith("promotion_class_missing:")), ...j])]
+  }, x = n.map((p) => {
+    if (!s.cardIds.includes(p.id) || !p.classId) return p;
+    const y = i.tiersByClass[p.classId], v = p.failureReasons.filter((S) => !S.startsWith("promotion_"));
     return {
-      ...c,
-      promotionFamilyId: t.id,
-      promotionTiers: j,
-      failureReasons: y,
-      status: c.price.effectivePrice && j.length && !y.length ? "ready" : "need_review"
+      ...p,
+      promotionFamilyId: i.id,
+      promotionTiers: y,
+      failureReasons: v,
+      status: p.price.effectivePrice && y.length && !v.length ? "ready" : "need_review"
     };
   });
-  return { group: d, cards: v, blockedClasses: [] };
+  return { group: u, cards: x, blockedClasses: [] };
 }
-function Ds(e, n, t) {
-  const x = n.filter((c) => c.monthKey === e), f = x.filter((c) => c.status === "published").sort((c, j) => j.revision - c.revision)[0], d = Math.max(0, ...x.map((c) => c.revision)) + 1, v = crypto.randomUUID();
+function Be(s, n, i) {
+  const f = n.filter((x) => x.monthKey === s), j = f.filter((x) => x.status === "published").sort((x, p) => p.revision - x.revision)[0], u = Math.max(0, ...f.map((x) => x.revision)) + 1;
   return {
-    id: `version:${e}:${d}:${v}`,
-    monthKey: e,
-    revision: d,
+    id: crypto.randomUUID(),
+    monthKey: s,
+    revision: u,
     status: "imported",
-    previousVersionId: (f == null ? void 0 : f.id) ?? null,
+    previousVersionId: (j == null ? void 0 : j.id) ?? null,
     createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-    createdBy: t,
+    createdBy: i,
     publishedAt: null,
     source: { pdfName: null, workbookName: null, pdfHash: null, workbookHash: null }
   };
 }
-const Gs = () => {
-  const e = /* @__PURE__ */ new Date();
-  return `PROMO-${e.getFullYear()}-${String(e.getMonth() + 1).padStart(2, "0")}`;
-}, Us = (e) => e == null ? "-" : `฿${e.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-function Ts({ onLogin: e, onDemo: n }) {
-  const [t, x] = m.useState(""), [f, d] = m.useState(""), [v, c] = m.useState(!1), [j, y] = m.useState(""), N = async (i) => {
-    i.preventDefault(), c(!0), y("");
+const Le = () => {
+  const s = /* @__PURE__ */ new Date();
+  return `PROMO-${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}`;
+}, Ve = (s) => s == null ? "-" : `฿${s.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function Ae({ onLogin: s, onDemo: n }) {
+  const [i, f] = m.useState(""), [j, u] = m.useState(""), [x, p] = m.useState(!1), [y, v] = m.useState(""), S = async (r) => {
+    r.preventDefault(), p(!0), v("");
     try {
-      e(await ds(t, f));
-    } catch (w) {
-      y(String(w.message || w));
+      s(await ve(i, j));
+    } catch (P) {
+      v(String(P.message || P));
     } finally {
-      c(!1);
+      p(!1);
     }
   };
-  return /* @__PURE__ */ s.jsx("main", { className: "login-page", children: /* @__PURE__ */ s.jsxs("section", { className: "login-card", children: [
-    /* @__PURE__ */ s.jsx("div", { className: "eyebrow", children: "PROMO SYSTEM REBUILD" }),
-    /* @__PURE__ */ s.jsx("h1", { children: "หลังบ้านโปรโมชั่นใหม่" }),
-    /* @__PURE__ */ s.jsx("p", { children: "ต้องเข้าสู่ระบบก่อนบันทึก SKU ราคา Draft หรือ Publish ข้อมูลทุกอย่างจะผ่าน Backend ที่ตรวจสิทธิ์" }),
-    j && /* @__PURE__ */ s.jsxs("div", { className: "notice error", children: [
+  return /* @__PURE__ */ e.jsx("main", { className: "login-page", children: /* @__PURE__ */ e.jsxs("section", { className: "login-card", children: [
+    /* @__PURE__ */ e.jsx("div", { className: "eyebrow", children: "PROMO SYSTEM REBUILD" }),
+    /* @__PURE__ */ e.jsx("h1", { children: "หลังบ้านโปรโมชั่นใหม่" }),
+    /* @__PURE__ */ e.jsx("p", { children: "ต้องเข้าสู่ระบบก่อนบันทึก SKU ราคา Draft หรือ Publish ข้อมูลทุกอย่างจะผ่าน Backend ที่ตรวจสิทธิ์" }),
+    y && /* @__PURE__ */ e.jsxs("div", { className: "notice error", children: [
       "เข้าสู่ระบบไม่สำเร็จ: ",
-      j
+      y
     ] }),
-    /* @__PURE__ */ s.jsxs("form", { onSubmit: N, children: [
-      /* @__PURE__ */ s.jsxs("label", { className: "field", children: [
+    /* @__PURE__ */ e.jsxs("form", { onSubmit: S, children: [
+      /* @__PURE__ */ e.jsxs("label", { className: "field", children: [
         "อีเมลผู้ดูแล",
-        /* @__PURE__ */ s.jsx("input", { type: "email", autoComplete: "username", value: t, onChange: (i) => x(i.target.value), required: !0 })
+        /* @__PURE__ */ e.jsx("input", { type: "email", autoComplete: "username", value: i, onChange: (r) => f(r.target.value), required: !0 })
       ] }),
-      /* @__PURE__ */ s.jsxs("label", { className: "field", children: [
+      /* @__PURE__ */ e.jsxs("label", { className: "field", children: [
         "รหัสผ่าน",
-        /* @__PURE__ */ s.jsx("input", { type: "password", autoComplete: "current-password", value: f, onChange: (i) => d(i.target.value), minLength: 8, required: !0 })
+        /* @__PURE__ */ e.jsx("input", { type: "password", autoComplete: "current-password", value: j, onChange: (r) => u(r.target.value), minLength: 8, required: !0 })
       ] }),
-      /* @__PURE__ */ s.jsx("button", { className: "btn primary", disabled: v, children: v ? "กำลังตรวจสิทธิ์..." : "เข้าสู่ระบบ" })
+      /* @__PURE__ */ e.jsx("button", { className: "btn primary", disabled: x, children: x ? "กำลังตรวจสิทธิ์..." : "เข้าสู่ระบบ" })
     ] }),
-    /* @__PURE__ */ s.jsx("div", { className: "divider", children: "หรือ" }),
-    /* @__PURE__ */ s.jsx("button", { className: "btn soft", style: { width: "100%" }, onClick: n, children: "ดู Preview แบบสาธิต (อ่านอย่างเดียว)" }),
-    /* @__PURE__ */ s.jsxs("div", { className: "audit-note", children: [
-      /* @__PURE__ */ s.jsx(Ss, { size: 14 }),
+    /* @__PURE__ */ e.jsx("div", { className: "divider", children: "หรือ" }),
+    /* @__PURE__ */ e.jsx("button", { className: "btn soft", style: { width: "100%" }, onClick: n, children: "ดู Preview แบบสาธิต (อ่านอย่างเดียว)" }),
+    /* @__PURE__ */ e.jsxs("div", { className: "audit-note", children: [
+      /* @__PURE__ */ e.jsx($e, { size: 14 }),
       " โหมดสาธิตไม่เชื่อมฐานข้อมูล ไม่บันทึก และไม่สามารถ Publish ได้"
     ] })
   ] }) });
 }
-function qs({ group: e, dataset: n, priceDraft: t, onPriceDraft: x, onConfirmSku: f, onApply: d }) {
-  var N;
-  const [v, c] = m.useState(e.promotionFamilyId || ""), j = n.cards.filter((i) => e.cardIds.includes(i.id)), y = n.promotionFamilies.find((i) => i.id === v);
-  return /* @__PURE__ */ s.jsx("article", { className: `group-card ${e.status}`, children: /* @__PURE__ */ s.jsxs("div", { className: "group-top", children: [
-    /* @__PURE__ */ s.jsxs("div", { children: [
-      /* @__PURE__ */ s.jsx("div", { className: "thumbs", children: j.map((i) => /* @__PURE__ */ s.jsxs("div", { className: "thumb", children: [
-        i.imageUrl ? /* @__PURE__ */ s.jsx("img", { src: i.imageUrl, alt: i.id, loading: "lazy" }) : /* @__PURE__ */ s.jsx("div", { className: "empty", children: "ไม่มีรูป" }),
-        /* @__PURE__ */ s.jsx("span", { children: i.classId })
-      ] }, i.id)) }),
-      /* @__PURE__ */ s.jsx("div", { className: "product-name", children: e.sku.canonicalName }),
-      /* @__PURE__ */ s.jsxs("div", { className: "tags", children: [
-        /* @__PURE__ */ s.jsx("span", { className: "tag", children: e.sku.code }),
-        /* @__PURE__ */ s.jsx("span", { className: `tag ${e.status === "ready" ? "good" : e.status === "blocked" ? "bad" : "warn"}`, children: e.status }),
-        /* @__PURE__ */ s.jsxs("span", { className: "tag", children: [
-          e.cardIds.length,
+function Ke({ group: s, dataset: n, priceDraft: i, onPriceDraft: f, onConfirmSku: j, onApply: u }) {
+  var S;
+  const [x, p] = m.useState(s.promotionFamilyId || ""), y = n.cards.filter((r) => s.cardIds.includes(r.id)), v = n.promotionFamilies.find((r) => r.id === x);
+  return /* @__PURE__ */ e.jsx("article", { className: `group-card ${s.status}`, children: /* @__PURE__ */ e.jsxs("div", { className: "group-top", children: [
+    /* @__PURE__ */ e.jsxs("div", { children: [
+      /* @__PURE__ */ e.jsx("div", { className: "thumbs", children: y.map((r) => /* @__PURE__ */ e.jsxs("div", { className: "thumb", children: [
+        r.imageUrl ? /* @__PURE__ */ e.jsx("img", { src: r.imageUrl, alt: r.id, loading: "lazy" }) : /* @__PURE__ */ e.jsx("div", { className: "empty", children: "ไม่มีรูป" }),
+        /* @__PURE__ */ e.jsx("span", { children: r.classId })
+      ] }, r.id)) }),
+      /* @__PURE__ */ e.jsx("div", { className: "product-name", children: s.sku.canonicalName }),
+      /* @__PURE__ */ e.jsxs("div", { className: "tags", children: [
+        /* @__PURE__ */ e.jsx("span", { className: "tag", children: s.sku.code }),
+        /* @__PURE__ */ e.jsx("span", { className: `tag ${s.status === "ready" ? "good" : s.status === "blocked" ? "bad" : "warn"}`, children: s.status }),
+        /* @__PURE__ */ e.jsxs("span", { className: "tag", children: [
+          s.cardIds.length,
           " การ์ด"
         ] }),
-        e.classIds.map((i) => /* @__PURE__ */ s.jsx("span", { className: "tag", children: i }, i))
+        s.classIds.map((r) => /* @__PURE__ */ e.jsx("span", { className: "tag", children: r }, r))
       ] }),
-      /* @__PURE__ */ s.jsxs("div", { className: "sku-meta", children: [
-        /* @__PURE__ */ s.jsxs("span", { children: [
-          /* @__PURE__ */ s.jsx("b", { children: "แบรนด์:" }),
+      /* @__PURE__ */ e.jsxs("div", { className: "sku-meta", children: [
+        /* @__PURE__ */ e.jsxs("span", { children: [
+          /* @__PURE__ */ e.jsx("b", { children: "แบรนด์:" }),
           " ",
-          e.sku.identity.brand || "-"
+          s.sku.identity.brand || "-"
         ] }),
-        /* @__PURE__ */ s.jsxs("span", { children: [
-          /* @__PURE__ */ s.jsx("b", { children: "ชนิด:" }),
+        /* @__PURE__ */ e.jsxs("span", { children: [
+          /* @__PURE__ */ e.jsx("b", { children: "ชนิด:" }),
           " ",
-          e.sku.identity.productType || "-"
+          s.sku.identity.productType || "-"
         ] }),
-        /* @__PURE__ */ s.jsxs("span", { children: [
-          /* @__PURE__ */ s.jsx("b", { children: "ขนาด:" }),
+        /* @__PURE__ */ e.jsxs("span", { children: [
+          /* @__PURE__ */ e.jsx("b", { children: "ขนาด:" }),
           " ",
-          e.sku.identity.sizeValue || "-",
+          s.sku.identity.sizeValue || "-",
           " ",
-          e.sku.identity.sizeUnit
+          s.sku.identity.sizeUnit
         ] }),
-        /* @__PURE__ */ s.jsxs("span", { children: [
-          /* @__PURE__ */ s.jsx("b", { children: "หน่วย/Pack:" }),
+        /* @__PURE__ */ e.jsxs("span", { children: [
+          /* @__PURE__ */ e.jsx("b", { children: "หน่วย/Pack:" }),
           " ",
-          e.sku.identity.salesUnit,
+          s.sku.identity.salesUnit,
           " × ",
-          e.sku.identity.packQuantity
+          s.sku.identity.packQuantity
         ] }),
-        /* @__PURE__ */ s.jsxs("span", { children: [
-          /* @__PURE__ */ s.jsx("b", { children: "Variant:" }),
+        /* @__PURE__ */ e.jsxs("span", { children: [
+          /* @__PURE__ */ e.jsx("b", { children: "Variant:" }),
           " ",
-          e.sku.identity.variant || "-"
+          s.sku.identity.variant || "-"
         ] }),
-        /* @__PURE__ */ s.jsxs("span", { children: [
-          /* @__PURE__ */ s.jsx("b", { children: "ราคาเดิม:" }),
+        /* @__PURE__ */ e.jsxs("span", { children: [
+          /* @__PURE__ */ e.jsx("b", { children: "ราคาเดิม:" }),
           " ",
-          Us((N = e.price.effectivePrice) == null ? void 0 : N.amount)
+          Ve((S = s.price.effectivePrice) == null ? void 0 : S.amount)
         ] })
       ] }),
-      e.sku.status === "candidate" && /* @__PURE__ */ s.jsx("button", { className: "btn soft", style: { marginTop: 10 }, onClick: f, children: "ยืนยันเป็น SKU ใหม่" }),
-      !!e.failureReasons.length && /* @__PURE__ */ s.jsx("div", { className: "failure", children: e.failureReasons.join(" · ") })
+      s.sku.status === "candidate" && /* @__PURE__ */ e.jsx("button", { className: "btn soft", style: { marginTop: 10 }, onClick: j, children: "ยืนยันเป็น SKU ใหม่" }),
+      !!s.failureReasons.length && /* @__PURE__ */ e.jsx("div", { className: "failure", children: s.failureReasons.join(" · ") })
     ] }),
-    /* @__PURE__ */ s.jsxs("div", { className: "group-controls", children: [
-      /* @__PURE__ */ s.jsxs("label", { className: "field", children: [
+    /* @__PURE__ */ e.jsxs("div", { className: "group-controls", children: [
+      /* @__PURE__ */ e.jsxs("label", { className: "field", children: [
         "Promotion Family",
-        /* @__PURE__ */ s.jsxs("select", { value: v, onChange: (i) => c(i.target.value), children: [
-          /* @__PURE__ */ s.jsx("option", { value: "", children: "เลือกจาก CSV/XLSM" }),
-          n.promotionFamilies.map((i) => /* @__PURE__ */ s.jsxs("option", { value: i.id, children: [
-            i.name,
+        /* @__PURE__ */ e.jsxs("select", { value: x, onChange: (r) => p(r.target.value), children: [
+          /* @__PURE__ */ e.jsx("option", { value: "", children: "เลือกจาก CSV/XLSM" }),
+          n.promotionFamilies.map((r) => /* @__PURE__ */ e.jsxs("option", { value: r.id, children: [
+            r.name,
             " · ",
-            Object.keys(i.tiersByClass).join(", ")
-          ] }, i.id))
+            Object.keys(r.tiersByClass).join(", ")
+          ] }, r.id))
         ] })
       ] }),
-      /* @__PURE__ */ s.jsxs("div", { className: "price-row", children: [
-        /* @__PURE__ */ s.jsxs("label", { className: "field", children: [
+      /* @__PURE__ */ e.jsxs("div", { className: "price-row", children: [
+        /* @__PURE__ */ e.jsxs("label", { className: "field", children: [
           "ราคากลางต่อชิ้น",
-          /* @__PURE__ */ s.jsx("input", { type: "number", min: "0.01", step: "0.01", inputMode: "decimal", value: t, onChange: (i) => x(i.target.value), placeholder: "0.00" })
+          /* @__PURE__ */ e.jsx("input", { type: "number", min: "0.01", step: "0.01", inputMode: "decimal", value: i, onChange: (r) => f(r.target.value), placeholder: "0.00" })
         ] }),
-        /* @__PURE__ */ s.jsxs("label", { className: "field", children: [
+        /* @__PURE__ */ e.jsxs("label", { className: "field", children: [
           "แหล่งราคา",
-          /* @__PURE__ */ s.jsx("input", { value: e.price.source === "central_override" ? "ราคากลางถาวร" : e.price.source === "pdf" ? "ราคา PDF" : "ยังไม่มีราคา", readOnly: !0 })
+          /* @__PURE__ */ e.jsx("input", { value: s.price.source === "central_override" ? "ราคากลางถาวร" : s.price.source === "pdf" ? "ราคา PDF" : "ยังไม่มีราคา", readOnly: !0 })
         ] })
       ] }),
-      /* @__PURE__ */ s.jsx("div", { className: "price-source", children: "ผูกกับ SKU + ขนาด + หน่วย + Pack และใช้ทุก Class ในกลุ่ม" }),
-      /* @__PURE__ */ s.jsx("div", { className: "tier-preview", children: y ? e.classIds.map((i) => {
-        var w;
-        return /* @__PURE__ */ s.jsxs("div", { className: "tier-line", children: [
-          /* @__PURE__ */ s.jsx("b", { children: i }),
-          /* @__PURE__ */ s.jsx("span", { children: ((w = y.tiersByClass[i]) == null ? void 0 : w.map((o) => o.sourceText).join(" / ")) || "ไม่มี Class นี้ — จะ Block" })
-        ] }, i);
-      }) : /* @__PURE__ */ s.jsx("span", { children: "เลือก Promotion Family เพื่อดูเงื่อนไขแต่ละ Class" }) }),
-      /* @__PURE__ */ s.jsx("div", { className: "control-actions", children: /* @__PURE__ */ s.jsx("button", { className: "btn success", disabled: !v || !Number(t), onClick: () => d(v, Number(t)), children: "ใช้โปรและราคากับทุก Class" }) })
+      /* @__PURE__ */ e.jsx("div", { className: "price-source", children: "ผูกกับ SKU + ขนาด + หน่วย + Pack และใช้ทุก Class ในกลุ่ม" }),
+      /* @__PURE__ */ e.jsx("div", { className: "tier-preview", children: v ? s.classIds.map((r) => {
+        var P;
+        return /* @__PURE__ */ e.jsxs("div", { className: "tier-line", children: [
+          /* @__PURE__ */ e.jsx("b", { children: r }),
+          /* @__PURE__ */ e.jsx("span", { children: ((P = v.tiersByClass[r]) == null ? void 0 : P.map((d) => d.sourceText).join(" / ")) || "ไม่มี Class นี้ — จะ Block" })
+        ] }, r);
+      }) : /* @__PURE__ */ e.jsx("span", { children: "เลือก Promotion Family เพื่อดูเงื่อนไขแต่ละ Class" }) }),
+      /* @__PURE__ */ e.jsx("div", { className: "control-actions", children: /* @__PURE__ */ e.jsx("button", { className: "btn success", disabled: !x || !Number(i), onClick: () => u(x, Number(i)), children: "ใช้โปรและราคากับทุก Class" }) })
     ] })
   ] }) });
 }
-function Os() {
-  const e = new URLSearchParams(location.search).get("demo") === "1", [n, t] = m.useState(ns()), [x, f] = m.useState(!!n), [d, v] = m.useState(e), [c, j] = m.useState(Gs()), [y, N] = m.useState(null), [i, w] = m.useState(null), [o, b] = m.useState(!0), [r, P] = m.useState(e ? K("draft") : null), [C, F] = m.useState([]), [g, U] = m.useState(null), [D, l] = m.useState(!1), [T, G] = m.useState("เลือก PDF และ CSV/XLSM ของเดือนเดียวกัน"), [B, _] = m.useState(""), [q, H] = m.useState(""), [O, W] = m.useState("all"), [X, L] = m.useState({});
+function He() {
+  const s = new URLSearchParams(location.search).get("demo") === "1", [n, i] = m.useState(de()), [f, j] = m.useState(!!n), [u, x] = m.useState(s), [p, y] = m.useState(Le()), [v, S] = m.useState(null), [r, P] = m.useState(null), [d, w] = m.useState(!0), [a, I] = m.useState(s ? Q("draft") : null), [_, U] = m.useState([]), [N, T] = m.useState(null), [$, l] = m.useState(!1), [q, F] = m.useState("เลือก PDF และ CSV/XLSM ของเดือนเดียวกัน"), [H, M] = m.useState(""), [E, Z] = m.useState(""), [z, J] = m.useState("all"), [ee, W] = m.useState({}), [A, O] = m.useState(!1), [G, B] = m.useState(null);
   m.useEffect(() => {
     if (!n) {
-      f(!1);
+      j(!1);
       return;
     }
-    is(n).catch(() => t(null)).finally(() => f(!1));
+    ue(n).catch(() => i(null)).finally(() => j(!1));
   }, []);
-  const Y = async () => {
-    if (!(!y || !i)) {
-      l(!0), _(""), P(null), F([]);
+  const se = async () => {
+    if (!(!v || !r)) {
+      l(!0), M(""), I(null), U([]), O(!1), B(null);
       try {
-        const [{ importPromotionPdf: a }, { parsePromotionWorkbook: h }] = await Promise.all([
-          import("./chunks/pdf-importer-CZ6R0IAk.js"),
-          import("./chunks/workbook-parser-CyKOcvOh.js")
-        ]), S = await h(i), u = await a(y, { monthKey: c, enableOcr: o, onProgress: U }), k = $s(c, u.cards), I = Ds(c, [], (n == null ? void 0 : n.user.id) || null);
-        I.status = "need_review", I.source = { pdfName: y.name, workbookName: i.name, pdfHash: null, workbookHash: null };
-        const p = {
+        const [{ importPromotionPdf: t }, { parsePromotionWorkbook: c }] = await Promise.all([
+          import("./chunks/pdf-importer-CnGdUR3N.js"),
+          import("./chunks/workbook-parser-D-gaA0Wc.js")
+        ]), g = await c(r), o = await t(v, { monthKey: p, enableOcr: d, onProgress: T }), k = Ee(p, o.cards), C = Be(p, [], (n == null ? void 0 : n.user.id) || null);
+        C.status = "need_review", C.source = { pdfName: v.name, workbookName: r.name, pdfHash: null, workbookHash: null };
+        const h = {
           schema: "promo-system-rebuild-v1",
-          version: I,
+          version: C,
           skus: k.skus,
           prices: k.prices,
           cards: k.cards,
           productGroups: k.groups,
-          promotionFamilies: S.families,
-          warnings: [...u.warnings, ...S.warnings, ...k.warnings]
+          promotionFamilies: g.families,
+          warnings: [...o.warnings, ...g.warnings, ...k.warnings]
         };
-        P(p), F(k.quarantineCards), L(Object.fromEntries(p.productGroups.map((R) => {
-          var $;
-          return [R.id, String((($ = R.price.effectivePrice) == null ? void 0 : $.amount) || "")];
-        }))), G(`ประมวลผลแล้ว ${p.cards.length} การ์ด · ${p.productGroups.length} Product Group · quarantine ${k.quarantineCards.length}`);
-      } catch (a) {
-        _(String(a.message || a));
+        I(h), U(k.quarantineCards), W(Object.fromEntries(h.productGroups.map((b) => {
+          var R;
+          return [b.id, String(((R = b.price.effectivePrice) == null ? void 0 : R.amount) || "")];
+        }))), F(`ประมวลผลแล้ว ${h.cards.length} การ์ด · ${h.productGroups.length} Product Group · quarantine ${k.quarantineCards.length}`);
+      } catch (t) {
+        M(String(t.message || t));
       } finally {
         l(!1);
       }
     }
-  }, Q = (a) => P((h) => {
-    if (!h) return h;
-    const S = h.productGroups.find((u) => u.id === a);
-    if (!S) return h;
+  }, ae = (t) => I((c) => {
+    if (!c) return c;
+    const g = c.productGroups.find((o) => o.id === t);
+    if (!g) return c;
     try {
-      const u = ls(S.sku), k = h.productGroups.map((p) => p.id === a ? { ...p, sku: u, failureReasons: p.failureReasons.filter((R) => R !== "new_sku_requires_confirmation") } : p), I = h.skus.map((p) => p.id === u.id ? u : p);
-      return { ...h, skus: I, productGroups: k };
-    } catch (u) {
-      return _(String(u.message || u)), h;
+      const o = me(g.sku), k = c.productGroups.map((h) => h.id === t ? { ...h, sku: o, failureReasons: h.failureReasons.filter((b) => b !== "new_sku_requires_confirmation") } : h), C = c.skus.map((h) => h.id === o.id ? o : h);
+      return O(!1), B(null), { ...c, skus: C, productGroups: k };
+    } catch (o) {
+      return M(String(o.message || o)), c;
     }
-  }), Z = (a, h, S) => P((u) => {
-    if (!u) return u;
-    const k = u.productGroups.find((p) => p.id === a), I = u.promotionFamilies.find((p) => p.id === h);
-    if (!k || !I) return u;
+  }), te = (t, c, g) => I((o) => {
+    if (!o) return o;
+    const k = o.productGroups.find((h) => h.id === t), C = o.promotionFamilies.find((h) => h.id === c);
+    if (!k || !C) return o;
     try {
-      const p = Is(k.price, S), R = Ms(k, u.cards, p), $ = Fs(R.group, R.cards, I);
-      return $.blockedClasses.length ? _(`Block: CSV ไม่มี Class ${$.blockedClasses.join(", ")} สำหรับ ${k.sku.canonicalName}`) : _(""), {
-        ...u,
-        prices: [...u.prices.filter((E) => E.skuId !== p.skuId), p],
-        cards: $.cards,
-        productGroups: u.productGroups.map((E) => E.id === a ? $.group : E)
+      const h = Oe(k.price, g), b = Te(k, o.cards, h), R = ze(b.group, b.cards, C);
+      return R.blockedClasses.length ? M(`Block: CSV ไม่มี Class ${R.blockedClasses.join(", ")} สำหรับ ${k.sku.canonicalName}`) : M(""), O(!1), B(null), {
+        ...o,
+        prices: [...o.prices.filter((L) => L.skuId !== h.skuId), h],
+        cards: R.cards,
+        productGroups: o.productGroups.map((L) => L.id === t ? R.group : L)
       };
-    } catch (p) {
-      return _(String(p.message || p)), u;
+    } catch (h) {
+      return M(String(h.message || h)), o;
     }
-  }), A = m.useMemo(() => ((r == null ? void 0 : r.productGroups) || []).filter((a) => {
-    if (O !== "all" && a.status !== O) return !1;
-    const h = [a.sku.canonicalName, a.sku.code, a.sku.identity.brand, a.sku.identity.productType, ...a.classIds].join(" ").toLowerCase();
-    return !q || h.includes(q.toLowerCase());
-  }), [r, q, O]), J = async () => {
-    if (!(!r || !n || d)) {
-      l(!0), _("");
+  }), X = m.useMemo(() => ((a == null ? void 0 : a.productGroups) || []).filter((t) => {
+    if (z !== "all" && t.status !== z) return !1;
+    const c = [t.sku.canonicalName, t.sku.code, t.sku.identity.brand, t.sku.identity.productType, ...t.classIds].join(" ").toLowerCase();
+    return !E || c.includes(E.toLowerCase());
+  }), [a, E, z]), ne = async () => {
+    var t;
+    if (!(!a || !n || u)) {
+      l(!0), M("");
       try {
-        const a = await os(r, n);
-        G(`บันทึก Draft แล้ว revision ${a.data.revision}`);
-      } catch (a) {
-        _(String(a.message || a));
+        const c = a.version.status === "draft" ? crypto.randomUUID() : a.version.id, g = [];
+        for (let h = 0; h < a.cards.length; h += 1) {
+          const b = a.cards[h];
+          F(`กำลังอัปโหลดรูป ${h + 1}/${a.cards.length}`);
+          const R = (t = b.imageUrl) != null && t.startsWith("data:") ? await xe(c, b.id, b.imageUrl, n) : b.imageUrl;
+          g.push({ ...b, imageUrl: R });
+        }
+        const o = { ...a, cards: g, version: { ...a.version, id: c } }, k = await fe(o, n), C = String(k.data.version_id || c);
+        I({ ...o, version: { ...o.version, id: C, revision: k.data.revision, status: "draft" } }), B(C), O(!1), F(`บันทึก Draft แล้ว revision ${k.data.revision} — ตรวจ Preview ก่อน Publish`);
+      } catch (c) {
+        M(String(c.message || c));
+      } finally {
+        l(!1);
+      }
+    }
+  }, ie = async () => {
+    if (!(!a || !n || u || !G || !A)) {
+      l(!0), M("");
+      try {
+        await je(G, n), I({ ...a, version: { ...a.version, status: "published", publishedAt: (/* @__PURE__ */ new Date()).toISOString() } }), F(`Published revision ${a.version.revision} แล้ว`);
+      } catch (t) {
+        M(String(t.message || t));
       } finally {
         l(!1);
       }
     }
   };
-  if (x) return /* @__PURE__ */ s.jsx("main", { className: "login-page", children: /* @__PURE__ */ s.jsx("section", { className: "login-card", children: "กำลังตรวจ session..." }) });
-  if (!n && !d) return /* @__PURE__ */ s.jsx(Ts, { onLogin: (a) => t(a), onDemo: () => {
-    v(!0), P(K("draft"));
+  if (f) return /* @__PURE__ */ e.jsx("main", { className: "login-page", children: /* @__PURE__ */ e.jsx("section", { className: "login-card", children: "กำลังตรวจ session..." }) });
+  if (!n && !u) return /* @__PURE__ */ e.jsx(Ae, { onLogin: (t) => i(t), onDemo: () => {
+    x(!0), I(Q("draft"));
   } });
-  const V = (r == null ? void 0 : r.productGroups.filter((a) => a.status === "ready").length) || 0, ss = (r == null ? void 0 : r.productGroups.filter((a) => a.status === "blocked").length) || 0;
-  return /* @__PURE__ */ s.jsxs("div", { className: "admin-shell", children: [
-    /* @__PURE__ */ s.jsx("header", { className: "admin-hero", children: /* @__PURE__ */ s.jsx("div", { className: "hero-inner", children: /* @__PURE__ */ s.jsxs("div", { className: "hero-row", children: [
-      /* @__PURE__ */ s.jsxs("div", { children: [
-        /* @__PURE__ */ s.jsxs("div", { className: "eyebrow", children: [
+  const K = (a == null ? void 0 : a.productGroups.filter((t) => t.status === "ready").length) || 0, Y = (a == null ? void 0 : a.productGroups.filter((t) => t.status === "blocked").length) || 0, re = !!(a && G && A && !$ && !u && K === a.productGroups.length && Y === 0 && _.length === 0 && a.version.status !== "published");
+  return /* @__PURE__ */ e.jsxs("div", { className: "admin-shell", children: [
+    /* @__PURE__ */ e.jsx("header", { className: "admin-hero", children: /* @__PURE__ */ e.jsx("div", { className: "hero-inner", children: /* @__PURE__ */ e.jsxs("div", { className: "hero-row", children: [
+      /* @__PURE__ */ e.jsxs("div", { children: [
+        /* @__PURE__ */ e.jsxs("div", { className: "eyebrow", children: [
           "PROMO SYSTEM REBUILD · ",
-          d ? "DEMO READ-ONLY" : "AUTHENTICATED ADMIN"
+          u ? "DEMO READ-ONLY" : "AUTHENTICATED ADMIN"
         ] }),
-        /* @__PURE__ */ s.jsx("h1", { children: "จัดโปรโมชั่นเป็นกลุ่ม ไม่ไล่ติ๊กทีละการ์ด" }),
-        /* @__PURE__ */ s.jsx("p", { children: "นำเข้า PDF + CSV/XLSM แล้วจัด SKU, Product Group, โปรราย Class และราคากลางในหน้าจอเดียว" })
+        /* @__PURE__ */ e.jsx("h1", { children: "จัดโปรโมชั่นเป็นกลุ่ม ไม่ไล่ติ๊กทีละการ์ด" }),
+        /* @__PURE__ */ e.jsx("p", { children: "นำเข้า PDF + CSV/XLSM แล้วจัด SKU, Product Group, โปรราย Class และราคากลางในหน้าจอเดียว" })
       ] }),
-      /* @__PURE__ */ s.jsxs("div", { className: "hero-actions", children: [
-        /* @__PURE__ */ s.jsx("a", { className: "btn ghost", href: "/promo-new.html?demo=1", children: "ดูหน้าลูกค้า" }),
-        n && /* @__PURE__ */ s.jsxs("button", { className: "btn ghost", onClick: () => rs(n).finally(() => t(null)), children: [
-          /* @__PURE__ */ s.jsx(ks, { size: 16 }),
+      /* @__PURE__ */ e.jsxs("div", { className: "hero-actions", children: [
+        /* @__PURE__ */ e.jsx("a", { className: "btn ghost", href: "/promo-new.html?demo=1", children: "ดูหน้าลูกค้า" }),
+        n && /* @__PURE__ */ e.jsxs("button", { className: "btn ghost", onClick: () => he(n).finally(() => i(null)), children: [
+          /* @__PURE__ */ e.jsx(Ie, { size: 16 }),
           " ออกจากระบบ"
         ] })
       ] })
     ] }) }) }),
-    /* @__PURE__ */ s.jsxs("main", { className: "admin-main", children: [
-      d && /* @__PURE__ */ s.jsx("div", { className: "notice warn", children: "นี่คือข้อมูลสาธิตสำหรับตรวจ UI เท่านั้น ปุ่มบันทึก/Publish ถูกปิด และไม่มีการเชื่อม Production" }),
-      B && /* @__PURE__ */ s.jsxs("div", { className: "notice error", children: [
-        /* @__PURE__ */ s.jsx(Cs, { size: 15 }),
+    /* @__PURE__ */ e.jsxs("main", { className: "admin-main", children: [
+      u && /* @__PURE__ */ e.jsx("div", { className: "notice warn", children: "นี่คือข้อมูลสาธิตสำหรับตรวจ UI เท่านั้น ปุ่มบันทึก/Publish ถูกปิด และไม่มีการเชื่อม Production" }),
+      H && /* @__PURE__ */ e.jsxs("div", { className: "notice error", children: [
+        /* @__PURE__ */ e.jsx(Fe, { size: 15 }),
         " ",
-        B
+        H
       ] }),
-      /* @__PURE__ */ s.jsxs("section", { className: "panel", children: [
-        /* @__PURE__ */ s.jsxs("div", { className: "step-grid", children: [
-          /* @__PURE__ */ s.jsxs("label", { className: "field", children: [
+      /* @__PURE__ */ e.jsxs("section", { className: "panel", children: [
+        /* @__PURE__ */ e.jsxs("div", { className: "step-grid", children: [
+          /* @__PURE__ */ e.jsxs("label", { className: "field", children: [
             "เดือนโปรโมชั่น",
-            /* @__PURE__ */ s.jsx("input", { value: c, onChange: (a) => j(a.target.value.toUpperCase()), placeholder: "เช่น PROMO-2026-08" })
+            /* @__PURE__ */ e.jsx("input", { value: p, onChange: (t) => y(t.target.value.toUpperCase()), placeholder: "เช่น PROMO-2026-08" })
           ] }),
-          /* @__PURE__ */ s.jsxs("label", { className: "field file-drop", children: [
-            /* @__PURE__ */ s.jsxs("span", { children: [
-              /* @__PURE__ */ s.jsx(ms, { size: 16 }),
+          /* @__PURE__ */ e.jsxs("label", { className: "field file-drop", children: [
+            /* @__PURE__ */ e.jsxs("span", { children: [
+              /* @__PURE__ */ e.jsx(be, { size: 16 }),
               " เลือก PDF โปรโมชั่น"
             ] }),
-            /* @__PURE__ */ s.jsx("input", { type: "file", accept: "application/pdf,.pdf", onChange: (a) => {
-              var h;
-              return N(((h = a.target.files) == null ? void 0 : h[0]) || null);
+            /* @__PURE__ */ e.jsx("input", { type: "file", accept: "application/pdf,.pdf", onChange: (t) => {
+              var c;
+              return S(((c = t.target.files) == null ? void 0 : c[0]) || null);
             } }),
-            /* @__PURE__ */ s.jsx("small", { children: (y == null ? void 0 : y.name) || "ยังไม่ได้เลือก" })
+            /* @__PURE__ */ e.jsx("small", { children: (v == null ? void 0 : v.name) || "ยังไม่ได้เลือก" })
           ] }),
-          /* @__PURE__ */ s.jsxs("label", { className: "field file-drop", children: [
-            /* @__PURE__ */ s.jsxs("span", { children: [
-              /* @__PURE__ */ s.jsx(fs, { size: 16 }),
+          /* @__PURE__ */ e.jsxs("label", { className: "field file-drop", children: [
+            /* @__PURE__ */ e.jsxs("span", { children: [
+              /* @__PURE__ */ e.jsx(Se, { size: 16 }),
               " เลือก CSV/XLSM"
             ] }),
-            /* @__PURE__ */ s.jsx("input", { type: "file", accept: ".csv,.xlsx,.xlsm,.xls", onChange: (a) => {
-              var h;
-              return w(((h = a.target.files) == null ? void 0 : h[0]) || null);
+            /* @__PURE__ */ e.jsx("input", { type: "file", accept: ".csv,.xlsx,.xlsm,.xls", onChange: (t) => {
+              var c;
+              return P(((c = t.target.files) == null ? void 0 : c[0]) || null);
             } }),
-            /* @__PURE__ */ s.jsx("small", { children: (i == null ? void 0 : i.name) || "ยังไม่ได้เลือก" })
+            /* @__PURE__ */ e.jsx("small", { children: (r == null ? void 0 : r.name) || "ยังไม่ได้เลือก" })
           ] })
         ] }),
-        /* @__PURE__ */ s.jsxs("div", { className: "run-row", children: [
-          /* @__PURE__ */ s.jsxs("label", { className: "field", style: { flexDirection: "row", alignItems: "center" }, children: [
-            /* @__PURE__ */ s.jsx("input", { style: { width: 18, height: 18 }, type: "checkbox", checked: o, onChange: (a) => b(a.target.checked) }),
+        /* @__PURE__ */ e.jsxs("div", { className: "run-row", children: [
+          /* @__PURE__ */ e.jsxs("label", { className: "field", style: { flexDirection: "row", alignItems: "center" }, children: [
+            /* @__PURE__ */ e.jsx("input", { style: { width: 18, height: 18 }, type: "checkbox", checked: d, onChange: (t) => w(t.target.checked) }),
             " OCR เฉพาะเมื่อ PDF ไม่มี text layer"
           ] }),
-          /* @__PURE__ */ s.jsx("button", { className: "btn primary", disabled: D || !y || !i || d, onClick: Y, children: D ? "กำลังประมวลผล..." : "ประมวลผลครั้งเดียว" })
+          /* @__PURE__ */ e.jsx("button", { className: "btn primary", disabled: $ || !v || !r || u, onClick: se, children: $ ? "กำลังประมวลผล..." : "ประมวลผลครั้งเดียว" })
         ] }),
-        /* @__PURE__ */ s.jsx("div", { className: "progress", children: /* @__PURE__ */ s.jsx("i", { style: { width: g ? `${Math.max(3, g.page / Math.max(1, g.pageCount) * 100)}%` : "0%" } }) }),
-        /* @__PURE__ */ s.jsxs("div", { className: "progress-meta", children: [
-          /* @__PURE__ */ s.jsx("span", { children: (g == null ? void 0 : g.message) || T }),
-          /* @__PURE__ */ s.jsx("span", { children: g ? `${g.cards} การ์ด · ${(g.elapsedMs / 1e3).toFixed(1)} วินาที` : "" })
+        /* @__PURE__ */ e.jsx("div", { className: "progress", children: /* @__PURE__ */ e.jsx("i", { style: { width: N ? `${Math.max(3, N.page / Math.max(1, N.pageCount) * 100)}%` : "0%" } }) }),
+        /* @__PURE__ */ e.jsxs("div", { className: "progress-meta", children: [
+          /* @__PURE__ */ e.jsx("span", { children: (N == null ? void 0 : N.message) || q }),
+          /* @__PURE__ */ e.jsx("span", { children: N ? `${N.cards} การ์ด · ${(N.elapsedMs / 1e3).toFixed(1)} วินาที` : "" })
         ] })
       ] }),
-      /* @__PURE__ */ s.jsx("section", { className: "panel", children: /* @__PURE__ */ s.jsxs("div", { className: "summary", children: [
-        /* @__PURE__ */ s.jsxs("div", { className: "stat", children: [
-          /* @__PURE__ */ s.jsx("span", { children: "SKU" }),
-          /* @__PURE__ */ s.jsx("b", { children: (r == null ? void 0 : r.skus.length) || 0 })
+      /* @__PURE__ */ e.jsx("section", { className: "panel", children: /* @__PURE__ */ e.jsxs("div", { className: "summary", children: [
+        /* @__PURE__ */ e.jsxs("div", { className: "stat", children: [
+          /* @__PURE__ */ e.jsx("span", { children: "SKU" }),
+          /* @__PURE__ */ e.jsx("b", { children: (a == null ? void 0 : a.skus.length) || 0 })
         ] }),
-        /* @__PURE__ */ s.jsxs("div", { className: "stat", children: [
-          /* @__PURE__ */ s.jsx("span", { children: "Product Group" }),
-          /* @__PURE__ */ s.jsx("b", { children: (r == null ? void 0 : r.productGroups.length) || 0 })
+        /* @__PURE__ */ e.jsxs("div", { className: "stat", children: [
+          /* @__PURE__ */ e.jsx("span", { children: "Product Group" }),
+          /* @__PURE__ */ e.jsx("b", { children: (a == null ? void 0 : a.productGroups.length) || 0 })
         ] }),
-        /* @__PURE__ */ s.jsxs("div", { className: "stat", children: [
-          /* @__PURE__ */ s.jsx("span", { children: "การ์ด" }),
-          /* @__PURE__ */ s.jsx("b", { children: (r == null ? void 0 : r.cards.length) || 0 })
+        /* @__PURE__ */ e.jsxs("div", { className: "stat", children: [
+          /* @__PURE__ */ e.jsx("span", { children: "การ์ด" }),
+          /* @__PURE__ */ e.jsx("b", { children: (a == null ? void 0 : a.cards.length) || 0 })
         ] }),
-        /* @__PURE__ */ s.jsxs("div", { className: "stat", children: [
-          /* @__PURE__ */ s.jsx("span", { children: "พร้อมใช้" }),
-          /* @__PURE__ */ s.jsx("b", { children: V })
+        /* @__PURE__ */ e.jsxs("div", { className: "stat", children: [
+          /* @__PURE__ */ e.jsx("span", { children: "พร้อมใช้" }),
+          /* @__PURE__ */ e.jsx("b", { children: K })
         ] }),
-        /* @__PURE__ */ s.jsxs("div", { className: "stat", children: [
-          /* @__PURE__ */ s.jsx("span", { children: "Block/Quarantine" }),
-          /* @__PURE__ */ s.jsx("b", { children: ss + C.length })
+        /* @__PURE__ */ e.jsxs("div", { className: "stat", children: [
+          /* @__PURE__ */ e.jsx("span", { children: "Block/Quarantine" }),
+          /* @__PURE__ */ e.jsx("b", { children: Y + _.length })
         ] })
       ] }) }),
-      /* @__PURE__ */ s.jsxs("section", { className: "panel", children: [
-        /* @__PURE__ */ s.jsxs("div", { className: "section-head", children: [
-          /* @__PURE__ */ s.jsxs("div", { children: [
-            /* @__PURE__ */ s.jsxs("h2", { children: [
-              /* @__PURE__ */ s.jsx(ys, { size: 19 }),
+      /* @__PURE__ */ e.jsxs("section", { className: "panel", children: [
+        /* @__PURE__ */ e.jsxs("div", { className: "section-head", children: [
+          /* @__PURE__ */ e.jsxs("div", { children: [
+            /* @__PURE__ */ e.jsxs("h2", { children: [
+              /* @__PURE__ */ e.jsx(Ce, { size: 19 }),
               " Product Group"
             ] }),
-            /* @__PURE__ */ s.jsx("small", { children: "หนึ่งเดือน + หนึ่ง SKU; รูปยังแยกตาม Class" })
+            /* @__PURE__ */ e.jsx("small", { children: "หนึ่งเดือน + หนึ่ง SKU; รูปยังแยกตาม Class" })
           ] }),
-          /* @__PURE__ */ s.jsxs("span", { className: "tag", children: [
-            A.length,
+          /* @__PURE__ */ e.jsxs("span", { className: "tag", children: [
+            X.length,
             " กลุ่ม"
           ] })
         ] }),
-        /* @__PURE__ */ s.jsxs("div", { className: "search-row", children: [
-          /* @__PURE__ */ s.jsxs("label", { style: { position: "relative" }, children: [
-            /* @__PURE__ */ s.jsx(cs, { size: 17, style: { position: "absolute", left: 12, top: 14, color: "#64748b" } }),
-            /* @__PURE__ */ s.jsx("input", { style: { paddingLeft: 38 }, value: q, onChange: (a) => H(a.target.value), placeholder: "ค้นหาชื่อสินค้า แบรนด์ SKU หรือ Class" })
+        /* @__PURE__ */ e.jsxs("div", { className: "search-row", children: [
+          /* @__PURE__ */ e.jsxs("label", { style: { position: "relative" }, children: [
+            /* @__PURE__ */ e.jsx(pe, { size: 17, style: { position: "absolute", left: 12, top: 14, color: "#64748b" } }),
+            /* @__PURE__ */ e.jsx("input", { style: { paddingLeft: 38 }, value: E, onChange: (t) => Z(t.target.value), placeholder: "ค้นหาชื่อสินค้า แบรนด์ SKU หรือ Class" })
           ] }),
-          /* @__PURE__ */ s.jsxs("select", { value: O, onChange: (a) => W(a.target.value), children: [
-            /* @__PURE__ */ s.jsx("option", { value: "all", children: "ทุกสถานะ" }),
-            /* @__PURE__ */ s.jsx("option", { value: "ready", children: "พร้อมใช้" }),
-            /* @__PURE__ */ s.jsx("option", { value: "need_review", children: "ต้องตรวจ" }),
-            /* @__PURE__ */ s.jsx("option", { value: "blocked", children: "Block" })
+          /* @__PURE__ */ e.jsxs("select", { value: z, onChange: (t) => J(t.target.value), children: [
+            /* @__PURE__ */ e.jsx("option", { value: "all", children: "ทุกสถานะ" }),
+            /* @__PURE__ */ e.jsx("option", { value: "ready", children: "พร้อมใช้" }),
+            /* @__PURE__ */ e.jsx("option", { value: "need_review", children: "ต้องตรวจ" }),
+            /* @__PURE__ */ e.jsx("option", { value: "blocked", children: "Block" })
           ] })
         ] }),
-        /* @__PURE__ */ s.jsx("div", { className: "group-list", children: r ? A.map((a) => {
-          var h;
-          return /* @__PURE__ */ s.jsx(qs, { group: a, dataset: r, priceDraft: X[a.id] ?? String(((h = a.price.effectivePrice) == null ? void 0 : h.amount) || ""), onPriceDraft: (S) => L((u) => ({ ...u, [a.id]: S })), onConfirmSku: () => Q(a.id), onApply: (S, u) => Z(a.id, S, u) }, a.id);
-        }) : /* @__PURE__ */ s.jsx("div", { className: "empty", children: "เลือกไฟล์แล้วกดประมวลผล ระบบจะแสดง Product Group ที่นี่" }) })
+        /* @__PURE__ */ e.jsx("div", { className: "group-list", children: a ? X.map((t) => {
+          var c;
+          return /* @__PURE__ */ e.jsx(Ke, { group: t, dataset: a, priceDraft: ee[t.id] ?? String(((c = t.price.effectivePrice) == null ? void 0 : c.amount) || ""), onPriceDraft: (g) => W((o) => ({ ...o, [t.id]: g })), onConfirmSku: () => ae(t.id), onApply: (g, o) => te(t.id, g, o) }, t.id);
+        }) : /* @__PURE__ */ e.jsx("div", { className: "empty", children: "เลือกไฟล์แล้วกดประมวลผล ระบบจะแสดง Product Group ที่นี่" }) })
       ] }),
-      !!C.length && /* @__PURE__ */ s.jsxs("section", { className: "panel", children: [
-        /* @__PURE__ */ s.jsxs("div", { className: "section-head", children: [
-          /* @__PURE__ */ s.jsxs("div", { children: [
-            /* @__PURE__ */ s.jsx("h2", { children: "รายการที่ต้องแก้กลุ่มเฉพาะจุด" }),
-            /* @__PURE__ */ s.jsx("small", { children: "ระบบไม่สร้าง SKU ให้เมื่อหลักฐานชื่อ/ชนิด/ขนาด/หน่วยไม่ครบ" })
+      !!_.length && /* @__PURE__ */ e.jsxs("section", { className: "panel", children: [
+        /* @__PURE__ */ e.jsxs("div", { className: "section-head", children: [
+          /* @__PURE__ */ e.jsxs("div", { children: [
+            /* @__PURE__ */ e.jsx("h2", { children: "รายการที่ต้องแก้กลุ่มเฉพาะจุด" }),
+            /* @__PURE__ */ e.jsx("small", { children: "ระบบไม่สร้าง SKU ให้เมื่อหลักฐานชื่อ/ชนิด/ขนาด/หน่วยไม่ครบ" })
           ] }),
-          /* @__PURE__ */ s.jsx("span", { className: "tag bad", children: C.length })
+          /* @__PURE__ */ e.jsx("span", { className: "tag bad", children: _.length })
         ] }),
-        /* @__PURE__ */ s.jsx("div", { className: "quarantine", children: C.map((a) => /* @__PURE__ */ s.jsxs("article", { className: "quarantine-card", children: [
-          /* @__PURE__ */ s.jsx("img", { src: a.imageUrl, alt: a.cardId }),
-          /* @__PURE__ */ s.jsx("b", { children: a.productText || "อ่านชื่อสินค้าไม่ได้" }),
-          /* @__PURE__ */ s.jsx("div", { className: "failure", children: a.failureReasons.join(" · ") })
-        ] }, a.cardId)) })
+        /* @__PURE__ */ e.jsx("div", { className: "quarantine", children: _.map((t) => /* @__PURE__ */ e.jsxs("article", { className: "quarantine-card", children: [
+          /* @__PURE__ */ e.jsx("img", { src: t.imageUrl, alt: t.cardId }),
+          /* @__PURE__ */ e.jsx("b", { children: t.productText || "อ่านชื่อสินค้าไม่ได้" }),
+          /* @__PURE__ */ e.jsx("div", { className: "failure", children: t.failureReasons.join(" · ") })
+        ] }, t.cardId)) })
       ] }),
-      /* @__PURE__ */ s.jsxs("div", { className: "footer-actions", children: [
-        /* @__PURE__ */ s.jsxs("button", { className: "btn soft", disabled: !r, onClick: () => r && G(`Preview พร้อม: ${V}/${r.productGroups.length} กลุ่ม ready`), children: [
-          /* @__PURE__ */ s.jsx(hs, { size: 16 }),
-          " ตรวจ Preview"
+      /* @__PURE__ */ e.jsxs("div", { className: "footer-actions", children: [
+        /* @__PURE__ */ e.jsxs("button", { className: "btn soft", disabled: !a || !G || $, onClick: () => {
+          a && (O(!0), F(`Preview ผ่านการยืนยัน: ${K}/${a.productGroups.length} กลุ่ม ready`));
+        }, children: [
+          /* @__PURE__ */ e.jsx(ke, { size: 16 }),
+          " ",
+          A ? "Preview ตรวจแล้ว" : "ตรวจ Preview"
         ] }),
-        /* @__PURE__ */ s.jsxs("button", { className: "btn primary", disabled: !r || !n || d || D, onClick: J, children: [
-          /* @__PURE__ */ s.jsx(Ns, { size: 16 }),
-          " บันทึก Draft"
+        /* @__PURE__ */ e.jsxs("button", { className: "btn primary", disabled: !a || !n || u || $ || !!G || a.version.status === "published", onClick: ne, children: [
+          /* @__PURE__ */ e.jsx(Me, { size: 16 }),
+          " ",
+          G ? "Draft บันทึกแล้ว" : "บันทึก Draft"
         ] }),
-        /* @__PURE__ */ s.jsx("button", { className: "btn dark", disabled: !0, children: "Publish ภายหลัง (ไม่ทำอัตโนมัติ)" })
+        /* @__PURE__ */ e.jsx("button", { className: "btn dark", disabled: !re, onClick: ie, children: "Publish เวอร์ชันนี้" })
       ] })
     ] })
   ] });
 }
-as.createRoot(document.getElementById("promo-admin-new-root")).render(/* @__PURE__ */ s.jsx(ts.StrictMode, { children: /* @__PURE__ */ s.jsx(Os, {}) }));
+ce.createRoot(document.getElementById("promo-admin-new-root")).render(/* @__PURE__ */ e.jsx(oe.StrictMode, { children: /* @__PURE__ */ e.jsx(He, {}) }));

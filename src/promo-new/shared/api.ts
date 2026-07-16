@@ -59,6 +59,15 @@ export async function saveDraft(dataset: PromoDataset, session: AdminSession) {
   });
 }
 
+export async function uploadCardImage(versionId: string, cardId: string, dataUrl: string, session: AdminSession): Promise<string> {
+  const response = await request<{ ok: true; path: string }>('card-image', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session.accessToken}` },
+    body: JSON.stringify({ versionId, cardId, dataUrl }),
+  });
+  return response.path;
+}
+
 export async function publishVersion(versionId: string, session: AdminSession) {
   return request('publish', {
     method: 'POST',

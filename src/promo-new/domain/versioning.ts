@@ -22,9 +22,8 @@ export function nextDraftVersion(monthKey: string, versions: PromoVersion[], act
   const monthVersions = versions.filter(version => version.monthKey === monthKey);
   const active = monthVersions.filter(version => version.status === 'published').sort((a, b) => b.revision - a.revision)[0];
   const revision = Math.max(0, ...monthVersions.map(version => version.revision)) + 1;
-  const suffix = crypto.randomUUID();
   return {
-    id: `version:${monthKey}:${revision}:${suffix}`,
+    id: crypto.randomUUID(),
     monthKey,
     revision,
     status: 'imported',

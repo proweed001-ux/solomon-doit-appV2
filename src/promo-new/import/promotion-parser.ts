@@ -1,5 +1,5 @@
 import type { PromotionTier } from '../domain/types';
-import { normalizeClassId } from './pdf-importer';
+import { normalizeClassId } from './class-id';
 
 const THAI_DIGITS: Record<string, string> = {
   '๐': '0', '๑': '1', '๒': '2', '๓': '3', '๔': '4',

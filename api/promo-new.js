@@ -20,6 +20,7 @@ function queryValue(req, name) {
 
 function validateDatasetPayload(dataset) {
   if (!dataset || dataset.schema !== 'promo-system-rebuild-v1') throw new Error('dataset_schema_invalid');
+  if (!UUID.test(String(dataset.version?.id || ''))) throw new Error('version_id_invalid');
   const monthKey = String(dataset.version?.monthKey || '').toUpperCase();
   if (!MONTH_KEY.test(monthKey)) throw new Error('month_key_invalid');
   if (!Array.isArray(dataset.cards) || !Array.isArray(dataset.productGroups) || !Array.isArray(dataset.promotionFamilies)) throw new Error('dataset_collections_missing');
