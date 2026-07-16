@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import type { PromotionFamily, PromotionTier } from '../domain/types';
 import { parsePromotionTiers, splitClassIds } from './promotion-parser';
+import { inspectPromotionWorkbookFile, validatePromotionWorkbookSignature } from './workbook-file';
 
 type Cell = string | number | boolean | Date | null | undefined;
 type Matrix = Cell[][];
@@ -194,11 +195,20 @@ export function parsePromotionMatrix(matrix: Matrix, sheetName: string): { famil
 }
 
 export async function parsePromotionWorkbook(file: File): Promise<WorkbookParseResult> {
+  const fileInfo = inspectPromotionWorkbookFile(file);
+  if (!fileInfo.kind || fileInfo.error) throw new Error(fileInfo.error || 'ชนิดไฟล์ตารางโปรโมชั่นไม่ถูกต้อง');
   const bytes = await file.arrayBuffer();
-  const isCsv = file.name.toLowerCase().endsWith('.csv') || /(?:^|\/)csv$/i.test(file.type);
-  const workbook = isCsv
-    ? XLSX.read(new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/u, ''), { type: 'string', cellDates: true, dense: true })
-    : XLSX.read(bytes, { type: 'array', cellDates: true, dense: true });
+  const signatureError = validatePromotionWorkbookSignature(fileInfo.kind, bytes);
+  if (signatureError) throw new Error(signatureError);
+  let workbook: XLSX.WorkBook;
+  try {
+    workbook = fileInfo.kind === 'csv'
+      ? XLSX.read(new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/u, ''), { type: 'string', cellDates: true, dense: true })
+      : XLSX.read(bytes, { type: 'array', cellDates: true, dense: true });
+  } catch {
+    throw new Error(`อ่านไฟล์ ${fileInfo.label} ไม่สำเร็จ กรุณาเปิดใน Excel แล้ว Save As ใหม่โดยไม่ตั้งรหัสผ่าน`);
+  }
+  if (!workbook.SheetNames.length) throw new Error(`ไฟล์ ${fileInfo.label} ไม่มี Worksheet ที่อ่านได้`);
   const all = new Map<string, PromotionFamily>();
   const sheets: WorkbookParseResult['sheets'] = [];
   const warnings: string[] = [];

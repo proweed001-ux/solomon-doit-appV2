@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as XLSX from 'xlsx';
 import type { PromoCard, ProductGroup, PromotionFamily, Sku } from '../../src/promo-new/domain/types';
 import type { ImportedCardCandidate } from '../../src/promo-new/import/pdf-importer';
 import { collectOcrItems } from '../../src/promo-new/import/ocr-items';
 import { makeCardId } from '../../src/promo-new/import/card-id';
 import { normalizeClassId } from '../../src/promo-new/import/class-id';
-import { parsePromotionMatrix } from '../../src/promo-new/import/workbook-parser';
+import { parsePromotionMatrix, parsePromotionWorkbook } from '../../src/promo-new/import/workbook-parser';
+import { inspectPromotionWorkbookFile, validatePromotionWorkbookSignature } from '../../src/promo-new/import/workbook-file';
 import { parsePromotionTiers } from '../../src/promo-new/import/promotion-parser';
 import { evaluateGrid } from '../../src/promo-new/import/grid-detector';
 import { calculatePromotion } from '../../src/promo-new/domain/calculator';
@@ -217,6 +219,27 @@ test('Promotion workbook รวมหลายแถว Class เป็น Famil
   ], 'Sheet1');
   assert.equal(parsed.families.length, 1);
   assert.deepEqual(Object.keys(parsed.families[0].tiersByClass).sort(), ['HFSM', 'HFSS']);
+});
+
+test('ไฟล์ XLSM จริงเลือกและอ่าน Promotion Family ได้โดยไม่รัน macro', async () => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['Promotion Family', 'สินค้า', 'Class', 'โปรโมชั่น'],
+    ['HAIR-XLSM', 'Pantene แชมพู 70 มล.', 'HFSS', 'ซื้อ 6 ชิ้น ลด 10%'],
+    ['', '', 'HFSM', 'ซื้อ 6 ชิ้น ลด 12%'],
+  ]), 'Promotion');
+  const bytes = XLSX.write(workbook, { type: 'array', bookType: 'xlsm' }) as ArrayBuffer;
+  const file = new File([bytes], 'PROMO_Aug26.XLSM', { type: 'application/vnd.ms-excel.sheet.macroEnabled.12' });
+  assert.deepEqual(inspectPromotionWorkbookFile(file), { kind: 'xlsm', label: 'Excel XLSM', error: null });
+  assert.equal(validatePromotionWorkbookSignature('xlsm', bytes), null);
+  const parsed = await parsePromotionWorkbook(file);
+  assert.equal(parsed.families.length, 1);
+  assert.deepEqual(Object.keys(parsed.families[0].tiersByClass).sort(), ['HFSM', 'HFSS']);
+});
+
+test('XLSM ที่ไม่ใช่ ZIP หรือเข้ารหัสถูก Block พร้อมคำแนะนำ', () => {
+  const fake = new TextEncoder().encode('not an excel workbook').buffer;
+  assert.match(validatePromotionWorkbookSignature('xlsm', fake), /Save As/u);
 });
 
 test('CSV แบบ Description คอลัมน์เดียวรวม Family และแยก tier ตาม Class', () => {

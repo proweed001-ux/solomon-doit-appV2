@@ -7,6 +7,7 @@ import { applyPriceToGroup, setCentralPrice } from '../domain/pricing';
 import { confirmSkuCandidate } from '../domain/sku-identity';
 import { nextDraftVersion } from '../domain/versioning';
 import type { ImportedCardCandidate, PdfImportProgress } from '../import/pdf-importer';
+import { inspectPromotionWorkbookFile, PROMOTION_WORKBOOK_ACCEPT } from '../import/workbook-file';
 import { createDemoDataset } from '../shared/demo-data';
 import { loadSession, login, logout, publishVersion, saveDraft, uploadCardImage, validateSession } from '../shared/api';
 import './admin.css';
@@ -95,6 +96,21 @@ function AdminApp() {
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [previewChecked, setPreviewChecked] = useState(false);
   const [savedVersionId, setSavedVersionId] = useState<string | null>(null);
+
+  const selectWorkbook = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0] || null;
+    if (!selected) { setWorkbook(null); return; }
+    const info = inspectPromotionWorkbookFile(selected);
+    if (info.error) {
+      setWorkbook(null);
+      setError(info.error);
+      event.target.value = '';
+      return;
+    }
+    setWorkbook(selected);
+    setError('');
+    setMessage(`เลือก ${info.label}: ${selected.name} — พร้อมประมวลผลร่วมกับ PDF`);
+  };
 
   useEffect(() => {
     if (!session) { setChecking(false); return; }
@@ -214,7 +230,7 @@ function AdminApp() {
       <section className="panel"><div className="step-grid">
         <label className="field">เดือนโปรโมชั่น<input value={monthKey} onChange={event => setMonthKey(event.target.value.toUpperCase())} placeholder="เช่น PROMO-2026-08" /></label>
         <label className="field file-drop"><span><UploadCloud size={16} /> เลือก PDF โปรโมชั่น</span><input type="file" accept="application/pdf,.pdf" onChange={event => setPdf(event.target.files?.[0] || null)} /><small>{pdf?.name || 'ยังไม่ได้เลือก'}</small></label>
-        <label className="field file-drop"><span><FileSpreadsheet size={16} /> เลือก CSV/XLSM</span><input type="file" accept=".csv,.xlsx,.xlsm,.xls" onChange={event => setWorkbook(event.target.files?.[0] || null)} /><small>{workbook?.name || 'ยังไม่ได้เลือก'}</small></label>
+        <label className="field file-drop"><span><FileSpreadsheet size={16} /> เลือก CSV/XLSX/XLSM</span><input type="file" accept={PROMOTION_WORKBOOK_ACCEPT} onChange={selectWorkbook} /><small>{workbook ? `${workbook.name} · ${inspectPromotionWorkbookFile(workbook).label}` : 'รองรับ .csv, .xlsx, .xlsm และ .xls'}</small></label>
       </div><div className="run-row"><label className="field" style={{ flexDirection: 'row', alignItems: 'center' }}><input style={{ width: 18, height: 18 }} type="checkbox" checked={ocr} onChange={event => setOcr(event.target.checked)} /> OCR เฉพาะเมื่อ PDF ไม่มี text layer</label><button className="btn primary" disabled={busy || !pdf || !workbook || demo} onClick={processFiles}>{busy ? 'กำลังประมวลผล...' : 'ประมวลผลครั้งเดียว'}</button></div>
         <div className="progress"><i style={{ width: progress ? `${Math.max(3, progress.page / Math.max(1, progress.pageCount) * 100)}%` : '0%' }} /></div><div className="progress-meta"><span>{progress?.message || message}</span><span>{progress ? `${progress.cards} การ์ด · ${(progress.elapsedMs / 1000).toFixed(1)} วินาที` : ''}</span></div>
       </section>
