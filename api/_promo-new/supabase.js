@@ -65,8 +65,17 @@ export function callAdminRpc(name, body) {
   return request(`/rest/v1/rpc/${name}`, { method: 'POST', key: secretKey(), body });
 }
 
-export function getPublishedCatalog(monthKey) {
-  return callAdminRpc('promo_new_get_published_catalog', { p_month_key: monthKey || null });
+export async function getPublishedCatalog(monthKey) {
+  const catalog = await callAdminRpc('promo_new_get_published_catalog', { p_month_key: monthKey || null });
+  if (catalog?.cards && Array.isArray(catalog.cards)) {
+    catalog.cards = catalog.cards.map(card => ({
+      ...card,
+      imageUrl: card.imageUrl && !String(card.imageUrl).startsWith('data:') && !String(card.imageUrl).startsWith('http')
+        ? `${projectUrl()}/storage/v1/object/public/${String(card.imageUrl).replace(/^\/+/, '')}`
+        : card.imageUrl,
+    }));
+  }
+  return catalog;
 }
 
 export async function uploadCardImage({ versionId, cardId, bytes, contentType }) {

@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  publicDir: false,
   build: {
     outDir: 'dist/assets/promo-new',
     emptyOutDir: true,
@@ -10,6 +11,7 @@ export default defineConfig({
     lib: {
       entry: {
         admin: 'src/promo-new/admin/main.tsx',
+        frontend: 'src/promo-new/frontend/main.tsx',
       },
       formats: ['es'],
     },

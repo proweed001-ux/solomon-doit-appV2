@@ -1,1 +1,0 @@
-fuel bill template placeholder
