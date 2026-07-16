@@ -9,6 +9,8 @@ export function normalizeClassId(value: string): string | null {
     const compact = candidate.replace(/[^A-Z0-9]/g, '');
     if (noise.has(compact) || compact.length < 3 || compact.length > 20) continue;
     if (compact === 'HFSWH') return 'HFSM';
+    if (compact === 'HFSWSS') return 'HFSWS-S';
+    if (compact === 'HFSWSL') return 'HFSWS-L';
     return compact;
   }
   return null;

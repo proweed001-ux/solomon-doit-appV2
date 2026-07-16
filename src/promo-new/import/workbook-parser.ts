@@ -24,7 +24,8 @@ export interface WorkbookParseResult {
   warnings: string[];
 }
 
-const normalize = (value: unknown) => String(value ?? '').normalize('NFKC').toUpperCase().replace(/\s+/g, ' ').trim();
+const thaiNfkc = (value: unknown) => String(value ?? '').normalize('NFKC').replace(/\u0E4D\u0E32/gu, '\u0E33');
+const normalize = (value: unknown) => thaiNfkc(value).toUpperCase().replace(/\s+/g, ' ').trim();
 const compact = (value: unknown) => normalize(value).replace(/[^A-Z0-9ก-๙]/gu, '');
 
 function hash(value: string): string {
@@ -60,7 +61,11 @@ function findHeader(matrix: Matrix): number {
     const score = headerScore(row);
     if (score > best.score) best = { index, score };
   });
-  return best.score >= 2 ? best.index : -1;
+  if (best.score >= 2) return best.index;
+  const row = matrix[best.index] || [];
+  const values = row.map(compact).filter(Boolean);
+  const descriptionHeaders = aliases.scope.map(compact);
+  return best.score === 1 && values.length === 1 && descriptionHeaders.includes(values[0]) ? best.index : -1;
 }
 
 function mapColumns(row: Cell[]): ColumnMap {
@@ -118,13 +123,28 @@ function mergeTiers(existing: PromotionTier[], incoming: PromotionTier[]): Promo
   return result;
 }
 
+function embeddedDescription(value: Cell): { scope: string; promotion: string; classIds: string[] } {
+  const original = thaiNfkc(value).replace(/\s+/g, ' ').trim();
+  const classMatch = original.match(/\[\s*(?:เฉพาะช่องทาง|CHANNEL|CLASS)\s*[:=-]?\s*([^\]]+)\]/iu);
+  const classIds = splitClassIds(classMatch?.[1] || '');
+  const withoutClass = original.replace(classMatch?.[0] || '', '').trim();
+  const mechanicAt = withoutClass.search(/(?:^|\s)(?:ขั้นต่ำ\s*\d|(?:เมื่อ\s*)?ซื้อ(?:ขั้นต่ำ)?\s*\d)/iu);
+  if (mechanicAt < 0) return { scope: withoutClass, promotion: withoutClass, classIds };
+  return {
+    scope: withoutClass.slice(0, mechanicAt).replace(/[,:;\s]+$/u, '').trim(),
+    promotion: withoutClass.slice(mechanicAt).trim(),
+    classIds,
+  };
+}
+
 export function parsePromotionMatrix(matrix: Matrix, sheetName: string): { families: PromotionFamily[]; headerRow: number; acceptedRows: number; warnings: string[] } {
   const headerRow = findHeader(matrix);
   if (headerRow < 0) return { families: [], headerRow: -1, acceptedRows: 0, warnings: [`sheet:${sheetName}:header_not_found`] };
   const columns = mapColumns(matrix[headerRow]);
+  const descriptionMode = columns.scope != null && columns.classId == null && columns.promotion == null;
   const warnings: string[] = [];
-  if (columns.classId == null) warnings.push(`sheet:${sheetName}:class_column_missing`);
-  if (columns.promotion == null && columns.minQuantity == null) warnings.push(`sheet:${sheetName}:promotion_columns_missing`);
+  if (columns.classId == null && !descriptionMode) warnings.push(`sheet:${sheetName}:class_column_missing`);
+  if (columns.promotion == null && columns.minQuantity == null && !descriptionMode) warnings.push(`sheet:${sheetName}:promotion_columns_missing`);
   const families = new Map<string, PromotionFamily>();
   let carriedFamilyId = '';
   let carriedName = '';
@@ -133,15 +153,16 @@ export function parsePromotionMatrix(matrix: Matrix, sheetName: string): { famil
 
   matrix.slice(headerRow + 1).forEach((row, offset) => {
     const sourceRow = headerRow + offset + 2;
+    const embedded = descriptionMode ? embeddedDescription(cell(row, columns.scope)) : null;
     const explicitId = normalize(cell(row, columns.familyId));
     const name = normalize(cell(row, columns.name));
-    const scope = normalize(cell(row, columns.scope));
+    const scope = normalize(embedded?.scope || cell(row, columns.scope));
     if (explicitId) carriedFamilyId = explicitId;
     if (name) carriedName = name;
     if (scope) carriedScope = scope;
     const familySeed = carriedFamilyId || carriedScope || carriedName;
-    const classIds = splitClassIds(cell(row, columns.classId));
-    const promotionText = String(cell(row, columns.promotion) || '').trim();
+    const classIds = embedded?.classIds || splitClassIds(cell(row, columns.classId));
+    const promotionText = embedded?.promotion || String(cell(row, columns.promotion) || '').trim();
     if (!familySeed && !classIds.length && !promotionText) return;
     if (!familySeed) {
       warnings.push(`sheet:${sheetName}:row:${sourceRow}:family_scope_missing`);
@@ -173,7 +194,11 @@ export function parsePromotionMatrix(matrix: Matrix, sheetName: string): { famil
 }
 
 export async function parsePromotionWorkbook(file: File): Promise<WorkbookParseResult> {
-  const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true, dense: true });
+  const bytes = await file.arrayBuffer();
+  const isCsv = file.name.toLowerCase().endsWith('.csv') || /(?:^|\/)csv$/i.test(file.type);
+  const workbook = isCsv
+    ? XLSX.read(new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/u, ''), { type: 'string', cellDates: true, dense: true })
+    : XLSX.read(bytes, { type: 'array', cellDates: true, dense: true });
   const all = new Map<string, PromotionFamily>();
   const sheets: WorkbookParseResult['sheets'] = [];
   const warnings: string[] = [];

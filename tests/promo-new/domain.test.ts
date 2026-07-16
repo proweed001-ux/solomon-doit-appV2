@@ -4,6 +4,7 @@ import type { PromoCard, ProductGroup, PromotionFamily, Sku } from '../../src/pr
 import type { ImportedCardCandidate } from '../../src/promo-new/import/pdf-importer';
 import { makeCardId } from '../../src/promo-new/import/card-id';
 import { parsePromotionMatrix } from '../../src/promo-new/import/workbook-parser';
+import { parsePromotionTiers } from '../../src/promo-new/import/promotion-parser';
 import { calculatePromotion } from '../../src/promo-new/domain/calculator';
 import { applyPromotionFamily, groupImportedCards } from '../../src/promo-new/domain/grouping';
 import { applyPriceToGroup, inheritedSkuPrice, setCentralPrice, type StoredPrice } from '../../src/promo-new/domain/pricing';
@@ -213,6 +214,25 @@ test('Promotion workbook รวมหลายแถว Class เป็น Famil
   ], 'Sheet1');
   assert.equal(parsed.families.length, 1);
   assert.deepEqual(Object.keys(parsed.families[0].tiersByClass).sort(), ['HFSM', 'HFSS']);
+});
+
+test('CSV แบบ Description คอลัมน์เดียวรวม Family และแยก tier ตาม Class', () => {
+  const parsed = parsePromotionMatrix([
+    ['Description'],
+    ['Pantene แชมพู 70 มล. ทุกสูตร ขั้นต่ำ 6 ขวด ลด 10%, ขั้นต่ำ 12 ขวด ลด 17% [เฉพาะช่องทาง HFSS]'],
+    ['Pantene แชมพู 70 มล. ทุกสูตร ขั้นต่ำ 12 ขวด ลด 12%, ขั้นต่ำ 48 ขวด ลด 20% [เฉพาะช่องทาง HFSWS-L]'],
+  ], 'Description');
+  assert.equal(parsed.families.length, 1);
+  assert.deepEqual(Object.keys(parsed.families[0].tiersByClass).sort(), ['HFSS', 'HFSWS-L']);
+  assert.deepEqual(parsed.families[0].tiersByClass.HFSS.map(tier => tier.discountPercent), [10, 17]);
+  assert.deepEqual(parsed.families[0].tiersByClass['HFSWS-L'].map(tier => tier.discountPercent), [12, 20]);
+});
+
+test('Promotion parser รองรับช่วงจำนวนและหลักฐานจำนวนชิ้นในวงเล็บ', () => {
+  const range = parsePromotionTiers('ขั้นต่ำ 1-2 ชิ้น เท่านั้น ลด 24%');
+  assert.deepEqual(range.tiers.map(tier => [tier.minQuantity, tier.maxQuantity, tier.discountPercent]), [[1, 2, 24]]);
+  const packs = parsePromotionTiers('ขั้นต่ำ 1 แพ็ค (3 ชิ้น) ลด 20%, 32 แพ็ค (96 ชิ้น) ลด 25%');
+  assert.deepEqual(packs.tiers.map(tier => [tier.minQuantity, tier.purchaseUnit, tier.discountPercent]), [[1, 'แพ็ค', 20], [32, 'แพ็ค', 25]]);
 });
 
 test('Calculator เลือก Tier สูงสุดที่จำนวนซื้อถึงและปัด 0.01 บาท', () => {

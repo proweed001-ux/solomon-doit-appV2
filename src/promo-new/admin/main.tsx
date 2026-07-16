@@ -74,7 +74,9 @@ function GroupEditor({ group, dataset, priceDraft, onPriceDraft, onConfirmSku, o
 }
 
 function AdminApp() {
-  const demoFromUrl = new URLSearchParams(location.search).get('demo') === '1';
+  const params = new URLSearchParams(location.search);
+  const demoFromUrl = params.get('demo') === '1';
+  const dryRun = params.get('dryrun') === '1';
   const [session, setSession] = useState<Session | null>(loadSession());
   const [checking, setChecking] = useState(Boolean(session));
   const [demo, setDemo] = useState(demoFromUrl);
@@ -199,14 +201,15 @@ function AdminApp() {
   };
 
   if (checking) return <main className="login-page"><section className="login-card">กำลังตรวจ session...</section></main>;
-  if (!session && !demo) return <LoginPage onLogin={value => setSession(value)} onDemo={() => { setDemo(true); setDataset(createDemoDataset('draft')); }} />;
+  if (!session && !demo && !dryRun) return <LoginPage onLogin={value => setSession(value)} onDemo={() => { setDemo(true); setDataset(createDemoDataset('draft')); }} />;
   const ready = dataset?.productGroups.filter(group => group.status === 'ready').length || 0;
   const blocked = dataset?.productGroups.filter(group => group.status === 'blocked').length || 0;
   const publishable = Boolean(dataset && savedVersionId && previewChecked && !busy && !demo && ready === dataset.productGroups.length && blocked === 0 && quarantine.length === 0 && dataset.version.status !== 'published');
   return <div className="admin-shell">
-    <header className="admin-hero"><div className="hero-inner"><div className="hero-row"><div><div className="eyebrow">PROMO SYSTEM REBUILD · {demo ? 'DEMO READ-ONLY' : 'AUTHENTICATED ADMIN'}</div><h1>จัดโปรโมชั่นเป็นกลุ่ม ไม่ไล่ติ๊กทีละการ์ด</h1><p>นำเข้า PDF + CSV/XLSM แล้วจัด SKU, Product Group, โปรราย Class และราคากลางในหน้าจอเดียว</p></div><div className="hero-actions"><a className="btn ghost" href="/promo-new.html?demo=1">ดูหน้าลูกค้า</a>{session && <button className="btn ghost" onClick={() => logout(session).finally(() => setSession(null))}><LogOut size={16} /> ออกจากระบบ</button>}</div></div></div></header>
+    <header className="admin-hero"><div className="hero-inner"><div className="hero-row"><div><div className="eyebrow">PROMO SYSTEM REBUILD · {demo ? 'DEMO READ-ONLY' : dryRun ? 'FILE DRY-RUN' : 'AUTHENTICATED ADMIN'}</div><h1>จัดโปรโมชั่นเป็นกลุ่ม ไม่ไล่ติ๊กทีละการ์ด</h1><p>นำเข้า PDF + CSV/XLSM แล้วจัด SKU, Product Group, โปรราย Class และราคากลางในหน้าจอเดียว</p></div><div className="hero-actions"><a className="btn ghost" href="/promo-new.html?demo=1">ดูหน้าลูกค้า</a>{session && <button className="btn ghost" onClick={() => logout(session).finally(() => setSession(null))}><LogOut size={16} /> ออกจากระบบ</button>}</div></div></div></header>
     <main className="admin-main">
       {demo && <div className="notice warn">นี่คือข้อมูลสาธิตสำหรับตรวจ UI เท่านั้น ปุ่มบันทึก/Publish ถูกปิด และไม่มีการเชื่อม Production</div>}
+      {dryRun && <div className="notice warn">โหมดทดสอบไฟล์จริง: ประมวลผลในหน่วยความจำเท่านั้น ปุ่มบันทึก/Publish ถูกปิด และไม่เขียน Production</div>}
       {error && <div className="notice error"><AlertTriangle size={15} /> {error}</div>}
       <section className="panel"><div className="step-grid">
         <label className="field">เดือนโปรโมชั่น<input value={monthKey} onChange={event => setMonthKey(event.target.value.toUpperCase())} placeholder="เช่น PROMO-2026-08" /></label>

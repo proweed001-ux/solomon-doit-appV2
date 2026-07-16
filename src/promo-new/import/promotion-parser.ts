@@ -9,6 +9,7 @@ const THAI_DIGITS: Record<string, string> = {
 export function normalizePromotionText(value: unknown): string {
   return String(value || '')
     .normalize('NFKC')
+    .replace(/\u0E4D\u0E32/gu, '\u0E33')
     .replace(/[๐-๙]/g, digit => THAI_DIGITS[digit] || digit)
     .replace(/\r?\n+/g, '; ')
     .replace(/[|；]+/g, '; ')
@@ -56,10 +57,13 @@ export function parsePromotionTiers(value: unknown, fallbackUnit = 'ชิ้น
   const text = normalizePromotionText(value);
   const tiers: PromotionTier[] = [];
   const spans: Array<{ start: number; end: number }> = [];
-  const unit = '(ขวด|ชิ้น|แพ็ค|แพค|กล่อง|ลัง|ซอง|ถุง|ชุด|ด้าม|piece|pcs?|pack|box)';
+  const unitValue = 'ขวด|ชิ้น|แพ็ค|แพค|กล่อง|ลัง|ซอง|ถุง|ชุด|ด้าม|piece|pcs?|pack|box';
+  const unit = `(${unitValue})`;
+  const packEvidence = `(?:\\s*\\(\\s*\\d+(?:\\.\\d+)?\\s*(?:${unitValue})\\s*\\))?`;
+  const only = '(?:\\s*เท่านั้น)?';
   const patterns: Array<{ regex: RegExp; build: (match: RegExpMatchArray) => PromotionTier | null }> = [
     {
-      regex: new RegExp(`(?:เมื่อ)?\\s*ซื้อ\\s*(\\d+(?:\\.\\d+)?)\\s*${unit}\\s*(?:แถม|ฟรี)\\s*(\\d+(?:\\.\\d+)?)\\s*${unit}?`, 'giu'),
+      regex: new RegExp(`(?:เมื่อ\\s*)?(?:ซื้อ(?:ขั้นต่ำ)?|ขั้นต่ำ)\\s*(\\d+(?:\\.\\d+)?)\\s*${unit}${packEvidence}${only}\\s*(?:แถม|ฟรี)\\s*(\\d+(?:\\.\\d+)?)\\s*${unit}?`, 'giu'),
       build: match => {
         const buy = number(match[1]);
         const free = number(match[3]);
@@ -81,7 +85,7 @@ export function parsePromotionTiers(value: unknown, fallbackUnit = 'ชิ้น
       },
     },
     {
-      regex: new RegExp(`(?:ซื้อ|ขั้นต่ำ)?\\s*(\\d+(?:\\.\\d+)?)\\s*-\\s*(\\d+(?:\\.\\d+)?)\\s*${unit}\\s*ลด\\s*(\\d+(?:\\.\\d+)?)\\s*%`, 'giu'),
+      regex: new RegExp(`(?:ซื้อ|ขั้นต่ำ)?\\s*(\\d+(?:\\.\\d+)?)\\s*-\\s*(\\d+(?:\\.\\d+)?)\\s*${unit}${packEvidence}${only}\\s*ลด\\s*(\\d+(?:\\.\\d+)?)\\s*%`, 'giu'),
       build: match => {
         const minimum = number(match[1]);
         const maximum = number(match[2]);
@@ -104,7 +108,7 @@ export function parsePromotionTiers(value: unknown, fallbackUnit = 'ชิ้น
       },
     },
     {
-      regex: new RegExp(`(?:เมื่อ)?\\s*ซื้อ(?:ขั้นต่ำ)?\\s*(\\d+(?:\\.\\d+)?)\\s*${unit}\\s*ลด\\s*(\\d+(?:\\.\\d+)?)\\s*%`, 'giu'),
+      regex: new RegExp(`(?:(?:เมื่อ\\s*)?(?:ซื้อ(?:ขั้นต่ำ)?|ขั้นต่ำ)\\s*)?(\\d+(?:\\.\\d+)?)\\s*${unit}${packEvidence}${only}\\s*ลด\\s*(\\d+(?:\\.\\d+)?)\\s*%`, 'giu'),
       build: match => {
         const minimum = number(match[1]);
         const discount = number(match[3]);
@@ -126,7 +130,7 @@ export function parsePromotionTiers(value: unknown, fallbackUnit = 'ชิ้น
       },
     },
     {
-      regex: new RegExp(`(?:ซื้อ\\s*)?(\\d+(?:\\.\\d+)?)\\s*${unit}\\s*(?:ในราคา|ราคา)\\s*(\\d+(?:\\.\\d+)?)\\s*บาท`, 'giu'),
+      regex: new RegExp(`(?:ซื้อ\\s*)?(\\d+(?:\\.\\d+)?)\\s*${unit}${packEvidence}\\s*(?:ในราคา|ราคา)\\s*(\\d+(?:\\.\\d+)?)\\s*บาท`, 'giu'),
       build: match => {
         const minimum = number(match[1]);
         const price = number(match[3]);
