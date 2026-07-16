@@ -1,6 +1,7 @@
 # Promo New — Jul 2026 real-file validation
 
 Validation date: 2026-07-16 (Asia/Bangkok)
+XLSM upload follow-up: 2026-07-17 (Asia/Bangkok)
 
 This report covers local/read-only validation only. No Production database,
 Storage, policy, Edge Function, or Production deployment was changed.
@@ -27,6 +28,18 @@ modified. The repaired copy is PDF 1.7, 18 pages, 960 × 540 pt, unencrypted.
 The real file uses a single `Description` column. The parser extracts product
 scope, embedded Class evidence, and tier mechanics, then joins same-scope rows
 as one Promotion Family while keeping tiers separated by Class.
+
+## XLSM upload follow-up
+
+- A real ZIP-based `.xlsm` workbook was selected through the Admin browser UI
+  with MIME `application/vnd.ms-excel.sheet.macroEnabled.12`.
+- The same 178 promotion rows produced 42 Promotion Families with no parser or
+  browser error.
+- The file picker now accepts both Excel extensions and browser MIME values,
+  including generic MIME when the file name ends in `.xlsm`.
+- The importer reads worksheet values only; it does not execute VBA macros.
+- Empty, oversized, malformed, or password-encrypted workbooks are blocked
+  before import with a user-facing Save As instruction.
 
 ## PDF grid result
 
@@ -125,7 +138,7 @@ so several one-Card groups intentionally remain for Admin review.
 
 ## Automated checks
 
-- Promo domain/import/security tests: 27 passed
+- Promo domain/import/security tests: 30 passed
 - TypeScript: passed
 - Production build: passed
 - Security/static checks: passed
