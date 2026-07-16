@@ -66,6 +66,11 @@ check(frontHtml.includes('width=device-width'), 'frontend_mobile_viewport_missin
 const css = read('dist/assets/promo-new/style.css');
 check((css.match(/@media/g) || []).length >= 4, 'responsive_breakpoints_missing');
 
+const vercel = JSON.parse(read('vercel.json'));
+check(vercel.buildCommand === 'npm run build:promo-new', 'preview_must_build_promo_source');
+check(vercel.installCommand === 'npm ci', 'preview_install_must_be_lockfile_deterministic');
+check(vercel.outputDirectory === 'dist', 'preview_output_directory_changed');
+
 for (const file of walk('dist/assets/promo-new').filter(file => file.endsWith('.js'))) {
   const size = fs.statSync(path.join(root, file)).size;
   check(size < 4_500_000, `bundle_too_large_for_mobile:${file}:${size}`);

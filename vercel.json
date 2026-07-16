@@ -1,7 +1,7 @@
 {
-  "buildCommand": "echo using verified prebuilt dist",
+  "buildCommand": "npm run build:promo-new",
   "outputDirectory": "dist",
-  "installCommand": "echo skip install",
+  "installCommand": "npm ci",
   "framework": null,
   "redirects": [
     {
