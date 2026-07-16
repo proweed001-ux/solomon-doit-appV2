@@ -7,20 +7,17 @@ export function normalizeClassId(value: string): string | null {
   const noise = new Set(['PROMOTION', 'PROMOTIONS', 'PRICE', 'MONTH', 'CLASS', 'PAGE', 'CANVASS']);
   const canonicalHfs = (candidate: string): string | null => {
     const compact = candidate.replace(/[^A-Z0-9]/g, '');
-    if (!/^HFS(?:S|M|L|XL|WH|WSS|WSL)$/.test(compact)) return null;
-    if (compact === 'HFSWH') return 'HFSM';
-    if (compact === 'HFSWSS') return 'HFSWS-S';
-    if (compact === 'HFSWSL') return 'HFSWS-L';
-    return compact;
+    const complete = compact.match(/HFS(?:WSS|WSL|XL|WH|S|M|L)(?![A-Z0-9])/)?.[0];
+    if (!complete) return null;
+    if (complete === 'HFSWH') return 'HFSM';
+    if (complete === 'HFSWSS') return 'HFSWS-S';
+    if (complete === 'HFSWSL') return 'HFSWS-L';
+    return complete;
   };
   for (const candidate of candidates) {
     const hfs = canonicalHfs(candidate);
     if (hfs) return hfs;
   }
-  for (const candidate of candidates) {
-    const compact = candidate.replace(/[^A-Z0-9]/g, '');
-    if (noise.has(compact) || compact.startsWith('HFS') || compact.length < 3 || compact.length > 20) continue;
-    return compact;
-  }
+  if (candidates.some(candidate => noise.has(candidate.replace(/[^A-Z0-9]/g, '')))) return null;
   return null;
 }

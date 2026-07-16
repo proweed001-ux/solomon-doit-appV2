@@ -19,6 +19,7 @@
     "typecheck:promo-new": "tsc --noEmit",
     "test:promo-new": "node --import tsx --test tests/promo-new/*.test.ts",
     "inspect:promo-grid": "node --import tsx scripts/inspect-promo-grid.ts",
+    "inspect:promo-real-files": "node --import tsx scripts/inspect-promo-real-files.ts",
     "test:promo-new-security": "node scripts/test-promo-new-security.mjs",
     "verify:promo-new": "npm run typecheck:promo-new && npm run test:promo-new && npm run build:promo-new && npm run test:promo-new-security",
     "test:pro-lazy": "node scripts/test-pro-telesale-pagination.mjs",

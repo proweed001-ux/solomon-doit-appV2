@@ -4,6 +4,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { cropCanvas, detectCardGrid, type GridDiagnostics, type Rect } from './grid-detector';
 import { normalizeClassId } from './class-id';
 import { makeCardId } from './card-id';
+import { createSkuCandidate } from '../domain/sku-identity';
 
 export { normalizeClassId } from './class-id';
 export { makeCardId } from './card-id';
@@ -130,7 +131,7 @@ function preparedHeaderCanvas(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const image = context.getImageData(0, rowHeight, output.width, rowHeight);
   for (let offset = 0; offset < image.data.length; offset += 4) {
     const luminance = image.data[offset] * 0.299 + image.data[offset + 1] * 0.587 + image.data[offset + 2] * 0.114;
-    const value = luminance >= 178 ? 255 : 0;
+    const value = luminance >= 204 ? 255 : 0;
     image.data[offset] = value;
     image.data[offset + 1] = value;
     image.data[offset + 2] = value;
@@ -151,6 +152,65 @@ async function headerClassOcr(worker: Worker, canvas: HTMLCanvasElement): Promis
     header.width = 1;
     header.height = 1;
   }
+}
+
+function preparedProductCanvas(canvas: HTMLCanvasElement, bounds: Rect, threshold: boolean): HTMLCanvasElement {
+  const product = cropCanvas(canvas, productZone(bounds));
+  const output = document.createElement('canvas');
+  output.width = product.width * 4;
+  output.height = product.height * 4;
+  const context = output.getContext('2d', { alpha: false, willReadFrequently: true });
+  if (!context) throw new Error('canvas_context_unavailable');
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(product, 0, 0, output.width, output.height);
+  if (threshold) {
+    const image = context.getImageData(0, 0, output.width, output.height);
+    for (let offset = 0; offset < image.data.length; offset += 4) {
+      const luminance = image.data[offset] * 0.299 + image.data[offset + 1] * 0.587 + image.data[offset + 2] * 0.114;
+      const value = luminance >= 166 ? 255 : 0;
+      image.data[offset] = value;
+      image.data[offset + 1] = value;
+      image.data[offset + 2] = value;
+      image.data[offset + 3] = 255;
+    }
+    context.putImageData(image, 0, 0);
+  }
+  product.width = 1;
+  product.height = 1;
+  return output;
+}
+
+async function recognizeProductVariant(worker: Worker, canvas: HTMLCanvasElement, bounds: Rect, threshold: boolean): Promise<string> {
+  const product = preparedProductCanvas(canvas, bounds, threshold);
+  try {
+    const result = await worker.recognize(product);
+    return clean(result.data.text);
+  } finally {
+    product.width = 1;
+    product.height = 1;
+  }
+}
+
+function productEvidenceFailures(value: string): number {
+  return createSkuCandidate(value).failureReasons.length;
+}
+
+async function productFieldOcr(worker: Worker, canvas: HTMLCanvasElement, bounds: Rect, initialText: string): Promise<string> {
+  let bestText = initialText;
+  let bestFailures = productEvidenceFailures(initialText);
+  if (bestFailures === 0) return bestText;
+  const colorText = await recognizeProductVariant(worker, canvas, bounds, false);
+  const colorFailures = productEvidenceFailures(colorText);
+  if (colorFailures < bestFailures || (colorFailures === bestFailures && colorText.length < bestText.length)) {
+    bestText = colorText;
+    bestFailures = colorFailures;
+  }
+  if (bestFailures === 0) return bestText;
+  const thresholdText = await recognizeProductVariant(worker, canvas, bounds, true);
+  const thresholdFailures = productEvidenceFailures(thresholdText);
+  if (thresholdFailures < bestFailures || (thresholdFailures === bestFailures && thresholdText.length < bestText.length)) return thresholdText;
+  return bestText;
 }
 
 async function canvasFromPage(page: any): Promise<{ canvas: HTMLCanvasElement; viewport: any }> {
@@ -176,6 +236,18 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
   const pages: PdfImportResult['pages'] = [];
   const warnings: string[] = [];
   let worker: Worker | null = null;
+  let workerLanguage: 'eng+tha' | 'tha' | null = null;
+  const ensureWorker = async (language: 'eng+tha' | 'tha'): Promise<Worker> => {
+    if (!worker) {
+      worker = await createWorker('eng+tha');
+      workerLanguage = 'eng+tha';
+    }
+    if (workerLanguage !== language) {
+      await worker.reinitialize(language);
+      workerLanguage = language;
+    }
+    return worker;
+  };
   const progress = (phase: PdfImportProgress['phase'], page: number, message: string) => options.onProgress?.({
     phase,
     page,
@@ -195,24 +267,31 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       let textMethod: 'pdf_text' | 'page_ocr' | 'none' = textItems.length ? 'pdf_text' : 'none';
       if (!textItems.length && options.enableOcr) {
         progress('ocr', pageNumber, `หน้า ${pageNumber}: ไม่มี text layer กำลัง OCR หน้าครั้งเดียว`);
-        worker ||= await createWorker('eng+tha');
-        textItems = await pageOcr(worker, canvas);
+        textItems = await pageOcr(await ensureWorker('eng+tha'), canvas);
         textMethod = textItems.length ? 'page_ocr' : 'none';
       }
       let headerText = textIn(textItems, pageHeaderZone(canvas.width, canvas.height));
       let classId = normalizeClassId(headerText);
       if (!classId && grid.regions.length && options.enableOcr) {
         progress('ocr', pageNumber, `หน้า ${pageNumber}: อ่าน Class จากหัวหน้า`);
-        worker ||= await createWorker('eng+tha');
-        const classText = await headerClassOcr(worker, canvas);
+        const classText = await headerClassOcr(await ensureWorker('eng+tha'), canvas);
         classId = normalizeClassId(classText);
         headerText = clean(`${headerText} ${classText}`);
       }
       if (!classId && grid.regions.length) warnings.push(`page:${pageNumber}:class_missing`);
       if (grid.diagnostics.status !== 'ok') warnings.push(...grid.diagnostics.reasons.map(reason => `page:${pageNumber}:${reason}`));
+      if (textMethod === 'page_ocr' && grid.regions.length && options.enableOcr) await ensureWorker('tha');
       for (const [index, bounds] of grid.regions.entries()) {
         const sequence = index + 1;
-        const productText = textIn(textItems, productZone(bounds));
+        let productText = textIn(textItems, productZone(bounds));
+        if (textMethod === 'page_ocr' && options.enableOcr && worker) {
+          progress('ocr', pageNumber, `หน้า ${pageNumber}: อ่านหัวการ์ด ${sequence}/${grid.regions.length}`);
+          try {
+            productText = (await productFieldOcr(worker, canvas, bounds, productText)) || productText;
+          } catch {
+            warnings.push(`card:${pageNumber}:${sequence}:product_field_ocr_failed`);
+          }
+        }
         const rawText = textIn(textItems, bounds);
         const failureReasons = [
           ...(!classId ? ['class_missing'] : []),
@@ -246,7 +325,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     }
   } finally {
-    await worker?.terminate();
+    await (worker as Worker | null)?.terminate();
     await document.cleanup();
   }
   const ids = cards.map(card => card.cardId);
