@@ -4,20 +4,15 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { cropCanvas, detectCardGrid, type GridDiagnostics, type Rect } from './grid-detector';
 import { normalizeClassId } from './class-id';
 import { makeCardId } from './card-id';
+import { collectOcrItems, type PositionedText } from './ocr-items';
 import { createSkuCandidate } from '../domain/sku-identity';
 
 export { normalizeClassId } from './class-id';
 export { makeCardId } from './card-id';
+export { collectOcrItems } from './ocr-items';
+export type { PositionedText } from './ocr-items';
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-
-export interface PositionedText {
-  text: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 
 export interface ImportedCardCandidate {
   cardId: string;
@@ -90,22 +85,6 @@ async function pdfTextItems(page: any, viewport: any): Promise<PositionedText[]>
     const height = Math.max(1, Math.abs(Number(item.height || item.transform?.[3] || 1) * viewport.scale));
     return [{ text, x: point[0], y: point[1] - height, width: Math.max(1, Number(item.width || 1) * viewport.scale), height }];
   });
-}
-
-function collectOcrItems(value: unknown, output: PositionedText[] = []): PositionedText[] {
-  if (!value || typeof value !== 'object') return output;
-  const item = value as Record<string, unknown>;
-  const bbox = item.bbox as { x0?: number; y0?: number; x1?: number; y1?: number } | undefined;
-  const text = clean(item.text);
-  if (text && bbox && Number.isFinite(bbox.x0) && Number.isFinite(bbox.y0) && Number.isFinite(bbox.x1) && Number.isFinite(bbox.y1)) {
-    output.push({ text, x: Number(bbox.x0), y: Number(bbox.y0), width: Number(bbox.x1) - Number(bbox.x0), height: Number(bbox.y1) - Number(bbox.y0) });
-    return output;
-  }
-  for (const childKey of ['blocks', 'paragraphs', 'lines', 'words']) {
-    const children = item[childKey];
-    if (Array.isArray(children)) children.forEach(child => collectOcrItems(child, output));
-  }
-  return output;
 }
 
 async function pageOcr(worker: Worker, canvas: HTMLCanvasElement): Promise<PositionedText[]> {
