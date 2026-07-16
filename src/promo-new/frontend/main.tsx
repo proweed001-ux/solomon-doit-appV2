@@ -6,6 +6,7 @@ import { calculatePromotion } from '../domain/calculator';
 import { createDemoDataset } from '../shared/demo-data';
 import { fetchPublished } from '../shared/api';
 import './front.css';
+import './mobile.css';
 
 const money = (value: number) => value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const tierText = (tier: PromotionTier) => tier.sourceText || (tier.type === 'free_goods'
