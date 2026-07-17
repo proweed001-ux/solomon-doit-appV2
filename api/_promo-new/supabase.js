@@ -65,6 +65,80 @@ export function callAdminRpc(name, body) {
   return request(`/rest/v1/rpc/${name}`, { method: 'POST', key: secretKey(), body });
 }
 
+const asArray = value => Array.isArray(value) ? value : [];
+const hasReasons = value => asArray(value).length > 0;
+
+export async function getPromoMasterData() {
+  const [skuRows, priceRows] = await Promise.all([
+    request('/rest/v1/promo_new_skus?status=eq.active&select=id,external_id,sku_code,canonical_name,identity_key,brand,product_type,variant,size_value,size_unit,sales_unit,pack_quantity,status,evidence,failure_reasons&order=canonical_name.asc', { key: secretKey() }),
+    request('/rest/v1/promo_new_sku_prices?effective_price=not.is.null&select=sku_id,effective_price,source_reference,updated_at', { key: secretKey() }),
+  ]);
+  const byDatabaseId = new Map(asArray(skuRows).map(row => [row.id, row]));
+  const skus = asArray(skuRows).map(row => ({
+    id: row.external_id,
+    code: row.sku_code,
+    canonicalName: row.canonical_name,
+    identityKey: row.identity_key,
+    identity: {
+      brand: row.brand,
+      productType: row.product_type,
+      variant: row.variant || null,
+      sizeValue: Number(row.size_value),
+      sizeUnit: row.size_unit,
+      salesUnit: row.sales_unit,
+      packQuantity: Number(row.pack_quantity),
+    },
+    status: row.status,
+    evidence: asArray(row.evidence),
+    failureReasons: asArray(row.failure_reasons),
+  }));
+  const prices = asArray(priceRows).flatMap(row => {
+    const sku = byDatabaseId.get(row.sku_id);
+    const amount = Number(row.effective_price);
+    if (!sku || !Number.isFinite(amount) || amount <= 0) return [];
+    return [{
+      skuIdentityKey: sku.identity_key,
+      skuId: sku.external_id,
+      amount,
+      currency: 'THB',
+      sourceReference: row.source_reference || 'previous_month',
+      updatedAt: row.updated_at || null,
+    }];
+  });
+  return { skus, prices };
+}
+
+export async function assertVersionPublishable(versionId) {
+  const [cards, groups, families, skus] = await Promise.all([
+    request(`/rest/v1/promo_new_cards?version_id=eq.${encodeURIComponent(versionId)}&select=card_id,status,effective_price,failure_reasons,promotion_family_id,class_id,sku_id`, { key: secretKey() }),
+    request(`/rest/v1/promo_new_product_groups?version_id=eq.${encodeURIComponent(versionId)}&select=external_id,status,failure_reasons,promotion_family_id,sku_id`, { key: secretKey() }),
+    request(`/rest/v1/promo_new_promotion_families?version_id=eq.${encodeURIComponent(versionId)}&select=id,external_id,failure_reasons`, { key: secretKey() }),
+    request('/rest/v1/promo_new_skus?select=id,status,failure_reasons', { key: secretKey() }),
+  ]);
+  const blockers = [];
+  const skuById = new Map(asArray(skus).map(row => [row.id, row]));
+  const familyById = new Map(asArray(families).map(row => [row.id, row]));
+  for (const card of asArray(cards)) {
+    if (card.status !== 'ready') blockers.push(`card:${card.card_id}:status`);
+    if (!(Number(card.effective_price) > 0)) blockers.push(`card:${card.card_id}:price`);
+    if (!card.promotion_family_id) blockers.push(`card:${card.card_id}:family`);
+    if (hasReasons(card.failure_reasons)) blockers.push(`card:${card.card_id}:failure_reasons`);
+    const sku = skuById.get(card.sku_id);
+    if (!sku || sku.status !== 'active' || hasReasons(sku.failure_reasons)) blockers.push(`card:${card.card_id}:sku_not_active`);
+    const family = familyById.get(card.promotion_family_id);
+    if (!family || hasReasons(family.failure_reasons)) blockers.push(`card:${card.card_id}:family_not_clean`);
+  }
+  for (const group of asArray(groups)) {
+    if (group.status !== 'ready') blockers.push(`group:${group.external_id}:status`);
+    if (!group.promotion_family_id) blockers.push(`group:${group.external_id}:family`);
+    if (hasReasons(group.failure_reasons)) blockers.push(`group:${group.external_id}:failure_reasons`);
+    const sku = skuById.get(group.sku_id);
+    if (!sku || sku.status !== 'active' || hasReasons(sku.failure_reasons)) blockers.push(`group:${group.external_id}:sku_not_active`);
+  }
+  if (!asArray(cards).length || !asArray(groups).length) blockers.push('published_version_empty');
+  if (blockers.length) throw new Error(`publish_server_validation_failed:${[...new Set(blockers)].slice(0, 20).join(',')}`);
+}
+
 export async function getPublishedCatalog(monthKey) {
   const catalog = await callAdminRpc('promo_new_get_published_catalog', { p_month_key: monthKey || null });
   if (catalog?.cards && Array.isArray(catalog.cards)) {
