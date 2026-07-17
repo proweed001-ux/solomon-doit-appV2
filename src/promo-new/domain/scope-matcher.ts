@@ -289,7 +289,7 @@ function qualifierMatches(evidence: string, token: string): boolean {
   if (token === 'Q_PACK_2_PLUS_1') return /แพ็ค\s*2\s*แถม\s*1|PACK\s*2\s*(?:FREE|PLUS)\s*1/iu.test(evidence);
   if (token === 'Q_PACK_1_PLUS_1') return /แพ็ค\s*1\s*แถม\s*1|PACK\s*1\s*(?:FREE|PLUS)\s*1/iu.test(evidence);
   if (token === 'Q_LARGE_REFILL') return /ถุงเติมขนาดใหญ่|LARGE\s*REFILL/iu.test(evidence);
-  if (token === 'Q_SUPERTHIN_TWO') return fuzzyContains(evidence, 'ซุปเปอร์ธิน ทู') || /SUPER\s*THIN\s*(?:2|TWO)/iu.test(evidence);
+  if (token === 'Q_SUPERTHIN_TWO') return /(?:ซุปเปอร์ธิน|SUPER\s*THIN)[^\n]{0,14}(?:ทู|2|TWO)/iu.test(evidence);
   if (token === 'Q_HANDLE') return fuzzyContains(evidence, 'ด้ามมีด') || /RAZOR\s*HANDLE/iu.test(evidence);
   if (token === 'Q_BLADE') return fuzzyContains(evidence, 'ใบมีด') || /BLADE/iu.test(evidence);
   return fuzzyContains(evidence, token);
