@@ -1,6 +1,7 @@
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 import { createSkuCandidate, normalizeProductText } from './sku-identity';
 import { applySafeCardFingerprintClusters } from './card-fingerprint-safe';
+import { applyCatalogSequenceRecovery } from './catalog-sequence';
 import {
   buildProductScopes,
   resolveStructuredScope,
@@ -212,5 +213,6 @@ export function resolveScopesSafely(
       });
     }
   }
-  return applySafeCardFingerprintClusters(cards, families, scopes, resolutions, visualSignatures);
+  const sequenceRecovered = applyCatalogSequenceRecovery(cards, families, resolutions, visualSignatures);
+  return applySafeCardFingerprintClusters(cards, families, scopes, sequenceRecovered, visualSignatures);
 }
