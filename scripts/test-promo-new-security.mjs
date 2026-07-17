@@ -29,6 +29,7 @@ const api = read('api/promo-new.js');
 check(api.includes('requirePromoAdmin'), 'backend_missing_admin_guard');
 check(api.includes('validateDatasetPayload'), 'backend_missing_payload_validation');
 check(api.includes('card_crosses_month'), 'backend_missing_month_guard');
+check(api.includes('assertVersionPublishable'), 'backend_missing_publish_revalidation');
 check(!/sb_secret_[A-Za-z0-9_-]+/.test(read('api/_promo-new/supabase.js')), 'secret_value_hardcoded_in_backend');
 
 const migration = read('supabase/migrations/20260716083231_promo_system_rebuild.sql');
@@ -52,6 +53,8 @@ const adminSource = read('src/promo-new/admin/main.tsx');
 check(adminSource.includes('uploadCardImage'), 'admin_card_upload_flow_missing');
 check(adminSource.includes('publishVersion'), 'admin_manual_publish_flow_missing');
 check(adminSource.includes('previewChecked'), 'admin_preview_gate_missing');
+check(adminSource.includes('assertReadyForPublish'), 'admin_preview_validation_missing');
+check(adminSource.includes('fetchPromoMasterData'), 'admin_master_data_load_missing');
 
 const rollback = read('supabase/rollback/20260716083231_promo_system_rebuild.sql');
 check(rollback.includes('drop table if exists public.promo_new_cards;'), 'rollback_cards_missing');
@@ -67,7 +70,14 @@ const css = read('dist/assets/promo-new/style.css');
 check((css.match(/@media/g) || []).length >= 4, 'responsive_breakpoints_missing');
 
 const vercel = JSON.parse(read('vercel.json'));
-check(vercel.buildCommand === 'npm run build:promo-new', 'preview_must_build_promo_source');
+const packageJson = JSON.parse(read('package.json'));
+const directBuild = vercel.buildCommand === 'npm run build:promo-new';
+const verifiedBuild = vercel.buildCommand === 'npm run verify:promo-new'
+  && String(packageJson.scripts?.['verify:promo-new'] || '').includes('npm run build:promo-new')
+  && String(packageJson.scripts?.['verify:promo-new'] || '').includes('npm run typecheck:promo-new')
+  && String(packageJson.scripts?.['verify:promo-new'] || '').includes('npm run test:promo-new')
+  && String(packageJson.scripts?.['verify:promo-new'] || '').includes('npm run test:promo-new-security');
+check(directBuild || verifiedBuild, 'preview_must_build_verified_promo_source');
 check(vercel.installCommand === 'npm ci', 'preview_install_must_be_lockfile_deterministic');
 check(vercel.outputDirectory === 'dist', 'preview_output_directory_changed');
 
@@ -82,4 +92,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: auth/backend boundary, RLS/revokes, status gates, rollback, mobile assets, and legacy promo isolation.');
+console.log('Promo new security/static checks passed: auth/backend boundary, RLS/revokes, status gates, rollback, mobile assets, verified build pipeline, and legacy promo isolation.');
