@@ -167,6 +167,9 @@ function specialQualifiers(value: string): string[] {
   if (/แพ็ค\s*2\s*แถม\s*1|PACK\s*2\s*(?:FREE|PLUS)\s*1/iu.test(text)) output.push('Q_PACK_2_PLUS_1');
   if (/แพ็ค\s*1\s*แถม\s*1|PACK\s*1\s*(?:FREE|PLUS)\s*1/iu.test(text)) output.push('Q_PACK_1_PLUS_1');
   if (/ถุงเติมขนาดใหญ่|LARGE\s*REFILL/iu.test(text)) output.push('Q_LARGE_REFILL');
+  if (/ซุปเปอร์ธิน\s*ทู|SUPER\s*THIN\s*(?:2|TWO)/iu.test(text)) output.push('Q_SUPERTHIN_TWO');
+  if (/ด้ามมีด|RAZOR\s*HANDLE/iu.test(text)) output.push('Q_HANDLE');
+  if (/ใบมีด|BLADE/iu.test(text)) output.push('Q_BLADE');
   return output;
 }
 
@@ -179,7 +182,7 @@ function usefulTokens(value: string): string[] {
       && !GENERIC_TOKENS.has(token)
       && !BRANDS.some(brand => brand.aliases.some(alias => compact(alias) === compact(token)))
       && !GENERIC_TYPE_PATTERNS.some(pattern => pattern.test(token)));
-  return [...new Set([...regular, ...specialQualifiers(value)])];
+  return [...new Set([...regular, ...specialQualifiers(positiveScope)])];
 }
 
 export interface ProductScopeCandidate {
@@ -286,12 +289,16 @@ function qualifierMatches(evidence: string, token: string): boolean {
   if (token === 'Q_PACK_2_PLUS_1') return /แพ็ค\s*2\s*แถม\s*1|PACK\s*2\s*(?:FREE|PLUS)\s*1/iu.test(evidence);
   if (token === 'Q_PACK_1_PLUS_1') return /แพ็ค\s*1\s*แถม\s*1|PACK\s*1\s*(?:FREE|PLUS)\s*1/iu.test(evidence);
   if (token === 'Q_LARGE_REFILL') return /ถุงเติมขนาดใหญ่|LARGE\s*REFILL/iu.test(evidence);
+  if (token === 'Q_SUPERTHIN_TWO') return fuzzyContains(evidence, 'ซุปเปอร์ธิน ทู') || /SUPER\s*THIN\s*(?:2|TWO)/iu.test(evidence);
+  if (token === 'Q_HANDLE') return fuzzyContains(evidence, 'ด้ามมีด') || /RAZOR\s*HANDLE/iu.test(evidence);
+  if (token === 'Q_BLADE') return fuzzyContains(evidence, 'ใบมีด') || /BLADE/iu.test(evidence);
   return fuzzyContains(evidence, token);
 }
 
 function tokenOverlap(text: string, scope: ProductScopeCandidate): number {
   if (!scope.variantTokens.length) return 0;
-  return scope.variantTokens.filter(token => qualifierMatches(text, token)).length / scope.variantTokens.length;
+  const positiveEvidence = clean(text).split(/\bEXCEPT\b|ยกเว้น/iu)[0].trim();
+  return scope.variantTokens.filter(token => qualifierMatches(positiveEvidence, token)).length / scope.variantTokens.length;
 }
 
 function contradictsVariant(evidence: string, scope: ProductScopeCandidate): boolean {
