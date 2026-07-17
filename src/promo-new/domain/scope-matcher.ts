@@ -163,7 +163,7 @@ export function buildProductScopes(families: PromotionFamily[]): ProductScopeCan
           maximumSize: size.maximum,
           sizeUnit: size.unit,
           salesUnit: SALES_UNITS[productType] || 'ชิ้น',
-          packQuantity: /แพ็ค|แพค|PACK/iu.test(segment) ? 1 : 1,
+          packQuantity: 1,
           variant,
           variantTokens,
           classIds: Object.keys(family.tiersByClass),
@@ -190,13 +190,26 @@ function typeCompatible(sku: Sku, scope: ProductScopeCandidate, rawText: string)
 
 function tokenOverlap(text: string, scope: ProductScopeCandidate): number {
   if (!scope.variantTokens.length) return 1;
-  const source = compact(text);
-  return scope.variantTokens.filter(token => source.includes(compact(token))).length / scope.variantTokens.length;
+  const sourceTokens = new Set(usefulTokens(text).map(token => compact(token)));
+  return scope.variantTokens.filter(token => sourceTokens.has(compact(token))).length / scope.variantTokens.length;
+}
+
+function contradictsVariant(evidence: string, scope: ProductScopeCandidate): boolean {
+  const source = compact(evidence);
+  const target = compact(scope.rawText);
+  const sourceNoCap = source.includes(compact('ไม่มีฝา'));
+  const sourceWithCap = source.includes(compact('มีฝา')) && !sourceNoCap;
+  const targetNoCap = target.includes(compact('ไม่มีฝา'));
+  const targetWithCap = target.includes(compact('มีฝา')) && !targetNoCap;
+  if (sourceNoCap && targetWithCap) return true;
+  if (sourceWithCap && targetNoCap) return true;
+  return false;
 }
 
 function scoreScope(source: ImportedCardCandidate, scope: ProductScopeCandidate): number | null {
   if (!source.classId || !scope.classIds.includes(source.classId)) return null;
   const evidence = `${source.productText} ${source.rawText}`;
+  if (contradictsVariant(evidence, scope)) return null;
   const sku = createSkuCandidate(source.productText || source.rawText);
   let score = 5;
   if (sku.identity.brand) {
@@ -273,6 +286,7 @@ export function resolveScopesWithVisualConsensus(
       if (reference.classId === card.classId) continue;
       const scope = resolutions.get(reference.cardId)?.scope;
       if (!scope || classesByScope.get(scope.key)?.has(card.classId)) continue;
+      if (contradictsVariant(`${card.productText} ${card.rawText}`, scope)) continue;
       if (observed.identity.brand && observed.identity.brand !== scope.brand) continue;
       if (observed.identity.productType && typeCompatible(observed, scope, card.productText) === false) continue;
       if (sizeCompatible(observed, scope) === false) continue;
@@ -309,7 +323,7 @@ export function skuFromScope(scope: ProductScopeCandidate, observed: Sku, existi
   const identityKey = buildSkuIdentityKey(identity);
   const existing = existingSkus.find(sku => sku.identityKey === identityKey);
   if (existing) return existing;
-  const requiresRangeReview = scope.minimumSize != null && scope.maximumSize != null && scope.minimumSize !== scope.maximumSize && !observedSizeCompatible;
+  const requiresRangeReview = scope.minimumSize != null && scope.maximumSize != null && scope.minimumSize !== scope.maximumSize;
   const failureReasons = requiresRangeReview ? ['scope_size_range_requires_master_confirmation'] : [];
   const hash = stableHash(scope.key);
   return {
