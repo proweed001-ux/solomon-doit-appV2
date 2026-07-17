@@ -1,3 +1,4 @@
+import { buildCardVisualSignatures } from '../domain/visual-consensus';
 import type { PdfImportResult } from '../import/pdf-importer';
 import type { WorkbookParseResult } from '../import/workbook-parser';
 
@@ -218,6 +219,9 @@ export async function loadPromoTestCache(): Promise<LoadedPromoTestCache | null>
   if (!record || record.schemaVersion !== 1) return null;
   const summary = summaryOf(record);
   saveSummary(summary);
+  const visualSignatures = record.imported
+    ? await buildCardVisualSignatures(record.imported.cards)
+    : record.visualSignatures;
   return {
     summary,
     monthKey: record.monthKey,
@@ -226,7 +230,7 @@ export async function loadPromoTestCache(): Promise<LoadedPromoTestCache | null>
     workbook: restoredFile(record.workbook),
     imported: record.imported,
     parsedWorkbook: record.parsedWorkbook,
-    visualSignatures: record.visualSignatures,
+    visualSignatures,
   };
 }
 
