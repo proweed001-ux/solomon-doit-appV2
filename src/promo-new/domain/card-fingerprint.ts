@@ -343,7 +343,7 @@ export function applyCardFingerprintClusters(
         scope: best.scope,
         score: Number(best.score.toFixed(1)),
         margin: Number(margin.toFixed(1)),
-        method: 'card_fingerprint',
+        method: 'visual_consensus',
       });
     }
   }
