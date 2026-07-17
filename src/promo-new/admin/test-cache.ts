@@ -177,7 +177,7 @@ async function requestPersistentStorage(): Promise<void> {
 export async function savePromoTestCache(input: SavePromoTestCacheInput): Promise<PromoTestCacheSummary> {
   await requestPersistentStorage();
   const base = {
-    key: LATEST_KEY,
+    key: LATEST_KEY as typeof LATEST_KEY,
     schemaVersion: 1 as const,
     savedAt: new Date().toISOString(),
     monthKey: input.monthKey,
