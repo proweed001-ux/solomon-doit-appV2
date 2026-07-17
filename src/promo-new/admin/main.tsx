@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, Layers3, LogOut, Save, Search, ShieldCheck, UploadCloud } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Database, FileSpreadsheet, Layers3, LogOut, Save, Search, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 import type { PromoDataset, ProductGroup } from '../domain/types';
 import { autoAssignPromotionFamilies } from '../domain/auto-match';
 import { applyPromotionFamily, groupImportedCards } from '../domain/grouping';
@@ -9,10 +9,20 @@ import { confirmSkuCandidate } from '../domain/sku-identity';
 import { assertReadyForPublish } from '../domain/validation';
 import { buildCardVisualSignatures } from '../domain/visual-consensus';
 import { nextDraftVersion } from '../domain/versioning';
-import type { ImportedCardCandidate, PdfImportProgress } from '../import/pdf-importer';
+import type { ImportedCardCandidate, PdfImportProgress, PdfImportResult } from '../import/pdf-importer';
+import type { WorkbookParseResult } from '../import/workbook-parser';
 import { inspectPromotionWorkbookFile, PROMOTION_WORKBOOK_ACCEPT } from '../import/workbook-file';
 import { createDemoDataset } from '../shared/demo-data';
 import { fetchPromoMasterData, loadSession, login, logout, publishVersion, saveDraft, uploadCardImage, validateSession } from '../shared/api';
+import {
+  clearPromoTestCache,
+  formatCacheSize,
+  loadPromoTestCache,
+  readPromoTestCacheSummary,
+  refreshPromoTestCacheSummary,
+  savePromoTestCache,
+  type PromoTestCacheSummary,
+} from './test-cache';
 import './admin.css';
 
 type Session = NonNullable<ReturnType<typeof loadSession>>;
@@ -23,6 +33,7 @@ const defaultMonth = () => {
 };
 
 const money = (value: number | null | undefined) => value == null ? '-' : `฿${value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const cacheDate = (value: string) => new Date(value).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
 
 function LoginPage({ onLogin, onDemo }: { onLogin: (session: Session) => void; onDemo: () => void }) {
   const [email, setEmail] = useState('');
@@ -90,11 +101,12 @@ function AdminApp() {
   const [pdf, setPdf] = useState<File | null>(null);
   const [workbook, setWorkbook] = useState<File | null>(null);
   const [ocr, setOcr] = useState(true);
+  const [cacheSummary, setCacheSummary] = useState<PromoTestCacheSummary | null>(() => readPromoTestCacheSummary());
   const [dataset, setDataset] = useState<PromoDataset | null>(demoFromUrl ? createDemoDataset('draft') : null);
   const [quarantine, setQuarantine] = useState<ImportedCardCandidate[]>([]);
   const [progress, setProgress] = useState<PdfImportProgress | null>(null);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('เลือก PDF และ CSV/XLSM ของเดือนเดียวกัน');
+  const [message, setMessage] = useState('เลือก PDF และ CSV/XLSM ของเดือนเดียวกัน หรือใช้แคชล่าสุด');
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -122,6 +134,55 @@ function AdminApp() {
     validateSession(session).catch(() => setSession(null)).finally(() => setChecking(false));
   }, []);
 
+  useEffect(() => {
+    refreshPromoTestCacheSummary().then(setCacheSummary).catch(() => undefined);
+  }, []);
+
+  const groupArtifacts = async (
+    imported: PdfImportResult,
+    parsedWorkbook: WorkbookParseResult,
+    visualSignatures: Record<string, string>,
+    sourcePdfName: string,
+    sourceWorkbookName: string,
+    extraWarnings: string[] = [],
+    sourceLabel = 'ไฟล์ใหม่',
+  ) => {
+    let master = { skus: [], prices: [] } as Awaited<ReturnType<typeof fetchPromoMasterData>>;
+    let masterWarning = '';
+    if (session) {
+      try { master = await fetchPromoMasterData(session); }
+      catch (caught) { masterWarning = `master_data_unavailable:${String((caught as Error).message || caught)}`; }
+    }
+    const grouped = groupImportedCards(
+      monthKey,
+      imported.cards,
+      master.skus,
+      master.prices,
+      parsedWorkbook.families,
+      visualSignatures,
+    );
+    const version = nextDraftVersion(monthKey, [], session?.user.id || null);
+    version.status = 'need_review';
+    version.source = { pdfName: sourcePdfName, workbookName: sourceWorkbookName, pdfHash: null, workbookHash: null };
+    const next: PromoDataset = {
+      schema: 'promo-system-rebuild-v1',
+      version,
+      skus: grouped.skus,
+      prices: grouped.prices,
+      cards: grouped.cards,
+      productGroups: grouped.groups,
+      promotionFamilies: parsedWorkbook.families,
+      warnings: [...imported.warnings, ...parsedWorkbook.warnings, ...grouped.warnings, ...extraWarnings, ...(masterWarning ? [masterWarning] : [])],
+    };
+    const automated = autoAssignPromotionFamilies(next);
+    const inheritedPrices = automated.dataset.productGroups.filter(group => group.price.source === 'central_override').length;
+    setDataset(automated.dataset);
+    setQuarantine(grouped.quarantineCards);
+    setProgress(null);
+    setPriceDrafts(Object.fromEntries(automated.dataset.productGroups.map(group => [group.id, String(group.price.effectivePrice?.amount || '')])));
+    setMessage(`${sourceLabel}: ${automated.dataset.cards.length}/${imported.cards.length} การ์ด · ${automated.dataset.productGroups.length} กลุ่ม · Scope ${grouped.diagnostics.structuredScope} · ภาพช่วยกู้ ${grouped.diagnostics.visualConsensus} · Exact ${grouped.diagnostics.exactIdentity} · ราคาเดิม ${inheritedPrices} · unresolved ${grouped.diagnostics.unresolved}`);
+  };
+
   const processFiles = async () => {
     if (!pdf || !workbook) return;
     setBusy(true); setError(''); setDataset(null); setQuarantine([]); setProgress(null); setPreviewChecked(false); setSavedVersionId(null);
@@ -130,38 +191,57 @@ function AdminApp() {
         import('../import/pdf-importer'),
         import('../import/workbook-parser'),
       ]);
-      let master = { skus: [], prices: [] } as Awaited<ReturnType<typeof fetchPromoMasterData>>;
-      let masterWarning = '';
-      if (session) {
-        try { master = await fetchPromoMasterData(session); }
-        catch (caught) { masterWarning = `master_data_unavailable:${String((caught as Error).message || caught)}`; }
-      }
       const parsedWorkbook = await parsePromotionWorkbook(workbook);
       const imported = await importPromotionPdf(pdf, { monthKey, enableOcr: ocr, onProgress: setProgress });
       const visualSignatures = await buildCardVisualSignatures(imported.cards, (completed, total) => {
         setProgress(current => current ? { ...current, phase: 'cards', message: `สร้างหลักฐานภาพสินค้า ${completed}/${total}` } : null);
       });
-      const grouped = groupImportedCards(
-        monthKey,
-        imported.cards,
-        master.skus,
-        master.prices,
-        parsedWorkbook.families,
-        visualSignatures,
+      const cacheWarnings: string[] = [];
+      try {
+        const summary = await savePromoTestCache({ monthKey, ocrEnabled: ocr, pdf, workbook, imported, parsedWorkbook, visualSignatures });
+        setCacheSummary(summary);
+        if (summary.mode === 'source_only') cacheWarnings.push('browser_cache_source_only_storage_quota');
+      } catch (caught) {
+        cacheWarnings.push(`browser_cache_save_failed:${String((caught as Error).message || caught)}`);
+      }
+      await groupArtifacts(imported, parsedWorkbook, visualSignatures, pdf.name, workbook.name, cacheWarnings, 'OCR ใหม่และบันทึกแคชแล้ว');
+    } catch (caught) { setError(String((caught as Error).message || caught)); } finally { setBusy(false); }
+  };
+
+  const useCachedRun = async () => {
+    setBusy(true); setError(''); setDataset(null); setQuarantine([]); setProgress(null); setPreviewChecked(false); setSavedVersionId(null);
+    try {
+      const cached = await loadPromoTestCache();
+      if (!cached) throw new Error('ยังไม่มีไฟล์ทดสอบที่บันทึกไว้ในเครื่องนี้');
+      setCacheSummary(cached.summary);
+      setMonthKey(cached.monthKey);
+      setOcr(cached.ocrEnabled);
+      setPdf(cached.pdf);
+      setWorkbook(cached.workbook);
+      if (!cached.imported || !cached.parsedWorkbook || !cached.visualSignatures) {
+        setMessage(`กู้ไฟล์ ${cached.pdf.name} และ ${cached.workbook.name} แล้ว แต่พื้นที่เครื่องไม่พอเก็บผล OCR — กด “OCR ใหม่และบันทึกแคช”`);
+        return;
+      }
+      await groupArtifacts(
+        cached.imported,
+        cached.parsedWorkbook,
+        cached.visualSignatures,
+        cached.pdf.name,
+        cached.workbook.name,
+        ['grouping_rerun_from_browser_cache'],
+        'จัดกลุ่มใหม่จากแคชโดยไม่ OCR ซ้ำ',
       );
-      const version = nextDraftVersion(monthKey, [], session?.user.id || null);
-      version.status = 'need_review';
-      version.source = { pdfName: pdf.name, workbookName: workbook.name, pdfHash: null, workbookHash: null };
-      const next: PromoDataset = {
-        schema: 'promo-system-rebuild-v1', version, skus: grouped.skus, prices: grouped.prices, cards: grouped.cards,
-        productGroups: grouped.groups, promotionFamilies: parsedWorkbook.families,
-        warnings: [...imported.warnings, ...parsedWorkbook.warnings, ...grouped.warnings, ...(masterWarning ? [masterWarning] : [])],
-      };
-      const automated = autoAssignPromotionFamilies(next);
-      const inheritedPrices = automated.dataset.productGroups.filter(group => group.price.source === 'central_override').length;
-      setDataset(automated.dataset); setQuarantine(grouped.quarantineCards); setProgress(null);
-      setPriceDrafts(Object.fromEntries(automated.dataset.productGroups.map(group => [group.id, String(group.price.effectivePrice?.amount || '')])));
-      setMessage(`ประมวลผล ${automated.dataset.cards.length}/${imported.cards.length} การ์ด · ${automated.dataset.productGroups.length} กลุ่ม · Scope ${grouped.diagnostics.structuredScope} · ภาพช่วยกู้ ${grouped.diagnostics.visualConsensus} · Exact ${grouped.diagnostics.exactIdentity} · ราคาเดิม ${inheritedPrices} · unresolved ${grouped.diagnostics.unresolved}`);
+    } catch (caught) { setError(String((caught as Error).message || caught)); } finally { setBusy(false); }
+  };
+
+  const clearCachedRun = async () => {
+    setBusy(true); setError('');
+    try {
+      await clearPromoTestCache();
+      setCacheSummary(null);
+      setPdf(null); setWorkbook(null); setDataset(null); setQuarantine([]); setProgress(null);
+      setPreviewChecked(false); setSavedVersionId(null); setPriceDrafts({});
+      setMessage('ล้างไฟล์และผลประมวลผลที่บันทึกในเบราว์เซอร์แล้ว');
     } catch (caught) { setError(String((caught as Error).message || caught)); } finally { setBusy(false); }
   };
 
@@ -276,18 +356,38 @@ function AdminApp() {
     <header className="admin-hero"><div className="hero-inner"><div className="hero-row"><div><div className="eyebrow">PROMO SYSTEM REBUILD · {demo ? 'DEMO READ-ONLY' : dryRun ? 'FILE DRY-RUN' : 'AUTHENTICATED ADMIN'}</div><h1>จัดโปรโมชั่นเป็นกลุ่ม ไม่ไล่ติ๊กทีละการ์ด</h1><p>นำเข้า PDF + CSV/XLSM แล้วจัด SKU, Product Group, โปรราย Class และราคากลางในหน้าจอเดียว</p></div><div className="hero-actions"><a className="btn ghost" href="/promo-new.html?demo=1">ดูหน้าลูกค้า</a>{session && <button className="btn ghost" onClick={() => logout(session).finally(() => setSession(null))}><LogOut size={16} /> ออกจากระบบ</button>}</div></div></div></header>
     <main className="admin-main">
       {demo && <div className="notice warn">นี่คือข้อมูลสาธิตสำหรับตรวจ UI เท่านั้น ปุ่มบันทึก/Publish ถูกปิด และไม่มีการเชื่อม Production</div>}
-      {dryRun && <div className="notice warn">โหมดทดสอบไฟล์จริง: ประมวลผลในหน่วยความจำเท่านั้น ปุ่มบันทึก/Publish ถูกปิด และไม่เขียน Production</div>}
+      {dryRun && <div className="notice warn">โหมดทดสอบไฟล์จริง: ไม่เขียน Production แต่สามารถเก็บไฟล์และผล OCR ไว้ในเบราว์เซอร์เครื่องนี้เพื่อทดสอบซ้ำได้</div>}
       {error && <div className="notice error"><AlertTriangle size={15} /> {error}</div>}
-      <section className="panel"><div className="step-grid">
-        <label className="field">เดือนโปรโมชั่น<input value={monthKey} onChange={event => setMonthKey(event.target.value.toUpperCase())} placeholder="เช่น PROMO-2026-08" /></label>
-        <label className="field file-drop"><span><UploadCloud size={16} /> เลือก PDF โปรโมชั่น</span><input type="file" accept="application/pdf,.pdf" onChange={event => setPdf(event.target.files?.[0] || null)} /><small>{pdf?.name || 'ยังไม่ได้เลือก'}</small></label>
-        <label className="field file-drop"><span><FileSpreadsheet size={16} /> เลือก CSV/XLSX/XLSM</span><input type="file" accept={PROMOTION_WORKBOOK_ACCEPT} onChange={selectWorkbook} /><small>{workbook ? `${workbook.name} · ${inspectPromotionWorkbookFile(workbook).label}` : 'รองรับ .csv, .xlsx, .xlsm และ .xls'}</small></label>
-      </div><div className="run-row"><label className="field" style={{ flexDirection: 'row', alignItems: 'center' }}><input style={{ width: 18, height: 18 }} type="checkbox" checked={ocr} onChange={event => setOcr(event.target.checked)} /> OCR และหลักฐานภาพสินค้า</label><button className="btn primary" disabled={busy || !pdf || !workbook || demo} onClick={processFiles}>{busy ? 'กำลังประมวลผล...' : 'ประมวลผลครั้งเดียว'}</button></div>
+      <section className="panel">
+        <div className="step-grid">
+          <label className="field">เดือนโปรโมชั่น<input value={monthKey} onChange={event => setMonthKey(event.target.value.toUpperCase())} placeholder="เช่น PROMO-2026-08" /></label>
+          <label className="field file-drop"><span><UploadCloud size={16} /> เลือก PDF โปรโมชั่น</span><input type="file" accept="application/pdf,.pdf" onChange={event => setPdf(event.target.files?.[0] || null)} /><small>{pdf?.name || 'ยังไม่ได้เลือก'}</small></label>
+          <label className="field file-drop"><span><FileSpreadsheet size={16} /> เลือก CSV/XLSX/XLSM</span><input type="file" accept={PROMOTION_WORKBOOK_ACCEPT} onChange={selectWorkbook} /><small>{workbook ? `${workbook.name} · ${inspectPromotionWorkbookFile(workbook).label}` : 'รองรับ .csv, .xlsx, .xlsm และ .xls'}</small></label>
+        </div>
+        <div className="run-row">
+          <label className="field" style={{ flexDirection: 'row', alignItems: 'center' }}><input style={{ width: 18, height: 18 }} type="checkbox" checked={ocr} onChange={event => setOcr(event.target.checked)} /> เปิด OCR อ่านข้อความจาก PDF — หลักฐานภาพทำงานอัตโนมัติ</label>
+          <button className="btn primary" disabled={busy || !pdf || !workbook || demo} onClick={processFiles}>{busy ? 'กำลังประมวลผล...' : 'OCR ใหม่และบันทึกแคช'}</button>
+        </div>
+        <div style={{ marginTop: 12, padding: 12, border: '1px solid #dbe4ef', borderRadius: 12, background: '#f8fafc' }}>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <div>
+              <b style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Database size={16} /> ไฟล์ทดสอบล่าสุดในเครื่องนี้</b>
+              <small>{cacheSummary
+                ? `${cacheSummary.monthKey} · ${cacheSummary.pdfName} · ${cacheSummary.workbookName} · ${cacheSummary.cardCount || '-'} การ์ด · ${formatCacheSize(cacheSummary.estimatedBytes)} · ${cacheSummary.mode === 'full' ? 'จัดกลุ่มใหม่ได้โดยไม่ OCR' : 'เก็บเฉพาะไฟล์ ต้อง OCR ใหม่'} · ${cacheDate(cacheSummary.savedAt)}`
+                : 'ยังไม่มีแคช ระบบจะสร้างหลังประมวลผลครั้งแรก'}</small>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn soft" disabled={busy || demo || !cacheSummary} onClick={useCachedRun}><Database size={15} /> {cacheSummary?.mode === 'full' ? 'จัดกลุ่มใหม่จากแคช' : 'ใช้ไฟล์ทดสอบล่าสุด'}</button>
+              <button className="btn soft" disabled={busy || demo || !cacheSummary} onClick={clearCachedRun}><Trash2 size={15} /> ล้างแคช</button>
+            </div>
+          </div>
+          <small>แคชอยู่เฉพาะเบราว์เซอร์และเครื่องนี้ การเปิดจากโทรศัพท์หรือเบราว์เซอร์อื่นจะไม่เห็นแคชนี้</small>
+        </div>
         <div className="progress"><i style={{ width: progress ? `${Math.max(3, progress.page / Math.max(1, progress.pageCount) * 100)}%` : '0%' }} /></div><div className="progress-meta"><span>{progress?.message || message}</span><span>{progress ? `${progress.cards} การ์ด · ${(progress.elapsedMs / 1000).toFixed(1)} วินาที` : ''}</span></div>
       </section>
       <section className="panel"><div className="summary"><div className="stat"><span>SKU</span><b>{dataset?.skus.length || 0}</b></div><div className="stat"><span>Product Group</span><b>{dataset?.productGroups.length || 0}</b></div><div className="stat"><span>การ์ด</span><b>{dataset?.cards.length || 0}</b></div><div className="stat"><span>พร้อมใช้</span><b>{ready}</b></div><div className="stat"><span>Block/Quarantine</span><b>{blocked + quarantine.length}</b></div></div></section>
       <section className="panel"><div className="section-head"><div><h2><Layers3 size={19} /> Product Group</h2><small>ขอบเขตสินค้าจาก CSV เป็นหลัก; OCR และภาพใช้ยืนยันข้าม Class โดยไม่เดาเมื่อคะแนนสูสี</small></div><span className="tag">{visibleGroups.length} กลุ่ม</span></div><div className="search-row"><label style={{ position: 'relative' }}><Search size={17} style={{ position: 'absolute', left: 12, top: 14, color: '#64748b' }} /><input style={{ paddingLeft: 38 }} value={search} onChange={event => setSearch(event.target.value)} placeholder="ค้นหาชื่อสินค้า แบรนด์ SKU หรือ Class" /></label><select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">ทุกสถานะ</option><option value="ready">พร้อมใช้</option><option value="need_review">ต้องตรวจ</option><option value="blocked">Block</option></select></div>
-        <div className="group-list">{dataset ? visibleGroups.map(group => <GroupEditor key={group.id} group={group} dataset={dataset} priceDraft={priceDrafts[group.id] ?? String(group.price.effectivePrice?.amount || '')} onPriceDraft={value => setPriceDrafts(current => ({ ...current, [group.id]: value }))} onConfirmSku={() => confirmSku(group.id)} onApply={(familyId, amount) => applyGroup(group.id, familyId, amount)} />) : <div className="empty">เลือกไฟล์แล้วกดประมวลผล ระบบจะแสดง Product Group ที่นี่</div>}</div>
+        <div className="group-list">{dataset ? visibleGroups.map(group => <GroupEditor key={group.id} group={group} dataset={dataset} priceDraft={priceDrafts[group.id] ?? String(group.price.effectivePrice?.amount || '')} onPriceDraft={value => setPriceDrafts(current => ({ ...current, [group.id]: value }))} onConfirmSku={() => confirmSku(group.id)} onApply={(familyId, amount) => applyGroup(group.id, familyId, amount)} />) : <div className="empty">เลือกไฟล์แล้วกดประมวลผล หรือกดจัดกลุ่มใหม่จากแคช</div>}</div>
       </section>
       {!!quarantine.length && <section className="panel"><div className="section-head"><div><h2>รายการที่ต้องแก้กลุ่มเฉพาะจุด</h2><small>ไม่มี Product Scope ที่ชนะชัด หรือภาพคล้ายหลายกลุ่ม ระบบจึงไม่เดา</small></div><span className="tag bad">{quarantine.length}</span></div><div className="quarantine">{quarantine.map(card => <article className="quarantine-card" key={card.cardId}><img src={card.imageUrl} alt={card.cardId} /><b>{card.productText || 'อ่านชื่อสินค้าไม่ได้'}</b><div className="failure">{card.failureReasons.join(' · ')}</div></article>)}</div></section>}
       <div className="footer-actions"><button className="btn soft" disabled={!dataset || !savedVersionId || busy} onClick={validatePreview}><CheckCircle2 size={16} /> {previewChecked ? 'ตรวจความพร้อมผ่าน' : 'ตรวจความพร้อมจริง'}</button><button className="btn primary" disabled={!dataset || !session || demo || busy || Boolean(savedVersionId) || dataset.version.status === 'published'} onClick={save}><Save size={16} /> {savedVersionId ? 'Draft บันทึกแล้ว' : 'บันทึก Draft'}</button><button className="btn dark" disabled={!publishable} onClick={publish}>Publish เวอร์ชันนี้</button></div>
