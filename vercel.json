@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build:promo-new",
+  "buildCommand": "npm run verify:promo-new",
   "outputDirectory": "dist",
   "installCommand": "npm ci",
   "framework": null,
