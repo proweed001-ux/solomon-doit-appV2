@@ -350,6 +350,8 @@ function scoreScope(source: ImportedCardCandidate, scope: ProductScopeCandidate)
   score += size === 'exact' ? 25 : size === 'near' ? 16 : 8;
 
   const overlap = tokenOverlap(evidence, scope);
+  const exclusiveTokens = scope.variantTokens.filter(token => token.startsWith('Q_'));
+  if (exclusiveTokens.length && exclusiveTokens.some(token => !qualifierMatches(clean(evidence).split(/\bEXCEPT\b|ยกเว้น/iu)[0].trim(), token))) return null;
   if (scope.variantTokens.length && overlap === 0) return null;
   if (overlap > 0) score += 15 + Math.round(overlap * 10);
   return score;
@@ -421,6 +423,9 @@ export function resolveScopesWithVisualConsensus(
       const referencePrice = extractRetailPrice(`${reference.productText} ${reference.rawText}`);
       if (observedPrice != null && referencePrice != null && Math.abs(observedPrice - referencePrice) > 0.05) continue;
       const variantEvidence = tokenOverlap(evidence, scope);
+      const exclusiveTokens = scope.variantTokens.filter(token => token.startsWith('Q_'));
+      const positiveEvidence = clean(evidence).split(/\bEXCEPT\b|ยกเว้น/iu)[0].trim();
+      if (exclusiveTokens.length && exclusiveTokens.some(token => !qualifierMatches(positiveEvidence, token))) continue;
       const priceAnchor = observedPrice != null && referencePrice != null && Math.abs(observedPrice - referencePrice) <= 0.05;
       const anchored = Boolean(observedBrand || priceAnchor || sizeMatch(observed, scope, observedSize) === 'exact' || variantEvidence > 0);
       if (!anchored) continue;
