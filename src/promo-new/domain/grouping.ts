@@ -2,6 +2,12 @@ import type { PromoCard, ProductGroup, PromotionFamily, Sku, SkuPrice } from './
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 import { createSkuCandidate } from './sku-identity';
 import { inheritedSkuPrice, type StoredPrice } from './pricing';
+import {
+  resolveScopesWithVisualConsensus,
+  skuFromScope,
+  type ProductScopeCandidate,
+  type ScopeResolution,
+} from './scope-matcher';
 
 function stableHash(value: string): string {
   let result = 2166136261;
@@ -32,6 +38,41 @@ function normalizedCandidate(sourceText: string): Sku {
   return { ...candidate, canonicalName: buildSkuDisplayName(candidate) };
 }
 
+interface ResolvedCard {
+  source: ImportedCardCandidate;
+  observed: Sku;
+  scope: ProductScopeCandidate | null;
+  resolution: ScopeResolution;
+  bucketKey: string | null;
+}
+
+function chooseObserved(members: ResolvedCard[]): Sku {
+  const exactSizes = new Map<string, { count: number; confidence: number; sku: Sku }>();
+  for (const member of members) {
+    const identity = member.observed.identity;
+    if (!(identity.sizeValue > 0) || !identity.sizeUnit) continue;
+    const key = `${identity.sizeValue}|${identity.sizeUnit}`;
+    const current = exactSizes.get(key) || { count: 0, confidence: 0, sku: member.observed };
+    current.count += 1;
+    current.confidence += member.source.confidence;
+    if (member.observed.failureReasons.length < current.sku.failureReasons.length) current.sku = member.observed;
+    exactSizes.set(key, current);
+  }
+  const sizeWinner = [...exactSizes.values()].sort((left, right) => (
+    right.count - left.count || right.confidence - left.confidence || left.sku.failureReasons.length - right.sku.failureReasons.length
+  ))[0]?.sku;
+  if (sizeWinner) return sizeWinner;
+  return [...members].sort((left, right) => (
+    left.observed.failureReasons.length - right.observed.failureReasons.length
+    || right.source.confidence - left.source.confidence
+    || right.source.productText.length - left.source.productText.length
+  ))[0].observed;
+}
+
+function familyForScope(scope: ProductScopeCandidate | null, families: PromotionFamily[]): PromotionFamily | null {
+  return scope ? families.find(family => family.id === scope.familyId) || null : null;
+}
+
 export interface GroupingResult {
   skus: Sku[];
   prices: SkuPrice[];
@@ -39,6 +80,12 @@ export interface GroupingResult {
   groups: ProductGroup[];
   quarantineCards: ImportedCardCandidate[];
   warnings: string[];
+  diagnostics: {
+    structuredScope: number;
+    visualConsensus: number;
+    exactIdentity: number;
+    unresolved: number;
+  };
 }
 
 export function groupImportedCards(
@@ -46,42 +93,88 @@ export function groupImportedCards(
   imported: ImportedCardCandidate[],
   existingSkus: Sku[] = [],
   storedPrices: StoredPrice[] = [],
+  promotionFamilies: PromotionFamily[] = [],
+  visualSignatures: Record<string, string> = {},
 ): GroupingResult {
-  const skuByIdentity = new Map(existingSkus.map(sku => [sku.identityKey, sku]));
-  const resolved = imported.map(source => {
-    const candidate = normalizedCandidate(source.productText);
-    const sku = skuByIdentity.get(candidate.identityKey) || candidate;
-    if (!skuByIdentity.has(sku.identityKey)) skuByIdentity.set(sku.identityKey, sku);
-    return { source, sku };
+  const scopeResolutions = promotionFamilies.length
+    ? resolveScopesWithVisualConsensus(imported, promotionFamilies, visualSignatures)
+    : new Map<string, ScopeResolution>();
+  const existingByIdentity = new Map(existingSkus.map(sku => [sku.identityKey, sku]));
+  const diagnostics = { structuredScope: 0, visualConsensus: 0, exactIdentity: 0, unresolved: 0 };
+
+  const resolved: ResolvedCard[] = imported.map(source => {
+    const observed = normalizedCandidate(source.productText || source.rawText);
+    const resolution = scopeResolutions.get(source.cardId) || { scope: null, score: 0, margin: 0, method: 'unmatched' as const };
+    const scope = resolution.scope;
+    if (scope) {
+      if (resolution.method === 'visual_consensus') diagnostics.visualConsensus += 1;
+      else diagnostics.structuredScope += 1;
+      return { source, observed, scope, resolution, bucketKey: `scope:${scope.key}` };
+    }
+    if (observed.status !== 'quarantine' && source.classId) {
+      diagnostics.exactIdentity += 1;
+      return { source, observed, scope: null, resolution, bucketKey: `identity:${observed.identityKey}` };
+    }
+    diagnostics.unresolved += 1;
+    return { source, observed, scope: null, resolution, bucketKey: null };
   });
-  const quarantineCards = resolved.filter(item => item.sku.status === 'quarantine' || !item.source.classId).map(item => item.source);
-  const accepted = resolved.filter(item => item.sku.status !== 'quarantine' && item.source.classId);
-  const buckets = new Map<string, typeof accepted>();
-  accepted.forEach(item => {
-    const key = `${monthKey}|${item.sku.identityKey}`;
+
+  const unresolved = resolved.filter(item => !item.bucketKey || !item.source.classId);
+  const quarantineCards = unresolved.map(item => ({
+    ...item.source,
+    failureReasons: [...new Set([
+      ...item.source.failureReasons,
+      ...item.observed.failureReasons,
+      ...(item.source.classId ? [] : ['class_missing']),
+      'product_scope_unresolved',
+    ])],
+  }));
+  const accepted = resolved.filter((item): item is ResolvedCard & { bucketKey: string } => Boolean(item.bucketKey && item.source.classId));
+  const buckets = new Map<string, Array<ResolvedCard & { bucketKey: string }>>();
+  for (const item of accepted) {
+    const key = `${monthKey}|${item.bucketKey}`;
     const list = buckets.get(key) || [];
     list.push(item);
     buckets.set(key, list);
-  });
+  }
+
   const prices = new Map<string, SkuPrice>();
   const cards: PromoCard[] = [];
   const groups: ProductGroup[] = [];
+  const skus = new Map<string, Sku>();
   const warnings: string[] = [];
 
   for (const [key, members] of buckets) {
-    const sku = members[0].sku;
+    const scope = members[0].scope;
+    const observed = chooseObserved(members);
+    let sku = scope ? skuFromScope(scope, observed, existingSkus) : existingByIdentity.get(observed.identityKey) || observed;
+    if (!scope && sku.status !== 'quarantine') sku = { ...sku, canonicalName: buildSkuDisplayName(sku) };
+    skus.set(sku.id, sku);
     const groupId = `group:${stableHash(key)}`;
     const price = inheritedSkuPrice(sku, storedPrices);
     prices.set(sku.id, price);
     const classIds = members.map(member => member.source.classId as string);
-    const duplicateClasses = classIds.filter((classId, index) => classIds.indexOf(classId) !== index);
+    const duplicateClasses = [...new Set(classIds.filter((classId, index) => classIds.indexOf(classId) !== index))];
+    const family = familyForScope(scope, promotionFamilies);
+    const familyFailures = family?.failureReasons.length ? [`promotion_family_needs_review:${family.id}`] : [];
+    const missingFamilyClasses = family ? [...new Set(classIds)].filter(classId => !family.tiersByClass[classId]?.length) : [];
     const failureReasons = [...new Set([
-      ...(sku.status !== 'active' ? ['new_sku_requires_confirmation'] : []),
-      ...(duplicateClasses.length ? duplicateClasses.map(classId => `duplicate_class:${classId}`) : []),
+      ...(sku.status === 'active' ? [] : sku.status === 'candidate' ? ['new_sku_requires_confirmation'] : sku.failureReasons),
+      ...duplicateClasses.map(classId => `duplicate_class:${classId}`),
       ...(!price.effectivePrice ? ['central_price_missing'] : []),
+      ...missingFamilyClasses.map(classId => `promotion_class_missing:${classId}`),
+      ...familyFailures,
     ])];
+
     const groupCards = members.map(member => {
-      const card: PromoCard = {
+      const tiers = family && member.source.classId ? family.tiersByClass[member.source.classId] || [] : [];
+      const cardFailures = [...new Set([
+        ...member.source.failureReasons.filter(reason => !['product_text_missing', 'class_missing'].includes(reason)),
+        ...(sku.status === 'quarantine' ? sku.failureReasons : []),
+        ...(family && !tiers.length ? [`promotion_class_missing:${member.source.classId}`] : []),
+        ...familyFailures,
+      ])];
+      return {
         id: member.source.cardId,
         monthKey,
         page: member.source.page,
@@ -90,10 +183,10 @@ export function groupImportedCards(
         imageUrl: member.source.imageUrl,
         skuId: sku.id,
         productGroupId: groupId,
-        promotionFamilyId: null,
-        promotionTiers: [],
+        promotionFamilyId: family?.id || null,
+        promotionTiers: tiers,
         price,
-        status: 'need_review',
+        status: price.effectivePrice && sku.status === 'active' && tiers.length && !cardFailures.length ? 'ready' as const : 'need_review' as const,
         evidence: {
           rawText: member.source.rawText,
           productText: member.source.productText,
@@ -107,11 +200,11 @@ export function groupImportedCards(
             height: member.source.bounds.height,
           },
         },
-        failureReasons: [...member.source.failureReasons.filter(reason => !['product_text_missing', 'class_missing'].includes(reason))],
-      };
-      return card;
+        failureReasons: cardFailures,
+      } satisfies PromoCard;
     });
     cards.push(...groupCards);
+    const blocked = duplicateClasses.length > 0 || missingFamilyClasses.length > 0;
     groups.push({
       id: groupId,
       monthKey,
@@ -119,20 +212,29 @@ export function groupImportedCards(
       sku,
       cardIds: groupCards.map(card => card.id),
       classIds: [...new Set(classIds)].sort(),
-      promotionFamilyId: null,
+      promotionFamilyId: family?.id || null,
       price,
-      status: failureReasons.some(reason => reason.startsWith('duplicate_class')) ? 'blocked' : 'need_review',
+      status: blocked ? 'blocked' : price.effectivePrice && sku.status === 'active' && family && !failureReasons.length ? 'ready' : 'need_review',
       failureReasons,
     });
+    for (const member of members) {
+      warnings.push(`card:${member.source.cardId}:grouping_method:${member.resolution.scope ? member.resolution.method : 'exact_identity'}`);
+    }
   }
-  quarantineCards.forEach(card => warnings.push(`card:${card.cardId}:${card.failureReasons.join(',') || 'sku_quarantine'}`));
+
+  for (const card of quarantineCards) warnings.push(`card:${card.cardId}:${card.failureReasons.join(',') || 'sku_quarantine'}`);
+  warnings.push(`grouping:structured_scope:${diagnostics.structuredScope}`);
+  warnings.push(`grouping:visual_consensus:${diagnostics.visualConsensus}`);
+  warnings.push(`grouping:exact_identity:${diagnostics.exactIdentity}`);
+  warnings.push(`grouping:unresolved:${diagnostics.unresolved}`);
   return {
-    skus: [...new Map(resolved.map(item => [item.sku.id, item.sku])).values()],
+    skus: [...skus.values()],
     prices: [...prices.values()],
     cards,
     groups,
     quarantineCards,
-    warnings,
+    warnings: [...new Set(warnings)],
+    diagnostics,
   };
 }
 
@@ -157,17 +259,17 @@ export function applyPromotionFamily(
     status: group.price.effectivePrice && group.sku.status === 'active' && !group.failureReasons.length && !familyFailures.length ? 'ready' : 'need_review',
     failureReasons: [...new Set([...group.failureReasons.filter(reason => !reason.startsWith('promotion_class_missing:')), ...familyFailures])],
   };
-  const cards = allCards.map(card => {
+  const nextCards = allCards.map(card => {
     if (!group.cardIds.includes(card.id) || !card.classId) return card;
     const tiers = family.tiersByClass[card.classId];
-    const failureReasons = card.failureReasons.filter(reason => !reason.startsWith('promotion_'));
+    const cardFailureReasons = card.failureReasons.filter(reason => !reason.startsWith('promotion_'));
     return {
       ...card,
       promotionFamilyId: family.id,
       promotionTiers: tiers,
-      failureReasons,
-      status: card.price.effectivePrice && group.sku.status === 'active' && tiers.length && !failureReasons.length ? 'ready' as const : 'need_review' as const,
+      failureReasons: cardFailureReasons,
+      status: card.price.effectivePrice && group.sku.status === 'active' && tiers.length && !cardFailureReasons.length ? 'ready' as const : 'need_review' as const,
     };
   });
-  return { group: nextGroup, cards, blockedClasses: [] };
+  return { group: nextGroup, cards: nextCards, blockedClasses: [] };
 }
