@@ -2,8 +2,8 @@ import type { PromoCard, ProductGroup, PromotionFamily, Sku, SkuPrice } from './
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 import { createSkuCandidate } from './sku-identity';
 import { inheritedSkuPrice, type StoredPrice } from './pricing';
+import { resolveScopesSafely } from './scope-safety';
 import {
-  resolveScopesWithVisualConsensus,
   skuFromScope,
   type ProductScopeCandidate,
   type ScopeResolution,
@@ -97,7 +97,7 @@ export function groupImportedCards(
   visualSignatures: Record<string, string> = {},
 ): GroupingResult {
   const scopeResolutions = promotionFamilies.length
-    ? resolveScopesWithVisualConsensus(imported, promotionFamilies, visualSignatures)
+    ? resolveScopesSafely(imported, promotionFamilies, visualSignatures)
     : new Map<string, ScopeResolution>();
   const existingByIdentity = new Map(existingSkus.map(sku => [sku.identityKey, sku]));
   const diagnostics = { structuredScope: 0, visualConsensus: 0, exactIdentity: 0, unresolved: 0 };
