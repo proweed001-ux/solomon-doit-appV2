@@ -43,7 +43,7 @@ const UNIT_MAP: Record<string, string> = {
 };
 
 const SALES_UNITS: Record<string, string> = {
-  'แชมพู': 'ขวด', 'ครีมนวด': 'ขวด', 'ทรีทเมนต์ซอง': 'ซอง', 'ปรับผ้านุ่ม': 'ถุง',
+  'แชมพู': 'ขวด', 'ครีมนวด': 'ขวด', 'แชมพู/ครีมนวด': 'ขวด', 'ทรีทเมนต์ซอง': 'ซอง', 'ปรับผ้านุ่ม': 'ถุง',
   'สบู่': 'ก้อน', 'แปรงสีฟัน': 'ด้าม', 'มีดโกน': 'ชิ้น', 'สกินแคร์': 'ชิ้น',
   'ยาบาล์ม': 'กระปุก', 'ผลิตภัณฑ์ปรับอากาศ': 'ชิ้น',
   'แพ็ค แชมพู+แชมพู': 'แพ็ค', 'แพ็ค แชมพู+ครีมนวด': 'แพ็ค',
@@ -71,14 +71,6 @@ function detectBrand(text: string): string | null {
   return matched?.canonical || null;
 }
 
-function detectTypes(text: string, brand: string): string[] {
-  if (/แพ็ค|แพค|PACK/iu.test(text) && /แชมพู/iu.test(text) && /ครีมนวด/iu.test(text)) return ['แพ็ค แชมพู+ครีมนวด'];
-  if (/แพ็ค|แพค|PACK/iu.test(text) && /แชมพู/iu.test(text) && /\+/u.test(text)) return ['แพ็ค แชมพู+แชมพู'];
-  const found = TYPES.filter(type => type.aliases.some(pattern => pattern.test(text))).map(type => type.canonical);
-  if (found.includes('แชมพู') && found.includes('ครีมนวด')) return ['แชมพู', 'ครีมนวด'];
-  return found.length ? [...new Set(found)] : [TYPE_DEFAULTS[brand] || 'สินค้า'];
-}
-
 function normalizedUnit(value: string): string {
   const key = value.toUpperCase().replace(/[.\s]/g, '');
   return UNIT_MAP[key] || UNIT_MAP[value] || value;
@@ -97,6 +89,24 @@ function detectSize(text: string): { minimum: number | null; maximum: number | n
   return { minimum: null, maximum: null, unit: null };
 }
 
+function detectTypes(
+  text: string,
+  brand: string,
+  size: { minimum: number | null; maximum: number | null },
+): string[] {
+  const isPack = /แพ็ค|แพค|PACK/iu.test(text);
+  const hasShampoo = /แชมพู|SHAMPOO/iu.test(text);
+  const hasConditioner = /ครีมนวด|CONDITIONER/iu.test(text);
+  if (isPack && hasShampoo && hasConditioner) return ['แพ็ค แชมพู+ครีมนวด'];
+  if (isPack && hasShampoo && /\+/u.test(text)) return ['แพ็ค แชมพู+แชมพู'];
+  if (hasShampoo && hasConditioner) {
+    const exactLarge = size.minimum != null && size.minimum === size.maximum && size.minimum >= 300;
+    return exactLarge ? ['แชมพู/ครีมนวด'] : ['แชมพู', 'ครีมนวด'];
+  }
+  const found = TYPES.filter(type => type.aliases.some(pattern => pattern.test(text))).map(type => type.canonical);
+  return found.length ? [...new Set(found)] : [TYPE_DEFAULTS[brand] || 'สินค้า'];
+}
+
 function sourceSegments(scopeText: string): string[] {
   const prepared = clean(scopeText)
     .replace(/แชมพู\s*\/\s*ครีมนวด/giu, 'แชมพูและครีมนวด')
@@ -105,7 +115,8 @@ function sourceSegments(scopeText: string): string[] {
 }
 
 function usefulTokens(value: string): string[] {
-  const withoutNumbers = clean(value).replace(/\d+(?:[.,]\d+)?\s*(?:ML|มล\.?|L|LT|ลิตร|G|GM|กรัม|KG|กก\.?)?/giu, ' ');
+  const positiveScope = clean(value).split(/\bEXCEPT\b|ยกเว้น/iu)[0].trim();
+  const withoutNumbers = positiveScope.replace(/\d+(?:[.,]\d+)?\s*(?:ML|มล\.?|L|LT|ลิตร|G|GM|กรัม|KG|กก\.?)?/giu, ' ');
   return withoutNumbers.split(/[^A-Z0-9ก-๙&+]+/giu)
     .map(token => token.trim())
     .filter(token => token.length >= 3 && !GENERIC_TOKENS.has(token) && !BRANDS.some(brand => brand.aliases.some(alias => compact(alias) === compact(token))) && !TYPES.some(type => type.aliases.some(pattern => pattern.test(token))));
@@ -143,7 +154,7 @@ export function buildProductScopes(families: PromotionFamily[]): ProductScopeCan
       const brand = detectBrand(segment);
       if (!brand) continue;
       const size = detectSize(segment);
-      for (const productType of detectTypes(segment, brand)) {
+      for (const productType of detectTypes(segment, brand, size)) {
         const variantTokens = usefulTokens(segment);
         const variant = variantTokens.length ? variantTokens.join(' ') : null;
         const sizeKey = size.minimum == null ? 'NA' : `${size.minimum}-${size.maximum}-${size.unit}`;
@@ -182,6 +193,10 @@ function sizeCompatible(sku: Sku, scope: ProductScopeCandidate): boolean | null 
 }
 
 function typeCompatible(sku: Sku, scope: ProductScopeCandidate, rawText: string): boolean | null {
+  if (scope.productType === 'แชมพู/ครีมนวด') {
+    if (/แชมพู|SHAMPOO/iu.test(rawText) && /ครีมนวด|CONDITIONER/iu.test(rawText)) return true;
+    if (sku.identity.productType === 'แชมพู' || sku.identity.productType === 'ครีมนวด') return null;
+  }
   if (!sku.identity.productType) return null;
   if (sku.identity.productType === scope.productType) return true;
   if (scope.productType.startsWith('แพ็ค ') && /แพ็ค|แพค|PACK/iu.test(rawText)) return true;
@@ -189,7 +204,7 @@ function typeCompatible(sku: Sku, scope: ProductScopeCandidate, rawText: string)
 }
 
 function tokenOverlap(text: string, scope: ProductScopeCandidate): number {
-  if (!scope.variantTokens.length) return 1;
+  if (!scope.variantTokens.length) return 0;
   const sourceTokens = new Set(usefulTokens(text).map(token => compact(token)));
   return scope.variantTokens.filter(token => sourceTokens.has(compact(token))).length / scope.variantTokens.length;
 }
@@ -210,7 +225,9 @@ function scoreScope(source: ImportedCardCandidate, scope: ProductScopeCandidate)
   if (!source.classId || !scope.classIds.includes(source.classId)) return null;
   const evidence = `${source.productText} ${source.rawText}`;
   if (contradictsVariant(evidence, scope)) return null;
-  const sku = createSkuCandidate(source.productText || source.rawText);
+  const observedText = source.productText || source.rawText;
+  const sku = createSkuCandidate(observedText);
+  const evidenceSize = detectSize(evidence);
   let score = 5;
   if (sku.identity.brand) {
     if (sku.identity.brand !== scope.brand) return null;
@@ -220,15 +237,19 @@ function scoreScope(source: ImportedCardCandidate, scope: ProductScopeCandidate)
 
   const type = typeCompatible(sku, scope, evidence);
   if (type === false) return null;
-  score += type === true ? 25 : detectTypes(evidence, scope.brand).includes(scope.productType) ? 20 : 4;
+  const evidenceTypes = detectTypes(evidence, scope.brand, evidenceSize);
+  score += type === true ? 25 : evidenceTypes.includes(scope.productType) ? 20 : 4;
 
-  const size = sizeCompatible(sku, scope);
+  let size = sizeCompatible(sku, scope);
+  if (size == null && evidenceSize.minimum != null && evidenceSize.maximum != null && evidenceSize.unit && scope.minimumSize && scope.maximumSize && scope.sizeUnit) {
+    size = evidenceSize.unit === scope.sizeUnit && evidenceSize.minimum >= scope.minimumSize && evidenceSize.maximum <= scope.maximumSize;
+  }
   if (size === false) return null;
   score += size === true ? 25 : scope.minimumSize == null ? 8 : 3;
 
   const overlap = tokenOverlap(evidence, scope);
+  if (scope.variantTokens.length && overlap === 0) return null;
   score += Math.round(overlap * 25);
-  if (scope.variantTokens.length && overlap === 0 && score < 75) return null;
   return score;
 }
 
@@ -324,7 +345,11 @@ export function skuFromScope(scope: ProductScopeCandidate, observed: Sku, existi
   const existing = existingSkus.find(sku => sku.identityKey === identityKey);
   if (existing) return existing;
   const requiresRangeReview = scope.minimumSize != null && scope.maximumSize != null && scope.minimumSize !== scope.maximumSize;
-  const failureReasons = requiresRangeReview ? ['scope_size_range_requires_master_confirmation'] : [];
+  const requiresCompositeReview = scope.productType.includes('/') || scope.productType.startsWith('แพ็ค ');
+  const failureReasons = [
+    ...(requiresRangeReview ? ['scope_size_range_requires_master_confirmation'] : []),
+    ...(requiresCompositeReview ? ['scope_composite_requires_master_confirmation'] : []),
+  ];
   const hash = stableHash(scope.key);
   return {
     id: `sku:${hash}`,
