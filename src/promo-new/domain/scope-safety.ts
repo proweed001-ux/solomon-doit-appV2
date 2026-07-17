@@ -1,6 +1,6 @@
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 import { createSkuCandidate, normalizeProductText } from './sku-identity';
-import { applyCardFingerprintClusters } from './card-fingerprint';
+import { applySafeCardFingerprintClusters } from './card-fingerprint-safe';
 import {
   buildProductScopes,
   resolveStructuredScope,
@@ -212,5 +212,5 @@ export function resolveScopesSafely(
       });
     }
   }
-  return applyCardFingerprintClusters(cards, families, scopes, resolutions, visualSignatures);
+  return applySafeCardFingerprintClusters(cards, families, scopes, resolutions, visualSignatures);
 }
