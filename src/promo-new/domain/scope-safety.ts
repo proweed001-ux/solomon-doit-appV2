@@ -2,6 +2,7 @@ import type { ImportedCardCandidate } from '../import/pdf-importer';
 import { createSkuCandidate, normalizeProductText } from './sku-identity';
 import { applySafeCardFingerprintClusters } from './card-fingerprint-safe';
 import { applyCatalogSequenceRecovery } from './catalog-sequence';
+import { recoverCachedCardClasses } from './class-recovery';
 import {
   buildProductScopes,
   resolveStructuredScope,
@@ -155,6 +156,7 @@ export function resolveScopesSafely(
   families: PromotionFamily[],
   visualSignatures: Record<string, string> = {},
 ): Map<string, ScopeResolution> {
+  recoverCachedCardClasses(cards, visualSignatures);
   const scopes = buildProductScopes(families);
   const resolutions = new Map(cards.map(card => [card.cardId, safeStructuredResolution(card, scopes)]));
   const anchors = cards.filter(card => resolutions.get(card.cardId)?.method === 'structured_scope');
