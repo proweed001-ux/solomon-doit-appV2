@@ -1,4 +1,5 @@
-import type { PromoDataset } from '../domain/types';
+import type { PromoDataset, Sku } from '../domain/types';
+import type { StoredPrice } from '../domain/pricing';
 
 const SESSION_KEY = 'promo-new-admin-session-v1';
 
@@ -7,6 +8,11 @@ interface AdminSession {
   refreshToken: string;
   expiresIn: number;
   user: { id: string; email: string | null };
+}
+
+export interface PromoMasterData {
+  skus: Sku[];
+  prices: StoredPrice[];
 }
 
 async function request<T>(action: string, options: RequestInit = {}, query: Record<string, string> = {}): Promise<T> {
@@ -49,6 +55,13 @@ export async function logout(session: AdminSession | null): Promise<void> {
   try {
     if (session) await request('logout', { method: 'POST', headers: { Authorization: `Bearer ${session.accessToken}` } });
   } finally { saveSession(null); }
+}
+
+export async function fetchPromoMasterData(session: AdminSession): Promise<PromoMasterData> {
+  const response = await request<{ ok: true; data: PromoMasterData }>('master-data', {
+    headers: { Authorization: `Bearer ${session.accessToken}` },
+  });
+  return response.data;
 }
 
 export async function saveDraft(dataset: PromoDataset, session: AdminSession) {
