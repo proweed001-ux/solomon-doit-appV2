@@ -62,6 +62,8 @@ const OCR_ALIASES: Record<PromoClassId, string[]> = {
   'HFSWS-L': ['HFSWSL', 'HFSWS1', 'HFSWSI', 'HFSWHSL'],
 };
 
+const ALL_ALIASES = [...new Set(Object.values(OCR_ALIASES).flat())].sort((left, right) => right.length - left.length);
+
 function levenshtein(left: string, right: string): number {
   const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
   for (let row = 1; row <= left.length; row += 1) {
@@ -83,11 +85,24 @@ function addScore(scores: Record<PromoClassId, number>, classId: PromoClassId, s
 }
 
 function extractTokens(rawText: string): string[] {
+  const normalized = clean(rawText);
   const compact = compactClass(rawText);
   const tokens = new Set<string>();
-  for (const match of compact.matchAll(/HFS[A-Z0-9]{1,5}/g)) tokens.add(match[0]);
+  const explicitPattern = /HFS\s*[-_/]?\s*(WS\s*[-_/]?\s*[SL5I1]|XL|X[IL1]|WH|IV|RN|[SMHLNI15W])(?=$|[^A-Z0-9])/gu;
+  for (const match of normalized.matchAll(explicitPattern)) tokens.add(`HFS${compactClass(match[1])}`);
+
+  let searchFrom = 0;
+  while (searchFrom < compact.length) {
+    const start = compact.indexOf('HFS', searchFrom);
+    if (start < 0) break;
+    const tail = compact.slice(start);
+    const alias = ALL_ALIASES.find(candidate => tail.startsWith(candidate));
+    if (alias) tokens.add(alias);
+    searchFrom = start + 3;
+  }
+
   if (/^(?:HFS)?(?:S|M|L|XL|WSS|WSL|WH|H|N|IV)$/u.test(compact)) tokens.add(compact.startsWith('HFS') ? compact : `HFS${compact}`);
-  const contextual = clean(rawText).match(/(?:CLASS|กลุ่ม|ระดับ|ร้าน)\s*[:=-]?\s*(S|M|L|XL|WS[- ]?S|WS[- ]?L|WH|H|N|IV)\b/u)?.[1];
+  const contextual = normalized.match(/(?:CLASS|กลุ่ม|ระดับ|ร้าน)\s*[:=-]?\s*(?:HFS\s*[-_/]?\s*)?(S|M|L|XL|WS[- ]?S|WS[- ]?L|WH|H|N|IV)\b/u)?.[1];
   if (contextual) tokens.add(`HFS${compactClass(contextual)}`);
   return [...tokens];
 }
