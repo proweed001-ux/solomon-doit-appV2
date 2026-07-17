@@ -1,4 +1,5 @@
 import { buildCardVisualSignatures } from '../domain/visual-consensus';
+import { enrichCardHeadersFromImages } from '../import/card-header-ocr';
 import type { PdfImportResult } from '../import/pdf-importer';
 import type { WorkbookParseResult } from '../import/workbook-parser';
 
@@ -7,6 +8,7 @@ const DB_VERSION = 1;
 const STORE_NAME = 'runs';
 const LATEST_KEY = 'latest';
 const SUMMARY_KEY = 'promo-new-test-cache-summary-v1';
+const HEADER_OCR_VERSION = 1;
 
 interface StoredFile {
   name: string;
@@ -20,6 +22,7 @@ export type PromoTestCacheMode = 'full' | 'source_only';
 interface StoredPromoTestCache {
   key: typeof LATEST_KEY;
   schemaVersion: 1;
+  headerOcrVersion?: number;
   savedAt: string;
   monthKey: string;
   ocrEnabled: boolean;
@@ -175,11 +178,25 @@ async function requestPersistentStorage(): Promise<void> {
   }
 }
 
+async function enrichImportedHeaders(imported: PdfImportResult, enabled: boolean): Promise<PdfImportResult> {
+  if (!enabled) return imported;
+  const enriched = await enrichCardHeadersFromImages(imported.cards);
+  return {
+    ...imported,
+    cards: enriched.cards,
+    warnings: [...new Set([...imported.warnings, ...enriched.warnings])],
+  };
+}
+
 export async function savePromoTestCache(input: SavePromoTestCacheInput): Promise<PromoTestCacheSummary> {
   await requestPersistentStorage();
+  const imported = await enrichImportedHeaders(input.imported, input.ocrEnabled);
+  input.imported.cards = imported.cards;
+  input.imported.warnings = imported.warnings;
   const base = {
     key: LATEST_KEY as typeof LATEST_KEY,
     schemaVersion: 1 as const,
+    headerOcrVersion: HEADER_OCR_VERSION,
     savedAt: new Date().toISOString(),
     monthKey: input.monthKey,
     ocrEnabled: input.ocrEnabled,
@@ -189,7 +206,7 @@ export async function savePromoTestCache(input: SavePromoTestCacheInput): Promis
   const full: StoredPromoTestCache = {
     ...base,
     mode: 'full',
-    imported: input.imported,
+    imported,
     parsedWorkbook: input.parsedWorkbook,
     visualSignatures: input.visualSignatures,
   };
@@ -217,18 +234,32 @@ export async function savePromoTestCache(input: SavePromoTestCacheInput): Promis
 export async function loadPromoTestCache(): Promise<LoadedPromoTestCache | null> {
   const record = await getRecord();
   if (!record || record.schemaVersion !== 1) return null;
+  let imported = record.imported;
+  let visualSignatures = record.visualSignatures;
+  if (imported && record.ocrEnabled && record.headerOcrVersion !== HEADER_OCR_VERSION) {
+    imported = await enrichImportedHeaders(imported, true);
+    visualSignatures = await buildCardVisualSignatures(imported.cards);
+    record.imported = imported;
+    record.visualSignatures = visualSignatures;
+    record.headerOcrVersion = HEADER_OCR_VERSION;
+    record.savedAt = new Date().toISOString();
+    try {
+      await putRecord(record);
+    } catch {
+      // The upgraded artifacts are still returned for this run even if persistence fails.
+    }
+  } else if (imported) {
+    visualSignatures = await buildCardVisualSignatures(imported.cards);
+  }
   const summary = summaryOf(record);
   saveSummary(summary);
-  const visualSignatures = record.imported
-    ? await buildCardVisualSignatures(record.imported.cards)
-    : record.visualSignatures;
   return {
     summary,
     monthKey: record.monthKey,
     ocrEnabled: record.ocrEnabled,
     pdf: restoredFile(record.pdf),
     workbook: restoredFile(record.workbook),
-    imported: record.imported,
+    imported,
     parsedWorkbook: record.parsedWorkbook,
     visualSignatures,
   };
