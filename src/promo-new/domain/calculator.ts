@@ -19,17 +19,11 @@ export const roundMoney = (value: number): number => Math.round((Number(value) +
 export function selectPromotionTier(tiers: PromotionTier[], quantity: number): { active: PromotionTier | null; next: PromotionTier | null } {
   const ordered = [...tiers].sort((left, right) => left.minQuantity - right.minQuantity || left.tierNo - right.tierNo);
   let active: PromotionTier | null = null;
-  let next: PromotionTier | null = null;
   for (const tier of ordered) {
     const withinMaximum = tier.maxQuantity == null || quantity <= tier.maxQuantity;
     if (quantity >= tier.minQuantity && withinMaximum) active = tier;
-    else if (quantity < tier.minQuantity && !next) next = tier;
   }
-  if (!active) {
-    const reached = ordered.filter(tier => quantity >= tier.minQuantity);
-    active = reached[reached.length - 1] || null;
-  }
-  if (active) next = ordered.find(tier => tier.minQuantity > active!.minQuantity) || null;
+  const next = ordered.find(tier => tier.minQuantity > quantity) || null;
   return { active, next };
 }
 
