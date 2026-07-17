@@ -4,6 +4,7 @@ import { createSkuCandidate, normalizeProductText } from './sku-identity';
 import { visualSimilarity, type ProductScopeCandidate, type ScopeResolution } from './scope-matcher';
 
 const clean = (value: unknown): string => normalizeProductText(value)
+  .replace(/\u0E4D\u0E32/gu, '\u0E33')
   .replace(/[๐-๙]/g, digit => String('๐๑๒๓๔๕๖๗๘๙'.indexOf(digit)))
   .replace(/\s+/g, ' ')
   .trim();
