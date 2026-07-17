@@ -51,7 +51,7 @@ function safeBrand(text: string): string | null {
     .map(([brand]) => brand);
   if (new Set(explicit).size === 1) return explicit[0];
   const parsed = createSkuCandidate(text).identity.brand;
-  return parsed && Object.hasOwn(BRAND_EVIDENCE, parsed) ? parsed : null;
+  return parsed && Object.prototype.hasOwnProperty.call(BRAND_EVIDENCE, parsed) ? parsed : null;
 }
 
 function sizeEvidence(text: string): SizeEvidence | null {
