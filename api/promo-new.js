@@ -1,7 +1,9 @@
 import { bearerToken, methodNotAllowed, readBody, safeError, sendJson } from './_promo-new/http.js';
 import {
+  assertVersionPublishable,
   backendConfigured,
   callAdminRpc,
+  getPromoMasterData,
   getPublishedCatalog,
   loginWithPassword,
   logout,
@@ -18,16 +20,86 @@ function queryValue(req, name) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+const rows = value => Array.isArray(value) ? value : [];
+const hasReasons = value => rows(value).length > 0;
+const positiveMoney = value => Number(value?.amount) > 0 && value?.currency === 'THB';
+
+function validateTier(tier) {
+  if (!Number.isInteger(Number(tier?.tierNo)) || Number(tier.tierNo) < 1) return false;
+  if (!(Number(tier?.minQuantity) > 0)) return false;
+  if (tier.maxQuantity != null && Number(tier.maxQuantity) < Number(tier.minQuantity)) return false;
+  if (tier.type === 'cash_discount') return Number(tier.discountPercent) > 0 && Number(tier.discountPercent) <= 100;
+  if (tier.type === 'free_goods') return Number(tier.freeQuantity) > 0 && tier.effectivePercentUsage === 'display_only';
+  if (tier.type === 'bundle_price') return positiveMoney(tier.bundlePrice);
+  return false;
+}
+
 function validateDatasetPayload(dataset) {
   if (!dataset || dataset.schema !== 'promo-system-rebuild-v1') throw new Error('dataset_schema_invalid');
   if (!UUID.test(String(dataset.version?.id || ''))) throw new Error('version_id_invalid');
   const monthKey = String(dataset.version?.monthKey || '').toUpperCase();
   if (!MONTH_KEY.test(monthKey)) throw new Error('month_key_invalid');
-  if (!Array.isArray(dataset.cards) || !Array.isArray(dataset.productGroups) || !Array.isArray(dataset.promotionFamilies)) throw new Error('dataset_collections_missing');
+  for (const key of ['skus', 'prices', 'cards', 'productGroups', 'promotionFamilies']) {
+    if (!Array.isArray(dataset[key])) throw new Error(`dataset_${key}_missing`);
+  }
   if (dataset.cards.some(card => String(card.monthKey || '').toUpperCase() !== monthKey)) throw new Error('card_crosses_month');
-  const ids = dataset.cards.map(card => String(card.id || ''));
-  if (ids.some(id => !CARD_ID.test(id)) || new Set(ids).size !== ids.length) throw new Error('card_id_invalid_or_duplicate');
-  if (dataset.cards.some(card => !card.classId || !card.skuId || !card.productGroupId)) throw new Error('card_identity_incomplete');
+  if (dataset.productGroups.some(group => String(group.monthKey || '').toUpperCase() !== monthKey)) throw new Error('group_crosses_month');
+
+  const cardIds = dataset.cards.map(card => String(card.id || ''));
+  const skuIds = dataset.skus.map(sku => String(sku.id || ''));
+  const groupIds = dataset.productGroups.map(group => String(group.id || ''));
+  const familyIds = dataset.promotionFamilies.map(family => String(family.id || ''));
+  if (cardIds.some(id => !CARD_ID.test(id)) || new Set(cardIds).size !== cardIds.length) throw new Error('card_id_invalid_or_duplicate');
+  if (skuIds.some(id => !id) || new Set(skuIds).size !== skuIds.length) throw new Error('sku_id_invalid_or_duplicate');
+  if (groupIds.some(id => !id) || new Set(groupIds).size !== groupIds.length) throw new Error('group_id_invalid_or_duplicate');
+  if (familyIds.some(id => !id) || new Set(familyIds).size !== familyIds.length) throw new Error('family_id_invalid_or_duplicate');
+
+  const skuById = new Map(dataset.skus.map(sku => [sku.id, sku]));
+  const groupById = new Map(dataset.productGroups.map(group => [group.id, group]));
+  const familyById = new Map(dataset.promotionFamilies.map(family => [family.id, family]));
+  const priceBySku = new Map(dataset.prices.map(price => [price.skuId, price]));
+
+  for (const family of dataset.promotionFamilies) {
+    for (const [classId, tiers] of Object.entries(family.tiersByClass || {})) {
+      if (!classId || !Array.isArray(tiers) || tiers.some(tier => !validateTier(tier))) throw new Error(`family_tier_invalid:${family.id}:${classId || 'missing'}`);
+    }
+  }
+
+  for (const group of dataset.productGroups) {
+    const sku = skuById.get(group.skuId);
+    if (!sku) throw new Error(`group_sku_missing:${group.id}`);
+    if (group.sku?.identityKey !== sku.identityKey) throw new Error(`group_sku_identity_mismatch:${group.id}`);
+    const memberCards = dataset.cards.filter(card => card.productGroupId === group.id);
+    if (!memberCards.length) throw new Error(`group_cards_missing:${group.id}`);
+    if (memberCards.some(card => card.skuId !== group.skuId)) throw new Error(`group_contains_different_sku:${group.id}`);
+    const classes = memberCards.map(card => card.classId);
+    if (classes.some(classId => !classId) || new Set(classes).size !== classes.length) throw new Error(`group_class_invalid_or_duplicate:${group.id}`);
+    if (group.status === 'ready') {
+      const family = familyById.get(group.promotionFamilyId);
+      const price = priceBySku.get(group.skuId) || group.price;
+      if (sku.status !== 'active' || hasReasons(sku.failureReasons)) throw new Error(`ready_group_sku_not_active:${group.id}`);
+      if (!family || hasReasons(family.failureReasons)) throw new Error(`ready_group_family_invalid:${group.id}`);
+      if (hasReasons(group.failureReasons)) throw new Error(`ready_group_has_failure_reasons:${group.id}`);
+      if (!positiveMoney(price?.effectivePrice)) throw new Error(`ready_group_price_missing:${group.id}`);
+      if (classes.some(classId => !family.tiersByClass?.[classId]?.length)) throw new Error(`ready_group_class_tier_missing:${group.id}`);
+    }
+  }
+
+  for (const card of dataset.cards) {
+    if (!card.classId || !card.skuId || !card.productGroupId) throw new Error('card_identity_incomplete');
+    const group = groupById.get(card.productGroupId);
+    const sku = skuById.get(card.skuId);
+    if (!group || !sku || group.skuId !== card.skuId) throw new Error(`card_reference_invalid:${card.id}`);
+    if (card.status === 'ready') {
+      const family = familyById.get(card.promotionFamilyId);
+      if (sku.status !== 'active' || hasReasons(sku.failureReasons)) throw new Error(`ready_card_sku_not_active:${card.id}`);
+      if (!family || hasReasons(family.failureReasons)) throw new Error(`ready_card_family_invalid:${card.id}`);
+      if (hasReasons(card.failureReasons)) throw new Error(`ready_card_has_failure_reasons:${card.id}`);
+      if (!positiveMoney(card.price?.effectivePrice)) throw new Error(`ready_card_price_missing:${card.id}`);
+      if (!Array.isArray(card.promotionTiers) || !card.promotionTiers.length || card.promotionTiers.some(tier => !validateTier(tier))) throw new Error(`ready_card_tiers_invalid:${card.id}`);
+      if (!family.tiersByClass?.[card.classId]?.length) throw new Error(`ready_card_class_tier_missing:${card.id}`);
+    }
+  }
   return monthKey;
 }
 
@@ -42,6 +114,10 @@ async function handleGet(req, res, action) {
   if (action === 'session') {
     const user = await requirePromoAdmin(bearerToken(req));
     return sendJson(res, 200, { ok: true, user: { id: user.id, email: user.email || null } });
+  }
+  if (action === 'master-data') {
+    await requirePromoAdmin(bearerToken(req));
+    return sendJson(res, 200, { ok: true, data: await getPromoMasterData() });
   }
   return sendJson(res, 404, { ok: false, error: 'action_not_found' });
 }
@@ -82,6 +158,7 @@ async function handlePost(req, res, action) {
   }
   if (action === 'publish') {
     if (!UUID.test(String(body.versionId || ''))) throw new Error('version_id_invalid');
+    await assertVersionPublishable(body.versionId);
     const data = await callAdminRpc('promo_new_publish_version', { p_version_id: body.versionId, p_actor_id: actor.id });
     return sendJson(res, 200, { ok: true, data });
   }
@@ -120,7 +197,7 @@ export default async function handler(req, res) {
     const status = /authentication_required/.test(message) ? 401
       : /promo_admin_required/.test(message) ? 403
         : /not_configured/.test(message) ? 503
-          : /invalid|missing|crosses|duplicate/.test(message) ? 400 : 500;
+          : /invalid|missing|crosses|duplicate|mismatch|not_active|failure_reasons|validation_failed|tier/.test(message) ? 400 : 500;
     return sendJson(res, status, { ok: false, error: message });
   }
 }
