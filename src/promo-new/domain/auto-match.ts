@@ -12,7 +12,7 @@ const normalize = (value: unknown): string => String(value || '')
 const BRAND_ALIASES: Record<string, string[]> = {
   'H&S': ['H&S', 'HEAD SHOULDERS', 'HEAD AND SHOULDERS', 'เฮดแอนด์โชว์เดอร์', 'เฮดแอนด์โชว์เตอร์'],
   PANTENE: ['PANTENE', 'แพนทีน'],
-  REJOICE: ['REJOICE', 'รีจอยส์', 'รีออยส์'],
+  REJOICE: ['REJOICE', 'รีจอยส์', 'รีจ้อยส์', 'รีออยส์'],
   DOWNY: ['DOWNY', 'ดาวน์นี่'],
   OLAY: ['OLAY', 'โอเลย์', 'โอเอย์'],
   'ORAL-B': ['ORAL-B', 'ORAL B', 'ออรัลบี', 'ออรัลบ'],
@@ -25,6 +25,7 @@ const BRAND_ALIASES: Record<string, string[]> = {
 const TYPE_ALIASES: Record<string, string[]> = {
   'แชมพู': ['แชมพู', 'SHAMPOO'],
   'ครีมนวด': ['ครีมนวด', 'CONDITIONER'],
+  'ทรีทเมนต์ซอง': ['ทรีทเมนต์', 'TREATMENT'],
   'ผงซักฟอก': ['ผงซักฟอก', 'POWDER DETERGENT'],
   'น้ำยาซักผ้า': ['น้ำยาซักผ้า', 'LAUNDRY LIQUID', 'LIQUID DETERGENT'],
   'ปรับผ้านุ่ม': ['ปรับผ้านุ่ม', 'FABRIC SOFTENER'],
@@ -33,7 +34,7 @@ const TYPE_ALIASES: Record<string, string[]> = {
   'แปรงสีฟัน': ['แปรงสีฟัน', 'TOOTHBRUSH'],
   'มีดโกน': ['มีดโกน', 'ใบมีด', 'ด้ามมีด', 'RAZOR', 'BLADE'],
   'สกินแคร์': ['สกินแคร์', 'ครีมบำรุง', 'เซรั่ม', 'TOTAL EFFECTS', 'TOTAL WHITE', 'WHITE RADIANCE'],
-  'ยาบาล์ม': ['ยาบาล์ม', 'BALM'],
+  'ยาบาล์ม': ['ยาบาล์ม', 'BALM', 'VAPORUB'],
   'ผลิตภัณฑ์ปรับอากาศ': ['ผลิตภัณฑ์ปรับอากาศ', 'AIR CARE', 'FRESH MINI'],
 };
 
@@ -107,7 +108,7 @@ export function scorePromotionFamily(group: ProductGroup, family: PromotionFamil
     score += 4;
     reasons.push('product_type');
   }
-  if (sizes.length) {
+  if (sizes.length && identity.sizeValue > 0) {
     const matchedSize = sizes.some(size => size.unit === identity.sizeUnit && identity.sizeValue >= size.minimum && identity.sizeValue <= size.maximum);
     if (!matchedSize) return null;
     score += 5;
@@ -148,6 +149,15 @@ export function autoAssignPromotionFamilies(dataset: PromoDataset): {
   let unmatched = 0;
   const warnings = [...dataset.warnings];
   const productGroups = dataset.productGroups.map(group => {
+    const assigned = group.promotionFamilyId
+      ? dataset.promotionFamilies.find(family => family.id === group.promotionFamilyId) || null
+      : null;
+    if (assigned) {
+      const applied = applyPromotionFamily(group, cards, assigned);
+      cards = applied.cards;
+      matched += 1;
+      return applied.group;
+    }
     const result = findPromotionFamily(group, dataset.promotionFamilies);
     if (!result.match) {
       if (result.ambiguous.length > 1) {
