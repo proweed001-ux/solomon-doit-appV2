@@ -2,12 +2,18 @@ import { createWorker, type Worker } from 'tesseract.js';
 import * as pdfjs from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { cropCanvas, detectCardGrid, type GridDiagnostics, type Rect } from './grid-detector';
-import { normalizeClassId } from './class-id';
+import {
+  classifyClassText,
+  normalizeClassId,
+  resolvePageClassSequence,
+  type PageClassObservation,
+  type ResolvedPageClass,
+} from './class-id';
 import { makeCardId } from './card-id';
 import { collectOcrItems, type PositionedText } from './ocr-items';
 import { createSkuCandidate } from '../domain/sku-identity';
 
-export { normalizeClassId } from './class-id';
+export { classifyClassText, normalizeClassId, resolvePageClassSequence } from './class-id';
 export { makeCardId } from './card-id';
 export { collectOcrItems } from './ocr-items';
 export type { PositionedText } from './ocr-items';
@@ -41,7 +47,16 @@ export interface PdfImportProgress {
 
 export interface PdfImportResult {
   cards: ImportedCardCandidate[];
-  pages: Array<{ page: number; classId: string | null; cardCount: number; diagnostics: GridDiagnostics; textMethod: 'pdf_text' | 'page_ocr' | 'none' }>;
+  pages: Array<{
+    page: number;
+    classId: string | null;
+    classConfidence?: number;
+    classMethod?: ResolvedPageClass['method'];
+    classRawText?: string;
+    cardCount: number;
+    diagnostics: GridDiagnostics;
+    textMethod: 'pdf_text' | 'page_ocr' | 'none';
+  }>;
   elapsedMs: number;
   warnings: string[];
 }
@@ -73,7 +88,7 @@ function productZone(rect: Rect): Rect {
 }
 
 function pageHeaderZone(width: number, height: number): Rect {
-  return { x: 0, y: 0, width, height: height * 0.18 };
+  return { x: 0, y: 0, width: width * 0.48, height: height * 0.2 };
 }
 
 async function pdfTextItems(page: any, viewport: any): Promise<PositionedText[]> {
@@ -92,45 +107,105 @@ async function pageOcr(worker: Worker, canvas: HTMLCanvasElement): Promise<Posit
   return collectOcrItems((result.data as unknown as { blocks?: unknown }).blocks);
 }
 
-function preparedHeaderCanvas(canvas: HTMLCanvasElement): HTMLCanvasElement {
-  const header = cropCanvas(canvas, {
-    x: canvas.width * 0.035,
-    y: canvas.height * 0.075,
-    width: canvas.width * 0.42,
-    height: canvas.height * 0.12,
-  });
+function scaledHeaderVariant(canvas: HTMLCanvasElement, rect: Rect, mode: 'color' | 'threshold'): HTMLCanvasElement {
+  const header = cropCanvas(canvas, rect);
   const output = document.createElement('canvas');
-  output.width = header.width * 3;
-  output.height = header.height * 6;
+  output.width = Math.max(1, Math.round(header.width * 4));
+  output.height = Math.max(1, Math.round(header.height * 4));
   const context = output.getContext('2d', { alpha: false, willReadFrequently: true });
   if (!context) throw new Error('canvas_context_unavailable');
-  const rowHeight = output.height / 2;
-  context.drawImage(header, 0, 0, output.width, rowHeight);
-  context.drawImage(header, 0, rowHeight, output.width, rowHeight);
-  const image = context.getImageData(0, rowHeight, output.width, rowHeight);
-  for (let offset = 0; offset < image.data.length; offset += 4) {
-    const luminance = image.data[offset] * 0.299 + image.data[offset + 1] * 0.587 + image.data[offset + 2] * 0.114;
-    const value = luminance >= 204 ? 255 : 0;
-    image.data[offset] = value;
-    image.data[offset + 1] = value;
-    image.data[offset + 2] = value;
-    image.data[offset + 3] = 255;
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, output.width, output.height);
+  context.drawImage(header, 0, 0, output.width, output.height);
+  if (mode === 'threshold') {
+    const image = context.getImageData(0, 0, output.width, output.height);
+    for (let offset = 0; offset < image.data.length; offset += 4) {
+      const red = image.data[offset];
+      const green = image.data[offset + 1];
+      const blue = image.data[offset + 2];
+      const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
+      const saturation = Math.max(red, green, blue) - Math.min(red, green, blue);
+      const likelyWhiteLetter = luminance >= 165 && saturation <= 95;
+      const value = likelyWhiteLetter ? 0 : 255;
+      image.data[offset] = value;
+      image.data[offset + 1] = value;
+      image.data[offset + 2] = value;
+      image.data[offset + 3] = 255;
+    }
+    context.putImageData(image, 0, 0);
   }
-  context.putImageData(image, 0, rowHeight);
   header.width = 1;
   header.height = 1;
   return output;
 }
 
-async function headerClassOcr(worker: Worker, canvas: HTMLCanvasElement): Promise<string> {
-  const header = preparedHeaderCanvas(canvas);
+function preparedHeaderCanvases(canvas: HTMLCanvasElement): HTMLCanvasElement[] {
+  const tokenRect = {
+    x: canvas.width * 0.085,
+    y: canvas.height * 0.055,
+    width: canvas.width * 0.31,
+    height: canvas.height * 0.13,
+  };
+  const broadRect = {
+    x: canvas.width * 0.025,
+    y: canvas.height * 0.015,
+    width: canvas.width * 0.44,
+    height: canvas.height * 0.18,
+  };
+  return [
+    scaledHeaderVariant(canvas, tokenRect, 'color'),
+    scaledHeaderVariant(canvas, tokenRect, 'threshold'),
+    scaledHeaderVariant(canvas, broadRect, 'threshold'),
+  ];
+}
+
+async function headerClassOcr(worker: Worker, canvas: HTMLCanvasElement): Promise<string[]> {
+  const variants = preparedHeaderCanvases(canvas);
+  const texts: string[] = [];
   try {
-    const result = await worker.recognize(header);
-    return clean(result.data.text);
+    for (const variant of variants) {
+      const result = await worker.recognize(variant);
+      const text = clean(result.data.text);
+      if (text) texts.push(text);
+    }
+    return [...new Set(texts)];
   } finally {
-    header.width = 1;
-    header.height = 1;
+    for (const variant of variants) {
+      variant.width = 1;
+      variant.height = 1;
+    }
   }
+}
+
+function headerColorEvidence(canvas: HTMLCanvasElement): [number, number, number] | null {
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) return null;
+  const x = Math.floor(canvas.width * 0.015);
+  const y = Math.floor(canvas.height * 0.015);
+  const width = Math.max(1, Math.floor(canvas.width * 0.44));
+  const height = Math.max(1, Math.floor(canvas.height * 0.16));
+  const data = context.getImageData(x, y, width, height).data;
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+  let count = 0;
+  for (let offset = 0; offset < data.length; offset += 16) {
+    const r = data[offset];
+    const g = data[offset + 1];
+    const b = data[offset + 2];
+    const maximum = Math.max(r, g, b);
+    const minimum = Math.min(r, g, b);
+    const saturation = maximum - minimum;
+    const luminance = r * 0.299 + g * 0.587 + b * 0.114;
+    if (saturation < 35 || luminance < 35 || luminance > 225) continue;
+    red += r;
+    green += g;
+    blue += b;
+    count += 1;
+  }
+  return count ? [Math.round(red / count), Math.round(green / count), Math.round(blue / count)] : null;
 }
 
 function preparedProductCanvas(canvas: HTMLCanvasElement, bounds: Rect, threshold: boolean): HTMLCanvasElement {
@@ -213,6 +288,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
   const document = await pdfjs.getDocument({ data: bytes }).promise;
   const cards: ImportedCardCandidate[] = [];
   const pages: PdfImportResult['pages'] = [];
+  const pageClassObservations: PageClassObservation[] = [];
   const warnings: string[] = [];
   let worker: Worker | null = null;
   let workerLanguage: 'eng+tha' | 'tha' | null = null;
@@ -249,15 +325,28 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
         textItems = await pageOcr(await ensureWorker('eng+tha'), canvas);
         textMethod = textItems.length ? 'page_ocr' : 'none';
       }
-      let headerText = textIn(textItems, pageHeaderZone(canvas.width, canvas.height));
-      let classId = normalizeClassId(headerText);
-      if (!classId && grid.regions.length && options.enableOcr) {
-        progress('ocr', pageNumber, `หน้า ${pageNumber}: อ่าน Class จากหัวหน้า`);
-        const classText = await headerClassOcr(await ensureWorker('eng+tha'), canvas);
-        classId = normalizeClassId(classText);
-        headerText = clean(`${headerText} ${classText}`);
+      const headerTexts: string[] = [];
+      const pageTextHeader = textIn(textItems, pageHeaderZone(canvas.width, canvas.height));
+      if (pageTextHeader) headerTexts.push(pageTextHeader);
+      let classEvidence = classifyClassText(headerTexts);
+      if (grid.regions.length && options.enableOcr && (!classEvidence.classId || classEvidence.confidence < 0.9)) {
+        progress('ocr', pageNumber, `หน้า ${pageNumber}: จำแนก Class จากหัวซ้ายบน`);
+        try {
+          const classTexts = await headerClassOcr(await ensureWorker('eng+tha'), canvas);
+          headerTexts.push(...classTexts);
+          classEvidence = classifyClassText(headerTexts);
+        } catch {
+          warnings.push(`page:${pageNumber}:class_header_ocr_failed`);
+        }
       }
-      if (!classId && grid.regions.length) warnings.push(`page:${pageNumber}:class_missing`);
+      const classId = classEvidence.classId;
+      const headerText = clean(headerTexts.join(' | '));
+      pageClassObservations.push({
+        page: pageNumber,
+        texts: headerTexts,
+        headerColor: headerColorEvidence(canvas),
+        hasCards: grid.regions.length > 0,
+      });
       if (grid.diagnostics.status !== 'ok') warnings.push(...grid.diagnostics.reasons.map(reason => `page:${pageNumber}:${reason}`));
       if (textMethod === 'page_ocr' && grid.regions.length && options.enableOcr) await ensureWorker('tha');
       for (const [index, bounds] of grid.regions.entries()) {
@@ -296,7 +385,16 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
         crop.width = 1;
         crop.height = 1;
       }
-      pages.push({ page: pageNumber, classId, cardCount: grid.regions.length, diagnostics: grid.diagnostics, textMethod });
+      pages.push({
+        page: pageNumber,
+        classId,
+        classConfidence: classEvidence.confidence,
+        classMethod: classEvidence.method,
+        classRawText: classEvidence.rawText,
+        cardCount: grid.regions.length,
+        diagnostics: grid.diagnostics,
+        textMethod,
+      });
       progress('cards', pageNumber, `หน้า ${pageNumber}: พบ ${grid.regions.length} การ์ด`);
       canvas.width = 1;
       canvas.height = 1;
@@ -307,6 +405,30 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
     await (worker as Worker | null)?.terminate();
     await document.cleanup();
   }
+
+  const resolvedClasses = resolvePageClassSequence(pageClassObservations);
+  const resolvedByPage = new Map(resolvedClasses.map(item => [item.page, item]));
+  for (const page of pages) {
+    const resolved = resolvedByPage.get(page.page);
+    const previous = page.classId;
+    page.classId = resolved?.classId || null;
+    page.classConfidence = resolved?.confidence || 0;
+    page.classMethod = resolved?.method || 'missing';
+    page.classRawText = resolved?.rawText || page.classRawText || '';
+    if (!page.classId && page.cardCount) warnings.push(`page:${page.page}:class_missing`);
+    if (previous && page.classId && previous !== page.classId) warnings.push(`page:${page.page}:class_sequence_override:${previous}->${page.classId}`);
+    if (!previous && page.classId) warnings.push(`page:${page.page}:class_recovered:${page.classId}`);
+  }
+  for (const card of cards) {
+    const resolved = resolvedByPage.get(card.page);
+    const previousClass = card.classId;
+    card.classId = resolved?.classId || null;
+    card.cardId = makeCardId(monthKey, card.classId, card.page, card.sequence);
+    card.failureReasons = card.failureReasons.filter(reason => reason !== 'class_missing');
+    if (!card.classId) card.failureReasons.push('class_missing');
+    if (!previousClass && card.classId) card.confidence = Number(Math.min(1, card.confidence + 0.2).toFixed(3));
+  }
+
   const ids = cards.map(card => card.cardId);
   if (new Set(ids).size !== ids.length) warnings.push('duplicate_card_id');
   progress('complete', document.numPages, `เสร็จ ${cards.length} การ์ด`);
