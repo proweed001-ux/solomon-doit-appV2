@@ -54,6 +54,10 @@ function safeBrand(text: string): string | null {
   return parsed && Object.prototype.hasOwnProperty.call(BRAND_EVIDENCE, parsed) ? parsed : null;
 }
 
+function canonicalizeStandaloneAliases(value: string): string {
+  return clean(value).replace(/(^|[^A-Z0-9])PT(?=$|[^A-Z0-9])/giu, '$1PANTENE');
+}
+
 function sizeEvidence(text: string): SizeEvidence | null {
   const source = clean(text).replace(/\s+/g, '');
   const unit = '(ML|VA|มล\.?|บล\.?|L|LT|ลิตร|G|GM|NSU|กรัม|กรับ|KG|กก\.?)';
@@ -95,18 +99,24 @@ function retailPrice(text: string): number | null {
 
 function exclusions(scope: ProductScopeCandidate): string[] {
   const source = clean(scope.rawText).split(/\bEXCEPT\b|ยกเว้น/iu)[1] || '';
-  return [...new Set(tokens(source).filter(token => token.length >= 2))];
+  const connectors = new Set(['และ', 'AND', 'OR']);
+  return [...new Set(tokens(source).filter(token => token.length >= 2 && !connectors.has(token)))];
+}
+
+function positiveEvidence(text: string): string {
+  return clean(text).split(/\bEXCEPT\b|ยกเว้น/iu)[0].trim();
 }
 
 function contradictsScope(text: string, scope: ProductScopeCandidate): boolean {
-  const source = compact(text);
+  const positive = positiveEvidence(text);
+  const source = compact(positive);
   const target = compact(scope.rawText);
   const sourceNoCap = source.includes(compact('ไม่มีฝา'));
   const sourceWithCap = source.includes(compact('มีฝา')) && !sourceNoCap;
   const targetNoCap = target.includes(compact('ไม่มีฝา'));
   const targetWithCap = target.includes(compact('มีฝา')) && !targetNoCap;
   if ((sourceNoCap && targetWithCap) || (sourceWithCap && targetNoCap)) return true;
-  const evidenceTokens = new Set(tokens(text));
+  const evidenceTokens = new Set(tokens(positive));
   return exclusions(scope).some(token => evidenceTokens.has(token));
 }
 
@@ -120,11 +130,18 @@ function productTypeCompatible(text: string, scope: ProductScopeCandidate): bool
 }
 
 function safeStructuredResolution(card: ImportedCardCandidate, scopes: ProductScopeCandidate[]): ScopeResolution {
-  const resolution = resolveStructuredScope(card, scopes);
-  const scope = resolution.scope;
-  if (!scope) return resolution;
   const evidence = `${card.productText} ${card.rawText}`;
   const brand = safeBrand(evidence);
+  const normalizedCard = brand === 'PANTENE' && tokens(evidence).includes('PT')
+    ? {
+      ...card,
+      productText: canonicalizeStandaloneAliases(card.productText),
+      rawText: canonicalizeStandaloneAliases(card.rawText),
+    }
+    : card;
+  const resolution = resolveStructuredScope(normalizedCard, scopes);
+  const scope = resolution.scope;
+  if (!scope) return resolution;
   if (!brand || brand !== scope.brand || contradictsScope(evidence, scope)) {
     return { scope: null, score: resolution.score, margin: resolution.margin, method: 'unmatched' };
   }
