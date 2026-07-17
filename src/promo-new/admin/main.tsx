@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { AlertTriangle, CheckCircle2, Database, FileSpreadsheet, Layers3, LogOut, Save, Search, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 import type { PromoDataset, ProductGroup } from '../domain/types';
 import { autoAssignPromotionFamilies } from '../domain/auto-match';
-import { applyPromotionFamily, groupImportedCards } from '../domain/grouping';
+import { applyPromotionFamily } from '../domain/grouping';
 import { applyPriceToGroup, setCentralPrice } from '../domain/pricing';
 import { confirmSkuCandidate } from '../domain/sku-identity';
 import { assertReadyForPublish } from '../domain/validation';
@@ -14,6 +14,7 @@ import type { WorkbookParseResult } from '../import/workbook-parser';
 import { inspectPromotionWorkbookFile, PROMOTION_WORKBOOK_ACCEPT } from '../import/workbook-file';
 import { createDemoDataset } from '../shared/demo-data';
 import { fetchPromoMasterData, loadSession, login, logout, publishVersion, saveDraft, uploadCardImage, validateSession } from '../shared/api';
+import { runGroupingInWorker } from './grouping-client';
 import {
   clearPromoTestCache,
   formatCacheSize,
@@ -146,6 +147,7 @@ function AdminApp() {
     sourceWorkbookName: string,
     extraWarnings: string[] = [],
     sourceLabel = 'ไฟล์ใหม่',
+    artifactMonthKey = monthKey,
   ) => {
     let master = { skus: [], prices: [] } as Awaited<ReturnType<typeof fetchPromoMasterData>>;
     let masterWarning = '';
@@ -153,15 +155,45 @@ function AdminApp() {
       try { master = await fetchPromoMasterData(session); }
       catch (caught) { masterWarning = `master_data_unavailable:${String((caught as Error).message || caught)}`; }
     }
-    const grouped = groupImportedCards(
-      monthKey,
-      imported.cards,
-      master.skus,
-      master.prices,
-      parsedWorkbook.families,
+
+    const groupingStarted = performance.now();
+    setProgress({
+      phase: 'cards',
+      page: 0,
+      pageCount: 1,
+      cards: imported.cards.length,
+      elapsedMs: 0,
+      message: 'กำลังเริ่ม Worker จัดกลุ่ม — หน้าจอยังใช้งานได้',
+    });
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    const grouped = await runGroupingInWorker({
+      monthKey: artifactMonthKey,
+      cards: imported.cards,
+      existingSkus: master.skus,
+      storedPrices: master.prices,
+      promotionFamilies: parsedWorkbook.families,
       visualSignatures,
-    );
-    const version = nextDraftVersion(monthKey, [], session?.user.id || null);
+      onProgress: workerMessage => setProgress({
+        phase: 'cards',
+        page: 0.65,
+        pageCount: 1,
+        cards: imported.cards.length,
+        elapsedMs: performance.now() - groupingStarted,
+        message: workerMessage,
+      }),
+    });
+
+    setProgress({
+      phase: 'cards',
+      page: 0.9,
+      pageCount: 1,
+      cards: imported.cards.length,
+      elapsedMs: performance.now() - groupingStarted,
+      message: 'กำลังจับ Promotion Family และสรุปผล',
+    });
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+
+    const version = nextDraftVersion(artifactMonthKey, [], session?.user.id || null);
     version.status = 'need_review';
     version.source = { pdfName: sourcePdfName, workbookName: sourceWorkbookName, pdfHash: null, workbookHash: null };
     const next: PromoDataset = {
@@ -204,12 +236,24 @@ function AdminApp() {
       } catch (caught) {
         cacheWarnings.push(`browser_cache_save_failed:${String((caught as Error).message || caught)}`);
       }
-      await groupArtifacts(imported, parsedWorkbook, visualSignatures, pdf.name, workbook.name, cacheWarnings, 'OCR ใหม่และบันทึกแคชแล้ว');
-    } catch (caught) { setError(String((caught as Error).message || caught)); } finally { setBusy(false); }
+      await groupArtifacts(imported, parsedWorkbook, visualSignatures, pdf.name, workbook.name, cacheWarnings, 'OCR ใหม่และบันทึกแคชแล้ว', monthKey);
+    } catch (caught) {
+      setProgress(null);
+      setError(String((caught as Error).message || caught));
+    } finally { setBusy(false); }
   };
 
   const useCachedRun = async () => {
-    setBusy(true); setError(''); setDataset(null); setQuarantine([]); setProgress(null); setPreviewChecked(false); setSavedVersionId(null);
+    const started = performance.now();
+    setBusy(true); setError(''); setPreviewChecked(false); setSavedVersionId(null);
+    setProgress({
+      phase: 'loading',
+      page: 0,
+      pageCount: 1,
+      cards: cacheSummary?.cardCount || 0,
+      elapsedMs: 0,
+      message: 'กำลังเปิดแคช — ผลเดิมจะยังอยู่จนกว่างานใหม่เสร็จ',
+    });
     try {
       const cached = await loadPromoTestCache();
       if (!cached) throw new Error('ยังไม่มีไฟล์ทดสอบที่บันทึกไว้ในเครื่องนี้');
@@ -219,9 +263,18 @@ function AdminApp() {
       setPdf(cached.pdf);
       setWorkbook(cached.workbook);
       if (!cached.imported || !cached.parsedWorkbook || !cached.visualSignatures) {
+        setProgress(null);
         setMessage(`กู้ไฟล์ ${cached.pdf.name} และ ${cached.workbook.name} แล้ว แต่พื้นที่เครื่องไม่พอเก็บผล OCR — กด “OCR ใหม่และบันทึกแคช”`);
         return;
       }
+      setProgress({
+        phase: 'cards',
+        page: 0.25,
+        pageCount: 1,
+        cards: cached.imported.cards.length,
+        elapsedMs: performance.now() - started,
+        message: 'โหลดแคชแล้ว กำลังส่งข้อมูลไป Worker จัดกลุ่ม',
+      });
       await groupArtifacts(
         cached.imported,
         cached.parsedWorkbook,
@@ -230,8 +283,12 @@ function AdminApp() {
         cached.workbook.name,
         ['grouping_rerun_from_browser_cache'],
         'จัดกลุ่มใหม่จากแคชโดยไม่ OCR ซ้ำ',
+        cached.monthKey,
       );
-    } catch (caught) { setError(String((caught as Error).message || caught)); } finally { setBusy(false); }
+    } catch (caught) {
+      setProgress(null);
+      setError(String((caught as Error).message || caught));
+    } finally { setBusy(false); }
   };
 
   const clearCachedRun = async () => {
