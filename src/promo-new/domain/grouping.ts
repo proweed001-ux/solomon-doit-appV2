@@ -1,6 +1,6 @@
 import type { PromoCard, ProductGroup, PromotionFamily, Sku, SkuPrice } from './types';
 import type { ImportedCardCandidate } from '../import/pdf-importer';
-import { createSkuCandidate } from './sku-identity';
+import { buildSkuIdentityKey, createSkuCandidate } from './sku-identity';
 import { inheritedSkuPrice, type StoredPrice } from './pricing';
 import { resolveScopesSafely } from './scope-safety';
 import {
@@ -22,6 +22,60 @@ function displayNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(3)));
 }
 
+const BRAND_TYPE_DEFAULTS: Record<string, string> = {
+  GILLETTE: 'มีดโกน',
+  'ORAL-B': 'แปรงสีฟัน',
+  OLAY: 'สกินแคร์',
+  VICKS: 'ยาบาล์ม',
+  'AMBI PUR': 'ผลิตภัณฑ์ปรับอากาศ',
+  DOWNY: 'ปรับผ้านุ่ม',
+};
+
+const TYPE_SALES_UNITS: Record<string, string> = {
+  'มีดโกน': 'ชิ้น',
+  'แปรงสีฟัน': 'ด้าม',
+  'สกินแคร์': 'ชิ้น',
+  'ยาบาล์ม': 'กระปุก',
+  'ผลิตภัณฑ์ปรับอากาศ': 'ชิ้น',
+  'ปรับผ้านุ่ม': 'ถุง',
+};
+
+function sizeIsOptional(sourceText: string, sku: Sku): boolean {
+  const productType = sku.identity.productType;
+  if (productType === 'มีดโกน' || productType === 'แปรงสีฟัน') return true;
+  const packOrModelIdentity = /ซอง|กล่อง|แพ็ค|แพค|ถุงเติมขนาดใหญ่|รุ่น|ซุปเปอร์|SUPER|VECTOR|BLADE|ด้าม|ใบมีด/iu.test(sourceText);
+  return packOrModelIdentity && Boolean(sku.identity.brand) && Boolean(sku.identity.variant || productType);
+}
+
+function normalizeEvidenceRequirements(sourceText: string, sourceSku: Sku): Sku {
+  let identity = { ...sourceSku.identity };
+  const inferredType = identity.productType || BRAND_TYPE_DEFAULTS[identity.brand] || '';
+  if (inferredType && !identity.productType) {
+    identity.productType = inferredType;
+    identity.salesUnit = TYPE_SALES_UNITS[inferredType] || identity.salesUnit;
+  }
+
+  let failureReasons = sourceSku.failureReasons.filter(reason => (
+    reason !== 'product_type_missing' || !inferredType
+  ));
+  const working = { ...sourceSku, identity };
+  if (sizeIsOptional(sourceText, working)) {
+    failureReasons = failureReasons.filter(reason => !['size_missing', 'size_unit_missing'].includes(reason));
+  }
+
+  const identityKey = buildSkuIdentityKey(identity);
+  const hash = stableHash(identityKey);
+  return {
+    ...sourceSku,
+    id: `sku:${hash}`,
+    code: `SKU-${hash}`,
+    identity,
+    identityKey,
+    status: failureReasons.length ? 'quarantine' : 'candidate',
+    failureReasons: [...new Set(failureReasons)],
+  };
+}
+
 export function buildSkuDisplayName(sku: Sku): string {
   const identity = sku.identity;
   const parts = [identity.brand, identity.productType].filter(Boolean);
@@ -33,7 +87,7 @@ export function buildSkuDisplayName(sku: Sku): string {
 }
 
 function normalizedCandidate(sourceText: string): Sku {
-  const candidate = createSkuCandidate(sourceText);
+  const candidate = normalizeEvidenceRequirements(sourceText, createSkuCandidate(sourceText));
   if (candidate.status === 'quarantine') return candidate;
   return { ...candidate, canonicalName: buildSkuDisplayName(candidate) };
 }
