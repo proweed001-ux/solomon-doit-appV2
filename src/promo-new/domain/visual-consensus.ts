@@ -1,9 +1,7 @@
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 
-const GRID_COLUMNS = 8;
-const GRID_ROWS = 6;
-const TARGET_WIDTH = 160;
-const TARGET_HEIGHT = 120;
+const TARGET_WIDTH = 32;
+const TARGET_HEIGHT = 24;
 
 function loadImage(source: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -27,10 +25,13 @@ function productCanvas(image: HTMLImageElement): HTMLCanvasElement {
   if (!context) throw new Error('canvas_context_unavailable');
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
-  const sourceX = image.naturalWidth * 0.18;
-  const sourceY = image.naturalHeight * 0.12;
-  const sourceWidth = image.naturalWidth * 0.58;
-  const sourceHeight = image.naturalHeight * 0.74;
+
+  // Cards place the product pack in the centre-right area. This crop removes most
+  // recommended-price text on the left and the red promotion mechanic at bottom-right.
+  const sourceX = image.naturalWidth * 0.28;
+  const sourceY = image.naturalHeight * 0.15;
+  const sourceWidth = image.naturalWidth * 0.54;
+  const sourceHeight = image.naturalHeight * 0.60;
   context.fillStyle = '#ffffff';
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
@@ -42,44 +43,22 @@ function featureBytes(canvas: HTMLCanvasElement): number[] {
   if (!context) return [];
   const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
   const output: number[] = [];
-  const cellWidth = canvas.width / GRID_COLUMNS;
-  const cellHeight = canvas.height / GRID_ROWS;
-  for (let row = 0; row < GRID_ROWS; row += 1) {
-    for (let column = 0; column < GRID_COLUMNS; column += 1) {
-      const startX = Math.floor(column * cellWidth);
-      const endX = Math.ceil((column + 1) * cellWidth);
-      const startY = Math.floor(row * cellHeight);
-      const endY = Math.ceil((row + 1) * cellHeight);
-      let foreground = 0;
-      let red = 0;
-      let green = 0;
-      let blue = 0;
-      let total = 0;
-      for (let y = startY; y < endY; y += 2) {
-        for (let x = startX; x < endX; x += 2) {
-          const offset = (y * canvas.width + x) * 4;
-          const r = data[offset];
-          const g = data[offset + 1];
-          const b = data[offset + 2];
-          const maximum = Math.max(r, g, b);
-          const minimum = Math.min(r, g, b);
-          const saturation = maximum - minimum;
-          const luminance = r * 0.299 + g * 0.587 + b * 0.114;
-          const isForeground = luminance < 232 || saturation > 34;
-          total += 1;
-          if (isForeground) {
-            foreground += 1;
-            red += r;
-            green += g;
-            blue += b;
-          }
-        }
-      }
-      output.push(clampByte(foreground / Math.max(1, total) * 255));
-      output.push(clampByte(red / Math.max(1, foreground)));
-      output.push(clampByte(green / Math.max(1, foreground)));
-      output.push(clampByte(blue / Math.max(1, foreground)));
-    }
+  for (let offset = 0; offset < data.length; offset += 4) {
+    const red = data[offset];
+    const green = data[offset + 1];
+    const blue = data[offset + 2];
+    const maximum = Math.max(red, green, blue);
+    const minimum = Math.min(red, green, blue);
+    const saturation = maximum - minimum;
+    const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
+    const foreground = luminance < 238 || saturation > 26;
+
+    // Store distance from white rather than raw RGB. White card background therefore
+    // contributes zero and the fingerprint concentrates on pack shape, colour and labels.
+    output.push(clampByte(255 - red));
+    output.push(clampByte(255 - green));
+    output.push(clampByte(255 - blue));
+    output.push(foreground ? 255 : 0);
   }
   return output;
 }
