@@ -7,6 +7,7 @@ import { applyPromotionFamily, groupImportedCards } from '../domain/grouping';
 import { applyPriceToGroup, setCentralPrice } from '../domain/pricing';
 import { confirmSkuCandidate } from '../domain/sku-identity';
 import { assertReadyForPublish } from '../domain/validation';
+import { buildCardVisualSignatures } from '../domain/visual-consensus';
 import { nextDraftVersion } from '../domain/versioning';
 import type { ImportedCardCandidate, PdfImportProgress } from '../import/pdf-importer';
 import { inspectPromotionWorkbookFile, PROMOTION_WORKBOOK_ACCEPT } from '../import/workbook-file';
@@ -62,8 +63,9 @@ function GroupEditor({ group, dataset, priceDraft, onPriceDraft, onConfirmSku, o
         <div className="thumbs">{cards.map(card => <div className="thumb" key={card.id}>{card.imageUrl ? <img src={card.imageUrl} alt={card.id} loading="lazy" /> : <div className="empty">ไม่มีรูป</div>}<span>{card.classId}</span></div>)}</div>
         <div className="product-name">{group.sku.canonicalName}</div>
         <div className="tags"><span className="tag">{group.sku.code}</span><span className={`tag ${group.status === 'ready' ? 'good' : group.status === 'blocked' ? 'bad' : 'warn'}`}>{group.status}</span><span className="tag">{group.cardIds.length} การ์ด</span>{group.promotionFamilyId && <span className="tag good">Family จับแล้ว</span>}{group.classIds.map(classId => <span className="tag" key={classId}>{classId}</span>)}</div>
-        <div className="sku-meta"><span><b>แบรนด์:</b> {group.sku.identity.brand || '-'}</span><span><b>ชนิด:</b> {group.sku.identity.productType || '-'}</span><span><b>ขนาด:</b> {group.sku.identity.sizeValue || '-'} {group.sku.identity.sizeUnit}</span><span><b>หน่วย/Pack:</b> {group.sku.identity.salesUnit} × {group.sku.identity.packQuantity}</span><span><b>Variant:</b> {group.sku.identity.variant ? 'รอยืนยันจากภาพ' : '-'}</span><span><b>ราคาเดิม:</b> {money(group.price.effectivePrice?.amount)}</span></div>
+        <div className="sku-meta"><span><b>แบรนด์:</b> {group.sku.identity.brand || '-'}</span><span><b>ชนิด:</b> {group.sku.identity.productType || '-'}</span><span><b>ขนาด:</b> {group.sku.identity.sizeValue || '-'} {group.sku.identity.sizeUnit}</span><span><b>หน่วย/Pack:</b> {group.sku.identity.salesUnit} × {group.sku.identity.packQuantity}</span><span><b>Variant:</b> {group.sku.identity.variant || '-'}</span><span><b>ราคาเดิม:</b> {money(group.price.effectivePrice?.amount)}</span></div>
         {group.sku.status === 'candidate' && <button className="btn soft" style={{ marginTop: 10 }} onClick={onConfirmSku}>ยืนยันเป็น SKU ใหม่</button>}
+        {group.sku.status === 'quarantine' && <div className="failure">กลุ่มนี้สร้างจากขอบเขตโปร แต่ยังต้องผูก Product Master ที่แน่นอนก่อนใช้ราคา</div>}
         {!!group.failureReasons.length && <div className="failure">{group.failureReasons.join(' · ')}</div>}
       </div>
       <div className="group-controls">
@@ -122,7 +124,7 @@ function AdminApp() {
 
   const processFiles = async () => {
     if (!pdf || !workbook) return;
-    setBusy(true); setError(''); setDataset(null); setQuarantine([]); setPreviewChecked(false); setSavedVersionId(null);
+    setBusy(true); setError(''); setDataset(null); setQuarantine([]); setProgress(null); setPreviewChecked(false); setSavedVersionId(null);
     try {
       const [{ importPromotionPdf }, { parsePromotionWorkbook }] = await Promise.all([
         import('../import/pdf-importer'),
@@ -136,7 +138,17 @@ function AdminApp() {
       }
       const parsedWorkbook = await parsePromotionWorkbook(workbook);
       const imported = await importPromotionPdf(pdf, { monthKey, enableOcr: ocr, onProgress: setProgress });
-      const grouped = groupImportedCards(monthKey, imported.cards, master.skus, master.prices);
+      const visualSignatures = await buildCardVisualSignatures(imported.cards, (completed, total) => {
+        setProgress(current => current ? { ...current, phase: 'cards', message: `สร้างหลักฐานภาพสินค้า ${completed}/${total}` } : null);
+      });
+      const grouped = groupImportedCards(
+        monthKey,
+        imported.cards,
+        master.skus,
+        master.prices,
+        parsedWorkbook.families,
+        visualSignatures,
+      );
       const version = nextDraftVersion(monthKey, [], session?.user.id || null);
       version.status = 'need_review';
       version.source = { pdfName: pdf.name, workbookName: workbook.name, pdfHash: null, workbookHash: null };
@@ -147,9 +159,9 @@ function AdminApp() {
       };
       const automated = autoAssignPromotionFamilies(next);
       const inheritedPrices = automated.dataset.productGroups.filter(group => group.price.source === 'central_override').length;
-      setDataset(automated.dataset); setQuarantine(grouped.quarantineCards);
+      setDataset(automated.dataset); setQuarantine(grouped.quarantineCards); setProgress(null);
       setPriceDrafts(Object.fromEntries(automated.dataset.productGroups.map(group => [group.id, String(group.price.effectivePrice?.amount || '')])));
-      setMessage(`ประมวลผล ${automated.dataset.cards.length} การ์ด · ${automated.dataset.productGroups.length} กลุ่ม · Auto Family ${automated.matched} · ราคาเดิม ${inheritedPrices} · ต้องตรวจ Family ${automated.ambiguous + automated.unmatched} · quarantine ${grouped.quarantineCards.length}`);
+      setMessage(`ประมวลผล ${automated.dataset.cards.length}/${imported.cards.length} การ์ด · ${automated.dataset.productGroups.length} กลุ่ม · Scope ${grouped.diagnostics.structuredScope} · ภาพช่วยกู้ ${grouped.diagnostics.visualConsensus} · Exact ${grouped.diagnostics.exactIdentity} · ราคาเดิม ${inheritedPrices} · unresolved ${grouped.diagnostics.unresolved}`);
     } catch (caught) { setError(String((caught as Error).message || caught)); } finally { setBusy(false); }
   };
 
@@ -270,14 +282,14 @@ function AdminApp() {
         <label className="field">เดือนโปรโมชั่น<input value={monthKey} onChange={event => setMonthKey(event.target.value.toUpperCase())} placeholder="เช่น PROMO-2026-08" /></label>
         <label className="field file-drop"><span><UploadCloud size={16} /> เลือก PDF โปรโมชั่น</span><input type="file" accept="application/pdf,.pdf" onChange={event => setPdf(event.target.files?.[0] || null)} /><small>{pdf?.name || 'ยังไม่ได้เลือก'}</small></label>
         <label className="field file-drop"><span><FileSpreadsheet size={16} /> เลือก CSV/XLSX/XLSM</span><input type="file" accept={PROMOTION_WORKBOOK_ACCEPT} onChange={selectWorkbook} /><small>{workbook ? `${workbook.name} · ${inspectPromotionWorkbookFile(workbook).label}` : 'รองรับ .csv, .xlsx, .xlsm และ .xls'}</small></label>
-      </div><div className="run-row"><label className="field" style={{ flexDirection: 'row', alignItems: 'center' }}><input style={{ width: 18, height: 18 }} type="checkbox" checked={ocr} onChange={event => setOcr(event.target.checked)} /> OCR เฉพาะเมื่อ PDF ไม่มี text layer</label><button className="btn primary" disabled={busy || !pdf || !workbook || demo} onClick={processFiles}>{busy ? 'กำลังประมวลผล...' : 'ประมวลผลครั้งเดียว'}</button></div>
+      </div><div className="run-row"><label className="field" style={{ flexDirection: 'row', alignItems: 'center' }}><input style={{ width: 18, height: 18 }} type="checkbox" checked={ocr} onChange={event => setOcr(event.target.checked)} /> OCR และหลักฐานภาพสินค้า</label><button className="btn primary" disabled={busy || !pdf || !workbook || demo} onClick={processFiles}>{busy ? 'กำลังประมวลผล...' : 'ประมวลผลครั้งเดียว'}</button></div>
         <div className="progress"><i style={{ width: progress ? `${Math.max(3, progress.page / Math.max(1, progress.pageCount) * 100)}%` : '0%' }} /></div><div className="progress-meta"><span>{progress?.message || message}</span><span>{progress ? `${progress.cards} การ์ด · ${(progress.elapsedMs / 1000).toFixed(1)} วินาที` : ''}</span></div>
       </section>
       <section className="panel"><div className="summary"><div className="stat"><span>SKU</span><b>{dataset?.skus.length || 0}</b></div><div className="stat"><span>Product Group</span><b>{dataset?.productGroups.length || 0}</b></div><div className="stat"><span>การ์ด</span><b>{dataset?.cards.length || 0}</b></div><div className="stat"><span>พร้อมใช้</span><b>{ready}</b></div><div className="stat"><span>Block/Quarantine</span><b>{blocked + quarantine.length}</b></div></div></section>
-      <section className="panel"><div className="section-head"><div><h2><Layers3 size={19} /> Product Group</h2><small>หนึ่งเดือน + หนึ่ง SKU; ระบบจับ Family และราคาเดิมให้อัตโนมัติเมื่อหลักฐานครบ</small></div><span className="tag">{visibleGroups.length} กลุ่ม</span></div><div className="search-row"><label style={{ position: 'relative' }}><Search size={17} style={{ position: 'absolute', left: 12, top: 14, color: '#64748b' }} /><input style={{ paddingLeft: 38 }} value={search} onChange={event => setSearch(event.target.value)} placeholder="ค้นหาชื่อสินค้า แบรนด์ SKU หรือ Class" /></label><select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">ทุกสถานะ</option><option value="ready">พร้อมใช้</option><option value="need_review">ต้องตรวจ</option><option value="blocked">Block</option></select></div>
+      <section className="panel"><div className="section-head"><div><h2><Layers3 size={19} /> Product Group</h2><small>ขอบเขตสินค้าจาก CSV เป็นหลัก; OCR และภาพใช้ยืนยันข้าม Class โดยไม่เดาเมื่อคะแนนสูสี</small></div><span className="tag">{visibleGroups.length} กลุ่ม</span></div><div className="search-row"><label style={{ position: 'relative' }}><Search size={17} style={{ position: 'absolute', left: 12, top: 14, color: '#64748b' }} /><input style={{ paddingLeft: 38 }} value={search} onChange={event => setSearch(event.target.value)} placeholder="ค้นหาชื่อสินค้า แบรนด์ SKU หรือ Class" /></label><select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">ทุกสถานะ</option><option value="ready">พร้อมใช้</option><option value="need_review">ต้องตรวจ</option><option value="blocked">Block</option></select></div>
         <div className="group-list">{dataset ? visibleGroups.map(group => <GroupEditor key={group.id} group={group} dataset={dataset} priceDraft={priceDrafts[group.id] ?? String(group.price.effectivePrice?.amount || '')} onPriceDraft={value => setPriceDrafts(current => ({ ...current, [group.id]: value }))} onConfirmSku={() => confirmSku(group.id)} onApply={(familyId, amount) => applyGroup(group.id, familyId, amount)} />) : <div className="empty">เลือกไฟล์แล้วกดประมวลผล ระบบจะแสดง Product Group ที่นี่</div>}</div>
       </section>
-      {!!quarantine.length && <section className="panel"><div className="section-head"><div><h2>รายการที่ต้องแก้กลุ่มเฉพาะจุด</h2><small>ระบบไม่สร้าง SKU ให้เมื่อหลักฐานชื่อ/ชนิด/ขนาด/หน่วยไม่ครบ</small></div><span className="tag bad">{quarantine.length}</span></div><div className="quarantine">{quarantine.map(card => <article className="quarantine-card" key={card.cardId}><img src={card.imageUrl} alt={card.cardId} /><b>{card.productText || 'อ่านชื่อสินค้าไม่ได้'}</b><div className="failure">{card.failureReasons.join(' · ')}</div></article>)}</div></section>}
+      {!!quarantine.length && <section className="panel"><div className="section-head"><div><h2>รายการที่ต้องแก้กลุ่มเฉพาะจุด</h2><small>ไม่มี Product Scope ที่ชนะชัด หรือภาพคล้ายหลายกลุ่ม ระบบจึงไม่เดา</small></div><span className="tag bad">{quarantine.length}</span></div><div className="quarantine">{quarantine.map(card => <article className="quarantine-card" key={card.cardId}><img src={card.imageUrl} alt={card.cardId} /><b>{card.productText || 'อ่านชื่อสินค้าไม่ได้'}</b><div className="failure">{card.failureReasons.join(' · ')}</div></article>)}</div></section>}
       <div className="footer-actions"><button className="btn soft" disabled={!dataset || !savedVersionId || busy} onClick={validatePreview}><CheckCircle2 size={16} /> {previewChecked ? 'ตรวจความพร้อมผ่าน' : 'ตรวจความพร้อมจริง'}</button><button className="btn primary" disabled={!dataset || !session || demo || busy || Boolean(savedVersionId) || dataset.version.status === 'published'} onClick={save}><Save size={16} /> {savedVersionId ? 'Draft บันทึกแล้ว' : 'บันทึก Draft'}</button><button className="btn dark" disabled={!publishable} onClick={publish}>Publish เวอร์ชันนี้</button></div>
     </main>
   </div>;
