@@ -230,6 +230,11 @@ function saveSummary(summary: PromoTestCacheSummary | null): void {
   }
 }
 
+function signaturesComplete(imported: PdfImportResult, signatures: Record<string, string> | null): signatures is Record<string, string> {
+  if (!signatures || imported.cards.length === 0) return false;
+  return imported.cards.every(card => Object.prototype.hasOwnProperty.call(signatures, card.cardId));
+}
+
 function isQuotaError(error: unknown): boolean {
   return error instanceof DOMException && ['QuotaExceededError', 'NS_ERROR_DOM_QUOTA_REACHED'].includes(error.name);
 }
@@ -313,39 +318,47 @@ export async function savePromoTestCache(input: SavePromoTestCacheInput): Promis
 }
 
 export async function loadPromoTestCache(): Promise<LoadedPromoTestCache | null> {
-  showProgress('กำลังเปิดไฟล์ทดสอบจากแคช', 'โปรดรอ ระบบยังทำงานอยู่', 0, 1);
+  showProgress('กำลังเปิดไฟล์ทดสอบจากแคช', 'อ่านข้อมูลเพียงรอบเดียว โปรดรอ', 0, 1);
   try {
     const record = await getRecord();
     if (!record || record.schemaVersion !== 1) {
+      saveSummary(null);
       hideProgress();
       return null;
     }
 
     let imported = record.imported;
     let visualSignatures = record.visualSignatures;
+    let recordChanged = false;
     const needsHeaderUpgrade = Boolean(imported && record.ocrEnabled && record.headerOcrVersion !== HEADER_OCR_VERSION);
     if (imported && needsHeaderUpgrade) {
       showProgress('กำลังอัปเกรด OCR หัวขวาบนเป็นเวอร์ชัน 3', `พบ ${imported.cards.length} การ์ด`, 0, imported.cards.length);
       imported = await enrichImportedHeaders(imported, true);
-      showProgress('กำลังสร้างลายนิ้วมือภาพใหม่', 'ใช้รูปการ์ดในแคช ไม่ได้ OCR PDF ทั้งหน้าใหม่', 0, imported.cards.length);
-      visualSignatures = await buildCardVisualSignatures(imported.cards, (completed, total) => {
-        showProgress('กำลังสร้างลายนิ้วมือภาพใหม่', `${completed}/${total} การ์ด`, completed, total);
-      });
       record.imported = imported;
-      record.visualSignatures = visualSignatures;
       record.headerOcrVersion = HEADER_OCR_VERSION;
       record.savedAt = new Date().toISOString();
+      recordChanged = true;
+    }
+
+    if (imported && signaturesComplete(imported, visualSignatures)) {
+      showProgress('ใช้หลักฐานภาพจากแคชเดิม', `พร้อมแล้ว ${imported.cards.length} การ์ด · ไม่สร้างรูปซ้ำ`, 1, 1);
+    } else if (imported) {
+      showProgress('ลายนิ้วมือภาพในแคชไม่ครบ', 'สร้างเฉพาะครั้งนี้แล้วจะบันทึกกลับ', 0, imported.cards.length);
+      visualSignatures = await buildCardVisualSignatures(imported.cards, (completed, total) => {
+        showProgress('กำลังซ่อมลายนิ้วมือภาพ', `${completed}/${total} การ์ด`, completed, total);
+      });
+      record.visualSignatures = visualSignatures;
+      record.savedAt = new Date().toISOString();
+      recordChanged = true;
+    }
+
+    if (recordChanged) {
       try {
-        showProgress('กำลังบันทึกผล OCR เวอร์ชัน 3', 'รอบถัดไปจะไม่อ่านซ้ำ', 1, 2);
+        showProgress('กำลังบันทึกแคชที่ซ่อมแล้ว', 'รอบถัดไปจะใช้ผลเดิมทันที', 1, 2);
         await putRecord(record);
       } catch {
-        // The upgraded result remains usable for this run.
+        // The repaired result remains usable for this run.
       }
-    } else if (imported) {
-      showProgress('กำลังจัดเตรียมหลักฐานภาพจากแคช', `ตรวจภาพ ${imported.cards.length} การ์ด`, 0, imported.cards.length);
-      visualSignatures = await buildCardVisualSignatures(imported.cards, (completed, total) => {
-        showProgress('กำลังจัดเตรียมหลักฐานภาพจากแคช', `${completed}/${total} การ์ด`, completed, total);
-      });
     }
 
     const summary = summaryOf(record);
@@ -379,6 +392,8 @@ export function readPromoTestCacheSummary(): PromoTestCacheSummary | null {
 }
 
 export async function refreshPromoTestCacheSummary(): Promise<PromoTestCacheSummary | null> {
+  const existing = readPromoTestCacheSummary();
+  if (existing) return existing;
   const record = await getRecord();
   const summary = record ? summaryOf(record) : null;
   saveSummary(summary);
