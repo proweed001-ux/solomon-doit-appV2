@@ -21,11 +21,13 @@ export interface GroupingWorkerRequest {
 }
 
 export type GroupingWorkerResponse =
+  | { type: 'ready' }
   | { type: 'progress'; message: string }
   | { type: 'result'; result: ReturnType<typeof groupImportedCards> }
   | { type: 'error'; error: string };
 
 const workerScope = self as unknown as DedicatedWorkerGlobalScope;
+workerScope.postMessage({ type: 'ready' } satisfies GroupingWorkerResponse);
 
 workerScope.onmessage = (event: MessageEvent<GroupingWorkerRequest>) => {
   if (event.data?.type !== 'group') return;
