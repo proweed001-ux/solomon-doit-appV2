@@ -26,6 +26,16 @@ export interface PromoMasterData {
   prices: StoredPrice[];
 }
 
+function isReadOnlyRuntime(): boolean {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('dryrun') === '1' || params.get('demo') === '1';
+}
+
+function assertWritableRuntime(): void {
+  if (isReadOnlyRuntime()) throw new Error('read_only_runtime_write_blocked');
+}
+
 async function request<T>(action: string, options: RequestInit = {}): Promise<T> {
   const url = new URL('/api/promo-legacy-auth', window.location.origin);
   url.searchParams.set('action', action);
@@ -42,6 +52,7 @@ async function request<T>(action: string, options: RequestInit = {}): Promise<T>
 }
 
 async function edgeRequest<T>(body: unknown, adminKey: string): Promise<T> {
+  assertWritableRuntime();
   const response = await fetch(`${SUPABASE_URL}/functions/v1/${UPLOAD_FUNCTION}`, {
     method: 'POST',
     headers: {
@@ -105,10 +116,16 @@ export async function fetchPromoMasterData(session: AdminSession): Promise<Promo
   const response = await request<{ ok: true; data: PromoMasterData }>('master-data', {
     headers: { 'x-promo-admin-key': session.accessToken },
   });
-  return response.data;
+  const data = response.data;
+  if (!data || !Array.isArray(data.skus) || !Array.isArray(data.prices)) {
+    throw new Error('product_master_payload_invalid');
+  }
+  if (!data.skus.length) throw new Error('product_master_empty');
+  return data;
 }
 
 export async function saveDraft(dataset: PromoDataset, session: AdminSession) {
+  assertWritableRuntime();
   const plan = await buildLegacyUploadPlan(dataset);
   const batches = chunkLegacyCards(plan.cards, 20);
   const uploadedIds: string[] = [];
@@ -147,6 +164,7 @@ export async function uploadCardImage(_versionId: string, _cardId: string, dataU
 }
 
 export async function publishVersion(versionId: string, session: AdminSession) {
+  assertWritableRuntime();
   let saved: SavedLegacyDraft | null = null;
   try { saved = JSON.parse(sessionStorage.getItem(LAST_DRAFT_KEY) || 'null') as SavedLegacyDraft | null; } catch { saved = null; }
   if (!saved || saved.promoMonthId !== versionId || !saved.cardIds.length) throw new Error('legacy_saved_draft_not_found');
