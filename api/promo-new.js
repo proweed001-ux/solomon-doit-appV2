@@ -1,5 +1,6 @@
 import { bearerToken, methodNotAllowed, readBody, safeError, sendJson } from './_promo-new/http.js';
 import {
+  assertVersionPublishable,
   backendConfigured,
   getPromoMasterData,
   getPublishedCatalog,
@@ -158,7 +159,12 @@ async function handlePost(req, res, action) {
     validateDatasetPayload(body.dataset);
     return sendJson(res, 409, { ok: false, error: WRITE_PENDING, next: 'install_revision_staging_adapter' });
   }
-  if (action === 'publish' || action === 'rollback' || action === 'card-image') {
+  if (action === 'publish') {
+    if (!UUID.test(String(body.versionId || ''))) throw new Error('version_id_invalid');
+    await assertVersionPublishable(body.versionId);
+    return sendJson(res, 409, { ok: false, error: WRITE_PENDING, next: 'install_revision_staging_adapter' });
+  }
+  if (action === 'rollback' || action === 'card-image') {
     return sendJson(res, 409, { ok: false, error: WRITE_PENDING, next: 'install_revision_staging_adapter' });
   }
   return sendJson(res, 404, { ok: false, error: 'action_not_found' });
