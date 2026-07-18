@@ -1,5 +1,5 @@
 import type { GroupingResult } from '../domain/grouping';
-import { shouldRefreshCardHeader } from '../import/card-header-ocr';
+import { enrichCardHeadersFromImages, shouldRefreshCardHeader } from '../import/card-header-ocr';
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 
 export interface AdaptiveHeaderOcrSelection {
@@ -18,8 +18,9 @@ export function selectAdaptiveHeaderOcrTargets(
   let unresolvedTargets = 0;
   let candidateTargets = 0;
 
-  for (const card of preflight.quarantineCards) {
-    if (!byId.has(card.cardId)) continue;
+  for (const unresolved of preflight.quarantineCards) {
+    const card = byId.get(unresolved.cardId);
+    if (!card || !shouldRefreshCardHeader(card)) continue;
     targetIds.add(card.cardId);
     unresolvedTargets += 1;
   }
@@ -39,5 +40,35 @@ export function selectAdaptiveHeaderOcrTargets(
     unresolvedTargets,
     candidateTargets,
     skippedByExistingKnowledge: Math.max(0, cards.length - targetIds.size),
+  };
+}
+
+export async function enrichAdaptiveCardHeaders(
+  cards: ImportedCardCandidate[],
+  targetIds: ReadonlySet<string>,
+  onProgress?: (completed: number, total: number) => void,
+): Promise<{ cards: ImportedCardCandidate[]; attempted: number; improved: number; warnings: string[] }> {
+  if (!targetIds.size) {
+    return {
+      cards,
+      attempted: 0,
+      improved: 0,
+      warnings: ['adaptive_header_ocr_skipped:no_targets'],
+    };
+  }
+
+  const selected = cards.filter(card => targetIds.has(card.cardId));
+  const enriched = await enrichCardHeadersFromImages(selected, onProgress);
+  const enrichedById = new Map(enriched.cards.map(card => [card.cardId, card]));
+  return {
+    cards: cards.map(card => enrichedById.get(card.cardId) || card),
+    attempted: enriched.attempted,
+    improved: enriched.improved,
+    warnings: [...new Set([
+      ...enriched.warnings,
+      `adaptive_header_ocr_targets:${targetIds.size}`,
+      `adaptive_header_ocr_attempted:${enriched.attempted}`,
+      `adaptive_header_ocr_improved:${enriched.improved}`,
+    ])],
   };
 }
