@@ -5,8 +5,9 @@ const DB_NAME = 'solomon-promo-new-test-cache';
 const DB_VERSION = 1;
 const STORE_NAME = 'runs';
 const LATEST_KEY = 'latest';
-const SUMMARY_KEY = 'promo-new-test-cache-summary-v1';
-const HEADER_OCR_VERSION = 3;
+const SUMMARY_KEY = 'promo-new-test-cache-summary-v2';
+const CACHE_SCHEMA_VERSION = 2 as const;
+const PIPELINE_VERSION = 'text-first-product-master-v1' as const;
 
 interface StoredFile {
   name: string;
@@ -19,8 +20,8 @@ export type PromoTestCacheMode = 'full' | 'source_only';
 
 interface StoredPromoTestCache {
   key: typeof LATEST_KEY;
-  schemaVersion: 1;
-  headerOcrVersion?: number;
+  schemaVersion: typeof CACHE_SCHEMA_VERSION;
+  pipelineVersion: typeof PIPELINE_VERSION;
   savedAt: string;
   monthKey: string;
   ocrEnabled: boolean;
@@ -61,7 +62,7 @@ export interface SavePromoTestCacheInput {
   workbook: File;
   imported: PdfImportResult;
   parsedWorkbook: WorkbookParseResult;
-  visualSignatures: Record<string, string>;
+  visualSignatures?: Record<string, string>;
 }
 
 function ensureIndexedDb(): IDBFactory {
@@ -109,13 +110,32 @@ async function putRecord(record: StoredPromoTestCache): Promise<void> {
   }
 }
 
-async function getRecord(): Promise<StoredPromoTestCache | null> {
+async function getRecord(): Promise<unknown> {
   const db = await openDb();
   try {
     return await requestResult(db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(LATEST_KEY)) || null;
   } finally {
     db.close();
   }
+}
+
+async function deleteRecord(): Promise<void> {
+  const db = await openDb();
+  try {
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    transaction.objectStore(STORE_NAME).delete(LATEST_KEY);
+    await transactionDone(transaction);
+  } finally {
+    db.close();
+  }
+}
+
+function isCurrentRecord(value: unknown): value is StoredPromoTestCache {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Partial<StoredPromoTestCache>;
+  return record.schemaVersion === CACHE_SCHEMA_VERSION
+    && record.pipelineVersion === PIPELINE_VERSION
+    && record.key === LATEST_KEY;
 }
 
 function storedFile(file: File): StoredFile {
@@ -139,10 +159,7 @@ function dataUrlBytes(value: string): number {
 
 function estimatedBytes(record: StoredPromoTestCache): number {
   const images = record.imported?.cards.reduce((sum, card) => sum + dataUrlBytes(card.imageUrl), 0) || 0;
-  const signatures = record.visualSignatures
-    ? Object.values(record.visualSignatures).reduce((sum, value) => sum + value.length / 2, 0)
-    : 0;
-  return record.pdf.blob.size + record.workbook.blob.size + images + signatures;
+  return record.pdf.blob.size + record.workbook.blob.size + images;
 }
 
 function summaryOf(record: StoredPromoTestCache): PromoTestCacheSummary {
@@ -166,11 +183,6 @@ function saveSummary(summary: PromoTestCacheSummary | null): void {
   }
 }
 
-function signaturesComplete(imported: PdfImportResult, signatures: Record<string, string> | null): boolean {
-  if (!signatures || imported.cards.length === 0) return false;
-  return imported.cards.every(card => Object.prototype.hasOwnProperty.call(signatures, card.cardId));
-}
-
 function isQuotaError(error: unknown): boolean {
   return error instanceof DOMException && ['QuotaExceededError', 'NS_ERROR_DOM_QUOTA_REACHED'].includes(error.name);
 }
@@ -183,8 +195,8 @@ export async function savePromoTestCache(input: SavePromoTestCacheInput): Promis
   await requestPersistentStorage();
   const base = {
     key: LATEST_KEY as typeof LATEST_KEY,
-    schemaVersion: 1 as const,
-    headerOcrVersion: HEADER_OCR_VERSION,
+    schemaVersion: CACHE_SCHEMA_VERSION,
+    pipelineVersion: PIPELINE_VERSION,
     savedAt: new Date().toISOString(),
     monthKey: input.monthKey,
     ocrEnabled: input.ocrEnabled,
@@ -196,7 +208,7 @@ export async function savePromoTestCache(input: SavePromoTestCacheInput): Promis
     mode: 'full',
     imported: input.imported,
     parsedWorkbook: input.parsedWorkbook,
-    visualSignatures: input.visualSignatures,
+    visualSignatures: {},
   };
   try {
     await putRecord(full);
@@ -220,32 +232,25 @@ export async function savePromoTestCache(input: SavePromoTestCacheInput): Promis
 }
 
 export async function loadPromoTestCache(): Promise<LoadedPromoTestCache | null> {
-  const record = await getRecord();
-  if (!record || record.schemaVersion !== 1) {
+  const raw = await getRecord();
+  if (!isCurrentRecord(raw)) {
+    if (raw) await deleteRecord();
     saveSummary(null);
     return null;
   }
 
-  const warnings: string[] = [];
-  if (record.imported && record.headerOcrVersion !== HEADER_OCR_VERSION) {
-    warnings.push(`cache_header_ocr_outdated:${record.headerOcrVersion || 0}->${HEADER_OCR_VERSION}`);
-  }
-  if (record.imported && !signaturesComplete(record.imported, record.visualSignatures)) {
-    warnings.push('cache_visual_signatures_incomplete');
-  }
-
-  const summary = summaryOf(record);
+  const summary = summaryOf(raw);
   saveSummary(summary);
   return {
     summary,
-    monthKey: record.monthKey,
-    ocrEnabled: record.ocrEnabled,
-    pdf: restoredFile(record.pdf),
-    workbook: restoredFile(record.workbook),
-    imported: record.imported,
-    parsedWorkbook: record.parsedWorkbook,
-    visualSignatures: record.visualSignatures,
-    warnings,
+    monthKey: raw.monthKey,
+    ocrEnabled: raw.ocrEnabled,
+    pdf: restoredFile(raw.pdf),
+    workbook: restoredFile(raw.workbook),
+    imported: raw.imported,
+    parsedWorkbook: raw.parsedWorkbook,
+    visualSignatures: {},
+    warnings: [`cache_pipeline:${PIPELINE_VERSION}`],
   };
 }
 
@@ -263,15 +268,8 @@ export async function refreshPromoTestCacheSummary(): Promise<PromoTestCacheSumm
 }
 
 export async function clearPromoTestCache(): Promise<void> {
-  const db = await openDb();
-  try {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    transaction.objectStore(STORE_NAME).delete(LATEST_KEY);
-    await transactionDone(transaction);
-    saveSummary(null);
-  } finally {
-    db.close();
-  }
+  await deleteRecord();
+  saveSummary(null);
 }
 
 export function formatCacheSize(bytes: number): string {
