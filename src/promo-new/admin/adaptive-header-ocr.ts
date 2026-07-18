@@ -7,6 +7,7 @@ export interface AdaptiveHeaderOcrSelection {
   unresolvedTargets: number;
   candidateTargets: number;
   skippedByExistingKnowledge: number;
+  unresolvedWithoutOcrBenefit: number;
 }
 
 export function selectAdaptiveHeaderOcrTargets(
@@ -16,30 +17,25 @@ export function selectAdaptiveHeaderOcrTargets(
   const byId = new Map(cards.map(card => [card.cardId, card]));
   const targetIds = new Set<string>();
   let unresolvedTargets = 0;
-  let candidateTargets = 0;
+  let unresolvedWithoutOcrBenefit = 0;
 
   for (const unresolved of preflight.quarantineCards) {
     const card = byId.get(unresolved.cardId);
-    if (!card || !shouldRefreshCardHeader(card)) continue;
+    if (!card) continue;
+    if (!shouldRefreshCardHeader(card)) {
+      unresolvedWithoutOcrBenefit += 1;
+      continue;
+    }
     targetIds.add(card.cardId);
     unresolvedTargets += 1;
-  }
-
-  for (const group of preflight.groups) {
-    if (group.sku.status === 'active') continue;
-    for (const cardId of group.cardIds) {
-      const card = byId.get(cardId);
-      if (!card || !shouldRefreshCardHeader(card) || targetIds.has(cardId)) continue;
-      targetIds.add(cardId);
-      candidateTargets += 1;
-    }
   }
 
   return {
     targetIds,
     unresolvedTargets,
-    candidateTargets,
+    candidateTargets: 0,
     skippedByExistingKnowledge: Math.max(0, cards.length - targetIds.size),
+    unresolvedWithoutOcrBenefit,
   };
 }
 
