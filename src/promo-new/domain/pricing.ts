@@ -25,7 +25,8 @@ export function missingSkuPrice(skuId: string, pdfSourceAmount: number | null = 
 }
 
 export function inheritedSkuPrice(sku: Sku, storedPrices: StoredPrice[]): SkuPrice {
-  const exact = storedPrices.find(price => price.skuIdentityKey === sku.identityKey);
+  const exact = storedPrices.find(price => price.skuId === sku.id)
+    || storedPrices.find(price => price.skuIdentityKey === sku.identityKey);
   if (!exact) return missingSkuPrice(sku.id);
   return {
     skuId: sku.id,
