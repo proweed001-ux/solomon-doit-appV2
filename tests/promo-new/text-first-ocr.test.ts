@@ -59,8 +59,8 @@ function emptyGrouping(overrides: Partial<GroupingResult> = {}): GroupingResult 
   };
 }
 
-test('repairs common OCR digit and unit errors before matching', () => {
-  assert.equal(repairCommonProductOcr('เฮดแอนโชเดอ แซมพู 14O บล.'), 'เฮดแอนโชเดอ แซมพู 140 มล.');
+test('repairs common OCR brand, type, digit and unit errors before matching', () => {
+  assert.equal(repairCommonProductOcr('เฮดแอนโชเดอ แซมพู 14O บล.'), 'H&S แชมพู 140 มล.');
 });
 
 test('matches noisy H&S shampoo text to the correct 140 ml Product Master', () => {
