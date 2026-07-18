@@ -5,22 +5,12 @@ const WORK_HEIGHT = 72;
 const NORMALIZED_SIZE = 32;
 const SAMPLE_SIZE = 16;
 const IMAGE_DECODE_TIMEOUT_MS = 12_000;
-const CACHE_DB_NAME = 'solomon-promo-new-test-cache';
-const CACHE_DB_VERSION = 1;
-const CACHE_STORE_NAME = 'runs';
-const CACHE_LATEST_KEY = 'latest';
 
 interface ViewSpec {
   x: number;
   y: number;
   width: number;
   height: number;
-}
-
-interface PersistedVisualCache {
-  key?: string;
-  imported?: { cards?: ImportedCardCandidate[] } | null;
-  visualSignatures?: Record<string, string> | null;
 }
 
 const VIEWS: ViewSpec[] = [
@@ -196,28 +186,6 @@ function encode(bytes: number[]): string {
   return bytes.map(value => clampByte(value).toString(16).padStart(2, '0')).join('');
 }
 
-function openVisualCacheDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(CACHE_DB_NAME, CACHE_DB_VERSION);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(CACHE_STORE_NAME)) {
-        request.result.createObjectStore(CACHE_STORE_NAME, { keyPath: 'key' });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('visual_cache_open_failed'));
-    request.onblocked = () => reject(new Error('visual_cache_open_blocked'));
-  });
-}
-
-function readLatestVisualCache(db: IDBDatabase): Promise<PersistedVisualCache | null> {
-  return new Promise((resolve, reject) => {
-    const request = db.transaction(CACHE_STORE_NAME, 'readonly').objectStore(CACHE_STORE_NAME).get(CACHE_LATEST_KEY);
-    request.onsuccess = () => resolve((request.result as PersistedVisualCache | undefined) || null);
-    request.onerror = () => reject(request.error || new Error('visual_cache_read_failed'));
-  });
-}
-
 export function exactCachedVisualSignatures(
   cards: ImportedCardCandidate[],
   storedCards: ImportedCardCandidate[] | undefined,
@@ -232,17 +200,6 @@ export function exactCachedVisualSignatures(
     exact[card.cardId] = signatures[card.cardId];
   }
   return exact;
-}
-
-async function persistedVisualSignatures(cards: ImportedCardCandidate[]): Promise<Record<string, string> | null> {
-  if (typeof indexedDB === 'undefined' || !cards.length) return null;
-  const db = await openVisualCacheDb();
-  try {
-    const record = await readLatestVisualCache(db);
-    return exactCachedVisualSignatures(cards, record?.imported?.cards, record?.visualSignatures);
-  } finally {
-    db.close();
-  }
 }
 
 export async function cardVisualSignature(imageUrl: string): Promise<string> {
@@ -269,16 +226,6 @@ export async function buildCardVisualSignatures(
   cards: ImportedCardCandidate[],
   onProgress?: (completed: number, total: number) => void,
 ): Promise<Record<string, string>> {
-  try {
-    const cached = await persistedVisualSignatures(cards);
-    if (cached) {
-      onProgress?.(cards.length, cards.length);
-      return cached;
-    }
-  } catch {
-    // Cache reuse is an optimization. Fall back to rebuilding when unavailable.
-  }
-
   const signatures: Record<string, string> = {};
   for (let index = 0; index < cards.length; index += 1) {
     const card = cards[index];
