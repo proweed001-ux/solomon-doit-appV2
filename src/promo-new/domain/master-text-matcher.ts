@@ -15,15 +15,22 @@ const BRAND_TYPE_DEFAULTS: Record<string, string> = {
 
 const PLACEHOLDER_MASTER = /รอตรวจข้อความจาก\s*PDF|ไม่ทราบสินค้า|สินค้าใหม่ที่ยังอ่านชื่อไม่ครบ/iu;
 
+export function repairCommonProductOcr(value: unknown): string {
+  return normalizeProductText(value)
+    .replace(/(\d)[Oo](?=\d|\s*(?:ML|มล\.?|บล\.?|G|กรัม))/giu, (_match, digit: string) => `${digit}0`)
+    .replace(/(\d)\s*(?:บล\.?)\b/giu, '$1 มล.')
+    .replace(/(\d)\s*(?:กรับ)\b/giu, '$1 กรัม');
+}
+
 function compact(value: unknown): string {
-  return normalizeProductText(value).toUpperCase().replace(/[^A-Z0-9ก-๙]+/gu, '');
+  return repairCommonProductOcr(value).toUpperCase().replace(/[^A-Z0-9ก-๙]+/gu, '');
 }
 
 function meaningfulEvidence(sku: Sku): string[] {
   return [...new Set([
     sku.canonicalName,
     ...sku.evidence.filter(value => value && !/^(?:legacy|compat):/iu.test(value)),
-  ].map(value => normalizeProductText(value)).filter(value => value && !PLACEHOLDER_MASTER.test(value)))];
+  ].map(value => repairCommonProductOcr(value)).filter(value => value && !PLACEHOLDER_MASTER.test(value)))];
 }
 
 function inferredIdentity(identity: SkuIdentity): SkuIdentity {
@@ -32,7 +39,7 @@ function inferredIdentity(identity: SkuIdentity): SkuIdentity {
 }
 
 function evidenceCandidate(value: string): Sku {
-  const candidate = createSkuCandidate(value);
+  const candidate = createSkuCandidate(repairCommonProductOcr(value));
   const identity = inferredIdentity(candidate.identity);
   const failureReasons = candidate.failureReasons.filter(reason => reason !== 'product_type_missing' || !identity.productType);
   return {
@@ -165,15 +172,18 @@ export interface MasterTextMatch {
 
 export function matchProductMasterByText(
   observedInput: Sku,
-  sourceText: string,
+  sourceTextInput: string,
   existingSkus: Sku[],
 ): MasterTextMatch {
-  const observedIdentity = inferredIdentity(observedInput.identity);
-  const observed = {
+  const sourceText = repairCommonProductOcr(sourceTextInput);
+  const inputIdentity = inferredIdentity(observedInput.identity);
+  const normalizedInput: Sku = {
     ...observedInput,
-    identity: observedIdentity,
-    identityKey: buildSkuIdentityKey(observedIdentity),
+    identity: inputIdentity,
+    identityKey: buildSkuIdentityKey(inputIdentity),
   };
+  const repaired = evidenceCandidate(sourceText);
+  const observed = candidateQuality(repaired) > candidateQuality(normalizedInput) ? repaired : normalizedInput;
   const scored = existingSkus
     .filter(sku => sku.status === 'active' && !PLACEHOLDER_MASTER.test(sku.canonicalName))
     .flatMap(sku => {
