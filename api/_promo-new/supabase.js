@@ -1,3 +1,9 @@
+import {
+  buildLegacyMasterData,
+  buildLegacyPromoDataset,
+  toLegacyMonthId,
+} from './legacy-adapter.js';
+
 const projectUrl = () => String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const publishableKey = () => String(process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '');
 const secretKey = () => String(process.env.SUPABASE_SECRET_KEY || '');
@@ -28,6 +34,10 @@ async function request(path, { method = 'GET', body, key, token = key, headers =
   return data;
 }
 
+function rest(table, query) {
+  return request(`/rest/v1/${table}?${query}`, { key: secretKey() });
+}
+
 export function loginWithPassword(email, password) {
   return request('/auth/v1/token?grant_type=password', {
     method: 'POST',
@@ -54,118 +64,92 @@ export function getUser(accessToken) {
 export async function requirePromoAdmin(accessToken) {
   if (!accessToken) throw new Error('authentication_required');
   const user = await getUser(accessToken);
-  const rows = await request(`/rest/v1/promo_new_admins?user_id=eq.${encodeURIComponent(user.id)}&active=is.true&select=user_id&limit=1`, {
-    key: secretKey(),
-  });
+  const rows = await rest(
+    'promo_admin_users',
+    `user_id=eq.${encodeURIComponent(user.id)}&select=user_id,role&limit=1`,
+  );
   if (!Array.isArray(rows) || !rows.length) throw new Error('promo_admin_required');
-  return user;
+  return { ...user, promoRole: rows[0].role || 'viewer' };
 }
 
-export function callAdminRpc(name, body) {
-  return request(`/rest/v1/rpc/${name}`, { method: 'POST', key: secretKey(), body });
+export function callAdminRpc() {
+  throw new Error('promo_new_schema_not_installed_use_legacy_adapter');
 }
 
-const asArray = value => Array.isArray(value) ? value : [];
-const hasReasons = value => asArray(value).length > 0;
+async function loadLegacyMasters() {
+  const [masters, masterPrices] = await Promise.all([
+    rest(
+      'promo_product_master',
+      'select=master_product_id,canonical_name,normalized_key,unit_label,status,created_from_month,updated_at&order=canonical_name.asc',
+    ),
+    rest(
+      'promo_product_master_prices',
+      'select=master_product_id,base_unit_price,unit_label,source_month,updated_at',
+    ),
+  ]);
+  return { masters, masterPrices };
+}
 
 export async function getPromoMasterData() {
-  const [skuRows, priceRows] = await Promise.all([
-    request('/rest/v1/promo_new_skus?status=eq.active&select=id,external_id,sku_code,canonical_name,identity_key,brand,product_type,variant,size_value,size_unit,sales_unit,pack_quantity,status,evidence,failure_reasons&order=canonical_name.asc', { key: secretKey() }),
-    request('/rest/v1/promo_new_sku_prices?effective_price=not.is.null&select=sku_id,effective_price,source_reference,updated_at', { key: secretKey() }),
-  ]);
-  const byDatabaseId = new Map(asArray(skuRows).map(row => [row.id, row]));
-  const skus = asArray(skuRows).map(row => ({
-    id: row.external_id,
-    code: row.sku_code,
-    canonicalName: row.canonical_name,
-    identityKey: row.identity_key,
-    identity: {
-      brand: row.brand,
-      productType: row.product_type,
-      variant: row.variant || null,
-      sizeValue: Number(row.size_value),
-      sizeUnit: row.size_unit,
-      salesUnit: row.sales_unit,
-      packQuantity: Number(row.pack_quantity),
-    },
-    status: row.status,
-    evidence: asArray(row.evidence),
-    failureReasons: asArray(row.failure_reasons),
-  }));
-  const prices = asArray(priceRows).flatMap(row => {
-    const sku = byDatabaseId.get(row.sku_id);
-    const amount = Number(row.effective_price);
-    if (!sku || !Number.isFinite(amount) || amount <= 0) return [];
-    return [{
-      skuIdentityKey: sku.identity_key,
-      skuId: sku.external_id,
-      amount,
-      currency: 'THB',
-      sourceReference: row.source_reference || 'previous_month',
-      updatedAt: row.updated_at || null,
-    }];
-  });
-  return { skus, prices };
+  const { masters, masterPrices } = await loadLegacyMasters();
+  return buildLegacyMasterData(masters, masterPrices);
 }
 
-export async function assertVersionPublishable(versionId) {
-  const [cards, groups, families, skus] = await Promise.all([
-    request(`/rest/v1/promo_new_cards?version_id=eq.${encodeURIComponent(versionId)}&select=card_id,status,effective_price,failure_reasons,promotion_family_id,class_id,sku_id`, { key: secretKey() }),
-    request(`/rest/v1/promo_new_product_groups?version_id=eq.${encodeURIComponent(versionId)}&select=external_id,status,failure_reasons,promotion_family_id,sku_id`, { key: secretKey() }),
-    request(`/rest/v1/promo_new_promotion_families?version_id=eq.${encodeURIComponent(versionId)}&select=id,external_id,failure_reasons`, { key: secretKey() }),
-    request('/rest/v1/promo_new_skus?select=id,status,failure_reasons', { key: secretKey() }),
-  ]);
-  const blockers = [];
-  const skuById = new Map(asArray(skus).map(row => [row.id, row]));
-  const familyById = new Map(asArray(families).map(row => [row.id, row]));
-  for (const card of asArray(cards)) {
-    if (card.status !== 'ready') blockers.push(`card:${card.card_id}:status`);
-    if (!(Number(card.effective_price) > 0)) blockers.push(`card:${card.card_id}:price`);
-    if (!card.promotion_family_id) blockers.push(`card:${card.card_id}:family`);
-    if (hasReasons(card.failure_reasons)) blockers.push(`card:${card.card_id}:failure_reasons`);
-    const sku = skuById.get(card.sku_id);
-    if (!sku || sku.status !== 'active' || hasReasons(sku.failure_reasons)) blockers.push(`card:${card.card_id}:sku_not_active`);
-    const family = familyById.get(card.promotion_family_id);
-    if (!family || hasReasons(family.failure_reasons)) blockers.push(`card:${card.card_id}:family_not_clean`);
-  }
-  for (const group of asArray(groups)) {
-    if (group.status !== 'ready') blockers.push(`group:${group.external_id}:status`);
-    if (!group.promotion_family_id) blockers.push(`group:${group.external_id}:family`);
-    if (hasReasons(group.failure_reasons)) blockers.push(`group:${group.external_id}:failure_reasons`);
-    const sku = skuById.get(group.sku_id);
-    if (!sku || sku.status !== 'active' || hasReasons(sku.failure_reasons)) blockers.push(`group:${group.external_id}:sku_not_active`);
-  }
-  if (!asArray(cards).length || !asArray(groups).length) blockers.push('published_version_empty');
-  if (blockers.length) throw new Error(`publish_server_validation_failed:${[...new Set(blockers)].slice(0, 20).join(',')}`);
+export async function assertVersionPublishable() {
+  throw new Error('legacy_revision_staging_not_installed');
+}
+
+async function resolvePublishedMonth(monthKey) {
+  const legacyId = toLegacyMonthId(monthKey);
+  if (monthKey && !legacyId) throw new Error('legacy_month_key_invalid');
+  const query = legacyId
+    ? `id=eq.${encodeURIComponent(legacyId)}&status=eq.published&select=id,label,year_month,status,source_pdf,source_price_file,created_at,updated_at,published_at&limit=1`
+    : 'status=eq.published&select=id,label,year_month,status,source_pdf,source_price_file,created_at,updated_at,published_at&order=published_at.desc.nullslast,updated_at.desc&limit=1';
+  const rows = await rest('promo_months', query);
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+function publicImageUrl(value) {
+  const image = String(value || '');
+  if (!image || image.startsWith('data:') || image.startsWith('http')) return image || null;
+  const path = image.replace(/^\/+/, '').replace(/^promo-cards\//, '');
+  return `${projectUrl()}/storage/v1/object/public/promo-cards/${path}`;
 }
 
 export async function getPublishedCatalog(monthKey) {
-  const catalog = await callAdminRpc('promo_new_get_published_catalog', { p_month_key: monthKey || null });
-  if (catalog?.cards && Array.isArray(catalog.cards)) {
-    catalog.cards = catalog.cards.map(card => ({
-      ...card,
-      imageUrl: card.imageUrl && !String(card.imageUrl).startsWith('data:') && !String(card.imageUrl).startsWith('http')
-        ? `${projectUrl()}/storage/v1/object/public/${String(card.imageUrl).replace(/^\/+/, '')}`
-        : card.imageUrl,
-    }));
+  const month = await resolvePublishedMonth(monthKey);
+  if (!month) return null;
+  const monthId = encodeURIComponent(month.id);
+  const [{ masters, masterPrices }, cards, tiers, groups] = await Promise.all([
+    loadLegacyMasters(),
+    rest(
+      'promo_cards_with_functions',
+      `promo_month_id=eq.${monthId}&status=neq.inactive&select=card_id,promo_month_id,class_id,page_no,card_no,promo_title,raw_text,status,image_url,image_name,sort_order,base_unit_price,unit_label,group_id,product_group_name,product_group_status,product_group_match_score,function_label,function_type,function_payload,function_confidence,master_product_id,master_product_name,price_source,master_current_price,master_price_updated_at&order=sort_order.asc`,
+    ),
+    rest(
+      'promo_tiers',
+      `card_id=like.${monthId}-*&select=tier_id,card_id,tier_no,min_qty_text,min_qty,max_qty,unit,discount_percent,free_qty,note&order=card_id.asc,tier_no.asc`,
+    ),
+    rest(
+      'promo_product_groups',
+      `promo_month_id=eq.${monthId}&select=group_id,promo_month_id,anchor_card_id,canonical_name,status,master_product_id,created_at,updated_at&order=canonical_name.asc`,
+    ),
+  ]);
+
+  const catalog = buildLegacyPromoDataset({
+    month,
+    cards,
+    tiers,
+    groups,
+    masters,
+    masterPrices,
+  });
+  if (catalog?.cards) {
+    catalog.cards = catalog.cards.map(card => ({ ...card, imageUrl: publicImageUrl(card.imageUrl) }));
   }
   return catalog;
 }
 
-export async function uploadCardImage({ versionId, cardId, bytes, contentType }) {
-  if (!projectUrl() || !secretKey()) throw new Error('promo_backend_not_configured');
-  const path = `${encodeURIComponent(versionId)}/${encodeURIComponent(cardId)}.webp`;
-  const response = await fetch(`${projectUrl()}/storage/v1/object/promo-new-cards/${path}`, {
-    method: 'POST',
-    headers: {
-      apikey: secretKey(),
-      Authorization: `Bearer ${secretKey()}`,
-      'Content-Type': contentType,
-      'x-upsert': 'true',
-    },
-    body: bytes,
-  });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`storage_${response.status}:${text.slice(0, 300)}`);
-  return `promo-new-cards/${versionId}/${cardId}.webp`;
+export async function uploadCardImage() {
+  throw new Error('legacy_revision_staging_not_installed');
 }
