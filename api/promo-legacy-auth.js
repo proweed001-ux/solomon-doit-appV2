@@ -1,0 +1,96 @@
+import { buildLegacyMasterData } from './_promo-new/legacy-adapter.js';
+
+const SUPABASE_URL = 'https://saodmeoilixfdqentofp.supabase.co';
+const PUBLISHABLE_KEY = 'sb_publishable_JThYwAl_-askk_cIaCd75w_TCWK2BTT';
+
+function json(res, status, body) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  return res.status(status).json(body);
+}
+
+function text(value) {
+  return String(value || '').trim();
+}
+
+async function supabase(path, options = {}) {
+  const response = await fetch(`${SUPABASE_URL}${path}`, {
+    ...options,
+    headers: {
+      apikey: PUBLISHABLE_KEY,
+      Authorization: `Bearer ${PUBLISHABLE_KEY}`,
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers || {}),
+    },
+  });
+  const raw = await response.text();
+  let data = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = raw; }
+  if (!response.ok) {
+    const message = data && typeof data === 'object' ? data.message || data.error || data.error_description : raw;
+    throw new Error(`supabase_${response.status}:${message || 'request_failed'}`);
+  }
+  return data;
+}
+
+async function latestPublishedMonth() {
+  const rows = await supabase('/rest/v1/promo_months?status=eq.published&select=id&order=published_at.desc.nullslast,updated_at.desc&limit=1');
+  return Array.isArray(rows) && rows[0]?.id ? rows[0].id : 'KEYCHECK';
+}
+
+async function validateUploadKey(adminKey) {
+  const key = text(adminKey);
+  if (!key || key.length > 500) throw new Error('invalid_upload_key');
+  const promoMonthId = await latestPublishedMonth();
+  await supabase('/functions/v1/promo-function-review', {
+    method: 'POST',
+    headers: { 'x-promo-admin-key': key },
+    body: JSON.stringify({ action: 'summary', promo_month_id: promoMonthId }),
+  });
+  return key;
+}
+
+async function masterData() {
+  const [masters, prices] = await Promise.all([
+    supabase('/rest/v1/promo_product_master?select=master_product_id,canonical_name,normalized_key,unit_label,status,created_from_month,updated_at&order=canonical_name.asc'),
+    supabase('/rest/v1/promo_product_master_prices?select=master_product_id,base_unit_price,unit_label,source_month,updated_at'),
+  ]);
+  return buildLegacyMasterData(masters, prices);
+}
+
+export default async function handler(req, res) {
+  try {
+    const action = text(req.query?.action || req.body?.action).toLowerCase();
+    const headerKey = text(req.headers['x-promo-admin-key']);
+
+    if (req.method === 'POST' && action === 'login') {
+      const adminKey = await validateUploadKey(req.body?.adminKey);
+      return json(res, 200, {
+        ok: true,
+        session: {
+          accessToken: adminKey,
+          refreshToken: '',
+          expiresIn: 0,
+          user: { id: 'PROMO-UPLOAD-KEY', email: null },
+        },
+      });
+    }
+
+    if (req.method === 'GET' && action === 'session') {
+      await validateUploadKey(headerKey);
+      return json(res, 200, { ok: true, user: { id: 'PROMO-UPLOAD-KEY', email: null, role: 'admin' } });
+    }
+
+    if (req.method === 'GET' && action === 'master-data') {
+      await validateUploadKey(headerKey);
+      return json(res, 200, { ok: true, data: await masterData() });
+    }
+
+    if (req.method === 'POST' && action === 'logout') return json(res, 200, { ok: true });
+    return json(res, 404, { ok: false, error: 'action_not_found' });
+  } catch (error) {
+    const message = String(error?.message || error || 'unknown_error');
+    const status = /invalid_upload_key|missing_admin_key|invalid_admin_key|supabase_401/.test(message) ? 401 : 500;
+    return json(res, status, { ok: false, error: message });
+  }
+}
