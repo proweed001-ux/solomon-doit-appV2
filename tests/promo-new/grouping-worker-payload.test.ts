@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { GroupingResult } from '../../src/promo-new/domain/grouping';
 import type { ImportedCardCandidate } from '../../src/promo-new/import/pdf-importer';
-import { prepareGroupingWorkerCards, restoreGroupingResultImages } from '../../src/promo-new/admin/grouping-client';
+import { prepareGroupingWorkerCards, restoreGroupingResultImages } from '../../src/promo-new/admin/grouping-transport';
 
 function card(cardId: string, imageUrl: string): ImportedCardCandidate {
   return {
