@@ -51,11 +51,27 @@ async function validateUploadKey(adminKey) {
 }
 
 async function masterData() {
-  const [masters, prices] = await Promise.all([
+  const [masters, prices, aliases] = await Promise.all([
     supabase('/rest/v1/promo_product_master?select=master_product_id,canonical_name,normalized_key,unit_label,status,created_from_month,updated_at&order=canonical_name.asc'),
     supabase('/rest/v1/promo_product_master_prices?select=master_product_id,base_unit_price,unit_label,source_month,updated_at'),
+    supabase('/rest/v1/promo_product_master_aliases?select=master_product_id,alias_text,normalized_alias&order=created_at.asc'),
   ]);
-  return buildLegacyMasterData(masters, prices);
+  const data = buildLegacyMasterData(masters, prices);
+  const aliasesByMaster = new Map();
+  for (const row of Array.isArray(aliases) ? aliases : []) {
+    const masterId = text(row?.master_product_id);
+    const alias = text(row?.alias_text);
+    if (!masterId || !alias) continue;
+    const list = aliasesByMaster.get(masterId) || [];
+    list.push(alias);
+    aliasesByMaster.set(masterId, list);
+  }
+  data.skus = data.skus.map(sku => {
+    const masterId = String(sku.id || '').startsWith('MASTER-') ? String(sku.id).slice(7) : '';
+    const masterAliases = aliasesByMaster.get(masterId) || [];
+    return { ...sku, evidence: [...new Set([...(sku.evidence || []), ...masterAliases])] };
+  });
+  return data;
 }
 
 export default async function handler(req, res) {
