@@ -29,7 +29,11 @@ function positionKey(page: number, sequence: number): string {
 export function prepareGroupingWorkerCards(cards: ImportedCardCandidate[]): PreparedWorkerCards {
   const imagesByPosition: Record<string, string> = {};
   const lightweightCards = cards.map(card => {
-    imagesByPosition[positionKey(card.page, card.sequence)] = card.imageUrl;
+    const key = positionKey(card.page, card.sequence);
+    if (Object.prototype.hasOwnProperty.call(imagesByPosition, key) && imagesByPosition[key] !== card.imageUrl) {
+      throw new Error(`duplicate_card_position:${key}`);
+    }
+    imagesByPosition[key] = card.imageUrl;
     return { ...card, imageUrl: '' };
   });
   return { cards: lightweightCards, imagesByPosition };
@@ -39,6 +43,9 @@ export function restoreGroupingResultImages(
   result: GroupingResult,
   imagesByPosition: Record<string, string>,
 ): GroupingResult {
+  if (!result || !Array.isArray(result.cards) || !Array.isArray(result.quarantineCards)) {
+    throw new Error('grouping_worker_invalid_result');
+  }
   const restorePromoCard = (card: PromoCard): PromoCard => ({
     ...card,
     imageUrl: imagesByPosition[positionKey(card.page, card.sequence)] || '',
@@ -87,8 +94,12 @@ export function runGroupingInWorker(input: RunGroupingInput): Promise<GroupingRe
         finish(() => reject(new Error(message.error)));
         return;
       }
-      const restored = restoreGroupingResultImages(message.result, prepared.imagesByPosition);
-      finish(() => resolve(restored));
+      try {
+        const restored = restoreGroupingResultImages(message.result, prepared.imagesByPosition);
+        finish(() => resolve(restored));
+      } catch (error) {
+        finish(() => reject(error instanceof Error ? error : new Error(String(error))));
+      }
     };
 
     const request: GroupingWorkerRequest = {
