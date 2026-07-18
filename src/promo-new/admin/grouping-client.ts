@@ -4,6 +4,7 @@ import type { PromotionFamily, PromoCard, Sku } from '../domain/types';
 import type { StoredPrice } from '../domain/pricing';
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 import type { GroupingWorkerRequest, GroupingWorkerResponse } from './grouping-worker';
+import { validateGroupingWorkerAsset } from './grouping-worker-asset';
 
 const GROUPING_TIMEOUT_MS = 120_000;
 const WORKER_READY_TIMEOUT_MS = 15_000;
@@ -67,16 +68,6 @@ export function restoreGroupingResultImages(
     cards: result.cards.map(restorePromoCard),
     quarantineCards: result.quarantineCards.map(restoreCandidate),
   };
-}
-
-export function validateGroupingWorkerAsset(status: number, contentType: string, source: string): void {
-  if (status < 200 || status >= 300) throw new Error(`grouping_worker_asset_http_${status}`);
-  const normalizedType = String(contentType || '').toLowerCase();
-  const prefix = String(source || '').slice(0, 300).toLowerCase();
-  if (!source.trim()) throw new Error('grouping_worker_asset_empty');
-  if (normalizedType.includes('text/html') || prefix.includes('<!doctype html') || prefix.includes('<html')) {
-    throw new Error('grouping_worker_asset_html');
-  }
 }
 
 async function loadAuthenticatedWorker(onProgress?: (message: string) => void): Promise<LoadedWorker> {
