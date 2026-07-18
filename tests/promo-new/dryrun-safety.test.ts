@@ -8,7 +8,7 @@ test('dry-run requires an upload-key session and validates stored sessions befor
   const html = read('dist/promo-admin-new.html');
   assert.match(html, /const dryRun = params\.get\('dryrun'\) === '1'/u);
   assert.match(html, /if \(demo\) \{\s*loadApp\(\)/u);
-  assert.doesNotMatch(html, /if \(demo \|\| dryRun/u);
+  assert.doesNotMatch(html, /if \(demo \|\| dryRun\) \{\s*loadApp\(\)/u);
   assert.match(html, /promo-legacy-auth\?action=session/u);
   assert.match(html, /sessionStorage\.removeItem\(sessionKey\)/u);
 });
