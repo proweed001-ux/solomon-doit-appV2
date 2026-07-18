@@ -32,11 +32,14 @@ workerScope.postMessage({ type: 'ready' } satisfies GroupingWorkerResponse);
 workerScope.onmessage = (event: MessageEvent<GroupingWorkerRequest>) => {
   if (event.data?.type !== 'group') return;
   try {
-    workerScope.postMessage({ type: 'progress', message: 'กำลังวิเคราะห์ Class, Product Scope และหลักฐานภาพ' } satisfies GroupingWorkerResponse);
+    workerScope.postMessage({ type: 'progress', message: 'กำลังเทียบ Product Master, ชื่อสินค้า, Class และ Promotion Scope' } satisfies GroupingWorkerResponse);
     const payload = event.data.payload;
     const initial = resolveScopesSafely(payload.cards, payload.promotionFamilies, payload.visualSignatures);
+    const hasVisualEvidence = Object.values(payload.visualSignatures).some(value => Boolean(value));
     const scopes = buildProductScopes(payload.promotionFamilies);
-    const matrix = applyClassMatrixRecovery(payload.cards, scopes, initial, payload.visualSignatures);
+    const matrix = hasVisualEvidence
+      ? applyClassMatrixRecovery(payload.cards, scopes, initial, payload.visualSignatures)
+      : { resolutions: initial, recovered: 0, ambiguous: 0 };
     const originalEvidence = new Map(payload.cards.map(card => [card.cardId, {
       productText: card.productText,
       rawText: card.rawText,
@@ -53,7 +56,9 @@ workerScope.onmessage = (event: MessageEvent<GroupingWorkerRequest>) => {
     });
     workerScope.postMessage({
       type: 'progress',
-      message: `Class Matrix กู้ ${matrix.recovered} การ์ด · คลุมเครือ ${matrix.ambiguous} การ์ด`,
+      message: hasVisualEvidence
+        ? `Class Matrix กู้ ${matrix.recovered} การ์ด · คลุมเครือ ${matrix.ambiguous} การ์ด`
+        : 'ใช้ข้อความและ Product Master เป็นหลัก · ไม่สร้างหรือเทียบลายนิ้วมือภาพ',
     } satisfies GroupingWorkerResponse);
     const result = groupImportedCards(
       payload.monthKey,
@@ -79,6 +84,7 @@ workerScope.onmessage = (event: MessageEvent<GroupingWorkerRequest>) => {
       ...result.warnings,
       `grouping:class_matrix:${matrix.recovered}`,
       `grouping:class_matrix_ambiguous:${matrix.ambiguous}`,
+      ...(hasVisualEvidence ? [] : ['grouping:visual_matching_disabled_text_first']),
       ...payload.cards.flatMap(card => {
         const resolution = matrix.resolutions.get(card.cardId) as (typeof initial extends Map<string, infer R> ? R : never) & { matrix?: boolean };
         return resolution?.matrix ? [`card:${card.cardId}:grouping_method:class_matrix`] : [];
