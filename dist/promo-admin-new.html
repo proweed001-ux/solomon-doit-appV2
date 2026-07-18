@@ -14,7 +14,8 @@
       const root = document.getElementById('promo-admin-new-root');
       const sessionKey = 'promo-new-admin-session-v1';
       const params = new URLSearchParams(location.search);
-      const bypass = params.get('dryrun') === '1' || params.get('demo') === '1';
+      const demo = params.get('demo') === '1';
+      const dryRun = params.get('dryrun') === '1';
       const readSession = () => {
         try { return JSON.parse(sessionStorage.getItem(sessionKey) || 'null'); } catch { return null; }
       };
@@ -26,14 +27,14 @@
         script.src = '/assets/promo-new/admin.js';
         document.body.appendChild(script);
       };
-      if (bypass || readSession()?.accessToken) {
+      if (demo || readSession()?.accessToken) {
         loadApp();
         return;
       }
       root.innerHTML = `<main class="login-page"><section class="login-card">
         <div class="eyebrow">PROMO SYSTEM</div>
-        <h1>หลังบ้านโปรโมชั่น</h1>
-        <p>ใช้รหัสอัปโหลดเดียวกับระบบโปรโมชั่นเดิม ไม่ต้องใช้อีเมล</p>
+        <h1>${dryRun ? 'ทดสอบไฟล์แบบอ่านอย่างเดียว' : 'หลังบ้านโปรโมชั่น'}</h1>
+        <p>${dryRun ? 'ต้องใช้รหัสอัปโหลดเพื่อโหลด Product Master จริง แต่โหมดนี้บล็อก Draft และ Publish' : 'ใช้รหัสอัปโหลดเดียวกับระบบโปรโมชั่นเดิม ไม่ต้องใช้อีเมล'}</p>
         <div id="legacy-login-error" class="notice error" style="display:none"></div>
         <form id="legacy-login-form">
           <label class="field">รหัสอัปโหลด<input id="legacy-admin-key" type="password" autocomplete="current-password" required autofocus></label>
