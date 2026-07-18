@@ -100,10 +100,35 @@ function confidence(value: unknown): number {
   return Math.max(0, Math.min(100, number <= 1 ? number * 100 : number));
 }
 
+function displayNumber(value: number | null | undefined): string {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '';
+  return Number.isInteger(number) ? String(number) : String(Math.round(number * 100) / 100);
+}
+
 function tierLabel(card: PromoCard): string {
-  const labels = card.promotionTiers.map(tier => clean(tier.sourceText)).filter(Boolean);
-  if (!labels.length) throw new Error(`legacy_tiers_missing:${card.id}`);
-  return labels.join('; ');
+  if (!card.promotionTiers.length) throw new Error(`legacy_tiers_missing:${card.id}`);
+  return card.promotionTiers.map(tier => {
+    const purchaseUnit = normalizedUnit(tier.purchaseUnit);
+    const min = displayNumber(tier.minQuantity);
+    if (!min) throw new Error(`legacy_tier_min_invalid:${card.id}:${tier.tierNo}`);
+    if (tier.type === 'cash_discount') {
+      const discount = displayNumber(tier.discountPercent);
+      if (!discount) throw new Error(`legacy_discount_invalid:${card.id}:${tier.tierNo}`);
+      const max = tier.maxQuantity == null ? '' : displayNumber(tier.maxQuantity);
+      return max && Number(max) > Number(min)
+        ? `${min}-${max} ${purchaseUnit} ลด ${discount}%`
+        : `${min} ${purchaseUnit} ลด ${discount}%`;
+    }
+    if (tier.type === 'free_goods') {
+      const free = displayNumber(tier.freeQuantity);
+      if (!free) throw new Error(`legacy_free_goods_invalid:${card.id}:${tier.tierNo}`);
+      const rewardUnit = normalizedUnit(tier.rewardUnit || purchaseUnit);
+      const effective = tier.effectivePercent == null ? '' : displayNumber(tier.effectivePercent);
+      return `${min} ${purchaseUnit} ฟรี ${free} ${rewardUnit}${effective ? ` (${effective}%)` : ''}`;
+    }
+    throw new Error(`legacy_bundle_price_not_supported:${card.id}:${tier.tierNo}`);
+  }).join('; ');
 }
 
 async function masterForSku(sku: Sku): Promise<{ id: string; isNew: boolean; key: string }> {
