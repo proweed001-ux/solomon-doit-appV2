@@ -83,6 +83,15 @@ test('rejects a Product Master when product type conflicts', () => {
   assert.equal(result.sku, null);
 });
 
+test('does not match a specific variant when OCR has no variant evidence', () => {
+  const source = 'H&S แชมพู 140 มล.';
+  const result = matchProductMasterByText(createSkuCandidate(source), source, [
+    master('cool-menthol', 'H&S แชมพู คูลเมนทอล 140 มล.'),
+  ]);
+  assert.equal(result.status, 'unmatched');
+  assert.equal(result.sku, null);
+});
+
 test('does not auto-match placeholder Product Masters', () => {
   const source = 'H&S แชมพู 140 มล.';
   const result = matchProductMasterByText(createSkuCandidate(source), source, [
