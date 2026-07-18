@@ -1,8 +1,10 @@
+import GroupingWorker from './grouping-worker?worker&inline';
 import type { GroupingResult } from '../domain/grouping';
-import type { PromotionFamily, PromoCard, Sku } from '../domain/types';
+import type { PromotionFamily, Sku } from '../domain/types';
 import type { StoredPrice } from '../domain/pricing';
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 import type { GroupingWorkerRequest, GroupingWorkerResponse } from './grouping-worker';
+import { prepareGroupingWorkerCards, restoreGroupingResultImages } from './grouping-transport';
 
 const GROUPING_TIMEOUT_MS = 120_000;
 const WORKER_READY_TIMEOUT_MS = 15_000;
@@ -18,55 +20,10 @@ export interface RunGroupingInput {
   onProgress?: (message: string) => void;
 }
 
-interface PreparedWorkerCards {
-  cards: ImportedCardCandidate[];
-  imagesByPosition: Record<string, string>;
-}
-
-function positionKey(page: number, sequence: number): string {
-  return `${page}:${sequence}`;
-}
-
-export function prepareGroupingWorkerCards(cards: ImportedCardCandidate[]): PreparedWorkerCards {
-  const imagesByPosition: Record<string, string> = {};
-  const lightweightCards = cards.map(card => {
-    const key = positionKey(card.page, card.sequence);
-    if (Object.prototype.hasOwnProperty.call(imagesByPosition, key) && imagesByPosition[key] !== card.imageUrl) {
-      throw new Error(`duplicate_card_position:${key}`);
-    }
-    imagesByPosition[key] = card.imageUrl;
-    return { ...card, imageUrl: '' };
-  });
-  return { cards: lightweightCards, imagesByPosition };
-}
-
-export function restoreGroupingResultImages(
-  result: GroupingResult,
-  imagesByPosition: Record<string, string>,
-): GroupingResult {
-  if (!result || !Array.isArray(result.cards) || !Array.isArray(result.quarantineCards)) {
-    throw new Error('grouping_worker_invalid_result');
-  }
-  const restorePromoCard = (card: PromoCard): PromoCard => ({
-    ...card,
-    imageUrl: imagesByPosition[positionKey(card.page, card.sequence)] || '',
-  });
-  const restoreCandidate = (card: ImportedCardCandidate): ImportedCardCandidate => ({
-    ...card,
-    imageUrl: imagesByPosition[positionKey(card.page, card.sequence)] || '',
-  });
-  return {
-    ...result,
-    cards: result.cards.map(restorePromoCard),
-    quarantineCards: result.quarantineCards.map(restoreCandidate),
-  };
-}
-
-async function createInlineWorker(): Promise<Worker> {
+function createInlineWorker(): Worker {
   if (typeof Worker === 'undefined') throw new Error('browser_worker_unavailable');
   try {
-    const WorkerFactory = (await import('./grouping-worker-factory')).default;
-    return new WorkerFactory({ name: 'promo-grouping-worker' });
+    return new GroupingWorker({ name: 'promo-grouping-worker' });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`grouping_worker_inline_create_failed:${message}`);
@@ -86,7 +43,7 @@ function workerErrorMessage(event: ErrorEvent): string {
 export async function runGroupingInWorker(input: RunGroupingInput): Promise<GroupingResult> {
   const prepared = prepareGroupingWorkerCards(input.cards);
   input.onProgress?.('กำลังเปิด Inline Worker');
-  const worker = await createInlineWorker();
+  const worker = createInlineWorker();
 
   return new Promise((resolve, reject) => {
     const startedAt = performance.now();
