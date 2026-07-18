@@ -1,4 +1,3 @@
-import groupingWorkerUrl from './grouping-worker?worker&url';
 import type { GroupingResult } from '../domain/grouping';
 import type { PromotionFamily, PromoCard, Sku } from '../domain/types';
 import type { StoredPrice } from '../domain/pricing';
@@ -74,6 +73,14 @@ async function loadAuthenticatedWorker(onProgress?: (message: string) => void): 
   if (typeof Worker === 'undefined') throw new Error('browser_worker_unavailable');
   if (typeof fetch === 'undefined' || typeof Blob === 'undefined' || typeof URL?.createObjectURL !== 'function') {
     throw new Error('browser_worker_blob_unavailable');
+  }
+
+  let groupingWorkerUrl = '';
+  try {
+    groupingWorkerUrl = (await import('./grouping-worker-url')).default;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`grouping_worker_url_import_failed:${message}`);
   }
 
   onProgress?.('กำลังโหลด Worker bundle พร้อมสิทธิ์ Preview');
