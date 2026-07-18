@@ -3,6 +3,7 @@ import type { ImportedCardCandidate } from '../import/pdf-importer';
 import { buildSkuIdentityKey, createSkuCandidate } from './sku-identity';
 import { inheritedSkuPrice, type StoredPrice } from './pricing';
 import { matchProductMasterByText, type MasterTextMatch } from './master-text-matcher';
+import { normalizeProductOcrText } from './product-text-normalizer';
 import { resolveScopesSafely } from './scope-safety';
 import {
   skuFromScope,
@@ -162,7 +163,7 @@ export function groupImportedCards(
   const diagnostics = { masterText: 0, structuredScope: 0, visualConsensus: 0, exactIdentity: 0, unresolved: 0 };
 
   const resolved: ResolvedCard[] = imported.map(source => {
-    const sourceText = source.productText || source.rawText;
+    const sourceText = normalizeProductOcrText(source.productText || source.rawText);
     const observed = normalizedCandidate(sourceText);
     const masterMatch = matchProductMasterByText(observed, sourceText, existingSkus);
     const resolution = scopeResolutions.get(source.cardId) || { scope: null, score: 0, margin: 0, method: 'unmatched' as const };
