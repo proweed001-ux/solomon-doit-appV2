@@ -4,12 +4,24 @@ import {
   toLegacyMonthId,
 } from './legacy-adapter.js';
 
-const projectUrl = () => String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
-const publishableKey = () => String(process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '');
+const LEGACY_PROJECT_URL = 'https://saodmeoilixfdqentofp.supabase.co';
+const LEGACY_PUBLISHABLE_KEY = 'sb_publishable_JThYwAl_-askk_cIaCd75w_TCWK2BTT';
+
+const projectUrl = () => String(process.env.SUPABASE_URL || LEGACY_PROJECT_URL).replace(/\/$/, '');
+const publishableKey = () => String(
+  process.env.SUPABASE_PUBLISHABLE_KEY
+  || process.env.SUPABASE_ANON_KEY
+  || LEGACY_PUBLISHABLE_KEY,
+);
 const secretKey = () => String(process.env.SUPABASE_SECRET_KEY || '');
+const readKey = () => secretKey() || publishableKey();
 
 export function backendConfigured() {
-  return Boolean(projectUrl() && publishableKey() && secretKey());
+  return Boolean(projectUrl() && publishableKey());
+}
+
+export function writeBackendConfigured() {
+  return Boolean(projectUrl() && secretKey());
 }
 
 async function request(path, { method = 'GET', body, key, token = key, headers = {} } = {}) {
@@ -34,8 +46,10 @@ async function request(path, { method = 'GET', body, key, token = key, headers =
   return data;
 }
 
-function rest(table, query) {
-  return request(`/rest/v1/${table}?${query}`, { key: secretKey() });
+function rest(table, query, options = {}) {
+  const key = options.key || readKey();
+  const token = options.token || key;
+  return request(`/rest/v1/${table}?${query}`, { key, token });
 }
 
 export function loginWithPassword(email, password) {
@@ -67,6 +81,7 @@ export async function requirePromoAdmin(accessToken) {
   const rows = await rest(
     'promo_admin_users',
     `user_id=eq.${encodeURIComponent(user.id)}&select=user_id,role&limit=1`,
+    { key: publishableKey(), token: accessToken },
   );
   if (!Array.isArray(rows) || !rows.length) throw new Error('promo_admin_required');
   return { ...user, promoRole: rows[0].role || 'viewer' };
