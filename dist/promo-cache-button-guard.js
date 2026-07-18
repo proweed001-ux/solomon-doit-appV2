@@ -1,11 +1,12 @@
 (() => {
   'use strict';
 
-  const BUILD_ID = 'CACHE-CLICK-20260718-0205';
+  const BUILD_ID = 'WORKER-AUTH-20260718-0630';
   const STATUS_ID = 'promo-cache-click-status';
   const BADGE_ID = 'promo-cache-build-badge';
   const HELPER_ID = 'promo-cache-direct-button';
   let activeUntil = 0;
+  let activeSince = 0;
   let lastButton = null;
 
   const cacheButton = () => [...document.querySelectorAll('button')].find(button => {
@@ -13,13 +14,21 @@
     return text.includes('จัดกลุ่มใหม่จากแคช') || text.includes('ใช้ไฟล์ทดสอบล่าสุด');
   }) || null;
 
+  const progressOverlay = () => {
+    const overlay = document.getElementById('promo-cache-progress-overlay');
+    return overlay && getComputedStyle(overlay).display !== 'none' ? overlay : null;
+  };
+
   const progressText = () => {
-    const visibleOverlay = document.getElementById('promo-cache-progress-overlay');
-    if (visibleOverlay && getComputedStyle(visibleOverlay).display !== 'none') {
-      return String(visibleOverlay.textContent || '').replace(/\s+/g, ' ').trim();
-    }
+    const overlay = progressOverlay();
+    if (overlay) return String(overlay.textContent || '').replace(/\s+/g, ' ').trim();
     const meta = document.querySelector('.progress-meta');
     return String(meta?.textContent || '').replace(/\s+/g, ' ').trim();
+  };
+
+  const visibleWorkerError = () => {
+    const text = String(document.body?.innerText || '');
+    return text.match(/\b(grouping_worker_[a-z0-9_:./-]+)/i)?.[1] || '';
   };
 
   const showStatus = (message, tone = 'info') => {
@@ -55,19 +64,28 @@
     element.textContent = `${BUILD_ID} · ${message}`;
   };
 
+  const releaseActive = (message, tone = 'ok') => {
+    activeUntil = 0;
+    activeSince = 0;
+    if (lastButton) lastButton.disabled = false;
+    if (message) showStatus(message, tone);
+  };
+
   const installBadge = button => {
-    if (document.getElementById(BADGE_ID)) return;
-    const badge = document.createElement('small');
-    badge.id = BADGE_ID;
-    badge.textContent = `Build ${BUILD_ID} · ปุ่มแคชตรวจ event ได้`;
-    Object.assign(badge.style, {
-      display: 'block',
-      marginTop: '7px',
-      color: '#0f766e',
-      fontWeight: '850',
-    });
-    const container = button.closest('div[style*="flex-wrap"]')?.parentElement || button.parentElement;
-    container?.appendChild(badge);
+    let badge = document.getElementById(BADGE_ID);
+    if (!badge) {
+      badge = document.createElement('small');
+      badge.id = BADGE_ID;
+      Object.assign(badge.style, {
+        display: 'block',
+        marginTop: '7px',
+        color: '#0f766e',
+        fontWeight: '850',
+      });
+      const container = button.closest('div[style*="flex-wrap"]')?.parentElement || button.parentElement;
+      container?.appendChild(badge);
+    }
+    badge.textContent = `Build ${BUILD_ID} · ตรวจ click และ Worker load`;
   };
 
   const installHelper = button => {
@@ -85,8 +103,13 @@
         return;
       }
       if (Date.now() < activeUntil) {
-        showStatus('ระบบรับคำสั่งก่อนหน้าแล้ว กำลังรอผล', 'info');
-        return;
+        const error = visibleWorkerError();
+        if (error && !progressOverlay() && !target.disabled) {
+          releaseActive(`งานก่อนหน้าจบด้วยข้อผิดพลาด · ${error} · ปลดล็อกแล้ว`, 'error');
+        } else {
+          showStatus('ระบบรับคำสั่งก่อนหน้าแล้ว กำลังรอผล', 'info');
+          return;
+        }
       }
       target.disabled = false;
       target.click();
@@ -103,7 +126,15 @@
     installBadge(button);
     installHelper(button);
 
-    const running = Date.now() < activeUntil;
+    const now = Date.now();
+    const running = now < activeUntil;
+    const elapsed = activeSince ? now - activeSince : 0;
+    const overlay = progressOverlay();
+    const error = visibleWorkerError();
+    if (running && elapsed > 1200 && !button.disabled && !overlay) {
+      releaseActive(error ? `งานจบด้วยข้อผิดพลาด · ${error} · กดใหม่ได้ทันที` : 'งานก่อนหน้าจบแล้ว · กดใหม่ได้ทันที', error ? 'error' : 'ok');
+      return;
+    }
     if (button.disabled && !running) {
       button.disabled = false;
       button.dataset.guardUnlocked = '1';
@@ -120,18 +151,17 @@
   document.addEventListener('click', event => {
     const button = event.target instanceof Element ? event.target.closest('button[data-promo-cache-action="1"]') : null;
     if (!button) return;
-    activeUntil = Date.now() + 130000;
+    activeSince = Date.now();
+    activeUntil = activeSince + 130000;
     const before = progressText();
     showStatus('รับ click แล้ว · รอ React เปิด IndexedDB', 'info');
     window.setTimeout(() => {
       const after = progressText();
       const changed = after && after !== before;
-      if (changed || document.getElementById('promo-cache-progress-overlay')) {
+      if (changed || progressOverlay()) {
         showStatus(`React เริ่มทำงานแล้ว · ${after || 'กำลังเปิดแคช'}`, 'ok');
       } else {
-        activeUntil = 0;
-        if (lastButton) lastButton.disabled = false;
-        showStatus('React ไม่เปลี่ยนสถานะภายใน 0.5 วินาที · ปุ่มถูกปลดล็อกให้ลองอีกครั้ง', 'error');
+        releaseActive('React ไม่เปลี่ยนสถานะภายใน 0.5 วินาที · ปุ่มถูกปลดล็อกให้ลองอีกครั้ง', 'error');
       }
     }, 500);
   }, true);
