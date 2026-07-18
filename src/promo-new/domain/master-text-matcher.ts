@@ -1,5 +1,6 @@
 import type { Sku, SkuIdentity } from './types';
-import { buildSkuIdentityKey, createSkuCandidate, normalizeProductText } from './sku-identity';
+import { buildSkuIdentityKey, createSkuCandidate } from './sku-identity';
+import { normalizeProductOcrText } from './product-text-normalizer';
 
 const MASTER_MIN_SCORE = 85;
 const MASTER_MIN_MARGIN = 8;
@@ -16,10 +17,7 @@ const BRAND_TYPE_DEFAULTS: Record<string, string> = {
 const PLACEHOLDER_MASTER = /รอตรวจข้อความจาก\s*PDF|ไม่ทราบสินค้า|สินค้าใหม่ที่ยังอ่านชื่อไม่ครบ/iu;
 
 export function repairCommonProductOcr(value: unknown): string {
-  return normalizeProductText(value)
-    .replace(/(\d)[Oo](?=\d|\s*(?:ML|มล\.?|บล\.?|G|กรัม))/giu, (_match, digit: string) => `${digit}0`)
-    .replace(/(\d)\s*(?:บล\.?)\b/giu, '$1 มล.')
-    .replace(/(\d)\s*(?:กรับ)\b/giu, '$1 กรัม');
+  return normalizeProductOcrText(value);
 }
 
 function compact(value: unknown): string {
