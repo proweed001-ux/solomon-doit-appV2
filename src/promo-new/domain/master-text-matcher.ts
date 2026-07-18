@@ -144,6 +144,7 @@ function scoreMaster(observed: Sku, sourceText: string, master: Sku): ScoredMast
 
   const leftVariant = left.variant || '';
   const rightVariant = right.variant || '';
+  if (Boolean(leftVariant) !== Boolean(rightVariant)) return null;
   const variantSimilarity = leftVariant && rightVariant ? diceSimilarity(leftVariant, rightVariant) : 0;
   if (leftVariant && rightVariant) {
     if (variantSimilarity < 0.42) return null;
