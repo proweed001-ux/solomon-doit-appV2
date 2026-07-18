@@ -118,6 +118,11 @@ function edgeFor(
     score += 8;
     evidence.push(`visual2:${secondVisual.toFixed(3)}`);
   }
+  const visualOnlyConsensus = bestVisual >= 0.985 && secondVisual >= 0.96;
+  if (visualOnlyConsensus) {
+    score += 8;
+    evidence.push('visual-strong-consensus');
+  }
 
   const observedPrice = retailPrice(evidenceText);
   const anchorPrice = priceMode(anchors);
@@ -145,7 +150,6 @@ function edgeFor(
 
   score += Math.min(5, anchors.length);
   const strongIdentity = Boolean(observed.identity.brand && (type === true || size === 'exact'));
-  const visualOnlyConsensus = bestVisual >= 0.985 && secondVisual >= 0.96;
   if (!strongIdentity && !priceMatch && !multiAnchorVisual && !visualOnlyConsensus) return null;
 
   return { card, target, score: Number(score.toFixed(3)), evidence };
