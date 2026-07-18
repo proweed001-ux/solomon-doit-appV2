@@ -1,4 +1,6 @@
-declare module '*?worker&url' {
-  const workerUrl: string;
-  export default workerUrl;
+declare module '*?worker&inline' {
+  const WorkerFactory: {
+    new (options?: WorkerOptions): Worker;
+  };
+  export default WorkerFactory;
 }
