@@ -41,8 +41,11 @@ function workerErrorMessage(event: ErrorEvent): string {
 }
 
 export async function runGroupingInWorker(input: RunGroupingInput): Promise<GroupingResult> {
+  if (!Array.isArray(input.existingSkus) || input.existingSkus.length === 0) {
+    throw new Error('product_master_required_before_grouping');
+  }
   const prepared = prepareGroupingWorkerCards(input.cards);
-  input.onProgress?.('กำลังเปิด Inline Worker');
+  input.onProgress?.(`Product Master พร้อม ${input.existingSkus.length} รายการ · กำลังเปิด Inline Worker`);
   const worker = createInlineWorker();
 
   return new Promise((resolve, reject) => {
