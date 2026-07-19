@@ -7,6 +7,7 @@ const required = [
   'dist/promo-admin-new.html', 'dist/promo-new.html', 'dist/assets/promo-new/admin.js', 'dist/assets/promo-new/frontend.js',
   'api/promo-new.js', 'api/promo-legacy-auth.js', 'api/_promo-new/supabase.js',
   'src/promo-new/shared/api.ts', 'src/promo-new/import/pdf-importer.ts',
+  'src/promo-new/import/workbook-parser.ts', 'src/promo-new/import/workbook-safety.ts',
   'scripts/prepare-sheetjs-lock.mjs',
   'docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md',
   'supabase/migrations/20260716083231_promo_system_rebuild.sql',
@@ -54,6 +55,26 @@ check(pdfImporter.includes('MAX_PROMO_PDF_PAGES = 120'), 'pdf_page_limit_missing
 check(pdfImporter.includes('MAX_PROMO_PDF_CARDS = 2_000'), 'pdf_card_limit_missing');
 check(pdfImporter.includes("throw new Error('duplicate_card_id')"), 'pdf_duplicate_card_block_missing');
 check(pdfImporter.includes("throw new Error('duplicate_card_position')"), 'pdf_duplicate_position_block_missing');
+
+const workbookSafety = read('src/promo-new/import/workbook-safety.ts');
+for (const guard of [
+  'MAX_WORKBOOK_SHEETS = 40',
+  'MAX_WORKBOOK_ROWS_PER_SHEET = 20_000',
+  'MAX_WORKBOOK_COLUMNS_PER_SHEET = 256',
+  'MAX_WORKBOOK_TOTAL_CELLS = 500_000',
+  'MAX_WORKBOOK_ZIP_ENTRIES = 5_000',
+  'MAX_WORKBOOK_UNCOMPRESSED_BYTES = 200 * 1024 * 1024',
+  'MAX_WORKBOOK_COMPRESSION_RATIO = 300',
+]) check(workbookSafety.includes(guard), `workbook_guard_missing:${guard}`);
+check(workbookSafety.includes("decodeFatal('windows-874'"), 'thai_csv_windows_874_fallback_missing');
+check(workbookSafety.includes('assertWorkbookArchiveSafe'), 'workbook_zip_preflight_missing');
+check(workbookSafety.includes("sheetRows: MAX_WORKBOOK_ROWS_PER_SHEET + 1"), 'workbook_parse_row_cap_missing');
+const workbookParser = read('src/promo-new/import/workbook-parser.ts');
+check(workbookParser.includes('await assertWorkbookArchiveSafe(bytes)'), 'workbook_archive_guard_not_wired');
+check(workbookParser.includes('assertWorkbookBounds(workbook)'), 'workbook_range_guard_not_wired');
+check(workbookParser.includes('decodePromotionCsv(bytes)'), 'workbook_csv_decoder_not_wired');
+check(!workbookParser.includes('candidate.includes(value)'), 'workbook_reverse_partial_header_match_reintroduced');
+check(workbookParser.includes("carriedFamilyId = '';\n      carriedName = '';\n      carriedScope = '';"), 'workbook_blank_row_carry_reset_missing');
 
 const frontend = read('src/promo-new/frontend/main.tsx');
 check(frontend.includes("card.status === 'ready'"), 'frontend_ready_only_filter_missing');
@@ -128,4 +149,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: patched SheetJS lock, auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
+console.log('Promo new security/static checks passed: patched SheetJS lock, workbook ZIP/range/encoding bounds, auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
