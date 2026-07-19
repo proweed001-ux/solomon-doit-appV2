@@ -5,6 +5,8 @@ import { applyPromotionFamily, buildSkuDisplayName } from '../../src/promo-new/d
 import { applyPriceToGroup, missingSkuPrice, setCentralPrice } from '../../src/promo-new/domain/pricing';
 import type { ProductGroup, PromoCard, PromotionFamily, PromotionTier, Sku } from '../../src/promo-new/domain/types';
 import { validateSku } from '../../src/promo-new/domain/validation';
+import { shouldRefreshCardHeader } from '../../src/promo-new/import/card-header-ocr';
+import type { ImportedCardCandidate } from '../../src/promo-new/import/pdf-importer';
 import { legacyMasterIdentity } from '../../src/promo-new/shared/legacy-system';
 
 const read = (path: string) => readFileSync(path, 'utf8');
@@ -29,15 +31,7 @@ const sku = (overrides: Partial<Sku> = {}): Sku => ({
   code: 'SKU-TEST',
   canonicalName: 'H&S แชมพู 140 มล.',
   identityKey: 'H&S|แชมพู||140|มล.|ขวด|1',
-  identity: {
-    brand: 'H&S',
-    productType: 'แชมพู',
-    variant: null,
-    sizeValue: 140,
-    sizeUnit: 'มล.',
-    salesUnit: 'ขวด',
-    packQuantity: 1,
-  },
+  identity: { brand: 'H&S', productType: 'แชมพู', variant: null, sizeValue: 140, sizeUnit: 'มล.', salesUnit: 'ขวด', packQuantity: 1 },
   status: 'active',
   evidence: [],
   failureReasons: [],
@@ -63,6 +57,24 @@ function card(id: string, classId: string, price = missingSkuPrice('sku:test')):
   };
 }
 
+function importedCard(productText: string): ImportedCardCandidate {
+  return {
+    cardId: 'CARD-TEST',
+    monthKey: 'PROMO-2026-07',
+    page: 1,
+    sequence: 1,
+    classId: 'HFSS',
+    imageUrl: 'data:image/webp;base64,AA==',
+    rawText: productText,
+    productText,
+    pageClassText: 'HFSS',
+    confidence: 0.9,
+    evidenceMethod: 'page_ocr',
+    bounds: { x: 0, y: 0, width: 100, height: 100 },
+    failureReasons: [],
+  };
+}
+
 function group(price = missingSkuPrice('sku:test')): ProductGroup {
   return {
     id: 'group:test',
@@ -84,21 +96,14 @@ const family = (includeM = true): PromotionFamily => ({
   name: 'H&S 140 มล.',
   scopeText: 'H&S แชมพู 140 มล.',
   sourceRows: [1],
-  tiersByClass: {
-    HFSS: [tier()],
-    ...(includeM ? { HFSM: [tier('3 ขวด ลด 10%')] } : {}),
-  },
+  tiersByClass: { HFSS: [tier()], ...(includeM ? { HFSM: [tier('3 ขวด ลด 10%')] } : {}) },
   failureReasons: [],
 });
 
 test('central price clears stale price blockers from group and cards in one pass', () => {
   const currentGroup = group();
   currentGroup.failureReasons = ['central_price_missing'];
-  const currentCards = [card('card-s', 'HFSS'), card('card-m', 'HFSM')].map(item => ({
-    ...item,
-    promotionFamilyId: 'family:good',
-    failureReasons: ['central_price_missing'],
-  }));
+  const currentCards = [card('card-s', 'HFSS'), card('card-m', 'HFSM')].map(item => ({ ...item, promotionFamilyId: 'family:good', failureReasons: ['central_price_missing'] }));
   const nextPrice = setCentralPrice(currentGroup.price, 41.15);
   const result = applyPriceToGroup({ ...currentGroup, promotionFamilyId: 'family:good' }, currentCards, nextPrice);
   assert.deepEqual(result.group.failureReasons, []);
@@ -109,10 +114,7 @@ test('central price clears stale price blockers from group and cards in one pass
 test('correct promotion family removes old blockers and becomes ready on the first application', () => {
   const price = setCentralPrice(missingSkuPrice('sku:test'), 41.15);
   const currentGroup = { ...group(price), failureReasons: ['promotion_class_missing:HFSM', 'promotion_family_conflict'] };
-  const currentCards = [card('card-s', 'HFSS', price), card('card-m', 'HFSM', price)].map(item => ({
-    ...item,
-    failureReasons: [`promotion_class_missing:${item.classId}`],
-  }));
+  const currentCards = [card('card-s', 'HFSS', price), card('card-m', 'HFSM', price)].map(item => ({ ...item, failureReasons: [`promotion_class_missing:${item.classId}`] }));
   const result = applyPromotionFamily(currentGroup, currentCards, family(true));
   assert.deepEqual(result.blockedClasses, []);
   assert.equal(result.group.status, 'ready');
@@ -140,6 +142,11 @@ test('model-based SKU may omit numeric size while shampoo still requires size', 
   const shampoo = sku({ identity: { brand: 'H&S', productType: 'แชมพู', variant: null, sizeValue: 0, sizeUnit: '', salesUnit: 'ขวด', packQuantity: 1 } });
   assert.ok(validateSku(shampoo).includes('size_missing'));
   assert.ok(validateSku(shampoo).includes('size_unit_missing'));
+});
+
+test('fallback OCR skips a complete model-based product but still targets shampoo without size', () => {
+  assert.equal(shouldRefreshCardHeader(importedCard('GILLETTE มีดโกน ซุปเปอร์ธิน')), false);
+  assert.equal(shouldRefreshCardHeader(importedCard('H&S แชมพู')), true);
 });
 
 test('new SKU display name keeps the observed variant instead of a generic placeholder', () => {
