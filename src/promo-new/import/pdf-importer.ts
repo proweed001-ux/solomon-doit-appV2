@@ -236,7 +236,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
   const document = await pdfjs.getDocument({ data: bytes }).promise;
   if (!Number.isInteger(document.numPages) || document.numPages < 1 || document.numPages > MAX_PROMO_PDF_PAGES) {
     const pageCount = Number(document.numPages || 0);
-    await document.destroy();
+    await (document as unknown as { destroy: () => Promise<void> }).destroy();
     throw new Error(`promo_pdf_page_limit:${pageCount}/${MAX_PROMO_PDF_PAGES}`);
   }
   const cards: ImportedCardCandidate[] = [];
