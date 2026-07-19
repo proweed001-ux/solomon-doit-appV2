@@ -37,19 +37,20 @@ export function calculatePromotion(unitPrice: number, quantityInput: number, tie
   let giftUnit: string | null = null;
   let netAmount = grossAmount;
   if (active?.type === 'cash_discount') {
-    cashDiscount = roundMoney(grossAmount * Number(active.discountPercent || 0) / 100);
-    netAmount = roundMoney(grossAmount - cashDiscount);
+    const percent = Math.max(0, Math.min(100, Number(active.discountPercent || 0)));
+    cashDiscount = roundMoney(Math.min(grossAmount, grossAmount * percent / 100));
+    netAmount = roundMoney(Math.max(0, grossAmount - cashDiscount));
   } else if (active?.type === 'free_goods') {
     giftQuantity = Math.floor(quantity / active.minQuantity) * active.freeQuantity;
     giftUnit = active.rewardUnit || active.purchaseUnit;
-    // effectivePercent is display-only. It must never reduce cash here.
     cashDiscount = 0;
     netAmount = grossAmount;
   } else if (active?.type === 'bundle_price' && active.bundlePrice) {
+    if (!Number.isFinite(active.bundlePrice.amount) || active.bundlePrice.amount <= 0) throw new Error('bundle_price_invalid');
     const bundles = Math.floor(quantity / active.minQuantity);
     const remainder = quantity % active.minQuantity;
     netAmount = roundMoney(bundles * active.bundlePrice.amount + remainder * unitPrice);
-    cashDiscount = roundMoney(grossAmount - netAmount);
+    cashDiscount = roundMoney(Math.max(0, grossAmount - netAmount));
   }
   return {
     quantity,
