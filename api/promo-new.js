@@ -33,6 +33,55 @@ function validateTier(tier) {
   return false;
 }
 
+function missingPrice(skuId) {
+  return {
+    skuId,
+    pdfSourcePrice: null,
+    centralOverridePrice: null,
+    effectivePrice: null,
+    source: 'missing',
+    sourceReference: null,
+    updatedAt: null,
+  };
+}
+
+export function quarantinePublishedPriceConflicts(dataset) {
+  if (!dataset || !Array.isArray(dataset.warnings)) return dataset;
+  const conflictGroups = new Set(dataset.warnings.flatMap(warning => {
+    const match = String(warning).match(/^group:(.+):legacy_price_conflict$/u);
+    return match ? [match[1]] : [];
+  }));
+  if (!conflictGroups.size) return dataset;
+  const affectedSkuIds = new Set();
+  const productGroups = rows(dataset.productGroups).map(group => {
+    if (!conflictGroups.has(group.id)) return group;
+    affectedSkuIds.add(group.skuId);
+    return {
+      ...group,
+      price: missingPrice(group.skuId),
+      status: 'blocked',
+      failureReasons: [...new Set([...rows(group.failureReasons), 'legacy_price_conflict'])],
+    };
+  });
+  const cards = rows(dataset.cards).map(card => {
+    if (!conflictGroups.has(card.productGroupId)) return card;
+    return {
+      ...card,
+      price: missingPrice(card.skuId),
+      status: 'need_review',
+      failureReasons: [...new Set([...rows(card.failureReasons), 'legacy_price_conflict'])],
+    };
+  });
+  const prices = rows(dataset.prices).map(price => affectedSkuIds.has(price.skuId) ? missingPrice(price.skuId) : price);
+  return {
+    ...dataset,
+    cards,
+    productGroups,
+    prices,
+    warnings: [...new Set([...dataset.warnings, ...[...conflictGroups].map(groupId => `group:${groupId}:legacy_price_conflict_blocked`)])],
+  };
+}
+
 function validateDatasetPayload(dataset) {
   if (!dataset || dataset.schema !== 'promo-system-rebuild-v1') throw new Error('dataset_schema_invalid');
   if (!UUID.test(String(dataset.version?.id || ''))) throw new Error('version_id_invalid');
@@ -116,7 +165,7 @@ async function handleGet(req, res, action) {
   if (action === 'published') {
     const month = String(queryValue(req, 'month') || '').trim().toUpperCase();
     if (month && !MONTH_KEY.test(month)) return sendJson(res, 400, { ok: false, error: 'month_key_invalid' });
-    const data = await getPublishedCatalog(month || null);
+    const data = quarantinePublishedPriceConflicts(await getPublishedCatalog(month || null));
     return sendJson(res, 200, { ok: true, data });
   }
   if (action === 'session') {
