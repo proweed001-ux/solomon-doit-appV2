@@ -44,23 +44,24 @@ const largeFamily: PromotionFamily = {
   failureReasons: [],
 };
 
-function master(size: number): Sku {
+function legacyMaster(size: number): Sku {
+  const canonicalName = `H&S แชมพู ${size} มล. ขวด`;
   return {
     id: `MASTER-HS-${size}`,
     code: `PM-HS-${size}`,
-    canonicalName: `H&S แชมพู ${size} มล. ขวด`,
-    identityKey: `H&S|แชมพู||${size.toFixed(3)}|มล|ขวด|1`,
+    canonicalName,
+    identityKey: `legacy-normalized-${size}`,
     identity: {
       brand: 'H&S',
-      productType: 'แชมพู',
+      productType: canonicalName,
       variant: null,
       sizeValue: size,
-      sizeUnit: 'มล.',
+      sizeUnit: 'ML',
       salesUnit: 'ขวด',
       packQuantity: 1,
     },
     status: 'active',
-    evidence: [`H&S แชมพู ${size} มล.`],
+    evidence: ['legacy:promo_product_master', `เฮดแอนด์โชว์เดอร์ แชมพู ${size} มล.`],
     failureReasons: [],
   };
 }
@@ -99,10 +100,10 @@ test('JUL26 H&S 65 uses repeated OCR size evidence and rejects a one-off 365 rea
   assert.equal(createSkuCandidate(untrusted).identity.sizeValue, 0);
 });
 
-test('JUL26 H&S 140 range is canonicalized to the unique active 140 ml Product Master', () => {
-  const existing = [master(65), master(140)];
+test('JUL26 H&S 140 range uses canonical name to repair the actual legacy Product Master shape', () => {
+  const existing = [legacyMaster(65), legacyMaster(140)];
   const source = card('HFSM', 4, 'เฮดแอนด์โชว์เดอร์ แชมพู ทุกสูตร ขนาด 140 มล.');
-  const repaired = repairCardsWithMasterBackedScopes(source ? [source] : [], [smallFamily, largeFamily], existing);
+  const repaired = repairCardsWithMasterBackedScopes([source], [smallFamily, largeFamily], existing);
   assert.equal(repaired.repaired, 1);
   assert.equal(repaired.cards[0].productText, 'H&S แชมพู 140 มล. ขวด');
 
@@ -110,11 +111,13 @@ test('JUL26 H&S 140 range is canonicalized to the unique active 140 ml Product M
   assert.equal(grouped.quarantineCards.length, 0);
   assert.equal(grouped.groups.length, 1);
   assert.equal(grouped.groups[0].skuId, 'MASTER-HS-140');
+  assert.equal(grouped.groups[0].sku.identity.productType, 'แชมพู');
+  assert.equal(grouped.groups[0].sku.identity.sizeUnit, 'มล.');
   assert.deepEqual(grouped.groups[0].classIds, ['HFSM']);
 });
 
 test('JUL26 H&S 365 conflict is quarantined instead of becoming a new exact-identity SKU', () => {
-  const existing = [master(65), master(140)];
+  const existing = [legacyMaster(65), legacyMaster(140)];
   const source = card('HFSS', 1, 'H&S แชมพู 365 มล. ขวด');
   const repaired = repairCardsWithMasterBackedScopes([source], [smallFamily, largeFamily], existing);
   assert.equal(repaired.rejectedConflictingSizes, 1);
