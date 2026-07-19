@@ -5,7 +5,9 @@ const root = process.cwd();
 const failures = [];
 const required = [
   'dist/promo-admin-new.html', 'dist/promo-new.html', 'dist/assets/promo-new/admin.js', 'dist/assets/promo-new/frontend.js',
-  'api/promo-new.js', 'api/_promo-new/supabase.js',
+  'api/promo-new.js', 'api/promo-legacy-auth.js', 'api/_promo-new/supabase.js',
+  'src/promo-new/shared/api.ts', 'src/promo-new/import/pdf-importer.ts',
+  'docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md',
   'supabase/migrations/20260716083231_promo_system_rebuild.sql',
   'supabase/rollback/20260716083231_promo_system_rebuild.sql',
 ];
@@ -30,7 +32,33 @@ check(api.includes('requirePromoAdmin'), 'backend_missing_admin_guard');
 check(api.includes('validateDatasetPayload'), 'backend_missing_payload_validation');
 check(api.includes('card_crosses_month'), 'backend_missing_month_guard');
 check(api.includes('assertVersionPublishable'), 'backend_missing_publish_revalidation');
+check(api.includes('quarantinePublishedPriceConflicts'), 'published_price_conflict_guard_missing');
+check(api.includes('legacy_price_conflict_blocked'), 'published_price_conflict_block_status_missing');
 check(!/sb_secret_[A-Za-z0-9_-]+/.test(read('api/_promo-new/supabase.js')), 'secret_value_hardcoded_in_backend');
+
+const legacyAuth = read('api/promo-legacy-auth.js');
+check(legacyAuth.includes('MAX_LOGIN_BODY_BYTES = 4_096'), 'upload_key_body_limit_missing');
+check(legacyAuth.includes('MAX_UPLOAD_KEY_LENGTH = 200'), 'upload_key_length_limit_missing');
+check(legacyAuth.includes('promo_auth_unavailable'), 'generic_auth_service_error_missing');
+check(!/detail:\s*message/.test(legacyAuth), 'auth_internal_detail_exposed');
+
+const sharedApi = read('src/promo-new/shared/api.ts');
+check(sharedApi.includes('const LEGACY_WRITES_ENABLED = false'), 'legacy_writes_must_remain_disabled');
+check(sharedApi.includes('legacy_write_disabled_pending_atomic_revision_staging'), 'legacy_write_block_reason_missing');
+check(/function assertWritableRuntime\(\)[\s\S]*LEGACY_WRITES_ENABLED/.test(sharedApi), 'network_write_guard_missing');
+
+const pdfImporter = read('src/promo-new/import/pdf-importer.ts');
+check(pdfImporter.includes('MAX_PROMO_PDF_BYTES = 50 * 1024 * 1024'), 'pdf_byte_limit_missing');
+check(pdfImporter.includes('MAX_PROMO_PDF_PAGES = 120'), 'pdf_page_limit_missing');
+check(pdfImporter.includes('MAX_PROMO_PDF_CARDS = 2_000'), 'pdf_card_limit_missing');
+check(pdfImporter.includes("throw new Error('duplicate_card_id')"), 'pdf_duplicate_card_block_missing');
+check(pdfImporter.includes("throw new Error('duplicate_card_position')"), 'pdf_duplicate_position_block_missing');
+
+const frontend = read('src/promo-new/frontend/main.tsx');
+check(frontend.includes("card.status === 'ready'"), 'frontend_ready_only_filter_missing');
+check(frontend.includes('card.failureReasons.length === 0'), 'frontend_failure_reason_filter_missing');
+check(frontend.includes('Number(card.price.effectivePrice?.amount) > 0'), 'frontend_price_filter_missing');
+check(frontend.includes('card.promotionTiers.length > 0'), 'frontend_tier_filter_missing');
 
 const migration = read('supabase/migrations/20260716083231_promo_system_rebuild.sql');
 for (const table of ['promo_new_admins','promo_new_months','promo_new_versions','promo_new_skus','promo_new_sku_prices','promo_new_promotion_families','promo_new_promotion_tiers','promo_new_product_groups','promo_new_cards','promo_new_audit_log']) {
@@ -48,6 +76,9 @@ for (const action of ['sku_upserted', 'sku_price_changed', 'promotion_assigned']
   check(migration.includes(`'${action}'`), `audit_action_missing:${action}`);
 }
 check(migration.includes("v_version_id uuid := nullif(p_payload #>> '{version,id}', '')::uuid"), 'client_draft_uuid_not_persisted');
+const stagingBlockers = read('docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md');
+check(stagingBlockers.includes('must not be applied to Production'), 'migration_blocker_notice_missing');
+check(stagingBlockers.includes('LEGACY_WRITES_ENABLED = false'), 'migration_write_guard_notice_missing');
 
 const adminSource = read('src/promo-new/admin/main.tsx');
 check(adminSource.includes('uploadCardImage'), 'admin_card_upload_flow_missing');
@@ -92,4 +123,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: auth/backend boundary, RLS/revokes, status gates, rollback, mobile assets, verified build pipeline, and legacy promo isolation.');
+console.log('Promo new security/static checks passed: auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
