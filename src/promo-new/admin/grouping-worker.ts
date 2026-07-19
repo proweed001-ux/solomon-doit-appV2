@@ -3,6 +3,7 @@
 import { groupImportedCards } from '../domain/grouping';
 import { applyClassMatrixRecovery } from '../domain/class-matrix';
 import { attachMasterMatchAuditEvidenceAsync } from '../domain/master-match-audit';
+import { repairCardsWithMasterBackedScopes } from '../domain/master-backed-card-repair';
 import { buildProductScopes } from '../domain/scope-matcher';
 import { resolveScopesSafely } from '../domain/scope-safety';
 import { resolveTextFirstScopesSafely } from '../domain/text-first-scope';
@@ -38,6 +39,14 @@ workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
   try {
     const totalStarted = performance.now();
     const payload = event.data.payload;
+    const repaired = repairCardsWithMasterBackedScopes(
+      payload.cards,
+      payload.promotionFamilies,
+      payload.existingSkus,
+    );
+    const workingCards = repaired.cards;
+    progress(`ตรวจขนาดกับ CSV/Product Master แล้ว · แก้จาก Master ${repaired.repaired} ใบ · กักขนาดขัดแย้ง ${repaired.rejectedConflictingSizes} ใบ`);
+
     const hasVisualEvidence = Object.values(payload.visualSignatures).some(value => typeof value === 'string' && value.length >= 64);
     progress(hasVisualEvidence
       ? 'กำลังเทียบ Product Master, ชื่อสินค้า, Class, Promotion Scope และหลักฐานภาพ'
@@ -45,23 +54,23 @@ workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
 
     const scopeStarted = performance.now();
     const initial = hasVisualEvidence
-      ? resolveScopesSafely(payload.cards, payload.promotionFamilies, payload.visualSignatures)
-      : await resolveTextFirstScopesSafely(payload.cards, payload.promotionFamilies, state => {
+      ? resolveScopesSafely(workingCards, payload.promotionFamilies, payload.visualSignatures)
+      : await resolveTextFirstScopesSafely(workingCards, payload.promotionFamilies, state => {
         progress(`เทียบ Scope ${state.processed}/${state.total} การ์ด · candidate ${state.candidateComparisons} · Scope ทั้งหมด ${state.scopeCount}`);
       });
-    progress(`วิเคราะห์ Promotion Scope เสร็จ ${seconds(scopeStarted)} · ${initial.size}/${payload.cards.length} การ์ด`);
+    progress(`วิเคราะห์ Promotion Scope เสร็จ ${seconds(scopeStarted)} · ${initial.size}/${workingCards.length} การ์ด`);
 
     const matrixStarted = performance.now();
     const scopes = hasVisualEvidence ? buildProductScopes(payload.promotionFamilies) : [];
     const matrix = hasVisualEvidence
-      ? applyClassMatrixRecovery(payload.cards, scopes, initial, payload.visualSignatures)
+      ? applyClassMatrixRecovery(workingCards, scopes, initial, payload.visualSignatures)
       : { resolutions: initial, recovered: 0, ambiguous: 0 };
     const originalEvidence = new Map(payload.cards.map(card => [card.cardId, {
       productText: card.productText,
       rawText: card.rawText,
       pageClassText: card.pageClassText,
     }]));
-    const hintedCards = payload.cards.map(card => {
+    const hintedCards = workingCards.map(card => {
       const resolution = matrix.resolutions.get(card.cardId) as (typeof initial extends Map<string, infer R> ? R : never) & { matrix?: boolean };
       if (!resolution?.scope || !resolution.matrix) return card;
       return {
@@ -102,7 +111,7 @@ workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
     const auditStarted = performance.now();
     result = await attachMasterMatchAuditEvidenceAsync(
       result,
-      payload.cards,
+      workingCards,
       payload.existingSkus,
       payload.promotionFamilies,
       payload.visualSignatures,
@@ -112,11 +121,14 @@ workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
     progress(`ตรวจหลักฐาน Product Master เสร็จ ${seconds(auditStarted)} · รวม ${seconds(totalStarted)}`);
     result.warnings = [...new Set([
       ...result.warnings,
+      ...repaired.warnings,
+      `grouping:master_backed_scope_repaired:${repaired.repaired}`,
+      `grouping:workbook_scope_size_conflicts:${repaired.rejectedConflictingSizes}`,
       `grouping:class_matrix:${matrix.recovered}`,
       `grouping:class_matrix_ambiguous:${matrix.ambiguous}`,
       `grouping:worker_elapsed_ms:${Math.max(0, Math.round(performance.now() - totalStarted))}`,
       ...(hasVisualEvidence ? [] : ['grouping:visual_matching_disabled_text_first']),
-      ...payload.cards.flatMap(card => {
+      ...workingCards.flatMap(card => {
         const resolution = matrix.resolutions.get(card.cardId) as (typeof initial extends Map<string, infer R> ? R : never) & { matrix?: boolean };
         return resolution?.matrix ? [`card:${card.cardId}:grouping_method:class_matrix`] : [];
       }),
