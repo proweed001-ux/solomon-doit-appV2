@@ -7,8 +7,8 @@
   <title>หลังบ้านโปรโมชั่นใหม่</title>
   <link rel="stylesheet" href="/assets/promo-new/style.css">
   <style>
-    body[data-promo-readonly="1"] .footer-actions .btn.primary,
-    body[data-promo-readonly="1"] .footer-actions .btn.dark {
+    .footer-actions .btn.primary,
+    .footer-actions .btn.dark {
       display: none !important;
     }
   </style>
@@ -38,8 +38,8 @@
       const showLogin = () => {
         root.innerHTML = `<main class="login-page"><section class="login-card">
           <div class="eyebrow">PROMO SYSTEM</div>
-          <h1>${dryRun ? 'ทดสอบไฟล์แบบอ่านอย่างเดียว' : 'หลังบ้านโปรโมชั่น'}</h1>
-          <p>${dryRun ? 'ต้องใช้รหัสอัปโหลดเพื่อโหลด Product Master จริง แต่โหมดนี้บล็อก Draft และ Publish' : 'ใช้รหัสอัปโหลดเดียวกับระบบโปรโมชั่นเดิม ไม่ต้องใช้อีเมล'}</p>
+          <h1>${dryRun ? 'ทดสอบไฟล์แบบอ่านอย่างเดียว' : 'หลังบ้านโปรโมชั่น Preview'}</h1>
+          <p>ใช้รหัสอัปโหลดเพื่อโหลด Product Master จริง โดย Preview นี้ปิด Draft และ Publish จนกว่าจะมี revision staging แยก</p>
           <div id="legacy-login-error" class="notice error" style="display:none"></div>
           <form id="legacy-login-form">
             <label class="field">รหัสอัปโหลด<input id="legacy-admin-key" type="password" autocomplete="current-password" required autofocus></label>
