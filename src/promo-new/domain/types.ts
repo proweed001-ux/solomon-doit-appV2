@@ -70,6 +70,8 @@ export interface PromotionFamily {
   failureReasons: string[];
 }
 
+export type MasterMatchMethod = 'master_text' | 'structured_scope' | 'visual_consensus' | 'exact_identity' | 'new_sku';
+
 export interface CardEvidence {
   rawText: string;
   productText: string;
@@ -77,6 +79,9 @@ export interface CardEvidence {
   confidence: number;
   method: 'pdf_text' | 'page_ocr' | 'manual' | 'none';
   cropBounds: { x: number; y: number; width: number; height: number } | null;
+  masterMatchScore?: number | null;
+  masterMatchMargin?: number | null;
+  masterMatchMethod?: MasterMatchMethod | null;
 }
 
 export interface PromoCard {
