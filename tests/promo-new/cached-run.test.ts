@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { prepareCachedRun, visualSignaturesComplete } from '../../src/promo-new/admin/cached-run';
+import { PROMO_TEST_PIPELINE_VERSION } from '../../src/promo-new/admin/test-cache';
 import type { PdfImportResult } from '../../src/promo-new/import/pdf-importer';
 import { makeCardId } from '../../src/promo-new/import/card-id';
 
@@ -38,6 +39,8 @@ test('เตรียมแคชแก้ Class แบบเบาโดยไ�
   assert.match(prepared.imported.cards[1].cardId, /-HFSM-/u);
   assert.equal(prepared.visualSignatures[prepared.imported.cards[1].cardId], 'sig:2');
   assert.equal(prepared.visualSignatures[oldMId], undefined);
+  assert.equal(prepared.pipelineVersion, PROMO_TEST_PIPELINE_VERSION);
+  assert.ok(prepared.warnings.includes(`cache:pipeline:${PROMO_TEST_PIPELINE_VERSION}`));
   assert.equal(prepared.changedClasses, 1);
   assert.equal(prepared.recoveredPages, 1);
 });
