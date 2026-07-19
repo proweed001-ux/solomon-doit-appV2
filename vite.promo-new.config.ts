@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 
 function promoBuildIdPlugin(): Plugin {
   const commit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
-  const buildId = `PROMO-${commit}-XLSX-WORKER-HARDENED`;
+  const buildId = `PROMO-${commit}-OCR-SCOPE-TARGETED`;
   return {
     name: 'promo-build-id',
     enforce: 'pre',
