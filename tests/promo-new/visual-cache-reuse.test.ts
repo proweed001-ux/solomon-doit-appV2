@@ -1,38 +1,36 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { ImportedCardCandidate } from '../../src/promo-new/import/pdf-importer';
+import test from 'node:test';
 import { exactCachedVisualSignatures } from '../../src/promo-new/domain/visual-consensus';
+import type { ImportedCardCandidate } from '../../src/promo-new/import/pdf-importer';
 
-function card(cardId: string, imageUrl: string): ImportedCardCandidate {
-  return {
-    cardId,
-    monthKey: 'PROMO-2026-07',
-    page: 1,
-    sequence: 1,
-    classId: 'HFSM',
-    imageUrl,
-    rawText: '',
-    productText: '',
-    pageClassText: 'HFS-M',
-    confidence: 0.9,
-    evidenceMethod: 'page_ocr',
-    bounds: { x: 0, y: 0, width: 100, height: 100 },
-    failureReasons: [],
-  };
-}
-
-test('ใช้ลายนิ้วมือจากแคชทันทีเมื่อ Card ID และรูปตรงกันครบ', () => {
-  const cards = [card('CARD-A', 'image-a'), card('CARD-B', 'image-b')];
-  const result = exactCachedVisualSignatures(cards, cards.map(item => ({ ...item })), {
-    'CARD-A': 'aabb',
-    'CARD-B': '',
-  });
-  assert.deepEqual(result, { 'CARD-A': 'aabb', 'CARD-B': '' });
+const card = (id: string, image: string): ImportedCardCandidate => ({
+  cardId: id,
+  monthKey: 'PROMO-2026-07',
+  page: 1,
+  sequence: 1,
+  classId: 'HFSS',
+  imageUrl: image,
+  rawText: '',
+  productText: '',
+  pageClassText: '',
+  confidence: 0.8,
+  evidenceMethod: 'page_ocr',
+  bounds: { x: 0, y: 0, width: 10, height: 10 },
+  failureReasons: [],
 });
 
-test('ไม่ใช้ลายนิ้วมือเก่าเมื่อรูปหรือจำนวนการ์ดไม่ตรง', () => {
-  const cards = [card('CARD-A', 'image-new')];
-  assert.equal(exactCachedVisualSignatures(cards, [card('CARD-A', 'image-old')], { 'CARD-A': 'aabb' }), null);
-  assert.equal(exactCachedVisualSignatures(cards, [], { 'CARD-A': 'aabb' }), null);
-  assert.equal(exactCachedVisualSignatures(cards, cards, {}), null);
+test('ใช้ลายนิ้วมือจากแคชทันทีเมื่อ Card ID รูป และ signature ตรงกันครบ', () => {
+  const current = [card('A', 'data:image/webp;base64,AAA')];
+  const stored = [card('A', 'data:image/webp;base64,AAA')];
+  const signature = 'ab'.repeat(32);
+  assert.deepEqual(exactCachedVisualSignatures(current, stored, { A: signature }), { A: signature });
+});
+
+test('ไม่ใช้ลายนิ้วมือเก่าเมื่อรูป จำนวนการ์ด หรือ signature ไม่ตรง', () => {
+  const current = [card('A', 'data:image/webp;base64,AAA')];
+  const stored = [card('A', 'data:image/webp;base64,BBB')];
+  assert.equal(exactCachedVisualSignatures(current, stored, { A: 'ab'.repeat(32) }), null);
+  assert.equal(exactCachedVisualSignatures(current, current, { A: '' }), null);
+  assert.equal(exactCachedVisualSignatures(current, current, { A: 'invalid' }), null);
+  assert.equal(exactCachedVisualSignatures(current, [], { A: 'ab'.repeat(32) }), null);
 });
