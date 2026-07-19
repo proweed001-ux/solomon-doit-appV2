@@ -2,6 +2,12 @@ import * as XLSX from 'xlsx';
 import type { PromotionFamily, PromotionTier } from '../domain/types';
 import { parsePromotionTiers, splitClassIds } from './promotion-parser';
 import { inspectPromotionWorkbookFile, validatePromotionWorkbookSignature } from './workbook-file';
+import {
+  SAFE_WORKBOOK_READ_OPTIONS,
+  assertWorkbookArchiveSafe,
+  assertWorkbookBounds,
+  decodePromotionCsv,
+} from './workbook-safety';
 
 type Cell = string | number | boolean | Date | null | undefined;
 type Matrix = Cell[][];
@@ -155,6 +161,12 @@ export function parsePromotionMatrix(matrix: Matrix, sheetName: string): { famil
 
   matrix.slice(headerRow + 1).forEach((row, offset) => {
     const sourceRow = headerRow + offset + 2;
+    if (!row.some(value => normalize(value))) {
+      carriedFamilyId = '';
+      carriedName = '';
+      carriedScope = '';
+      return;
+    }
     const embedded = descriptionMode ? embeddedDescription(cell(row, columns.scope)) : null;
     const explicitId = normalize(cell(row, columns.familyId));
     const name = normalize(cell(row, columns.name));
@@ -201,18 +213,25 @@ export async function parsePromotionWorkbook(file: File): Promise<WorkbookParseR
   const bytes = await file.arrayBuffer();
   const signatureError = validatePromotionWorkbookSignature(fileInfo.kind, bytes);
   if (signatureError) throw new Error(signatureError);
+  const warnings: string[] = [];
   let workbook: XLSX.WorkBook;
   try {
-    workbook = fileInfo.kind === 'csv'
-      ? XLSX.read(new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/u, ''), { type: 'string', cellDates: true, dense: true })
-      : XLSX.read(bytes, { type: 'array', cellDates: true, dense: true });
-  } catch {
+    if (fileInfo.kind === 'csv') {
+      const decoded = decodePromotionCsv(bytes);
+      warnings.push(...decoded.warnings);
+      workbook = XLSX.read(decoded.text, { ...SAFE_WORKBOOK_READ_OPTIONS, type: 'string' });
+    } else {
+      if (fileInfo.kind === 'xlsx' || fileInfo.kind === 'xlsm') await assertWorkbookArchiveSafe(bytes);
+      workbook = XLSX.read(bytes, { ...SAFE_WORKBOOK_READ_OPTIONS, type: 'array' });
+    }
+    assertWorkbookBounds(workbook);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith('promotion_')) throw error;
     throw new Error(`อ่านไฟล์ ${fileInfo.label} ไม่สำเร็จ กรุณาเปิดใน Excel แล้ว Save As ใหม่โดยไม่ตั้งรหัสผ่าน`);
   }
-  if (!workbook.SheetNames.length) throw new Error(`ไฟล์ ${fileInfo.label} ไม่มี Worksheet ที่อ่านได้`);
   const all = new Map<string, PromotionFamily>();
   const sheets: WorkbookParseResult['sheets'] = [];
-  const warnings: string[] = [];
   for (const name of workbook.SheetNames) {
     const matrix = XLSX.utils.sheet_to_json<Cell[]>(workbook.Sheets[name], { header: 1, raw: false, defval: null }) as Matrix;
     const parsed = parsePromotionMatrix(matrix, name);
