@@ -348,18 +348,9 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
         hasCards: grid.regions.length > 0,
       });
       if (grid.diagnostics.status !== 'ok') warnings.push(...grid.diagnostics.reasons.map(reason => `page:${pageNumber}:${reason}`));
-      if (textMethod === 'page_ocr' && grid.regions.length && options.enableOcr) await ensureWorker('tha');
       for (const [index, bounds] of grid.regions.entries()) {
         const sequence = index + 1;
-        let productText = textIn(textItems, productZone(bounds));
-        if (textMethod === 'page_ocr' && options.enableOcr && worker) {
-          progress('ocr', pageNumber, `หน้า ${pageNumber}: อ่านหัวการ์ด ${sequence}/${grid.regions.length}`);
-          try {
-            productText = (await productFieldOcr(worker, canvas, bounds, productText)) || productText;
-          } catch {
-            warnings.push(`card:${pageNumber}:${sequence}:product_field_ocr_failed`);
-          }
-        }
+        const productText = textIn(textItems, productZone(bounds));
         const rawText = textIn(textItems, bounds);
         const failureReasons = [
           ...(!classId ? ['class_missing'] : []),
