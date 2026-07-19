@@ -7,10 +7,17 @@ import type { ScopeResolution } from './scope-matcher';
 import type { MasterMatchMethod, PromotionFamily, Sku } from './types';
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 
+const AUDIT_CHUNK_SIZE = 12;
+
 interface AuditEvidence {
   score: number | null;
   margin: number | null;
   method: MasterMatchMethod;
+}
+
+export interface MasterMatchAuditProgress {
+  processed: number;
+  total: number;
 }
 
 function bounded(value: number): number {
@@ -54,32 +61,22 @@ function scopeEvidence(
   };
 }
 
-export function attachMasterMatchAuditEvidence(
-  result: GroupingResult,
-  imported: ImportedCardCandidate[],
+function evidenceForGroup(
+  group: GroupingResult['groups'][number],
+  sourceById: Map<string, ImportedCardCandidate>,
   existingSkus: Sku[],
-  promotionFamilies: PromotionFamily[],
-  visualSignatures: Record<string, string>,
-  scopeResolutions?: Map<string, ScopeResolution>,
-): GroupingResult {
-  const sourceById = new Map(imported.map(card => [card.cardId, card]));
-  const resolutions = scopeResolutions || resolveScopesSafely(imported, promotionFamilies, visualSignatures);
-  const evidenceByGroup = new Map<string, AuditEvidence>();
+  resolutions: Map<string, ScopeResolution>,
+): AuditEvidence | null {
+  if (!String(group.sku.id).startsWith('MASTER-')) return { score: null, margin: null, method: 'new_sku' };
+  const sources = group.cardIds.flatMap(cardId => {
+    const source = sourceById.get(cardId);
+    return source ? [source] : [];
+  });
+  return textEvidence(group.sku, sources, existingSkus)
+    || scopeEvidence(group.sku, sources, existingSkus, resolutions);
+}
 
-  for (const group of result.groups) {
-    if (!String(group.sku.id).startsWith('MASTER-')) {
-      evidenceByGroup.set(group.id, { score: null, margin: null, method: 'new_sku' });
-      continue;
-    }
-    const sources = group.cardIds.flatMap(cardId => {
-      const source = sourceById.get(cardId);
-      return source ? [source] : [];
-    });
-    const evidence = textEvidence(group.sku, sources, existingSkus)
-      || scopeEvidence(group.sku, sources, existingSkus, resolutions);
-    if (evidence) evidenceByGroup.set(group.id, evidence);
-  }
-
+function applyAuditEvidence(result: GroupingResult, evidenceByGroup: Map<string, AuditEvidence>): GroupingResult {
   return {
     ...result,
     cards: result.cards.map(card => {
@@ -95,4 +92,57 @@ export function attachMasterMatchAuditEvidence(
       };
     }),
   };
+}
+
+function auditContext(
+  imported: ImportedCardCandidate[],
+  promotionFamilies: PromotionFamily[],
+  visualSignatures: Record<string, string>,
+  scopeResolutions?: Map<string, ScopeResolution>,
+): { sourceById: Map<string, ImportedCardCandidate>; resolutions: Map<string, ScopeResolution> } {
+  return {
+    sourceById: new Map(imported.map(card => [card.cardId, card])),
+    resolutions: scopeResolutions || resolveScopesSafely(imported, promotionFamilies, visualSignatures),
+  };
+}
+
+export function attachMasterMatchAuditEvidence(
+  result: GroupingResult,
+  imported: ImportedCardCandidate[],
+  existingSkus: Sku[],
+  promotionFamilies: PromotionFamily[],
+  visualSignatures: Record<string, string>,
+  scopeResolutions?: Map<string, ScopeResolution>,
+): GroupingResult {
+  const { sourceById, resolutions } = auditContext(imported, promotionFamilies, visualSignatures, scopeResolutions);
+  const evidenceByGroup = new Map<string, AuditEvidence>();
+  for (const group of result.groups) {
+    const evidence = evidenceForGroup(group, sourceById, existingSkus, resolutions);
+    if (evidence) evidenceByGroup.set(group.id, evidence);
+  }
+  return applyAuditEvidence(result, evidenceByGroup);
+}
+
+export async function attachMasterMatchAuditEvidenceAsync(
+  result: GroupingResult,
+  imported: ImportedCardCandidate[],
+  existingSkus: Sku[],
+  promotionFamilies: PromotionFamily[],
+  visualSignatures: Record<string, string>,
+  scopeResolutions?: Map<string, ScopeResolution>,
+  onProgress?: (progress: MasterMatchAuditProgress) => void,
+): Promise<GroupingResult> {
+  const { sourceById, resolutions } = auditContext(imported, promotionFamilies, visualSignatures, scopeResolutions);
+  const evidenceByGroup = new Map<string, AuditEvidence>();
+  for (let index = 0; index < result.groups.length; index += 1) {
+    const group = result.groups[index];
+    const evidence = evidenceForGroup(group, sourceById, existingSkus, resolutions);
+    if (evidence) evidenceByGroup.set(group.id, evidence);
+    const processed = index + 1;
+    if (processed % AUDIT_CHUNK_SIZE === 0 || processed === result.groups.length) {
+      onProgress?.({ processed, total: result.groups.length });
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
+  }
+  return applyAuditEvidence(result, evidenceByGroup);
 }
