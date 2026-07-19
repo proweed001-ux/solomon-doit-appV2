@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { groupImportedCards } from '../../src/promo-new/domain/grouping';
+import { applyPromotionFamily, groupImportedCards } from '../../src/promo-new/domain/grouping';
 import { attachMasterMatchAuditEvidence } from '../../src/promo-new/domain/master-match-audit';
 import type { PromoDataset, PromotionFamily, PromotionTier, Sku } from '../../src/promo-new/domain/types';
 import type { ImportedCardCandidate } from '../../src/promo-new/import/pdf-importer';
@@ -85,6 +85,8 @@ function buildDataset(): PromoDataset {
     {},
   );
   const audited = attachMasterMatchAuditEvidence(grouped, [source], [master], [family], {});
+  assert.equal(audited.groups.length, 1);
+  const applied = applyPromotionFamily(audited.groups[0], audited.cards, family);
   return {
     schema: 'promo-system-rebuild-v1',
     version: {
@@ -100,8 +102,8 @@ function buildDataset(): PromoDataset {
     },
     skus: audited.skus,
     prices: audited.prices,
-    cards: audited.cards,
-    productGroups: audited.groups,
+    cards: applied.cards,
+    productGroups: [applied.group],
     promotionFamilies: [family],
     warnings: audited.warnings,
   };
@@ -110,6 +112,8 @@ function buildDataset(): PromoDataset {
 test('real matcher score, margin and method reach the legacy upload plan unchanged', async () => {
   const dataset = buildDataset();
   assert.equal(dataset.cards.length, 1);
+  assert.equal(dataset.cards[0].status, 'ready');
+  assert.equal(dataset.productGroups[0].status, 'ready');
   const evidence = dataset.cards[0].evidence;
   assert.equal(evidence.masterMatchMethod, 'master_text');
   assert.ok(Number(evidence.masterMatchScore) >= 85);
