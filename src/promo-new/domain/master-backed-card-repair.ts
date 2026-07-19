@@ -98,7 +98,9 @@ export function repairCardsWithMasterBackedScopes(
   existingSkus: Sku[],
 ): MasterBackedCardRepairResult {
   const scopes = buildProductScopes(families);
-  const preparedMasters = existingSkus.map(prepareMaster);
+  const preparedMasters = existingSkus
+    .map(prepareMaster)
+    .filter(master => Boolean(master.parsed.identity.brand && master.parsed.identity.productType));
   let repaired = 0;
   let rejectedConflictingSizes = 0;
   const warnings: string[] = [];
