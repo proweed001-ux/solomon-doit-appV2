@@ -88,7 +88,7 @@ export function validateCard(card: PromoCard): string[] {
   if (!Number.isInteger(card.page) || card.page < 1) errors.push('page_invalid');
   if (!Number.isInteger(card.sequence) || card.sequence < 1) errors.push('sequence_invalid');
   if (!card.classId) errors.push('class_missing');
-  if (!card.imageUrl.trim()) errors.push('card_image_missing');
+  if (!String(card.imageUrl || '').trim()) errors.push('card_image_missing');
   if (!card.skuId) errors.push('sku_missing');
   if (!card.productGroupId) errors.push('product_group_missing');
   if (!card.promotionFamilyId) errors.push('promotion_family_missing');
