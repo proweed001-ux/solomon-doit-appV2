@@ -86,13 +86,21 @@ function normalizedCandidate(sourceText: string): Sku {
   return { ...candidate, canonicalName: buildSkuDisplayName(candidate) };
 }
 
+type GroupingMethod = 'master_text' | 'structured_scope' | 'visual_consensus' | 'exact_identity' | 'unmatched';
+
 interface ResolvedCard {
   source: ImportedCardCandidate;
   observed: Sku;
   scope: ProductScopeCandidate | null;
   resolution: ScopeResolution;
   masterMatch: MasterTextMatch;
+  groupingMethod: GroupingMethod;
   bucketKey: string | null;
+}
+
+function scopeMasterMatch(scope: ProductScopeCandidate, existingSkus: Sku[]): MasterTextMatch {
+  const evidence = normalizeProductOcrText(`${scope.name} ${scope.rawText}`);
+  return matchProductMasterByText(normalizedCandidate(evidence), evidence, existingSkus);
 }
 
 function chooseObserved(members: ResolvedCard[]): Sku {
@@ -138,28 +146,38 @@ export function groupImportedCards(
 ): GroupingResult {
   const scopeResolutions = promotionFamilies.length ? resolveScopesSafely(imported, promotionFamilies, visualSignatures) : new Map<string, ScopeResolution>();
   const existingByIdentity = new Map(existingSkus.map(sku => [sku.identityKey, sku]));
+  const scopeMasterMatches = new Map<string, MasterTextMatch>();
   const diagnostics = { masterText: 0, structuredScope: 0, visualConsensus: 0, exactIdentity: 0, unresolved: 0 };
   const resolved: ResolvedCard[] = imported.map(source => {
     const sourceText = normalizeProductOcrText(source.productText || source.rawText);
     const observed = normalizedCandidate(sourceText);
-    const masterMatch = matchProductMasterByText(observed, sourceText, existingSkus);
+    const directMasterMatch = matchProductMasterByText(observed, sourceText, existingSkus);
     const resolution = scopeResolutions.get(source.cardId) || { scope: null, score: 0, margin: 0, method: 'unmatched' as const };
     const scope = resolution.scope;
-    if (masterMatch.status === 'matched' && masterMatch.sku && source.classId) {
+    if (directMasterMatch.status === 'matched' && directMasterMatch.sku && source.classId) {
       diagnostics.masterText += 1;
-      return { source, observed, scope, resolution, masterMatch, bucketKey: `master:${masterMatch.sku.id}` };
+      return { source, observed, scope, resolution, masterMatch: directMasterMatch, groupingMethod: 'master_text', bucketKey: `master:${directMasterMatch.sku.id}` };
     }
     if (scope) {
       if (resolution.method === 'visual_consensus') diagnostics.visualConsensus += 1;
       else diagnostics.structuredScope += 1;
-      return { source, observed, scope, resolution, masterMatch, bucketKey: `scope:${scope.key}` };
+      let matched = scopeMasterMatches.get(scope.key);
+      if (!matched) {
+        matched = scopeMasterMatch(scope, existingSkus);
+        scopeMasterMatches.set(scope.key, matched);
+      }
+      const method = resolution.method === 'visual_consensus' ? 'visual_consensus' : 'structured_scope';
+      if (matched.status === 'matched' && matched.sku) {
+        return { source, observed, scope, resolution, masterMatch: matched, groupingMethod: method, bucketKey: `master:${matched.sku.id}` };
+      }
+      return { source, observed, scope, resolution, masterMatch: directMasterMatch, groupingMethod: method, bucketKey: `scope:${scope.key}` };
     }
     if (observed.status !== 'quarantine' && source.classId) {
       diagnostics.exactIdentity += 1;
-      return { source, observed, scope: null, resolution, masterMatch, bucketKey: `identity:${observed.identityKey}` };
+      return { source, observed, scope: null, resolution, masterMatch: directMasterMatch, groupingMethod: 'exact_identity', bucketKey: `identity:${observed.identityKey}` };
     }
     diagnostics.unresolved += 1;
-    return { source, observed, scope: null, resolution, masterMatch, bucketKey: null };
+    return { source, observed, scope: null, resolution, masterMatch: directMasterMatch, groupingMethod: 'unmatched', bucketKey: null };
   });
   const unresolved = resolved.filter(item => !item.bucketKey || !item.source.classId);
   const quarantineCards = unresolved.map(item => ({
@@ -256,10 +274,7 @@ export function groupImportedCards(
       status: blocked ? 'blocked' : price.effectivePrice && sku.status === 'active' && family && !failureReasons.length ? 'ready' : 'need_review',
       failureReasons,
     });
-    for (const member of members) {
-      const method = member.masterMatch.status === 'matched' ? 'master_text' : member.resolution.scope ? member.resolution.method : 'exact_identity';
-      warnings.push(`card:${member.source.cardId}:grouping_method:${method}`);
-    }
+    for (const member of members) warnings.push(`card:${member.source.cardId}:grouping_method:${member.groupingMethod}`);
   }
   for (const card of quarantineCards) warnings.push(`card:${card.cardId}:${card.failureReasons.join(',') || 'sku_quarantine'}`);
   warnings.push(`grouping:master_text:${diagnostics.masterText}`);
