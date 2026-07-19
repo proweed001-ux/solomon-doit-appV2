@@ -20,6 +20,10 @@ export type { PositionedText } from './ocr-items';
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
+export const MAX_PROMO_PDF_BYTES = 50 * 1024 * 1024;
+export const MAX_PROMO_PDF_PAGES = 120;
+export const MAX_PROMO_PDF_CARDS = 2_000;
+
 export interface ImportedCardCandidate {
   cardId: string;
   monthKey: string;
@@ -225,9 +229,16 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
   const started = performance.now();
   const monthKey = String(options.monthKey || '').normalize('NFKC').trim().toUpperCase().replace(/[^A-Z0-9ก-๙_-]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 48);
   if (!monthKey) throw new Error('month_key_required');
+  if (!(file?.size > 0)) throw new Error('promo_pdf_empty');
+  if (file.size > MAX_PROMO_PDF_BYTES) throw new Error(`promo_pdf_too_large:${file.size}/${MAX_PROMO_PDF_BYTES}`);
   assertProductMasterReady();
   const bytes = new Uint8Array(await file.arrayBuffer());
   const document = await pdfjs.getDocument({ data: bytes }).promise;
+  if (!Number.isInteger(document.numPages) || document.numPages < 1 || document.numPages > MAX_PROMO_PDF_PAGES) {
+    const pageCount = Number(document.numPages || 0);
+    await document.destroy();
+    throw new Error(`promo_pdf_page_limit:${pageCount}/${MAX_PROMO_PDF_PAGES}`);
+  }
   const cards: ImportedCardCandidate[] = [];
   const pages: PdfImportResult['pages'] = [];
   const pageClassObservations: PageClassObservation[] = [];
@@ -260,6 +271,12 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       const page = await document.getPage(pageNumber);
       const { canvas, viewport } = await canvasFromPage(page);
       const grid = detectCardGrid(canvas, pageNumber);
+      if (cards.length + grid.regions.length > MAX_PROMO_PDF_CARDS) {
+        canvas.width = 1;
+        canvas.height = 1;
+        page.cleanup();
+        throw new Error(`promo_pdf_card_limit:${cards.length + grid.regions.length}/${MAX_PROMO_PDF_CARDS}`);
+      }
       let textItems = await pdfTextItems(page, viewport);
       let textMethod: 'pdf_text' | 'page_ocr' | 'none' = textItems.length ? 'pdf_text' : 'none';
       if (!textItems.length && options.enableOcr) {
@@ -359,11 +376,13 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
     card.cardId = makeCardId(monthKey, card.classId, card.page, card.sequence);
     card.failureReasons = card.failureReasons.filter(reason => reason !== 'class_missing');
     if (!card.classId) card.failureReasons.push('class_missing');
-    if (!previousClass && card.classId) card.confidence = Number(Math.min(1, card.confidence + 0.2).toFixed(3));
+    if (!previousClass && card.classId) warnings.push(`card:${card.cardId}:class_recovered_without_product_confidence_boost`);
   }
 
   const ids = cards.map(card => card.cardId);
-  if (new Set(ids).size !== ids.length) warnings.push('duplicate_card_id');
+  if (new Set(ids).size !== ids.length) throw new Error('duplicate_card_id');
+  const positions = cards.map(card => `${card.page}:${card.sequence}`);
+  if (new Set(positions).size !== positions.length) throw new Error('duplicate_card_position');
   progress('complete', document.numPages, `เสร็จ ${cards.length} การ์ด`);
   return { cards, pages, elapsedMs: Math.round(performance.now() - started), warnings: [...new Set(warnings)] };
 }
