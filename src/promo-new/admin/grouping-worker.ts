@@ -2,6 +2,7 @@
 
 import { groupImportedCards } from '../domain/grouping';
 import { applyClassMatrixRecovery } from '../domain/class-matrix';
+import { attachMasterMatchAuditEvidence } from '../domain/master-match-audit';
 import { buildProductScopes } from '../domain/scope-matcher';
 import { resolveScopesSafely } from '../domain/scope-safety';
 import type { PromotionFamily, Sku } from '../domain/types';
@@ -60,7 +61,7 @@ workerScope.onmessage = (event: MessageEvent<GroupingWorkerRequest>) => {
         ? `Class Matrix กู้ ${matrix.recovered} การ์ด · คลุมเครือ ${matrix.ambiguous} การ์ด`
         : 'ใช้ข้อความและ Product Master เป็นหลัก · ไม่สร้างหรือเทียบลายนิ้วมือภาพ',
     } satisfies GroupingWorkerResponse);
-    const result = groupImportedCards(
+    let result = groupImportedCards(
       payload.monthKey,
       hintedCards,
       payload.existingSkus,
@@ -80,6 +81,13 @@ workerScope.onmessage = (event: MessageEvent<GroupingWorkerRequest>) => {
         },
       } : card;
     });
+    result = attachMasterMatchAuditEvidence(
+      result,
+      payload.cards,
+      payload.existingSkus,
+      payload.promotionFamilies,
+      payload.visualSignatures,
+    );
     result.warnings = [...new Set([
       ...result.warnings,
       `grouping:class_matrix:${matrix.recovered}`,
