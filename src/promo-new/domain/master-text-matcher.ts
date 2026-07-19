@@ -84,9 +84,7 @@ function bigrams(value: string): string[] {
   return Array.from({ length: source.length - 1 }, (_, index) => source.slice(index, index + 2));
 }
 
-function diceSimilarity(left: string, right: string): number {
-  const a = bigrams(left);
-  const b = bigrams(right);
+function diceSimilarityFromBigrams(a: string[], b: string[]): number {
   if (!a.length || !b.length) return 0;
   const counts = new Map<string, number>();
   for (const item of a) counts.set(item, (counts.get(item) || 0) + 1);
@@ -98,6 +96,10 @@ function diceSimilarity(left: string, right: string): number {
     counts.set(item, remaining - 1);
   }
   return (2 * overlap) / (a.length + b.length);
+}
+
+function diceSimilarity(left: string, right: string): number {
+  return diceSimilarityFromBigrams(bigrams(left), bigrams(right));
 }
 
 function sameNumber(left: number, right: number): boolean {
@@ -112,9 +114,24 @@ interface ScoredMaster {
   criticalEvidence: number;
 }
 
-function scoreMaster(observed: Sku, sourceText: string, master: Sku): ScoredMaster | null {
+interface PreparedMaster {
+  sku: Sku;
+  evidenceBigrams: string[][];
+}
+
+function prepareMasters(existingSkus: Sku[]): PreparedMaster[] {
+  return existingSkus
+    .filter(sku => sku.status === 'active' && !PLACEHOLDER_MASTER.test(sku.canonicalName))
+    .flatMap(sku => {
+      const parsed = parsedMasterSku(sku);
+      if (!parsed) return [];
+      return [{ sku: parsed, evidenceBigrams: meaningfulEvidence(parsed).map(value => bigrams(value)) }];
+    });
+}
+
+function scoreMaster(observed: Sku, sourceTextBigrams: string[], master: PreparedMaster): ScoredMaster | null {
   const left = inferredIdentity(observed.identity);
-  const right = inferredIdentity(master.identity);
+  const right = inferredIdentity(master.sku.identity);
   let score = 0;
   let criticalEvidence = 0;
 
@@ -151,14 +168,14 @@ function scoreMaster(observed: Sku, sourceText: string, master: Sku): ScoredMast
     score += Math.round(20 * variantSimilarity);
   }
 
-  const aliasSimilarity = Math.max(...meaningfulEvidence(master).map(value => diceSimilarity(sourceText, value)), 0);
+  const aliasSimilarity = Math.max(...master.evidenceBigrams.map(value => diceSimilarityFromBigrams(sourceTextBigrams, value)), 0);
   if (aliasSimilarity >= 0.45) score += Math.round(10 * aliasSimilarity);
 
   const missingSizeOnEitherSide = !(left.sizeValue > 0 && right.sizeValue > 0);
   if (missingSizeOnEitherSide && variantSimilarity < 0.6 && criticalEvidence < 3) return null;
   if (criticalEvidence < 2) return null;
 
-  return { sku: master, score, aliasSimilarity, variantSimilarity, criticalEvidence };
+  return { sku: master.sku, score, aliasSimilarity, variantSimilarity, criticalEvidence };
 }
 
 export interface MasterTextMatch {
@@ -169,10 +186,12 @@ export interface MasterTextMatch {
   candidateCount: number;
 }
 
-export function matchProductMasterByText(
+export type ProductMasterTextMatcher = (observedInput: Sku, sourceTextInput: string) => MasterTextMatch;
+
+function matchPreparedProductMasterByText(
   observedInput: Sku,
   sourceTextInput: string,
-  existingSkus: Sku[],
+  preparedMasters: PreparedMaster[],
 ): MasterTextMatch {
   const sourceText = repairCommonProductOcr(sourceTextInput);
   const inputIdentity = inferredIdentity(observedInput.identity);
@@ -183,12 +202,10 @@ export function matchProductMasterByText(
   };
   const repaired = evidenceCandidate(sourceText);
   const observed = candidateQuality(repaired) > candidateQuality(normalizedInput) ? repaired : normalizedInput;
-  const scored = existingSkus
-    .filter(sku => sku.status === 'active' && !PLACEHOLDER_MASTER.test(sku.canonicalName))
-    .flatMap(sku => {
-      const parsed = parsedMasterSku(sku);
-      if (!parsed) return [];
-      const result = scoreMaster(observed, sourceText, parsed);
+  const sourceTextBigrams = bigrams(sourceText);
+  const scored = preparedMasters
+    .flatMap(master => {
+      const result = scoreMaster(observed, sourceTextBigrams, master);
       return result ? [result] : [];
     })
     .sort((left, right) => right.score - left.score || right.aliasSimilarity - left.aliasSimilarity);
@@ -204,4 +221,17 @@ export function matchProductMasterByText(
     return { status: 'ambiguous', sku: null, score: best.score, margin, candidateCount: scored.length };
   }
   return { status: 'matched', sku: best.sku, score: best.score, margin, candidateCount: scored.length };
+}
+
+export function createProductMasterTextMatcher(existingSkus: Sku[]): ProductMasterTextMatcher {
+  const preparedMasters = prepareMasters(existingSkus);
+  return (observedInput, sourceTextInput) => matchPreparedProductMasterByText(observedInput, sourceTextInput, preparedMasters);
+}
+
+export function matchProductMasterByText(
+  observedInput: Sku,
+  sourceTextInput: string,
+  existingSkus: Sku[],
+): MasterTextMatch {
+  return createProductMasterTextMatcher(existingSkus)(observedInput, sourceTextInput);
 }
