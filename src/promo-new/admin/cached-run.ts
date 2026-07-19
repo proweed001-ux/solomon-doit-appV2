@@ -5,6 +5,7 @@ import type { PdfImportResult } from '../import/pdf-importer';
 export interface PreparedCachedRun {
   imported: PdfImportResult;
   visualSignatures: Record<string, string>;
+  pipelineVersion: typeof PROMO_TEST_PIPELINE_VERSION;
   warnings: string[];
   changedClasses: number;
   recoveredPages: number;
@@ -50,6 +51,7 @@ export function prepareCachedRun(
   return {
     imported,
     visualSignatures,
+    pipelineVersion: PROMO_TEST_PIPELINE_VERSION,
     warnings: [
       `cache:pipeline:${PROMO_TEST_PIPELINE_VERSION}`,
       `cache:class_recovered_cards:${recovery.changedCards}`,
