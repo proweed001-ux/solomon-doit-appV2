@@ -143,8 +143,10 @@ export function groupImportedCards(
   storedPrices: StoredPrice[] = [],
   promotionFamilies: PromotionFamily[] = [],
   visualSignatures: Record<string, string> = {},
+  precomputedScopeResolutions?: Map<string, ScopeResolution>,
 ): GroupingResult {
-  const scopeResolutions = promotionFamilies.length ? resolveScopesSafely(imported, promotionFamilies, visualSignatures) : new Map<string, ScopeResolution>();
+  const scopeResolutions = precomputedScopeResolutions
+    || (promotionFamilies.length ? resolveScopesSafely(imported, promotionFamilies, visualSignatures) : new Map<string, ScopeResolution>());
   const existingByIdentity = new Map(existingSkus.map(sku => [sku.identityKey, sku]));
   const scopeMasterMatches = new Map<string, MasterTextMatch>();
   const diagnostics = { masterText: 0, structuredScope: 0, visualConsensus: 0, exactIdentity: 0, unresolved: 0 };
