@@ -5,9 +5,9 @@ const DB_NAME = 'solomon-promo-new-test-cache';
 const DB_VERSION = 1;
 const STORE_NAME = 'runs';
 const LATEST_KEY = 'latest';
-const SUMMARY_KEY = 'promo-new-test-cache-summary-v2';
-const CACHE_SCHEMA_VERSION = 2 as const;
-const PIPELINE_VERSION = 'text-first-product-master-v1' as const;
+const SUMMARY_KEY = 'promo-new-test-cache-summary-v3';
+export const PROMO_TEST_CACHE_SCHEMA_VERSION = 3 as const;
+export const PROMO_TEST_PIPELINE_VERSION = 'text-first-product-master-v2-ocr-size-consensus' as const;
 
 interface StoredFile {
   name: string;
@@ -20,8 +20,8 @@ export type PromoTestCacheMode = 'full' | 'source_only';
 
 interface StoredPromoTestCache {
   key: typeof LATEST_KEY;
-  schemaVersion: typeof CACHE_SCHEMA_VERSION;
-  pipelineVersion: typeof PIPELINE_VERSION;
+  schemaVersion: typeof PROMO_TEST_CACHE_SCHEMA_VERSION;
+  pipelineVersion: typeof PROMO_TEST_PIPELINE_VERSION;
   savedAt: string;
   monthKey: string;
   ocrEnabled: boolean;
@@ -133,8 +133,8 @@ async function deleteRecord(): Promise<void> {
 function isCurrentRecord(value: unknown): value is StoredPromoTestCache {
   if (!value || typeof value !== 'object') return false;
   const record = value as Partial<StoredPromoTestCache>;
-  return record.schemaVersion === CACHE_SCHEMA_VERSION
-    && record.pipelineVersion === PIPELINE_VERSION
+  return record.schemaVersion === PROMO_TEST_CACHE_SCHEMA_VERSION
+    && record.pipelineVersion === PROMO_TEST_PIPELINE_VERSION
     && record.key === LATEST_KEY;
 }
 
@@ -195,8 +195,8 @@ export async function savePromoTestCache(input: SavePromoTestCacheInput): Promis
   await requestPersistentStorage();
   const base = {
     key: LATEST_KEY as typeof LATEST_KEY,
-    schemaVersion: CACHE_SCHEMA_VERSION,
-    pipelineVersion: PIPELINE_VERSION,
+    schemaVersion: PROMO_TEST_CACHE_SCHEMA_VERSION,
+    pipelineVersion: PROMO_TEST_PIPELINE_VERSION,
     savedAt: new Date().toISOString(),
     monthKey: input.monthKey,
     ocrEnabled: input.ocrEnabled,
@@ -250,7 +250,7 @@ export async function loadPromoTestCache(): Promise<LoadedPromoTestCache | null>
     imported: raw.imported,
     parsedWorkbook: raw.parsedWorkbook,
     visualSignatures: {},
-    warnings: [`cache_pipeline:${PIPELINE_VERSION}`],
+    warnings: [`cache_pipeline:${PROMO_TEST_PIPELINE_VERSION}`],
   };
 }
 
