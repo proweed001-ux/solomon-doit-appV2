@@ -28,16 +28,23 @@ export type GroupingWorkerResponse =
   | { type: 'error'; error: string };
 
 const workerScope = self as unknown as DedicatedWorkerGlobalScope;
+const seconds = (startedAt: number): string => `${((performance.now() - startedAt) / 1000).toFixed(1)} วินาที`;
+const progress = (message: string): void => workerScope.postMessage({ type: 'progress', message } satisfies GroupingWorkerResponse);
 workerScope.postMessage({ type: 'ready' } satisfies GroupingWorkerResponse);
 
 workerScope.onmessage = (event: MessageEvent<GroupingWorkerRequest>) => {
   if (event.data?.type !== 'group') return;
   try {
-    workerScope.postMessage({ type: 'progress', message: 'กำลังเทียบ Product Master, ชื่อสินค้า, Class และ Promotion Scope' } satisfies GroupingWorkerResponse);
+    const totalStarted = performance.now();
+    progress('กำลังเทียบ Product Master, ชื่อสินค้า, Class และ Promotion Scope');
     const payload = event.data.payload;
+    const scopeStarted = performance.now();
     const initial = resolveScopesSafely(payload.cards, payload.promotionFamilies, payload.visualSignatures);
-    const hasVisualEvidence = Object.values(payload.visualSignatures).some(value => Boolean(value));
+    const hasVisualEvidence = Object.values(payload.visualSignatures).some(value => typeof value === 'string' && value.length >= 64);
+    progress(`วิเคราะห์ Promotion Scope เสร็จ ${seconds(scopeStarted)} · ${hasVisualEvidence ? 'มีหลักฐานภาพ' : 'โหมดข้อความล้วน'}`);
+
     const scopes = buildProductScopes(payload.promotionFamilies);
+    const matrixStarted = performance.now();
     const matrix = hasVisualEvidence
       ? applyClassMatrixRecovery(payload.cards, scopes, initial, payload.visualSignatures)
       : { resolutions: initial, recovered: 0, ambiguous: 0 };
@@ -55,12 +62,11 @@ workerScope.onmessage = (event: MessageEvent<GroupingWorkerRequest>) => {
         rawText: `${resolution.scope.rawText} ${card.rawText}`.trim(),
       };
     });
-    workerScope.postMessage({
-      type: 'progress',
-      message: hasVisualEvidence
-        ? `Class Matrix กู้ ${matrix.recovered} การ์ด · คลุมเครือ ${matrix.ambiguous} การ์ด`
-        : 'ใช้ข้อความและ Product Master เป็นหลัก · ไม่สร้างหรือเทียบลายนิ้วมือภาพ',
-    } satisfies GroupingWorkerResponse);
+    progress(hasVisualEvidence
+      ? `Class Matrix กู้ ${matrix.recovered} การ์ด · คลุมเครือ ${matrix.ambiguous} การ์ด · ${seconds(matrixStarted)}`
+      : 'ข้าม Class Matrix และ fingerprint ภาพ เพราะไม่มีลายนิ้วมือภาพ');
+
+    const groupingStarted = performance.now();
     let result = groupImportedCards(
       payload.monthKey,
       hintedCards,
@@ -69,6 +75,7 @@ workerScope.onmessage = (event: MessageEvent<GroupingWorkerRequest>) => {
       payload.promotionFamilies,
       payload.visualSignatures,
     );
+    progress(`สร้าง SKU และ Product Group เสร็จ ${seconds(groupingStarted)} · ${result.groups.length} กลุ่ม`);
     result.cards = result.cards.map(card => {
       const original = originalEvidence.get(card.id);
       return original ? {
@@ -81,13 +88,17 @@ workerScope.onmessage = (event: MessageEvent<GroupingWorkerRequest>) => {
         },
       } : card;
     });
+
+    const auditStarted = performance.now();
     result = attachMasterMatchAuditEvidence(
       result,
       payload.cards,
       payload.existingSkus,
       payload.promotionFamilies,
       payload.visualSignatures,
+      matrix.resolutions,
     );
+    progress(`ตรวจหลักฐาน Product Master เสร็จ ${seconds(auditStarted)} · รวม ${seconds(totalStarted)}`);
     result.warnings = [...new Set([
       ...result.warnings,
       `grouping:class_matrix:${matrix.recovered}`,
