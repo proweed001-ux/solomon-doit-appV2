@@ -8,6 +8,8 @@ const required = [
   'api/promo-new.js', 'api/promo-legacy-auth.js', 'api/_promo-new/supabase.js',
   'src/promo-new/shared/api.ts', 'src/promo-new/import/pdf-importer.ts',
   'src/promo-new/import/workbook-parser.ts', 'src/promo-new/import/workbook-safety.ts',
+  'src/promo-new/admin/grouping-worker.ts', 'src/promo-new/domain/master-match-audit.ts',
+  'src/promo-new/domain/master-text-matcher.ts', 'vite.promo-new.config.ts',
   'scripts/prepare-sheetjs-lock.mjs',
   'docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md',
   'supabase/migrations/20260716083231_promo_system_rebuild.sql',
@@ -76,6 +78,19 @@ check(workbookParser.includes('decodePromotionCsv(bytes)'), 'workbook_csv_decode
 check(!workbookParser.includes('candidate.includes(value)'), 'workbook_reverse_partial_header_match_reintroduced');
 check(workbookParser.includes("carriedFamilyId = '';\n      carriedName = '';\n      carriedScope = '';"), 'workbook_blank_row_carry_reset_missing');
 
+const groupingWorker = read('src/promo-new/admin/grouping-worker.ts');
+check(groupingWorker.includes('await attachMasterMatchAuditEvidenceAsync('), 'chunked_master_audit_not_wired');
+check(groupingWorker.includes('ตรวจหลักฐาน Product Master ${state.processed}/${state.total} กลุ่ม'), 'master_audit_progress_missing');
+const masterAudit = read('src/promo-new/domain/master-match-audit.ts');
+check(masterAudit.includes('AUDIT_CHUNK_SIZE = 12'), 'master_audit_chunk_size_missing');
+check(masterAudit.includes('await new Promise<void>(resolve => setTimeout(resolve, 0))'), 'master_audit_event_loop_yield_missing');
+const masterMatcher = read('src/promo-new/domain/master-text-matcher.ts');
+check(masterMatcher.includes('byBrand: Map<string, PreparedMaster[]>'), 'product_master_brand_index_missing');
+check(masterMatcher.includes('prepared.byBrand.get(brand)'), 'product_master_brand_index_not_used');
+const promoVite = read('vite.promo-new.config.ts');
+check(promoVite.includes("name: 'promo-build-id'"), 'deployment_build_id_plugin_missing');
+check(promoVite.includes('VERCEL_GIT_COMMIT_SHA'), 'deployment_build_id_sha_missing');
+
 const frontend = read('src/promo-new/frontend/main.tsx');
 check(frontend.includes("card.status === 'ready'"), 'frontend_ready_only_filter_missing');
 check(frontend.includes('card.failureReasons.length === 0'), 'frontend_failure_reason_filter_missing');
@@ -138,7 +153,12 @@ check(sheetLock.includes("version: '0.20.3'"), 'sheetjs_lock_version_missing');
 check(sheetLock.includes('sha512-oLDq3jw7AcLqKWH2AhCpVTZl8mf6X2YReP+Neh0SJUzV/BdZYjth94tG5toiMB1PPrYtxOCfaoUCkvtuH+3AJA=='), 'sheetjs_lock_integrity_missing');
 check(vercel.outputDirectory === 'dist', 'preview_output_directory_changed');
 
-for (const file of walk('dist/assets/promo-new').filter(file => file.endsWith('.js'))) {
+const builtPromoJsFiles = walk('dist/assets/promo-new').filter(file => file.endsWith('.js'));
+const builtPromoJs = builtPromoJsFiles.map(file => read(file)).join('\n');
+const buildCommit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
+check(builtPromoJs.includes(`PROMO-${buildCommit}-XLSX-WORKER-HARDENED`), 'deployed_build_id_does_not_match_commit');
+check(!builtPromoJs.includes('FINAL-UPLOAD-AUDIT-20260719-0031'), 'stale_build_id_reached_deployed_bundle');
+for (const file of builtPromoJsFiles) {
   const size = fs.statSync(path.join(root, file)).size;
   check(size < 4_500_000, `bundle_too_large_for_mobile:${file}:${size}`);
   check(!read(file).includes('process.env.NODE_ENV'), `browser_node_env_reference:${file}`);
@@ -149,4 +169,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: patched SheetJS lock, workbook ZIP/range/encoding bounds, auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
+console.log('Promo new security/static checks passed: patched SheetJS lock, workbook ZIP/range/encoding bounds, chunked Worker audit, brand-indexed Product Master, commit Build ID, auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
