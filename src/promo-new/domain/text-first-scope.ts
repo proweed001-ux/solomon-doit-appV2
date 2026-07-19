@@ -7,6 +7,7 @@ import type { PromotionFamily } from './types';
 const clean = (value: unknown): string => normalizeProductText(value).replace(/\s+/g, ' ').trim();
 const tokens = (value: unknown): string[] => clean(value).toUpperCase().split(/[^A-Z0-9ก-๙&]+/gu).filter(Boolean);
 const compact = (value: unknown): string => tokens(value).join('');
+const CHUNK_SIZE = 12;
 
 const BRAND_EVIDENCE: Record<string, string[]> = {
   'H&S': ['H&S', 'HEAD&SHOULDERS', 'HEADANDSHOULDERS', 'เฮดแอนด์โชว์เดอร์', 'เฮดแอนด์โชว์เตอร์', 'เฮดแอนด์โชวเดอร์'],
@@ -63,9 +64,15 @@ function contradictsScope(text: string, scope: ProductScopeCandidate): boolean {
   return exclusions(scope).some(token => evidenceTokens.has(token));
 }
 
-function safeStructuredResolution(card: ImportedCardCandidate, scopes: ProductScopeCandidate[]): ScopeResolution {
+function safeStructuredResolution(
+  card: ImportedCardCandidate,
+  scopes: ProductScopeCandidate[],
+  brand: string | null,
+): ScopeResolution {
+  if (!brand || !card.classId || !scopes.length) {
+    return { scope: null, score: 0, margin: 0, method: 'unmatched' };
+  }
   const evidence = `${card.productText} ${card.rawText}`;
-  const brand = safeBrand(evidence);
   const normalizedCard = brand === 'PANTENE' && tokens(evidence).includes('PT')
     ? {
       ...card,
@@ -76,17 +83,59 @@ function safeStructuredResolution(card: ImportedCardCandidate, scopes: ProductSc
   const resolution = resolveStructuredScope(normalizedCard, scopes);
   const scope = resolution.scope;
   if (!scope) return resolution;
-  if (!brand || brand !== scope.brand || contradictsScope(evidence, scope)) {
+  if (brand !== scope.brand || contradictsScope(evidence, scope)) {
     return { scope: null, score: resolution.score, margin: resolution.margin, method: 'unmatched' };
   }
   return resolution;
 }
 
-export function resolveTextFirstScopesSafely(
+function indexScopes(scopes: ProductScopeCandidate[]): Map<string, ProductScopeCandidate[]> {
+  const index = new Map<string, ProductScopeCandidate[]>();
+  for (const scope of scopes) {
+    for (const classId of scope.classIds) {
+      const key = `${classId}|${scope.brand}`;
+      const list = index.get(key) || [];
+      list.push(scope);
+      index.set(key, list);
+    }
+  }
+  return index;
+}
+
+export interface TextFirstScopeProgress {
+  processed: number;
+  total: number;
+  candidateComparisons: number;
+  scopeCount: number;
+}
+
+export async function resolveTextFirstScopesSafely(
   cards: ImportedCardCandidate[],
   families: PromotionFamily[],
-): Map<string, ScopeResolution> {
+  onProgress?: (progress: TextFirstScopeProgress) => void,
+): Promise<Map<string, ScopeResolution>> {
   recoverCachedCardClasses(cards, {});
   const scopes = buildProductScopes(families);
-  return new Map(cards.map(card => [card.cardId, safeStructuredResolution(card, scopes)]));
+  const byClassAndBrand = indexScopes(scopes);
+  const resolutions = new Map<string, ScopeResolution>();
+  let candidateComparisons = 0;
+
+  for (let index = 0; index < cards.length; index += 1) {
+    const card = cards[index];
+    const evidence = `${card.productText} ${card.rawText}`;
+    const brand = safeBrand(evidence);
+    const candidates = card.classId && brand
+      ? byClassAndBrand.get(`${card.classId}|${brand}`) || []
+      : [];
+    candidateComparisons += candidates.length;
+    resolutions.set(card.cardId, safeStructuredResolution(card, candidates, brand));
+
+    const processed = index + 1;
+    if (processed % CHUNK_SIZE === 0 || processed === cards.length) {
+      onProgress?.({ processed, total: cards.length, candidateComparisons, scopeCount: scopes.length });
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
+  }
+
+  return resolutions;
 }
