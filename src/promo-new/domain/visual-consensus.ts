@@ -186,6 +186,13 @@ function encode(bytes: number[]): string {
   return bytes.map(value => clampByte(value).toString(16).padStart(2, '0')).join('');
 }
 
+function validEncodedSignature(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.length >= 64
+    && value.length % 2 === 0
+    && /^[0-9a-f]+$/iu.test(value);
+}
+
 export function exactCachedVisualSignatures(
   cards: ImportedCardCandidate[],
   storedCards: ImportedCardCandidate[] | undefined,
@@ -196,8 +203,9 @@ export function exactCachedVisualSignatures(
   const exact: Record<string, string> = {};
   for (const card of cards) {
     const stored = storedById.get(card.cardId);
-    if (!stored || stored.imageUrl !== card.imageUrl || !Object.prototype.hasOwnProperty.call(signatures, card.cardId)) return null;
-    exact[card.cardId] = signatures[card.cardId];
+    const signature = signatures[card.cardId];
+    if (!stored || stored.imageUrl !== card.imageUrl || !validEncodedSignature(signature)) return null;
+    exact[card.cardId] = signature;
   }
   return exact;
 }
