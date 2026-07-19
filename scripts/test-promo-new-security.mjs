@@ -7,6 +7,7 @@ const required = [
   'dist/promo-admin-new.html', 'dist/promo-new.html', 'dist/assets/promo-new/admin.js', 'dist/assets/promo-new/frontend.js',
   'api/promo-new.js', 'api/promo-legacy-auth.js', 'api/_promo-new/supabase.js',
   'src/promo-new/shared/api.ts', 'src/promo-new/import/pdf-importer.ts',
+  'scripts/prepare-sheetjs-lock.mjs',
   'docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md',
   'supabase/migrations/20260716083231_promo_system_rebuild.sql',
   'supabase/rollback/20260716083231_promo_system_rebuild.sql',
@@ -109,7 +110,11 @@ const verifiedBuild = vercel.buildCommand === 'npm run verify:promo-new'
   && String(packageJson.scripts?.['verify:promo-new'] || '').includes('npm run test:promo-new')
   && String(packageJson.scripts?.['verify:promo-new'] || '').includes('npm run test:promo-new-security');
 check(directBuild || verifiedBuild, 'preview_must_build_verified_promo_source');
-check(vercel.installCommand === 'npm ci', 'preview_install_must_be_lockfile_deterministic');
+check(vercel.installCommand === 'node scripts/prepare-sheetjs-lock.mjs && npm ci --no-fund', 'preview_install_must_patch_and_use_deterministic_lock');
+check(packageJson.dependencies?.xlsx === 'https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz', 'sheetjs_patched_source_missing');
+const sheetLock = read('scripts/prepare-sheetjs-lock.mjs');
+check(sheetLock.includes("version: '0.20.3'"), 'sheetjs_lock_version_missing');
+check(sheetLock.includes('sha512-oLDq3jw7AcLqKWH2AhCpVTZl8mf6X2YReP+Neh0SJUzV/BdZYjth94tG5toiMB1PPrYtxOCfaoUCkvtuH+3AJA=='), 'sheetjs_lock_integrity_missing');
 check(vercel.outputDirectory === 'dist', 'preview_output_directory_changed');
 
 for (const file of walk('dist/assets/promo-new').filter(file => file.endsWith('.js'))) {
@@ -123,4 +128,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
+console.log('Promo new security/static checks passed: patched SheetJS lock, auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
