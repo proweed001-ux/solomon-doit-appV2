@@ -13,13 +13,14 @@ test('dry-run requires an upload-key session and validates stored sessions befor
   assert.match(html, /sessionStorage\.removeItem\(sessionKey\)/u);
 });
 
-test('dry-run hides write controls and API blocks write calls independently of the UI', () => {
+test('all rebuild Preview modes hide write controls and API blocks write calls independently of the UI', () => {
   const html = read('dist/promo-admin-new.html');
   const api = read('src/promo-new/shared/api.ts');
-  assert.match(html, /body\[data-promo-readonly="1"\] \.footer-actions \.btn\.primary/u);
-  assert.match(html, /body\[data-promo-readonly="1"\] \.footer-actions \.btn\.dark/u);
-  assert.match(html, /if \(demo \|\| dryRun\) document\.body\.dataset\.promoReadonly = '1'/u);
+  assert.match(html, /\.footer-actions \.btn\.primary/u);
+  assert.match(html, /\.footer-actions \.btn\.dark/u);
+  assert.match(api, /const LEGACY_WRITES_ENABLED = false/u);
   assert.match(api, /function assertWritableRuntime\(\)/u);
+  assert.match(api, /legacy_write_disabled_pending_atomic_revision_staging/u);
   assert.match(api, /read_only_runtime_write_blocked/u);
   assert.match(api, /export async function saveDraft[\s\S]*?assertWritableRuntime\(\)/u);
   assert.match(api, /export async function publishVersion[\s\S]*?assertWritableRuntime\(\)/u);
