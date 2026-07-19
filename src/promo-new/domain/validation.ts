@@ -8,14 +8,24 @@ export interface ValidationResult {
 
 const finitePositive = (value: unknown): value is number => Number.isFinite(Number(value)) && Number(value) > 0;
 
+function skuCanUseModelInsteadOfSize(sku: Sku): boolean {
+  const identity = sku.identity;
+  if (!identity.variant) return false;
+  if (identity.productType === 'มีดโกน' || identity.productType === 'แปรงสีฟัน') return true;
+  if (identity.productType === 'สกินแคร์' || identity.productType === 'ผลิตภัณฑ์ปรับอากาศ') return true;
+  return identity.productType === 'ปรับผ้านุ่ม' && identity.salesUnit === 'ถุง';
+}
+
 export function validateSku(sku: Sku): string[] {
   const errors: string[] = [];
   const identity = sku.identity;
+  const sizeOptional = skuCanUseModelInsteadOfSize(sku);
   if (!sku.code.trim()) errors.push('sku_code_missing');
+  if (!sku.canonicalName.trim()) errors.push('sku_canonical_name_missing');
   if (!identity.brand.trim()) errors.push('brand_missing');
   if (!identity.productType.trim()) errors.push('product_type_missing');
-  if (!finitePositive(identity.sizeValue)) errors.push('size_missing');
-  if (!identity.sizeUnit.trim()) errors.push('size_unit_missing');
+  if (!sizeOptional && !finitePositive(identity.sizeValue)) errors.push('size_missing');
+  if (!sizeOptional && !identity.sizeUnit.trim()) errors.push('size_unit_missing');
   if (!identity.salesUnit.trim()) errors.push('sales_unit_missing');
   if (!Number.isInteger(identity.packQuantity) || identity.packQuantity < 1) errors.push('pack_quantity_invalid');
   if (!sku.identityKey.trim()) errors.push('sku_identity_key_missing');
