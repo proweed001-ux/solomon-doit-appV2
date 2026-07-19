@@ -59,11 +59,13 @@ const withoutPriceBlockers = (reasons: string[]): string[] => reasons.filter(rea
 export function applyPriceToGroup(group: ProductGroup, cards: PromoCard[], price: SkuPrice): { group: ProductGroup; cards: PromoCard[] } {
   if (price.skuId !== group.skuId) throw new Error('price_sku_mismatch');
   const groupFailureReasons = withoutPriceBlockers(group.failureReasons);
+  const priceReady = Number(price.effectivePrice?.amount) > 0;
+  const skuReady = group.sku.status === 'active' && group.sku.failureReasons.length === 0;
   const nextGroup: ProductGroup = {
     ...group,
     price,
     failureReasons: groupFailureReasons,
-    status: price.effectivePrice && group.promotionFamilyId && !groupFailureReasons.length ? 'ready' : 'need_review',
+    status: priceReady && skuReady && group.promotionFamilyId && !groupFailureReasons.length ? 'ready' : 'need_review',
   };
   const nextCards = cards.map(card => {
     if (!group.cardIds.includes(card.id)) return card;
@@ -72,7 +74,7 @@ export function applyPriceToGroup(group: ProductGroup, cards: PromoCard[], price
       ...card,
       price,
       failureReasons: cardFailureReasons,
-      status: price.effectivePrice && card.promotionFamilyId && card.promotionTiers.length && !cardFailureReasons.length ? 'ready' as const : 'need_review' as const,
+      status: priceReady && skuReady && card.promotionFamilyId && card.promotionTiers.length && !cardFailureReasons.length ? 'ready' as const : 'need_review' as const,
     };
   });
   return { group: nextGroup, cards: nextCards };
