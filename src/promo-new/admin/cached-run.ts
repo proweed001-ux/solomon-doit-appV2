@@ -9,12 +9,24 @@ export interface PreparedCachedRun {
   recoveredPages: number;
 }
 
+function validVisualSignature(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length < 64 || value.length % 2 !== 0) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    const digit = code >= 48 && code <= 57;
+    const lowerHex = code >= 97 && code <= 102;
+    const upperHex = code >= 65 && code <= 70;
+    if (!digit && !lowerHex && !upperHex) return false;
+  }
+  return true;
+}
+
 export function visualSignaturesComplete(
   imported: PdfImportResult,
   visualSignatures: Record<string, string> | null,
 ): visualSignatures is Record<string, string> {
   if (!visualSignatures || imported.cards.length === 0) return false;
-  return imported.cards.every(card => Object.prototype.hasOwnProperty.call(visualSignatures, card.cardId));
+  return imported.cards.every(card => validVisualSignature(visualSignatures[card.cardId]));
 }
 
 export function prepareCachedRun(
