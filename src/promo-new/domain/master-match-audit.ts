@@ -3,6 +3,7 @@ import { matchProductMasterByText } from './master-text-matcher';
 import { normalizeProductOcrText } from './product-text-normalizer';
 import { createSkuCandidate } from './sku-identity';
 import { resolveScopesSafely } from './scope-safety';
+import type { ScopeResolution } from './scope-matcher';
 import type { MasterMatchMethod, PromotionFamily, Sku } from './types';
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 
@@ -34,10 +35,8 @@ function scopeEvidence(
   groupSku: Sku,
   sources: ImportedCardCandidate[],
   existingSkus: Sku[],
-  families: PromotionFamily[],
-  visualSignatures: Record<string, string>,
+  resolutions: Map<string, ScopeResolution>,
 ): AuditEvidence | null {
-  const resolutions = resolveScopesSafely(sources, families, visualSignatures);
   const candidates = sources.flatMap(source => {
     const resolution = resolutions.get(source.cardId);
     if (!resolution?.scope) return [];
@@ -61,8 +60,10 @@ export function attachMasterMatchAuditEvidence(
   existingSkus: Sku[],
   promotionFamilies: PromotionFamily[],
   visualSignatures: Record<string, string>,
+  scopeResolutions?: Map<string, ScopeResolution>,
 ): GroupingResult {
   const sourceById = new Map(imported.map(card => [card.cardId, card]));
+  const resolutions = scopeResolutions || resolveScopesSafely(imported, promotionFamilies, visualSignatures);
   const evidenceByGroup = new Map<string, AuditEvidence>();
 
   for (const group of result.groups) {
@@ -75,7 +76,7 @@ export function attachMasterMatchAuditEvidence(
       return source ? [source] : [];
     });
     const evidence = textEvidence(group.sku, sources, existingSkus)
-      || scopeEvidence(group.sku, sources, existingSkus, promotionFamilies, visualSignatures);
+      || scopeEvidence(group.sku, sources, existingSkus, resolutions);
     if (evidence) evidenceByGroup.set(group.id, evidence);
   }
 
