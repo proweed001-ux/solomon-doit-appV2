@@ -1,6 +1,7 @@
 import type { PromoDataset, Sku } from '../domain/types';
 import type { StoredPrice } from '../domain/pricing';
 import { buildLegacyUploadPlan, chunkLegacyCards } from './legacy-system';
+import { clearProductMasterReady, markProductMasterReady } from './runtime-readiness';
 
 const SESSION_KEY = 'promo-new-admin-session-v1';
 const LAST_DRAFT_KEY = 'promo-new-legacy-draft-v1';
@@ -85,10 +86,14 @@ export function loadSession(): AdminSession | null {
 
 export function saveSession(session: AdminSession | null) {
   if (session) sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  else sessionStorage.removeItem(SESSION_KEY);
+  else {
+    sessionStorage.removeItem(SESSION_KEY);
+    clearProductMasterReady();
+  }
 }
 
 export async function login(email: string, password: string): Promise<AdminSession> {
+  clearProductMasterReady();
   const adminKey = String(password || email || '').trim();
   const response = await request<{ ok: true; session: AdminSession }>('login', {
     method: 'POST',
@@ -99,8 +104,14 @@ export async function login(email: string, password: string): Promise<AdminSessi
 }
 
 export async function validateSession(session: AdminSession): Promise<AdminSession> {
-  await request('session', { headers: { 'x-promo-admin-key': session.accessToken } });
-  return session;
+  try {
+    await request('session', { headers: { 'x-promo-admin-key': session.accessToken } });
+    return session;
+  } catch (error) {
+    saveSession(null);
+    if (typeof window !== 'undefined') window.setTimeout(() => window.location.reload(), 0);
+    throw error;
+  }
 }
 
 export async function logout(_session: AdminSession | null): Promise<void> {
@@ -118,9 +129,14 @@ export async function fetchPromoMasterData(session: AdminSession): Promise<Promo
   });
   const data = response.data;
   if (!data || !Array.isArray(data.skus) || !Array.isArray(data.prices)) {
+    clearProductMasterReady();
     throw new Error('product_master_payload_invalid');
   }
-  if (!data.skus.length) throw new Error('product_master_empty');
+  if (!data.skus.length) {
+    clearProductMasterReady();
+    throw new Error('product_master_empty');
+  }
+  markProductMasterReady(data.skus.length);
   return data;
 }
 
