@@ -119,6 +119,11 @@ interface PreparedMaster {
   evidenceBigrams: string[][];
 }
 
+interface PreparedMasterIndex {
+  all: PreparedMaster[];
+  byBrand: Map<string, PreparedMaster[]>;
+}
+
 function prepareMasters(existingSkus: Sku[]): PreparedMaster[] {
   return existingSkus
     .filter(sku => sku.status === 'active' && !PLACEHOLDER_MASTER.test(sku.canonicalName))
@@ -127,6 +132,18 @@ function prepareMasters(existingSkus: Sku[]): PreparedMaster[] {
       if (!parsed) return [];
       return [{ sku: parsed, evidenceBigrams: meaningfulEvidence(parsed).map(value => bigrams(value)) }];
     });
+}
+
+function prepareMasterIndex(existingSkus: Sku[]): PreparedMasterIndex {
+  const all = prepareMasters(existingSkus);
+  const byBrand = new Map<string, PreparedMaster[]>();
+  for (const master of all) {
+    const brand = master.sku.identity.brand;
+    const list = byBrand.get(brand) || [];
+    list.push(master);
+    byBrand.set(brand, list);
+  }
+  return { all, byBrand };
 }
 
 function scoreMaster(observed: Sku, sourceTextBigrams: string[], master: PreparedMaster): ScoredMaster | null {
@@ -224,8 +241,13 @@ function matchPreparedProductMasterByText(
 }
 
 export function createProductMasterTextMatcher(existingSkus: Sku[]): ProductMasterTextMatcher {
-  const preparedMasters = prepareMasters(existingSkus);
-  return (observedInput, sourceTextInput) => matchPreparedProductMasterByText(observedInput, sourceTextInput, preparedMasters);
+  const prepared = prepareMasterIndex(existingSkus);
+  return (observedInput, sourceTextInput) => {
+    const repaired = evidenceCandidate(sourceTextInput);
+    const brand = observedInput.identity.brand || repaired.identity.brand;
+    const candidates = brand ? prepared.byBrand.get(brand) || [] : prepared.all;
+    return matchPreparedProductMasterByText(observedInput, sourceTextInput, candidates);
+  };
 }
 
 const MATCHER_CACHE = new WeakMap<Sku[], ProductMasterTextMatcher>();
