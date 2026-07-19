@@ -11,7 +11,7 @@ import {
 } from './class-id';
 import { makeCardId } from './card-id';
 import { collectOcrItems, type PositionedText } from './ocr-items';
-import { createSkuCandidate } from '../domain/sku-identity';
+import { assertProductMasterReady } from '../shared/runtime-readiness';
 
 export { classifyClassText, normalizeClassId, resolvePageClassSequence } from './class-id';
 export { makeCardId } from './card-id';
@@ -208,65 +208,6 @@ function headerColorEvidence(canvas: HTMLCanvasElement): [number, number, number
   return count ? [Math.round(red / count), Math.round(green / count), Math.round(blue / count)] : null;
 }
 
-function preparedProductCanvas(canvas: HTMLCanvasElement, bounds: Rect, threshold: boolean): HTMLCanvasElement {
-  const product = cropCanvas(canvas, productZone(bounds));
-  const output = document.createElement('canvas');
-  output.width = product.width * 4;
-  output.height = product.height * 4;
-  const context = output.getContext('2d', { alpha: false, willReadFrequently: true });
-  if (!context) throw new Error('canvas_context_unavailable');
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = 'high';
-  context.drawImage(product, 0, 0, output.width, output.height);
-  if (threshold) {
-    const image = context.getImageData(0, 0, output.width, output.height);
-    for (let offset = 0; offset < image.data.length; offset += 4) {
-      const luminance = image.data[offset] * 0.299 + image.data[offset + 1] * 0.587 + image.data[offset + 2] * 0.114;
-      const value = luminance >= 166 ? 255 : 0;
-      image.data[offset] = value;
-      image.data[offset + 1] = value;
-      image.data[offset + 2] = value;
-      image.data[offset + 3] = 255;
-    }
-    context.putImageData(image, 0, 0);
-  }
-  product.width = 1;
-  product.height = 1;
-  return output;
-}
-
-async function recognizeProductVariant(worker: Worker, canvas: HTMLCanvasElement, bounds: Rect, threshold: boolean): Promise<string> {
-  const product = preparedProductCanvas(canvas, bounds, threshold);
-  try {
-    const result = await worker.recognize(product);
-    return clean(result.data.text);
-  } finally {
-    product.width = 1;
-    product.height = 1;
-  }
-}
-
-function productEvidenceFailures(value: string): number {
-  return createSkuCandidate(value).failureReasons.length;
-}
-
-async function productFieldOcr(worker: Worker, canvas: HTMLCanvasElement, bounds: Rect, initialText: string): Promise<string> {
-  let bestText = initialText;
-  let bestFailures = productEvidenceFailures(initialText);
-  if (bestFailures === 0) return bestText;
-  const colorText = await recognizeProductVariant(worker, canvas, bounds, false);
-  const colorFailures = productEvidenceFailures(colorText);
-  if (colorFailures < bestFailures || (colorFailures === bestFailures && colorText.length < bestText.length)) {
-    bestText = colorText;
-    bestFailures = colorFailures;
-  }
-  if (bestFailures === 0) return bestText;
-  const thresholdText = await recognizeProductVariant(worker, canvas, bounds, true);
-  const thresholdFailures = productEvidenceFailures(thresholdText);
-  if (thresholdFailures < bestFailures || (thresholdFailures === bestFailures && thresholdText.length < bestText.length)) return thresholdText;
-  return bestText;
-}
-
 async function canvasFromPage(page: any): Promise<{ canvas: HTMLCanvasElement; viewport: any }> {
   const base = page.getViewport({ scale: 1 });
   const scale = Math.max(1.25, Math.min(2, 1800 / Math.max(1, base.width)));
@@ -284,6 +225,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
   const started = performance.now();
   const monthKey = String(options.monthKey || '').normalize('NFKC').trim().toUpperCase().replace(/[^A-Z0-9ก-๙_-]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 48);
   if (!monthKey) throw new Error('month_key_required');
+  assertProductMasterReady();
   const bytes = new Uint8Array(await file.arrayBuffer());
   const document = await pdfjs.getDocument({ data: bytes }).promise;
   const cards: ImportedCardCandidate[] = [];
@@ -291,15 +233,15 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
   const pageClassObservations: PageClassObservation[] = [];
   const warnings: string[] = [];
   let worker: Worker | null = null;
-  let workerLanguage: 'eng+tha' | 'tha' | null = null;
-  const ensureWorker = async (language: 'eng+tha' | 'tha'): Promise<Worker> => {
+  let workerLanguage: 'eng+tha' | null = null;
+  const ensureWorker = async (): Promise<Worker> => {
     if (!worker) {
       worker = await createWorker('eng+tha');
       workerLanguage = 'eng+tha';
     }
-    if (workerLanguage !== language) {
-      await worker.reinitialize(language);
-      workerLanguage = language;
+    if (workerLanguage !== 'eng+tha') {
+      await worker.reinitialize('eng+tha');
+      workerLanguage = 'eng+tha';
     }
     return worker;
   };
@@ -322,7 +264,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       let textMethod: 'pdf_text' | 'page_ocr' | 'none' = textItems.length ? 'pdf_text' : 'none';
       if (!textItems.length && options.enableOcr) {
         progress('ocr', pageNumber, `หน้า ${pageNumber}: ไม่มี text layer กำลัง OCR หน้าครั้งเดียว`);
-        textItems = await pageOcr(await ensureWorker('eng+tha'), canvas);
+        textItems = await pageOcr(await ensureWorker(), canvas);
         textMethod = textItems.length ? 'page_ocr' : 'none';
       }
       const headerTexts: string[] = [];
@@ -332,7 +274,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       if (grid.regions.length && options.enableOcr && (!classEvidence.classId || classEvidence.confidence < 0.9)) {
         progress('ocr', pageNumber, `หน้า ${pageNumber}: จำแนก Class จากหัวซ้ายบน`);
         try {
-          const classTexts = await headerClassOcr(await ensureWorker('eng+tha'), canvas);
+          const classTexts = await headerClassOcr(await ensureWorker(), canvas);
           headerTexts.push(...classTexts);
           classEvidence = classifyClassText(headerTexts);
         } catch {
