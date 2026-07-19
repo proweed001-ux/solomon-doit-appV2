@@ -133,12 +133,13 @@ function tierLabel(card: PromoCard): string {
 
 async function masterForSku(sku: Sku): Promise<{ id: string; isNew: boolean; key: string }> {
   const existing = String(sku.id || '').match(/^MASTER-([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/iu);
-  const key = normalizeLegacyMasterKey(sku.canonicalName || sku.identityKey);
-  if (existing) return { id: existing[1].toLowerCase(), isNew: false, key };
+  const existingKey = normalizeLegacyMasterKey(sku.canonicalName || sku.identityKey);
+  if (existing) return { id: existing[1].toLowerCase(), isNew: false, key: existingKey };
   if (sku.status !== 'active' || sku.failureReasons.length) throw new Error(`legacy_master_not_confirmed:${sku.id}`);
   const identitySeed = clean(sku.identityKey);
   if (!identitySeed) throw new Error(`legacy_master_identity_missing:${sku.id}`);
-  return { id: await legacyMasterIdentity(`sku-identity|${identitySeed}`), isNew: true, key };
+  const identityKey = normalizeLegacyMasterKey(`sku-identity|${identitySeed}`);
+  return { id: await legacyMasterIdentity(identityKey), isNew: true, key: identityKey };
 }
 
 export async function buildLegacyUploadPlan(dataset: PromoDataset): Promise<LegacyUploadPlan> {
