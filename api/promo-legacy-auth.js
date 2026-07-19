@@ -2,15 +2,24 @@ import { buildLegacyMasterData } from './_promo-new/legacy-adapter.js';
 
 const SUPABASE_URL = 'https://saodmeoilixfdqentofp.supabase.co';
 const PUBLISHABLE_KEY = 'sb_publishable_JThYwAl_-askk_cIaCd75w_TCWK2BTT';
+const MAX_LOGIN_BODY_BYTES = 4_096;
+const MAX_UPLOAD_KEY_LENGTH = 200;
 
 function json(res, status, body) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   return res.status(status).json(body);
 }
 
 function text(value) {
   return String(value || '').trim();
+}
+
+function requestBodySize(req) {
+  const declared = Number(req.headers['content-length']);
+  if (Number.isFinite(declared) && declared >= 0) return declared;
+  try { return Buffer.byteLength(JSON.stringify(req.body || {}), 'utf8'); } catch { return MAX_LOGIN_BODY_BYTES + 1; }
 }
 
 async function supabase(path, options = {}) {
@@ -40,7 +49,7 @@ async function latestPublishedMonth() {
 
 async function validateUploadKey(adminKey) {
   const key = text(adminKey);
-  if (!key || key.length > 500) throw new Error('invalid_upload_key');
+  if (!key || key.length > MAX_UPLOAD_KEY_LENGTH) throw new Error('invalid_upload_key');
   const promoMonthId = await latestPublishedMonth();
   await supabase('/functions/v1/promo-function-review', {
     method: 'POST',
@@ -80,6 +89,7 @@ export default async function handler(req, res) {
     const headerKey = text(req.headers['x-promo-admin-key']);
 
     if (req.method === 'POST' && action === 'login') {
+      if (requestBodySize(req) > MAX_LOGIN_BODY_BYTES) return json(res, 413, { ok: false, error: 'request_body_too_large' });
       const adminKey = await validateUploadKey(req.body?.adminKey);
       return json(res, 200, {
         ok: true,
@@ -106,7 +116,7 @@ export default async function handler(req, res) {
     return json(res, 404, { ok: false, error: 'action_not_found' });
   } catch (error) {
     const message = String(error?.message || error || 'unknown_error');
-    const status = /invalid_upload_key|missing_admin_key|invalid_admin_key|supabase_401/.test(message) ? 401 : 500;
-    return json(res, status, { ok: false, error: message });
+    const authFailure = /invalid_upload_key|missing_admin_key|invalid_admin_key|supabase_401|supabase_403/.test(message);
+    return json(res, authFailure ? 401 : 503, { ok: false, error: authFailure ? 'invalid_upload_key' : 'promo_auth_unavailable' });
   }
 }
