@@ -1,5 +1,6 @@
 import { createWorker, type Worker } from 'tesseract.js';
 import { createSkuCandidate, normalizeProductText } from '../domain/sku-identity';
+import type { Sku } from '../domain/types';
 import type { ImportedCardCandidate } from './pdf-importer';
 
 const clean = (value: unknown): string => normalizeProductText(value).replace(/\s+/g, ' ').trim();
@@ -28,6 +29,7 @@ const BRAND_PATTERNS: Array<[RegExp, string]> = [
 
 const SIZE_PATTERN = /\d+(?:[.,]\d+)?\s*(?:มล\.?|ML|บล\.?|VA|ลิตร|L\b|กรัม|กรับ|G\b|กก\.?|KG\b)/iu;
 const PRODUCT_TYPE_PATTERN = /แชมพู|ครีมนวด|ปรับผ้านุ่ม|สบู่|แปรงสีฟัน|มีดโกน|ด้ามมีด|ใบมีด|ซุปเปอร์คลิ๊ก|เวคเตอร์|ครีม|โลชั่น|เซรั่ม|โททัลไวท์|ยาบาล์ม|SHAMPOO|CONDITIONER|SOAP|RAZOR|BLADE|SUPER\s*CLICK|VECTOR/iu;
+const MODEL_EVIDENCE = /ซอง|กล่อง|แพ็ค|แพค|ถุงเติมขนาดใหญ่|รุ่น|ซุปเปอร์|SUPER|VECTOR|BLADE|ด้าม|ใบมีด|โททัล|TOTAL/iu;
 
 function canonicalizeHeaderText(value: string): string {
   let output = clean(value)
@@ -45,6 +47,14 @@ function detectedBrand(value: string): string | null {
   return null;
 }
 
+function sizeEvidenceSatisfied(text: string, candidate: Sku): boolean {
+  if ((candidate.identity.sizeValue > 0 && candidate.identity.sizeUnit) || SIZE_PATTERN.test(text)) return true;
+  if (candidate.identity.productType === 'มีดโกน' || candidate.identity.productType === 'แปรงสีฟัน') {
+    return Boolean(candidate.identity.brand && (candidate.identity.variant || MODEL_EVIDENCE.test(text)));
+  }
+  return Boolean(candidate.identity.brand && candidate.identity.productType && candidate.identity.variant && MODEL_EVIDENCE.test(text));
+}
+
 export function scoreCardHeaderText(value: string): number {
   const text = canonicalizeHeaderText(value);
   if (!text) return -1000;
@@ -52,7 +62,7 @@ export function scoreCardHeaderText(value: string): number {
   let score = 0;
   if (detectedBrand(text) || candidate.identity.brand) score += 48;
   if (candidate.identity.productType || PRODUCT_TYPE_PATTERN.test(text)) score += 24;
-  if ((candidate.identity.sizeValue > 0 && candidate.identity.sizeUnit) || SIZE_PATTERN.test(text)) score += 34;
+  if (sizeEvidenceSatisfied(text, candidate)) score += 34;
   if (/ทุกสูตร|ซุปเปอร์|SUPER|โททัล|TOTAL|ถุงเติม|ซอง|แพ็ค|PACK/iu.test(text)) score += 7;
   score -= candidate.failureReasons.length * 7;
   if (text.length >= 5 && text.length <= 150) score += 8;
@@ -63,13 +73,13 @@ export function scoreCardHeaderText(value: string): number {
 }
 
 export function shouldRefreshCardHeader(card: ImportedCardCandidate): boolean {
-  const candidate = createSkuCandidate(card.productText || card.rawText);
-  const missing = new Set(candidate.failureReasons);
+  const sourceText = card.productText || card.rawText;
+  const candidate = createSkuCandidate(sourceText);
+  const sizeMissing = !sizeEvidenceSatisfied(sourceText, candidate);
   return !card.productText
     || !candidate.identity.brand
     || !candidate.identity.productType
-    || !(candidate.identity.sizeValue > 0 && candidate.identity.sizeUnit)
-    || ['brand_missing', 'product_type_missing', 'size_missing', 'size_unit_missing'].some(reason => missing.has(reason));
+    || sizeMissing;
 }
 
 function textCandidates(initialText: string, recognizedText: string): string[] {
@@ -114,11 +124,7 @@ function preprocessCanvas(canvas: HTMLCanvasElement, mode: HeaderMode): void {
   context.putImageData(pixels, 0, 0);
 }
 
-function preparedHeaderCanvas(
-  image: HTMLImageElement,
-  zone: (typeof HEADER_ZONES)[number],
-  mode: HeaderMode,
-): HTMLCanvasElement {
+function preparedHeaderCanvas(image: HTMLImageElement, zone: (typeof HEADER_ZONES)[number], mode: HeaderMode): HTMLCanvasElement {
   const sourceWidth = image.naturalWidth * zone.width;
   const sourceHeight = image.naturalHeight * zone.height;
   const canvas = document.createElement('canvas');
@@ -130,17 +136,7 @@ function preparedHeaderCanvas(
   context.imageSmoothingQuality = 'high';
   context.fillStyle = '#ffffff';
   context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(
-    image,
-    image.naturalWidth * zone.x,
-    image.naturalHeight * zone.y,
-    sourceWidth,
-    sourceHeight,
-    0,
-    0,
-    canvas.width,
-    canvas.height,
-  );
+  context.drawImage(image, image.naturalWidth * zone.x, image.naturalHeight * zone.y, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
   preprocessCanvas(canvas, mode);
   return canvas;
 }
@@ -181,10 +177,7 @@ export interface HeaderOcrResult {
   warnings: string[];
 }
 
-export async function enrichCardHeadersFromImages(
-  cards: ImportedCardCandidate[],
-  onProgress?: (completed: number, total: number) => void,
-): Promise<HeaderOcrResult> {
+export async function enrichCardHeadersFromImages(cards: ImportedCardCandidate[], onProgress?: (completed: number, total: number) => void): Promise<HeaderOcrResult> {
   const targets = cards.filter(card => card.imageUrl && shouldRefreshCardHeader(card));
   if (!targets.length) return { cards, attempted: 0, improved: 0, warnings: [] };
   const targetIds = new Set(targets.map(card => card.cardId));
@@ -208,7 +201,7 @@ export async function enrichCardHeadersFromImages(
         const gainedCriticalEvidence = (
           (!beforeSku.identity.brand && Boolean(afterSku.identity.brand))
           || (!beforeSku.identity.productType && Boolean(afterSku.identity.productType))
-          || (!(beforeSku.identity.sizeValue > 0 && beforeSku.identity.sizeUnit) && Boolean(afterSku.identity.sizeValue > 0 && afterSku.identity.sizeUnit))
+          || (!sizeEvidenceSatisfied(source.productText || source.rawText, beforeSku) && sizeEvidenceSatisfied(best, afterSku))
         );
         if (best && after > before && (after >= before + 4 || gainedCriticalEvidence)) {
           card.productText = best;
