@@ -6,9 +6,9 @@ import type { ImportedCardCandidate } from './pdf-importer';
 const clean = (value: unknown): string => normalizeProductText(value).replace(/\s+/g, ' ').trim();
 
 const HEADER_ZONES = [
-  { x: 0.50, y: 0.005, width: 0.485, height: 0.27 },
-  { x: 0.43, y: 0.005, width: 0.555, height: 0.36 },
-  { x: 0.36, y: 0.005, width: 0.625, height: 0.43 },
+  { x: 0.50, y: 0.005, width: 0.485, height: 0.58 },
+  { x: 0.43, y: 0.005, width: 0.555, height: 0.58 },
+  { x: 0.48, y: 0.04, width: 0.50, height: 0.52 },
 ] as const;
 
 type HeaderMode = 'color' | 'gray' | 'threshold';
@@ -55,6 +55,12 @@ function sizeEvidenceSatisfied(text: string, candidate: Sku): boolean {
   return Boolean(candidate.identity.brand && candidate.identity.productType && candidate.identity.variant && MODEL_EVIDENCE.test(text));
 }
 
+function sizeSignature(value: string): string | null {
+  const candidate = createSkuCandidate(canonicalizeHeaderText(value));
+  if (!(candidate.identity.sizeValue > 0) || !candidate.identity.sizeUnit) return null;
+  return `${Number(candidate.identity.sizeValue).toFixed(3)}|${candidate.identity.sizeUnit}`;
+}
+
 export function scoreCardHeaderText(value: string): number {
   const text = canonicalizeHeaderText(value);
   if (!text) return -1000;
@@ -82,9 +88,9 @@ export function shouldRefreshCardHeader(card: ImportedCardCandidate): boolean {
     || sizeMissing;
 }
 
-function textCandidates(initialText: string, recognizedText: string): string[] {
+function recognizedCandidates(recognizedText: string): string[] {
   const lines = recognizedText.split(/\n+/).map(clean).filter(Boolean);
-  const candidates = [initialText, recognizedText, ...lines];
+  const candidates = [recognizedText, ...lines];
   for (let index = 0; index < lines.length; index += 1) {
     candidates.push(lines.slice(index, index + 2).join(' '));
     candidates.push(lines.slice(index, index + 3).join(' '));
@@ -92,10 +98,45 @@ function textCandidates(initialText: string, recognizedText: string): string[] {
   return [...new Set(candidates.map(canonicalizeHeaderText).filter(Boolean))];
 }
 
+function textCandidates(initialText: string, recognizedText: string): string[] {
+  return [...new Set([
+    canonicalizeHeaderText(initialText),
+    ...recognizedCandidates(recognizedText),
+  ].filter(Boolean))];
+}
+
 export function chooseBestCardHeaderText(initialText: string, recognizedText: string): string {
   return textCandidates(initialText, recognizedText)
     .sort((left, right) => scoreCardHeaderText(right) - scoreCardHeaderText(left) || left.length - right.length)[0]
     || clean(initialText);
+}
+
+export function chooseTrustedCardHeaderText(initialText: string, recognizedAttempts: string[]): string {
+  const initial = canonicalizeHeaderText(initialText);
+  const support = new Map<string, number>();
+  for (const attempt of recognizedAttempts) {
+    const sizes = new Set(recognizedCandidates(attempt).map(sizeSignature).filter((value): value is string => Boolean(value)));
+    for (const size of sizes) support.set(size, (support.get(size) || 0) + 1);
+  }
+  const candidates = [...new Set([
+    initial,
+    ...recognizedAttempts.flatMap(recognizedCandidates),
+  ].filter(Boolean))];
+  const initialSize = sizeSignature(initial);
+  const trusted = candidates.filter(candidate => {
+    const size = sizeSignature(candidate);
+    if (!size) return true;
+    if (size === initialSize) return true;
+    return (support.get(size) || 0) >= 2;
+  });
+  const candidateScore = (candidate: string): number => {
+    const size = sizeSignature(candidate);
+    const repeatedSupport = size ? support.get(size) || 0 : 0;
+    return scoreCardHeaderText(candidate) + repeatedSupport * 12;
+  };
+  return trusted.sort((left, right) => candidateScore(right) - candidateScore(left) || left.length - right.length)[0]
+    || initial
+    || '';
 }
 
 function loadImage(source: string): Promise<HTMLImageElement> {
@@ -141,10 +182,9 @@ function preparedHeaderCanvas(image: HTMLImageElement, zone: (typeof HEADER_ZONE
   return canvas;
 }
 
-async function recognizeCardHeader(worker: Worker, card: ImportedCardCandidate): Promise<string> {
+async function recognizeCardHeader(worker: Worker, card: ImportedCardCandidate): Promise<string[]> {
   const image = await loadImage(card.imageUrl);
   const recognized: string[] = [];
-  let bestScore = scoreCardHeaderText(card.productText);
   try {
     for (const zone of HEADER_ZONES) {
       for (const mode of HEADER_MODES) {
@@ -154,9 +194,8 @@ async function recognizeCardHeader(worker: Worker, card: ImportedCardCandidate):
           const text = clean(result.data.text);
           if (text) {
             recognized.push(text);
-            const candidate = chooseBestCardHeaderText(card.productText, text);
-            bestScore = Math.max(bestScore, scoreCardHeaderText(candidate));
-            if (bestScore >= 112) return recognized.join('\n');
+            const candidate = chooseTrustedCardHeaderText(card.productText, recognized);
+            if (scoreCardHeaderText(candidate) >= 112 && sizeEvidenceSatisfied(candidate, createSkuCandidate(candidate))) return recognized;
           }
         } finally {
           canvas.width = 1;
@@ -164,7 +203,7 @@ async function recognizeCardHeader(worker: Worker, card: ImportedCardCandidate):
         }
       }
     }
-    return recognized.join('\n');
+    return recognized;
   } finally {
     image.src = '';
   }
@@ -193,7 +232,7 @@ export async function enrichCardHeadersFromImages(cards: ImportedCardCandidate[]
       if (!card || !targetIds.has(source.cardId)) continue;
       try {
         const recognized = await recognizeCardHeader(worker, source);
-        const best = chooseBestCardHeaderText(source.productText, recognized);
+        const best = chooseTrustedCardHeaderText(source.productText, recognized);
         const before = scoreCardHeaderText(source.productText);
         const after = scoreCardHeaderText(best);
         const beforeSku = createSkuCandidate(source.productText || source.rawText);
