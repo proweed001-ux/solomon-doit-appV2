@@ -31,21 +31,27 @@ function textEvidence(groupSku: Sku, sources: ImportedCardCandidate[], existingS
 }
 
 function scopeEvidence(
+  groupSku: Sku,
   sources: ImportedCardCandidate[],
+  existingSkus: Sku[],
   families: PromotionFamily[],
   visualSignatures: Record<string, string>,
 ): AuditEvidence | null {
   const resolutions = resolveScopesSafely(sources, families, visualSignatures);
   const candidates = sources.flatMap(source => {
     const resolution = resolutions.get(source.cardId);
-    return resolution?.scope ? [resolution] : [];
-  }).sort((left, right) => right.score - left.score || right.margin - left.margin);
+    if (!resolution?.scope) return [];
+    const scopeText = normalizeProductOcrText(`${resolution.scope.name} ${resolution.scope.rawText}`);
+    const master = matchProductMasterByText(createSkuCandidate(scopeText), scopeText, existingSkus);
+    if (master.status !== 'matched' || master.sku?.id !== groupSku.id) return [];
+    return [{ resolution, master }];
+  }).sort((left, right) => right.resolution.score - left.resolution.score || right.resolution.margin - left.resolution.margin);
   if (!candidates.length) return null;
   const best = candidates[0];
   return {
-    score: bounded(best.score),
-    margin: bounded(best.margin),
-    method: best.method === 'visual_consensus' ? 'visual_consensus' : 'structured_scope',
+    score: bounded(Math.min(best.resolution.score, best.master.score)),
+    margin: bounded(Math.min(best.resolution.margin, best.master.margin)),
+    method: best.resolution.method === 'visual_consensus' ? 'visual_consensus' : 'structured_scope',
   };
 }
 
@@ -69,7 +75,7 @@ export function attachMasterMatchAuditEvidence(
       return source ? [source] : [];
     });
     const evidence = textEvidence(group.sku, sources, existingSkus)
-      || scopeEvidence(sources, promotionFamilies, visualSignatures);
+      || scopeEvidence(group.sku, sources, existingSkus, promotionFamilies, visualSignatures);
     if (evidence) evidenceByGroup.set(group.id, evidence);
   }
 
