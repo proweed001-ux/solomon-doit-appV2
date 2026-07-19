@@ -52,17 +52,28 @@ export function setCentralPrice(current: SkuPrice, amount: number, sourceReferen
   };
 }
 
+const withoutPriceBlockers = (reasons: string[]): string[] => reasons.filter(reason => (
+  reason !== 'central_price_missing' && reason !== 'effective_price_missing'
+));
+
 export function applyPriceToGroup(group: ProductGroup, cards: PromoCard[], price: SkuPrice): { group: ProductGroup; cards: PromoCard[] } {
   if (price.skuId !== group.skuId) throw new Error('price_sku_mismatch');
+  const groupFailureReasons = withoutPriceBlockers(group.failureReasons);
   const nextGroup: ProductGroup = {
     ...group,
     price,
-    status: price.effectivePrice && group.promotionFamilyId && !group.failureReasons.length ? 'ready' : group.status,
+    failureReasons: groupFailureReasons,
+    status: price.effectivePrice && group.promotionFamilyId && !groupFailureReasons.length ? 'ready' : 'need_review',
   };
-  const nextCards = cards.map(card => group.cardIds.includes(card.id) ? {
-    ...card,
-    price,
-    status: price.effectivePrice && card.promotionFamilyId && card.promotionTiers.length && !card.failureReasons.length ? 'ready' as const : card.status,
-  } : card);
+  const nextCards = cards.map(card => {
+    if (!group.cardIds.includes(card.id)) return card;
+    const cardFailureReasons = withoutPriceBlockers(card.failureReasons);
+    return {
+      ...card,
+      price,
+      failureReasons: cardFailureReasons,
+      status: price.effectivePrice && card.promotionFamilyId && card.promotionTiers.length && !cardFailureReasons.length ? 'ready' as const : 'need_review' as const,
+    };
+  });
   return { group: nextGroup, cards: nextCards };
 }
