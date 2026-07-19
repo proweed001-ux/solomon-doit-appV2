@@ -1,3 +1,4 @@
+import { PROMO_TEST_PIPELINE_VERSION } from './test-cache';
 import { recoverCachedCardClasses } from '../domain/class-recovery';
 import type { PdfImportResult } from '../import/pdf-importer';
 
@@ -50,6 +51,7 @@ export function prepareCachedRun(
     imported,
     visualSignatures,
     warnings: [
+      `cache:pipeline:${PROMO_TEST_PIPELINE_VERSION}`,
       `cache:class_recovered_cards:${recovery.changedCards}`,
       `cache:class_recovered_pages:${recovery.recoveredPages}`,
     ],
