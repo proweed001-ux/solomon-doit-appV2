@@ -110,13 +110,6 @@ export function repairCardsWithMasterBackedScopes(
 
     const master = uniqueMasterForObserved(observed, candidates, existingSkus);
     if (!master) return card;
-    const alreadyExact = observed.identity.brand === master.identity.brand
-      && observed.identity.productType === master.identity.productType
-      && sameNumber(observed.identity.sizeValue, master.identity.sizeValue)
-      && observed.identity.sizeUnit === master.identity.sizeUnit
-      && compact(observed.identity.variant || '') === compact(master.identity.variant || '');
-    if (alreadyExact && compact(sourceText).includes(compact(master.canonicalName))) return card;
-
     repaired += 1;
     warnings.push(`card:${card.cardId}:master_backed_scope_repair:${master.id}`);
     return {
