@@ -108,7 +108,8 @@ export function scorePromotionFamily(group: ProductGroup, family: PromotionFamil
     score += 4;
     reasons.push('product_type');
   }
-  if (sizes.length && identity.sizeValue > 0) {
+  if (sizes.length) {
+    if (!(identity.sizeValue > 0) || !identity.sizeUnit) return null;
     const matchedSize = sizes.some(size => size.unit === identity.sizeUnit && identity.sizeValue >= size.minimum && identity.sizeValue <= size.maximum);
     if (!matchedSize) return null;
     score += 5;
