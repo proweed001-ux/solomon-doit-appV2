@@ -8,6 +8,7 @@ const LAST_DRAFT_KEY = 'promo-new-legacy-draft-v1';
 const SUPABASE_URL = 'https://saodmeoilixfdqentofp.supabase.co';
 const PUBLISHABLE_KEY = 'sb_publishable_JThYwAl_-askk_cIaCd75w_TCWK2BTT';
 const UPLOAD_FUNCTION = 'promo-image-upload-v2-preview';
+const LEGACY_WRITES_ENABLED = false;
 
 interface AdminSession {
   accessToken: string;
@@ -34,6 +35,7 @@ function isReadOnlyRuntime(): boolean {
 }
 
 function assertWritableRuntime(): void {
+  if (!LEGACY_WRITES_ENABLED) throw new Error('legacy_write_disabled_pending_atomic_revision_staging');
   if (isReadOnlyRuntime()) throw new Error('read_only_runtime_write_blocked');
 }
 
