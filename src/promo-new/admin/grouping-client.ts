@@ -6,7 +6,8 @@ import type { ImportedCardCandidate } from '../import/pdf-importer';
 import type { GroupingWorkerRequest, GroupingWorkerResponse } from './grouping-worker';
 import { prepareGroupingWorkerCards, restoreGroupingResultImages } from './grouping-transport';
 
-const GROUPING_TIMEOUT_MS = 120_000;
+const GROUPING_STALL_TIMEOUT_MS = 120_000;
+const GROUPING_HARD_TIMEOUT_MS = 300_000;
 const WORKER_READY_TIMEOUT_MS = 15_000;
 const HEARTBEAT_MS = 1_000;
 
@@ -52,20 +53,27 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
     const startedAt = performance.now();
     let settled = false;
     let requestSent = false;
+    let lastWorkerMessage = 'ยังไม่ได้รับข้อความจาก Worker';
+    let stallTimer = 0;
     const finish = (callback: () => void) => {
       if (settled) return;
       settled = true;
-      window.clearTimeout(timer);
+      window.clearTimeout(stallTimer);
+      window.clearTimeout(hardTimer);
       window.clearTimeout(readyTimer);
       window.clearInterval(heartbeat);
       worker.terminate();
       callback();
     };
-    const timer = window.setTimeout(() => finish(() => reject(new Error('grouping_worker_timeout'))), GROUPING_TIMEOUT_MS);
+    const resetStallTimer = () => {
+      window.clearTimeout(stallTimer);
+      stallTimer = window.setTimeout(() => finish(() => reject(new Error(`grouping_worker_stalled:${lastWorkerMessage}`))), GROUPING_STALL_TIMEOUT_MS);
+    };
+    const hardTimer = window.setTimeout(() => finish(() => reject(new Error(`grouping_worker_hard_timeout:${lastWorkerMessage}`))), GROUPING_HARD_TIMEOUT_MS);
     const readyTimer = window.setTimeout(() => finish(() => reject(new Error('grouping_worker_ready_timeout'))), WORKER_READY_TIMEOUT_MS);
     const heartbeat = window.setInterval(() => {
       const elapsedSeconds = Math.max(1, Math.round((performance.now() - startedAt) / 1000));
-      input.onProgress?.(`${requestSent ? 'Worker กำลังจัดกลุ่ม' : 'กำลังรอ Inline Worker พร้อม'} · ${elapsedSeconds} วินาที`);
+      input.onProgress?.(`${requestSent ? lastWorkerMessage : 'กำลังรอ Inline Worker พร้อม'} · ${elapsedSeconds} วินาที`);
     }, HEARTBEAT_MS);
 
     worker.onerror = event => finish(() => reject(new Error(workerErrorMessage(event))));
@@ -76,9 +84,11 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
         finish(() => reject(new Error('grouping_worker_invalid_message')));
         return;
       }
+      resetStallTimer();
       if (message.type === 'ready') {
         if (requestSent) return;
         requestSent = true;
+        lastWorkerMessage = 'Worker พร้อมและกำลังรับข้อมูล';
         window.clearTimeout(readyTimer);
         const request: GroupingWorkerRequest = {
           type: 'group',
@@ -100,6 +110,7 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
         return;
       }
       if (message.type === 'progress') {
+        lastWorkerMessage = message.message;
         input.onProgress?.(message.message);
         return;
       }
@@ -107,6 +118,7 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
         finish(() => reject(new Error(message.error)));
         return;
       }
+      lastWorkerMessage = 'Worker ส่งผลลัพธ์แล้ว กำลังคืนรูปการ์ด';
       try {
         const restored = restoreGroupingResultImages(message.result, prepared.imagesByPosition);
         finish(() => resolve(restored));
