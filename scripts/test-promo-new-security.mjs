@@ -6,9 +6,10 @@ const failures = [];
 const required = [
   'dist/promo-admin-new.html', 'dist/promo-new.html', 'dist/assets/promo-new/admin.js', 'dist/assets/promo-new/frontend.js',
   'api/promo-new.js', 'api/promo-legacy-auth.js', 'api/_promo-new/supabase.js',
-  'src/promo-new/shared/api.ts', 'src/promo-new/import/pdf-importer.ts',
+  'src/promo-new/shared/api.ts', 'src/promo-new/import/pdf-importer.ts', 'src/promo-new/import/card-header-ocr.ts',
   'src/promo-new/import/workbook-parser.ts', 'src/promo-new/import/workbook-safety.ts',
-  'src/promo-new/admin/grouping-worker.ts', 'src/promo-new/domain/master-match-audit.ts',
+  'src/promo-new/admin/grouping-worker.ts', 'src/promo-new/admin/test-cache.ts',
+  'src/promo-new/domain/master-backed-card-repair.ts', 'src/promo-new/domain/master-match-audit.ts',
   'src/promo-new/domain/master-text-matcher.ts', 'vite.promo-new.config.ts',
   'scripts/prepare-sheetjs-lock.mjs',
   'docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md',
@@ -58,6 +59,11 @@ check(pdfImporter.includes('MAX_PROMO_PDF_CARDS = 2_000'), 'pdf_card_limit_missi
 check(pdfImporter.includes("throw new Error('duplicate_card_id')"), 'pdf_duplicate_card_block_missing');
 check(pdfImporter.includes("throw new Error('duplicate_card_position')"), 'pdf_duplicate_position_block_missing');
 
+const headerOcr = read('src/promo-new/import/card-header-ocr.ts');
+check(headerOcr.includes('chooseTrustedCardHeaderText'), 'ocr_size_consensus_selector_missing');
+check(headerOcr.includes('(support.get(size) || 0) >= 2'), 'ocr_size_consensus_threshold_missing');
+check(headerOcr.includes('height: 0.58'), 'ocr_size_line_crop_missing');
+
 const workbookSafety = read('src/promo-new/import/workbook-safety.ts');
 for (const guard of [
   'MAX_WORKBOOK_SHEETS = 40',
@@ -70,7 +76,7 @@ for (const guard of [
 ]) check(workbookSafety.includes(guard), `workbook_guard_missing:${guard}`);
 check(workbookSafety.includes("decodeFatal('windows-874'"), 'thai_csv_windows_874_fallback_missing');
 check(workbookSafety.includes('assertWorkbookArchiveSafe'), 'workbook_zip_preflight_missing');
-check(workbookSafety.includes("sheetRows: MAX_WORKBOOK_ROWS_PER_SHEET + 1"), 'workbook_parse_row_cap_missing');
+check(workbookSafety.includes('sheetRows: MAX_WORKBOOK_ROWS_PER_SHEET + 1'), 'workbook_parse_row_cap_missing');
 const workbookParser = read('src/promo-new/import/workbook-parser.ts');
 check(workbookParser.includes('await assertWorkbookArchiveSafe(bytes)'), 'workbook_archive_guard_not_wired');
 check(workbookParser.includes('assertWorkbookBounds(workbook)'), 'workbook_range_guard_not_wired');
@@ -79,8 +85,17 @@ check(!workbookParser.includes('candidate.includes(value)'), 'workbook_reverse_p
 check(workbookParser.includes("carriedFamilyId = '';\n      carriedName = '';\n      carriedScope = '';"), 'workbook_blank_row_carry_reset_missing');
 
 const groupingWorker = read('src/promo-new/admin/grouping-worker.ts');
+check(groupingWorker.includes('repairCardsWithMasterBackedScopes('), 'master_backed_scope_repair_not_wired');
+check(groupingWorker.indexOf('repairCardsWithMasterBackedScopes(') < groupingWorker.indexOf('resolveTextFirstScopesSafely(workingCards'), 'master_backed_scope_repair_must_precede_scope');
 check(groupingWorker.includes('await attachMasterMatchAuditEvidenceAsync('), 'chunked_master_audit_not_wired');
 check(groupingWorker.includes('ตรวจหลักฐาน Product Master ${state.processed}/${state.total} กลุ่ม'), 'master_audit_progress_missing');
+const targetedRepair = read('src/promo-new/domain/master-backed-card-repair.ts');
+check(targetedRepair.includes('[master.canonicalName, ...master.evidence]'), 'legacy_master_canonical_reparse_missing');
+check(targetedRepair.includes("'ocr_size_conflicts_workbook_scope'"), 'conflicting_ocr_size_quarantine_missing');
+const testCache = read('src/promo-new/admin/test-cache.ts');
+check(testCache.includes('PROMO_TEST_CACHE_SCHEMA_VERSION = 3'), 'ocr_consensus_cache_schema_missing');
+check(testCache.includes("PROMO_TEST_PIPELINE_VERSION = 'text-first-product-master-v2-ocr-size-consensus'"), 'ocr_consensus_cache_pipeline_missing');
+
 const masterAudit = read('src/promo-new/domain/master-match-audit.ts');
 check(masterAudit.includes('AUDIT_CHUNK_SIZE = 12'), 'master_audit_chunk_size_missing');
 check(masterAudit.includes('await new Promise<void>(resolve => setTimeout(resolve, 0))'), 'master_audit_event_loop_yield_missing');
@@ -156,7 +171,7 @@ check(vercel.outputDirectory === 'dist', 'preview_output_directory_changed');
 const builtPromoJsFiles = walk('dist/assets/promo-new').filter(file => file.endsWith('.js'));
 const builtPromoJs = builtPromoJsFiles.map(file => read(file)).join('\n');
 const buildCommit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
-check(builtPromoJs.includes(`PROMO-${buildCommit}-XLSX-WORKER-HARDENED`), 'deployed_build_id_does_not_match_commit');
+check(builtPromoJs.includes(`PROMO-${buildCommit}-OCR-SCOPE-TARGETED`), 'deployed_build_id_does_not_match_targeted_commit');
 check(!builtPromoJs.includes('FINAL-UPLOAD-AUDIT-20260719-0031'), 'stale_build_id_reached_deployed_bundle');
 for (const file of builtPromoJsFiles) {
   const size = fs.statSync(path.join(root, file)).size;
@@ -169,4 +184,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: patched SheetJS lock, workbook ZIP/range/encoding bounds, chunked Worker audit, brand-indexed Product Master, commit Build ID, auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
+console.log('Promo new security/static checks passed: targeted OCR size consensus, legacy Product Master repair, cache generation, patched SheetJS lock, workbook ZIP/range/encoding bounds, chunked Worker audit, brand-indexed Product Master, commit Build ID, auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
