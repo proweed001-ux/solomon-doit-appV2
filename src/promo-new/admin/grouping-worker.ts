@@ -2,7 +2,7 @@
 
 import { groupImportedCards } from '../domain/grouping';
 import { applyClassMatrixRecovery } from '../domain/class-matrix';
-import { attachMasterMatchAuditEvidence } from '../domain/master-match-audit';
+import { attachMasterMatchAuditEvidenceAsync } from '../domain/master-match-audit';
 import { buildProductScopes } from '../domain/scope-matcher';
 import { resolveScopesSafely } from '../domain/scope-safety';
 import { resolveTextFirstScopesSafely } from '../domain/text-first-scope';
@@ -75,6 +75,7 @@ workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
       : 'ข้าม Class Matrix, catalog sequence และ fingerprint เพราะไม่มีลายนิ้วมือภาพ');
 
     const groupingStarted = performance.now();
+    progress(`กำลังสร้าง SKU และ Product Group จาก ${hintedCards.length} การ์ด`);
     let result = groupImportedCards(
       payload.monthKey,
       hintedCards,
@@ -99,13 +100,14 @@ workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
     });
 
     const auditStarted = performance.now();
-    result = attachMasterMatchAuditEvidence(
+    result = await attachMasterMatchAuditEvidenceAsync(
       result,
       payload.cards,
       payload.existingSkus,
       payload.promotionFamilies,
       payload.visualSignatures,
       matrix.resolutions,
+      state => progress(`ตรวจหลักฐาน Product Master ${state.processed}/${state.total} กลุ่ม`),
     );
     progress(`ตรวจหลักฐาน Product Master เสร็จ ${seconds(auditStarted)} · รวม ${seconds(totalStarted)}`);
     result.warnings = [...new Set([
