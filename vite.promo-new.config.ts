@@ -1,9 +1,11 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
+export const PROMO_BUILD_FLAVOR = 'OCR-SCOPE-TARGETED' as const;
+
 function promoBuildIdPlugin(): Plugin {
   const commit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
-  const buildId = `PROMO-${commit}-OCR-SCOPE-TARGETED`;
+  const buildId = `PROMO-${commit}-${PROMO_BUILD_FLAVOR}`;
   return {
     name: 'promo-build-id',
     enforce: 'pre',
