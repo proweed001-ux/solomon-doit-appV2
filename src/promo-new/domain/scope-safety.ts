@@ -63,7 +63,7 @@ function canonicalizeStandaloneAliases(value: string): string {
 
 function sizeEvidence(text: string): SizeEvidence | null {
   const source = clean(text).replace(/\s+/g, '');
-  const unit = '(ML|VA|มล\.?|บล\.?|L|LT|ลิตร|G|GM|NSU|กรัม|กรับ|KG|กก\.?)';
+  const unit = '(ML|VA|มล\\.?|บล\\.?|L|LT|ลิตร|G|GM|NSU|กรัม|กรับ|KG|กก\\.?)';
   const range = source.match(new RegExp('(\\d+(?:[.,]\\d+)?)\\s*[-–+]\\s*(\\d+(?:[.,]\\d+)?)\\s*' + unit, 'iu'));
   if (range) return {
     minimum: Number(range[1].replace(',', '.')),
@@ -151,6 +151,13 @@ function safeStructuredResolution(card: ImportedCardCandidate, scopes: ProductSc
   return resolution;
 }
 
+function hasVisualEvidence(cards: ImportedCardCandidate[], visualSignatures: Record<string, string>): boolean {
+  return cards.some(card => {
+    const signature = visualSignatures[card.cardId];
+    return typeof signature === 'string' && signature.length >= 64;
+  });
+}
+
 export function resolveScopesSafely(
   cards: ImportedCardCandidate[],
   families: PromotionFamily[],
@@ -159,6 +166,11 @@ export function resolveScopesSafely(
   recoverCachedCardClasses(cards, visualSignatures);
   const scopes = buildProductScopes(families);
   const resolutions = new Map(cards.map(card => [card.cardId, safeStructuredResolution(card, scopes)]));
+
+  // Text-first runs deliberately send no visual signatures. Do not execute the
+  // pairwise visual, sequence, or fingerprint recovery pipelines in that mode.
+  if (!hasVisualEvidence(cards, visualSignatures)) return resolutions;
+
   const anchors = cards.filter(card => resolutions.get(card.cardId)?.method === 'structured_scope');
   const classesByScope = new Map<string, Set<string>>();
   for (const anchor of anchors) {
