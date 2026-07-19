@@ -49,8 +49,9 @@ export function calculatePromotion(unitPrice: number, quantityInput: number, tie
     if (!Number.isFinite(active.bundlePrice.amount) || active.bundlePrice.amount <= 0) throw new Error('bundle_price_invalid');
     const bundles = Math.floor(quantity / active.minQuantity);
     const remainder = quantity % active.minQuantity;
-    netAmount = roundMoney(bundles * active.bundlePrice.amount + remainder * unitPrice);
-    cashDiscount = roundMoney(Math.max(0, grossAmount - netAmount));
+    const computedBundleTotal = roundMoney(bundles * active.bundlePrice.amount + remainder * unitPrice);
+    netAmount = Math.min(grossAmount, computedBundleTotal);
+    cashDiscount = roundMoney(grossAmount - netAmount);
   }
   return {
     quantity,
