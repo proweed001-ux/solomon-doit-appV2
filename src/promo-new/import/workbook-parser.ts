@@ -25,6 +25,7 @@ export interface WorkbookParseResult {
   warnings: string[];
 }
 
+const PROMO_CLASSES = new Set(['HFSS', 'HFSM', 'HFSL', 'HFSXL', 'HFSWS-S', 'HFSWS-L']);
 const thaiNfkc = (value: unknown) => String(value ?? '').normalize('NFKC').replace(/\u0E4D\u0E32/gu, '\u0E33');
 const normalize = (value: unknown) => thaiNfkc(value).toUpperCase().replace(/\s+/g, ' ').trim();
 const compact = (value: unknown) => normalize(value).replace(/[^A-Z0-9ก-๙]/gu, '');
@@ -230,6 +231,14 @@ export async function parsePromotionWorkbook(file: File): Promise<WorkbookParseR
       });
     }
   }
-  if (!all.size) warnings.push('promotion_family_not_found');
-  return { families: [...all.values()].sort((a, b) => a.name.localeCompare(b.name, 'th')), sheets, warnings: [...new Set(warnings)] };
+  const families = [...all.values()].sort((a, b) => a.name.localeCompare(b.name, 'th'));
+  if (!families.length) throw new Error('promotion_family_not_found_in_workbook');
+  const classIds = families.flatMap(family => Object.keys(family.tiersByClass));
+  const unsupported = [...new Set(classIds.filter(classId => !PROMO_CLASSES.has(classId)))];
+  if (unsupported.length) throw new Error(`promotion_workbook_unsupported_class:${unsupported.join(',')}`);
+  const tierCount = families.reduce((total, family) => (
+    total + Object.values(family.tiersByClass).reduce((sum, tiers) => sum + tiers.length, 0)
+  ), 0);
+  if (!tierCount) throw new Error('promotion_tiers_not_found_in_workbook');
+  return { families, sheets, warnings: [...new Set(warnings)] };
 }
