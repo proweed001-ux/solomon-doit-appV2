@@ -33,7 +33,7 @@ const seconds = (startedAt: number): string => `${((performance.now() - startedA
 const progress = (message: string): void => workerScope.postMessage({ type: 'progress', message } satisfies GroupingWorkerResponse);
 workerScope.postMessage({ type: 'ready' } satisfies GroupingWorkerResponse);
 
-workerScope.onmessage = (event: MessageEvent<GroupingWorkerRequest>) => {
+workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
   if (event.data?.type !== 'group') return;
   try {
     const totalStarted = performance.now();
@@ -46,7 +46,9 @@ workerScope.onmessage = (event: MessageEvent<GroupingWorkerRequest>) => {
     const scopeStarted = performance.now();
     const initial = hasVisualEvidence
       ? resolveScopesSafely(payload.cards, payload.promotionFamilies, payload.visualSignatures)
-      : resolveTextFirstScopesSafely(payload.cards, payload.promotionFamilies);
+      : await resolveTextFirstScopesSafely(payload.cards, payload.promotionFamilies, state => {
+        progress(`เทียบ Scope ${state.processed}/${state.total} การ์ด · candidate ${state.candidateComparisons} · Scope ทั้งหมด ${state.scopeCount}`);
+      });
     progress(`วิเคราะห์ Promotion Scope เสร็จ ${seconds(scopeStarted)} · ${initial.size}/${payload.cards.length} การ์ด`);
 
     const matrixStarted = performance.now();
