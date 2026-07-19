@@ -136,7 +136,9 @@ async function masterForSku(sku: Sku): Promise<{ id: string; isNew: boolean; key
   const key = normalizeLegacyMasterKey(sku.canonicalName || sku.identityKey);
   if (existing) return { id: existing[1].toLowerCase(), isNew: false, key };
   if (sku.status !== 'active' || sku.failureReasons.length) throw new Error(`legacy_master_not_confirmed:${sku.id}`);
-  return { id: await legacyMasterIdentity(key), isNew: true, key };
+  const identitySeed = clean(sku.identityKey);
+  if (!identitySeed) throw new Error(`legacy_master_identity_missing:${sku.id}`);
+  return { id: await legacyMasterIdentity(`sku-identity|${identitySeed}`), isNew: true, key };
 }
 
 export async function buildLegacyUploadPlan(dataset: PromoDataset): Promise<LegacyUploadPlan> {
