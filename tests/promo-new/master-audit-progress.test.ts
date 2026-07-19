@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import type { GroupingResult } from '../../src/promo-new/domain/grouping';
 import {
@@ -39,4 +40,10 @@ test('async Product Master audit yields every 12 groups and preserves sync evide
   ]);
   assert.deepEqual(asyncResult.cards, sync.cards);
   assert.ok(asyncResult.cards.every(card => card.evidence.masterMatchMethod === 'new_sku'));
+});
+
+test('grouping Worker awaits chunked audit and forwards group progress', () => {
+  const worker = readFileSync('src/promo-new/admin/grouping-worker.ts', 'utf8');
+  assert.match(worker, /await attachMasterMatchAuditEvidenceAsync\(/u);
+  assert.match(worker, /ตรวจหลักฐาน Product Master \$\{state\.processed\}\/\$\{state\.total\} กลุ่ม/u);
 });
