@@ -117,11 +117,15 @@ function scoreToken(token: string, scores: Record<PromoClassId, number>): { toke
   for (const classId of PROMO_CLASS_IDS) {
     const aliasIndex = OCR_ALIASES[classId].indexOf(token);
     if (aliasIndex >= 0) {
-      const score = token === 'HFSW' ? 0.74 : token === 'HFSWH' ? 0.93 : 0.9;
+      const score = token === 'HFSW' ? 0.74 : token === 'HFSWH' ? 0.76 : 0.9;
       addScore(scores, classId, score);
       if (token === 'HFSW') {
         addScore(scores, 'HFSWS-S', 0.5);
         addScore(scores, 'HFSWS-L', 0.5);
+      }
+      if (token === 'HFSWH') {
+        addScore(scores, 'HFSWS-S', 0.44);
+        addScore(scores, 'HFSWS-L', 0.44);
       }
       return { token, method: 'ocr_alias' };
     }
