@@ -11,6 +11,10 @@ export interface PreparedCachedRun {
   recoveredPages: number;
 }
 
+export function currentCachePipelineWarning(): string {
+  return `cache:pipeline:${PROMO_TEST_PIPELINE_VERSION}`;
+}
+
 function validVisualSignature(value: unknown): value is string {
   if (typeof value !== 'string' || value.length < 64 || value.length % 2 !== 0) return false;
   for (let index = 0; index < value.length; index += 1) {
@@ -53,7 +57,7 @@ export function prepareCachedRun(
     visualSignatures,
     pipelineVersion: PROMO_TEST_PIPELINE_VERSION,
     warnings: [
-      `cache:pipeline:${PROMO_TEST_PIPELINE_VERSION}`,
+      currentCachePipelineWarning(),
       `cache:class_recovered_cards:${recovery.changedCards}`,
       `cache:class_recovered_pages:${recovery.recoveredPages}`,
     ],
