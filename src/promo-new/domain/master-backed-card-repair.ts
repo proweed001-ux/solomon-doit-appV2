@@ -6,23 +6,33 @@ import type { PromotionFamily, Sku } from './types';
 const clean = (value: unknown): string => normalizeProductText(value).replace(/\s+/g, ' ').trim();
 const compact = (value: unknown): string => clean(value).toUpperCase().replace(/[^A-Z0-9ก-๙&]+/gu, '');
 
+interface PreparedMaster {
+  original: Sku;
+  parsed: Sku;
+}
+
+function prepareMaster(master: Sku): PreparedMaster {
+  const evidence = [master.canonicalName, ...master.evidence].filter(Boolean).join(' ');
+  return { original: master, parsed: createSkuCandidate(evidence) };
+}
+
 function sameNumber(left: number, right: number): boolean {
   return Math.abs(left - right) <= 0.001;
 }
 
-function variantCompatible(scope: ProductScopeCandidate, master: Sku): boolean {
+function variantCompatible(scope: ProductScopeCandidate, sku: Sku): boolean {
   const scopeVariant = compact(scope.variant || '');
-  const masterVariant = compact(master.identity.variant || '');
-  if (!scopeVariant) return !masterVariant;
-  return Boolean(masterVariant && (masterVariant.includes(scopeVariant) || scopeVariant.includes(masterVariant)));
+  const skuVariant = compact(sku.identity.variant || '');
+  if (!scopeVariant) return !skuVariant;
+  return Boolean(skuVariant && (skuVariant.includes(scopeVariant) || scopeVariant.includes(skuVariant)));
 }
 
-function masterFitsScope(master: Sku, scope: ProductScopeCandidate): boolean {
-  const identity = master.identity;
-  if (master.status !== 'active') return false;
+function masterFitsScope(master: PreparedMaster, scope: ProductScopeCandidate): boolean {
+  const identity = master.parsed.identity;
+  if (master.original.status !== 'active') return false;
   if (identity.brand !== scope.brand || identity.productType !== scope.productType) return false;
   if (Math.max(1, identity.packQuantity || 1) !== Math.max(1, scope.packQuantity || 1)) return false;
-  if (!variantCompatible(scope, master)) return false;
+  if (!variantCompatible(scope, master.parsed)) return false;
   if (scope.minimumSize == null || scope.maximumSize == null || !scope.sizeUnit) {
     return !(identity.sizeValue > 0) || !identity.sizeUnit;
   }
@@ -52,17 +62,18 @@ function relevantScopes(card: ImportedCardCandidate, observed: Sku, scopes: Prod
 function uniqueMasterForObserved(
   observed: Sku,
   scopes: ProductScopeCandidate[],
-  existingSkus: Sku[],
+  preparedMasters: PreparedMaster[],
 ): Sku | null {
   const fittingScopes = scopes.filter(scope => scopeMatchesObservedSize(scope, observed));
   if (!fittingScopes.length) return null;
-  const candidates = existingSkus.filter(master => (
-    fittingScopes.some(scope => masterFitsScope(master, scope))
-    && (!(observed.identity.sizeValue > 0)
-      || (sameNumber(master.identity.sizeValue, observed.identity.sizeValue)
-        && master.identity.sizeUnit === observed.identity.sizeUnit))
-  ));
-  const unique = [...new Map(candidates.map(master => [master.id, master])).values()];
+  const candidates = preparedMasters.filter(master => {
+    const identity = master.parsed.identity;
+    return fittingScopes.some(scope => masterFitsScope(master, scope))
+      && (!(observed.identity.sizeValue > 0)
+        || (sameNumber(identity.sizeValue, observed.identity.sizeValue)
+          && identity.sizeUnit === observed.identity.sizeUnit));
+  });
+  const unique = [...new Map(candidates.map(master => [master.original.id, master.original])).values()];
   return unique.length === 1 ? unique[0] : null;
 }
 
@@ -87,6 +98,7 @@ export function repairCardsWithMasterBackedScopes(
   existingSkus: Sku[],
 ): MasterBackedCardRepairResult {
   const scopes = buildProductScopes(families);
+  const preparedMasters = existingSkus.map(prepareMaster);
   let repaired = 0;
   let rejectedConflictingSizes = 0;
   const warnings: string[] = [];
@@ -108,7 +120,7 @@ export function repairCardsWithMasterBackedScopes(
       };
     }
 
-    const master = uniqueMasterForObserved(observed, candidates, existingSkus);
+    const master = uniqueMasterForObserved(observed, candidates, preparedMasters);
     if (!master) return card;
     repaired += 1;
     warnings.push(`card:${card.cardId}:master_backed_scope_repair:${master.id}`);
