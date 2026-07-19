@@ -12,7 +12,7 @@ import type { ImportedCardCandidate, PdfImportProgress, PdfImportResult } from '
 import type { WorkbookParseResult } from '../import/workbook-parser';
 import { inspectPromotionWorkbookFile, PROMOTION_WORKBOOK_ACCEPT } from '../import/workbook-file';
 import { createDemoDataset } from '../shared/demo-data';
-import { fetchPromoMasterData, loadSession, login, logout, publishVersion, saveDraft, uploadCardImage, validateSession } from '../shared/api';
+import { fetchPromoMasterData, loadSession, login, logout, publishVersion, saveDraft, saveSession, uploadCardImage, validateSession } from '../shared/api';
 import { enrichAdaptiveCardHeaders, selectAdaptiveHeaderOcrTargets } from './adaptive-header-ocr';
 import { prepareCachedRun } from './cached-run';
 import { runGroupingInWorker } from './grouping-client';
@@ -30,7 +30,8 @@ type Session = NonNullable<ReturnType<typeof loadSession>>;
 type MasterData = Awaited<ReturnType<typeof fetchPromoMasterData>>;
 type GroupedResult = Awaited<ReturnType<typeof runGroupingInWorker>>;
 
-const BUILD_ID = 'TEXT-FIRST-OCR-20260718-1505';
+const BUILD_ID = 'FINAL-UPLOAD-AUDIT-20260719-0031';
+const PROMO_CLASSES = new Set(['HFSS', 'HFSM', 'HFSL', 'HFSXL', 'HFSWS-S', 'HFSWS-L']);
 
 const defaultMonth = () => {
   const date = new Date();
@@ -40,11 +41,18 @@ const defaultMonth = () => {
 const money = (value: number | null | undefined) => value == null ? '-' : `฿${value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const cacheDate = (value: string) => new Date(value).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
 const errorText = (caught: unknown) => String((caught as Error)?.message || caught || 'unknown_error');
-const emptyMaster = (): MasterData => ({ skus: [], prices: [] });
 
-function LoginPage({ onLogin, onDemo }: { onLogin: (session: Session) => void; onDemo: () => void }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+function assertWorkbookReady(parsed: WorkbookParseResult): void {
+  if (!parsed.families.length) throw new Error('promotion_family_not_found_in_workbook');
+  const classIds = parsed.families.flatMap(family => Object.keys(family.tiersByClass));
+  const unsupported = [...new Set(classIds.filter(classId => !PROMO_CLASSES.has(classId)))];
+  if (unsupported.length) throw new Error(`promotion_workbook_unsupported_class:${unsupported.join(',')}`);
+  const tierCount = parsed.families.reduce((total, family) => total + Object.values(family.tiersByClass).reduce((sum, tiers) => sum + tiers.length, 0), 0);
+  if (!tierCount) throw new Error('promotion_tiers_not_found_in_workbook');
+}
+
+function LoginPage({ onLogin, onDemo, allowDemo }: { onLogin: (session: Session) => void; onDemo: () => void; allowDemo: boolean }) {
+  const [adminKey, setAdminKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const submit = async (event: React.FormEvent) => {
@@ -52,7 +60,7 @@ function LoginPage({ onLogin, onDemo }: { onLogin: (session: Session) => void; o
     setBusy(true);
     setError('');
     try {
-      onLogin(await login(email, password));
+      onLogin(await login('', adminKey));
     } catch (caught) {
       setError(errorText(caught));
     } finally {
@@ -61,16 +69,14 @@ function LoginPage({ onLogin, onDemo }: { onLogin: (session: Session) => void; o
   };
   return <main className="login-page"><section className="login-card">
     <div className="eyebrow">PROMO SYSTEM REBUILD</div><h1>หลังบ้านโปรโมชั่นใหม่</h1>
-    <p>ต้องเข้าสู่ระบบก่อนบันทึก SKU ราคา Draft หรือ Publish ข้อมูลทุกอย่างจะผ่าน Backend ที่ตรวจสิทธิ์</p>
+    <p>ใช้รหัสอัปโหลดเดิมเพื่อโหลด Product Master และราคาเดิมก่อนเริ่มอ่าน PDF</p>
     {error && <div className="notice error">เข้าสู่ระบบไม่สำเร็จ: {error}</div>}
     <form onSubmit={submit}>
-      <label className="field">อีเมลผู้ดูแล<input type="email" autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} required /></label>
-      <label className="field">รหัสผ่าน<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} minLength={8} required /></label>
+      <label className="field">รหัสอัปโหลด<input type="password" autoComplete="current-password" value={adminKey} onChange={event => setAdminKey(event.target.value)} required /></label>
       <button className="btn primary" disabled={busy}>{busy ? 'กำลังตรวจสิทธิ์...' : 'เข้าสู่ระบบ'}</button>
     </form>
-    <div className="divider">หรือ</div>
-    <button className="btn soft" style={{ width: '100%' }} onClick={onDemo}>ดู Preview แบบสาธิต (อ่านอย่างเดียว)</button>
-    <div className="audit-note"><ShieldCheck size={14} /> โหมดสาธิตไม่เชื่อมฐานข้อมูล ไม่บันทึก และไม่สามารถ Publish ได้</div>
+    {allowDemo && <><div className="divider">หรือ</div><button className="btn soft" style={{ width: '100%' }} onClick={onDemo}>ดู Preview แบบสาธิต (อ่านอย่างเดียว)</button></>}
+    <div className="audit-note"><ShieldCheck size={14} /> โหมด Dry-run โหลด Product Master จริง แต่บล็อก Draft และ Publish</div>
   </section></main>;
 }
 
@@ -144,30 +150,23 @@ function AdminApp() {
     }
     setWorkbook(selected);
     setError('');
-    setMessage(`เลือก ${info.label}: ${selected.name} — พร้อมประมวลผลร่วมกับ PDF`);
+    setMessage(`เลือก ${info.label}: ${selected.name} — พร้อมตรวจข้อมูลก่อนเปิด PDF`);
   };
 
   useEffect(() => {
     if (!session) { setChecking(false); return; }
-    validateSession(session).catch(() => setSession(null)).finally(() => setChecking(false));
+    validateSession(session).catch(() => {
+      saveSession(null);
+      setSession(null);
+    }).finally(() => setChecking(false));
   }, []);
 
-  const loadMasterData = async (): Promise<{ master: MasterData; warning: string }> => {
-    if (!session) return { master: emptyMaster(), warning: 'master_data_unavailable:no_session' };
-    try {
-      return { master: await fetchPromoMasterData(session), warning: '' };
-    } catch (caught) {
-      return { master: emptyMaster(), warning: `master_data_unavailable:${errorText(caught)}` };
-    }
+  const loadMasterData = async (): Promise<MasterData> => {
+    if (!session) throw new Error('admin_session_required_for_product_master');
+    return fetchPromoMasterData(session);
   };
 
-  const runGrouping = async (
-    imported: PdfImportResult,
-    parsedWorkbook: WorkbookParseResult,
-    master: MasterData,
-    artifactMonthKey: string,
-    progressPrefix: string,
-  ): Promise<GroupedResult> => {
+  const runGrouping = async (imported: PdfImportResult, parsedWorkbook: WorkbookParseResult, master: MasterData, artifactMonthKey: string, progressPrefix: string): Promise<GroupedResult> => {
     const groupingStarted = performance.now();
     setProgress({ phase: 'cards', page: 0.55, pageCount: 1, cards: imported.cards.length, elapsedMs: 0, message: `${progressPrefix} · กำลังเปิด Inline Worker` });
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -193,12 +192,10 @@ function AdminApp() {
     masterInput: MasterData | null = null,
     groupedInput: GroupedResult | null = null,
   ) => {
-    const loaded = masterInput ? { master: masterInput, warning: '' } : await loadMasterData();
-    const grouped = groupedInput || await runGrouping(imported, parsedWorkbook, loaded.master, artifactMonthKey, 'จัดกลุ่มจากข้อความ');
-
+    const master = masterInput || await loadMasterData();
+    const grouped = groupedInput || await runGrouping(imported, parsedWorkbook, master, artifactMonthKey, 'จัดกลุ่มจากข้อความ');
     setProgress({ phase: 'cards', page: 0.92, pageCount: 1, cards: imported.cards.length, elapsedMs: 0, message: 'กำลังสร้างผลลัพธ์และ Promotion Family' });
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-
     const version = nextDraftVersion(artifactMonthKey, [], session?.user.id || null);
     version.status = 'need_review';
     version.source = { pdfName: sourcePdfName, workbookName: sourceWorkbookName, pdfHash: null, workbookHash: null };
@@ -210,7 +207,7 @@ function AdminApp() {
       cards: grouped.cards,
       productGroups: grouped.groups,
       promotionFamilies: parsedWorkbook.families,
-      warnings: [...imported.warnings, ...parsedWorkbook.warnings, ...grouped.warnings, ...extraWarnings, ...(loaded.warning ? [loaded.warning] : [])],
+      warnings: [...imported.warnings, ...parsedWorkbook.warnings, ...grouped.warnings, ...extraWarnings],
     };
     const automated = autoAssignPromotionFamilies(next);
     const inheritedPrices = automated.dataset.productGroups.filter(group => group.price.source === 'central_override').length;
@@ -228,17 +225,13 @@ function AdminApp() {
     setPreviewChecked(false);
     setSavedVersionId(null);
     try {
-      const [{ importPromotionPdf }, { parsePromotionWorkbook }] = await Promise.all([
-        import('../import/pdf-importer'),
-        import('../import/workbook-parser'),
-      ]);
-      setProgress({ phase: 'loading', page: 0.02, pageCount: 1, cards: 0, elapsedMs: 0, message: 'อ่าน XLSM และโหลด Product Master ก่อนประมวลผล PDF' });
-      const [parsedWorkbook, loaded] = await Promise.all([
-        parsePromotionWorkbook(workbook),
-        loadMasterData(),
-      ]);
+      const [{ importPromotionPdf }, { parsePromotionWorkbook }] = await Promise.all([import('../import/pdf-importer'), import('../import/workbook-parser')]);
+      setProgress({ phase: 'loading', page: 0.02, pageCount: 1, cards: 0, elapsedMs: 0, message: 'ตรวจ XLSM และโหลด Product Master ก่อนเปิด PDF' });
+      const [parsedWorkbook, master] = await Promise.all([parsePromotionWorkbook(workbook), loadMasterData()]);
+      assertWorkbookReady(parsedWorkbook);
+      setProgress({ phase: 'loading', page: 0.05, pageCount: 1, cards: 0, elapsedMs: 0, message: `XLSM พร้อม ${parsedWorkbook.families.length} Family · Product Master ${master.skus.length} รายการ · เริ่มเปิด PDF` });
       let imported = await importPromotionPdf(pdf, { monthKey, enableOcr: ocr, onProgress: setProgress });
-      let grouped = await runGrouping(imported, parsedWorkbook, loaded.master, monthKey, 'Preflight จากชื่อรอบแรก');
+      let grouped = await runGrouping(imported, parsedWorkbook, master, monthKey, 'Preflight จาก OCR หน้ารอบหลัก');
       const selection = ocr ? selectAdaptiveHeaderOcrTargets(imported.cards, grouped) : {
         targetIds: new Set<string>(),
         unresolvedTargets: 0,
@@ -253,7 +246,6 @@ function AdminApp() {
         `adaptive_header_ocr_skipped_by_existing_knowledge:${selection.skippedByExistingKnowledge}`,
         `adaptive_header_ocr_no_expected_benefit:${selection.unresolvedWithoutOcrBenefit}`,
       ];
-
       if (ocr && selection.targetIds.size) {
         const headerStarted = performance.now();
         const enriched = await enrichAdaptiveCardHeaders(imported.cards, selection.targetIds, (completed, total) => {
@@ -263,12 +255,11 @@ function AdminApp() {
         adaptiveImproved = enriched.improved;
         adaptiveWarnings.push(...enriched.warnings);
         imported = { ...imported, cards: enriched.cards, warnings: [...new Set([...imported.warnings, ...enriched.warnings])] };
-        grouped = await runGrouping(imported, parsedWorkbook, loaded.master, monthKey, 'จัดกลุ่มซ้ำหลัง OCR เฉพาะจุด');
+        grouped = await runGrouping(imported, parsedWorkbook, master, monthKey, 'จัดกลุ่มซ้ำหลัง OCR เฉพาะจุด');
       } else {
         adaptiveWarnings.push(ocr ? 'adaptive_header_ocr_skipped:no_unresolved_targets' : 'adaptive_header_ocr_disabled');
       }
-
-      const cacheWarnings: string[] = [...adaptiveWarnings, ...(loaded.warning ? [loaded.warning] : [])];
+      const cacheWarnings: string[] = [...adaptiveWarnings];
       try {
         const summary = await savePromoTestCache({ monthKey, ocrEnabled: ocr, pdf, workbook, imported, parsedWorkbook, visualSignatures: {} });
         setCacheSummary(summary);
@@ -276,17 +267,7 @@ function AdminApp() {
       } catch (caught) {
         cacheWarnings.push(`browser_cache_save_failed:${errorText(caught)}`);
       }
-      await groupArtifacts(
-        imported,
-        parsedWorkbook,
-        pdf.name,
-        workbook.name,
-        cacheWarnings,
-        `ประมวลผลข้อความแล้ว · OCR เพิ่ม ${adaptiveAttempted} ใบ · ดีขึ้น ${adaptiveImproved} ใบ`,
-        monthKey,
-        loaded.master,
-        grouped,
-      );
+      await groupArtifacts(imported, parsedWorkbook, pdf.name, workbook.name, cacheWarnings, `ประมวลผลข้อความแล้ว · OCR เพิ่ม ${adaptiveAttempted} ใบ · ดีขึ้น ${adaptiveImproved} ใบ`, monthKey, master, grouped);
     } catch (caught) {
       setProgress(null);
       setError(errorText(caught));
@@ -304,7 +285,7 @@ function AdminApp() {
     setProgress({ phase: 'loading', page: 0.05, pageCount: 1, cards: cacheSummary?.cardCount || 0, elapsedMs: 0, message: 'รับคำสั่งแล้ว · กำลังอ่าน IndexedDB หนึ่งครั้ง' });
     try {
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-      const cached = await loadPromoTestCache();
+      const [cached, master] = await Promise.all([loadPromoTestCache(), loadMasterData()]);
       if (!cached) throw new Error('cache_not_found_on_this_browser');
       setCacheSummary(cached.summary);
       setMonthKey(cached.monthKey);
@@ -312,18 +293,10 @@ function AdminApp() {
       setPdf(cached.pdf);
       setWorkbook(cached.workbook);
       if (!cached.imported || !cached.parsedWorkbook) throw new Error('cache_source_only_reprocess_required');
-
-      const prepared = prepareCachedRun(cached.imported, cached.visualSignatures || {});
-      setProgress({ phase: 'cards', page: 0.3, pageCount: 1, cards: prepared.imported.cards.length, elapsedMs: performance.now() - started, message: `โหลดแคชแล้ว · แก้ Class ${prepared.changedClasses} การ์ดใน ${prepared.recoveredPages} หน้า` });
-      await groupArtifacts(
-        prepared.imported,
-        cached.parsedWorkbook,
-        cached.pdf.name,
-        cached.workbook.name,
-        ['grouping_rerun_from_browser_cache', ...cached.warnings, ...prepared.warnings],
-        `จัดกลุ่มใหม่จากแคช · ใช้ข้อความและ Product Master · แก้ Class ${prepared.changedClasses} การ์ด`,
-        cached.monthKey,
-      );
+      assertWorkbookReady(cached.parsedWorkbook);
+      const prepared = prepareCachedRun(cached.imported, {});
+      setProgress({ phase: 'cards', page: 0.3, pageCount: 1, cards: prepared.imported.cards.length, elapsedMs: performance.now() - started, message: `โหลดแคชแล้ว · Product Master ${master.skus.length} · แก้ Class ${prepared.changedClasses} การ์ดใน ${prepared.recoveredPages} หน้า` });
+      await groupArtifacts(prepared.imported, cached.parsedWorkbook, cached.pdf.name, cached.workbook.name, ['grouping_rerun_from_browser_cache', ...cached.warnings, ...prepared.warnings], `จัดกลุ่มใหม่จากแคช · ใช้ข้อความและ Product Master · แก้ Class ${prepared.changedClasses} การ์ด`, cached.monthKey, master);
     } catch (caught) {
       setProgress(null);
       const code = errorText(caught);
@@ -414,7 +387,7 @@ function AdminApp() {
   }), [dataset, search, filter]);
 
   const save = async () => {
-    if (!dataset || !session || demo) return;
+    if (!dataset || !session || demo || dryRun) return;
     setBusy(true);
     setError('');
     try {
@@ -456,7 +429,7 @@ function AdminApp() {
   };
 
   const publish = async () => {
-    if (!dataset || !session || demo || !savedVersionId || !previewChecked) return;
+    if (!dataset || !session || demo || dryRun || !savedVersionId || !previewChecked) return;
     setBusy(true);
     setError('');
     try {
@@ -471,16 +444,16 @@ function AdminApp() {
   };
 
   if (checking) return <main className="login-page"><section className="login-card">กำลังตรวจ session...</section></main>;
-  if (!session && !demo && !dryRun) return <LoginPage onLogin={value => setSession(value)} onDemo={() => { setDemo(true); setDataset(createDemoDataset('draft')); }} />;
+  if (!session && !demo) return <LoginPage onLogin={value => setSession(value)} onDemo={() => { setDemo(true); setDataset(createDemoDataset('draft')); }} allowDemo={!dryRun} />;
   const ready = dataset?.productGroups.filter(group => group.status === 'ready').length || 0;
   const blocked = dataset?.productGroups.filter(group => group.status === 'blocked').length || 0;
-  const publishable = Boolean(dataset && savedVersionId && previewChecked && !busy && !demo && ready === dataset.productGroups.length && blocked === 0 && quarantine.length === 0 && dataset.version.status !== 'published');
+  const publishable = Boolean(dataset && savedVersionId && previewChecked && !busy && !demo && !dryRun && ready === dataset.productGroups.length && blocked === 0 && quarantine.length === 0 && dataset.version.status !== 'published');
 
   return <div className="admin-shell">
     <header className="admin-hero"><div className="hero-inner"><div className="hero-row"><div><div className="eyebrow">PROMO SYSTEM REBUILD · {demo ? 'DEMO READ-ONLY' : dryRun ? 'FILE DRY-RUN' : 'AUTHENTICATED ADMIN'}</div><h1>จัดโปรโมชั่นเป็นกลุ่ม ไม่ไล่ติ๊กทีละการ์ด</h1><p>นำเข้า PDF + CSV/XLSM แล้วจัด SKU, Product Group, โปรราย Class และราคากลางในหน้าจอเดียว</p></div><div className="hero-actions"><a className="btn ghost" href="/promo-new.html?demo=1">ดูหน้าลูกค้า</a>{session && <button className="btn ghost" onClick={() => logout(session).finally(() => setSession(null))}><LogOut size={16} /> ออกจากระบบ</button>}</div></div></div></header>
     <main className="admin-main">
       {demo && <div className="notice warn">นี่คือข้อมูลสาธิตสำหรับตรวจ UI เท่านั้น ปุ่มบันทึก/Publish ถูกปิด และไม่มีการเชื่อม Production</div>}
-      {dryRun && <div className="notice warn">โหมดทดสอบไฟล์จริง · Build {BUILD_ID} · Text-first OCR · ไม่เขียน Production</div>}
+      {dryRun && <div className="notice warn">โหมดทดสอบไฟล์จริง · Build {BUILD_ID} · Product Master ก่อน PDF · ไม่เขียน Production</div>}
       {error && <div className="notice error"><AlertTriangle size={15} /> {error}</div>}
       <section className="panel">
         <div className="step-grid">
@@ -489,8 +462,8 @@ function AdminApp() {
           <label className="field file-drop"><span><FileSpreadsheet size={16} /> เลือก CSV/XLSX/XLSM</span><input type="file" accept={PROMOTION_WORKBOOK_ACCEPT} onChange={selectWorkbook} /><small>{workbook ? `${workbook.name} · ${inspectPromotionWorkbookFile(workbook).label}` : 'รองรับ .csv, .xlsx, .xlsm และ .xls'}</small></label>
         </div>
         <div className="run-row">
-          <label className="field" style={{ flexDirection: 'row', alignItems: 'center' }}><input style={{ width: 18, height: 18 }} type="checkbox" checked={ocr} onChange={event => setOcr(event.target.checked)} /> เปิด OCR อ่านชื่อขวาบน — รอบเพิ่มทำเฉพาะ unresolved หลังเทียบ Product Master</label>
-          <button className="btn primary" disabled={busy || !pdf || !workbook || demo} onClick={processFiles}>{busy ? 'กำลังประมวลผล...' : 'ประมวลผลไฟล์และบันทึกแคช'}</button>
+          <label className="field" style={{ flexDirection: 'row', alignItems: 'center' }}><input style={{ width: 18, height: 18 }} type="checkbox" checked={ocr} onChange={event => setOcr(event.target.checked)} /> OCR รอบหลักจากหน้า PDF ครั้งเดียว; OCR หัวขวาบนเพิ่มเฉพาะ unresolved หลังเทียบ Product Master</label>
+          <button className="btn primary" disabled={busy || !pdf || !workbook || demo || !session} onClick={processFiles}>{busy ? 'กำลังประมวลผล...' : 'ประมวลผลไฟล์และบันทึกแคช'}</button>
         </div>
         <div style={{ marginTop: 12, padding: 12, border: '1px solid #dbe4ef', borderRadius: 12, background: '#f8fafc' }}>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -499,7 +472,7 @@ function AdminApp() {
               <small>{cacheSummary ? `${cacheSummary.monthKey} · ${cacheSummary.pdfName} · ${cacheSummary.workbookName} · ${cacheSummary.cardCount || '-'} การ์ด · ${formatCacheSize(cacheSummary.estimatedBytes)} · ${cacheSummary.mode === 'full' ? 'พร้อมจัดกลุ่มใหม่' : 'เก็บเฉพาะไฟล์ ต้องประมวลผลใหม่'} · ${cacheDate(cacheSummary.savedAt)}` : 'ยังไม่มี summary หรือ localStorage ถูกล้าง — ปุ่มตรวจแคชจะตรวจ IndexedDB จริง'}</small>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn soft" disabled={busy || demo} onClick={useCachedRun}><Database size={15} /> {busy ? 'กำลังทำงาน...' : 'ตรวจและจัดกลุ่มจากแคช'}</button>
+              <button className="btn soft" disabled={busy || demo || !session} onClick={useCachedRun}><Database size={15} /> {busy ? 'กำลังทำงาน...' : 'ตรวจและจัดกลุ่มจากแคช'}</button>
               <button className="btn soft" disabled={busy || demo} onClick={clearCachedRun}><Trash2 size={15} /> ล้างแคช</button>
             </div>
           </div>
@@ -512,7 +485,7 @@ function AdminApp() {
         <div className="group-list">{dataset ? visibleGroups.map(group => <GroupEditor key={group.id} group={group} dataset={dataset} priceDraft={priceDrafts[group.id] ?? String(group.price.effectivePrice?.amount || '')} onPriceDraft={value => setPriceDrafts(current => ({ ...current, [group.id]: value }))} onConfirmSku={() => confirmSku(group.id)} onApply={(familyId, amount) => applyGroup(group.id, familyId, amount)} />) : <div className="empty">เลือกไฟล์แล้วกดประมวลผล หรือกดตรวจและจัดกลุ่มจากแคช</div>}</div>
       </section>
       {!!quarantine.length && <section className="panel"><div className="section-head"><div><h2>รายการที่ต้องแก้เฉพาะจุด</h2><small>ชื่อสินค้าไม่ครบ ข้อมูลขัดแย้ง หรือ Product Master มีตัวเลือกสูสี ระบบจึงไม่เดา</small></div><span className="tag bad">{quarantine.length}</span></div><div className="quarantine">{quarantine.map(card => <article className="quarantine-card" key={card.cardId}><img src={card.imageUrl} alt={card.cardId} /><b>{card.productText || 'อ่านชื่อสินค้าไม่ได้'}</b><div className="failure">{card.failureReasons.join(' · ')}</div></article>)}</div></section>}
-      <div className="footer-actions"><button className="btn soft" disabled={!dataset || !savedVersionId || busy} onClick={validatePreview}><CheckCircle2 size={16} /> {previewChecked ? 'ตรวจความพร้อมผ่าน' : 'ตรวจความพร้อมจริง'}</button><button className="btn primary" disabled={!dataset || !session || demo || busy || Boolean(savedVersionId) || dataset.version.status === 'published'} onClick={save}><Save size={16} /> {savedVersionId ? 'Draft บันทึกแล้ว' : 'บันทึก Draft'}</button><button className="btn dark" disabled={!publishable} onClick={publish}>Publish เวอร์ชันนี้</button></div>
+      <div className="footer-actions"><button className="btn soft" disabled={!dataset || busy || (!dryRun && !savedVersionId)} onClick={validatePreview}><CheckCircle2 size={16} /> {previewChecked ? 'ตรวจความพร้อมผ่าน' : 'ตรวจความพร้อมจริง'}</button><button className="btn primary" disabled={!dataset || !session || demo || dryRun || busy || Boolean(savedVersionId) || dataset.version.status === 'published'} onClick={save}><Save size={16} /> {savedVersionId ? 'Draft บันทึกแล้ว' : 'บันทึก Draft'}</button><button className="btn dark" disabled={!publishable} onClick={publish}>Publish เวอร์ชันนี้</button></div>
     </main>
   </div>;
 }
