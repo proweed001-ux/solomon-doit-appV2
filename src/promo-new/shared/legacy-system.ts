@@ -142,6 +142,22 @@ async function masterForSku(sku: Sku): Promise<{ id: string; isNew: boolean; key
   return { id: await legacyMasterIdentity(identityKey), isNew: true, key: identityKey };
 }
 
+function masterAuditEvidence(card: PromoCard, isNew: boolean): { score: number; margin: number; method: string } {
+  if (isNew) return { score: 100, margin: 100, method: 'new_sku' };
+  const score = Number(card.evidence.masterMatchScore);
+  const margin = Number(card.evidence.masterMatchMargin);
+  const method = clean(card.evidence.masterMatchMethod);
+  if (!Number.isFinite(score) || !Number.isFinite(margin) || !method) {
+    throw new Error(`legacy_master_match_evidence_missing:${card.id}`);
+  }
+  const normalizedScore = confidence(score);
+  const normalizedMargin = confidence(margin);
+  if (normalizedScore < 34 || normalizedMargin < 3) {
+    throw new Error(`legacy_master_match_evidence_below_edge_gate:${card.id}:${normalizedScore}:${normalizedMargin}`);
+  }
+  return { score: normalizedScore, margin: normalizedMargin, method };
+}
+
 export async function buildLegacyUploadPlan(dataset: PromoDataset): Promise<LegacyUploadPlan> {
   if (!dataset?.cards.length) throw new Error('legacy_dataset_empty');
   const promoMonthId = toLegacyMonthId(dataset.version.monthKey);
@@ -160,6 +176,7 @@ export async function buildLegacyUploadPlan(dataset: PromoDataset): Promise<Lega
     nextByClass.set(legacyClass, cardNo + 1);
     const fileName = `${legacyClass}-${String(cardNo).padStart(3, '0')}-p${String(card.page).padStart(2, '0')}.webp`;
     const master = await masterForSku(group.sku);
+    const masterEvidence = masterAuditEvidence(card, master.isNew);
     const amount = Number(card.price.effectivePrice?.amount || group.price.effectivePrice?.amount);
     if (!(amount > 0)) throw new Error(`legacy_price_missing:${card.id}`);
     const functionLabel = tierLabel(card);
@@ -174,7 +191,7 @@ export async function buildLegacyUploadPlan(dataset: PromoDataset): Promise<Lega
       detected_function_label: functionLabel,
       benefit_text: functionLabel,
       detection_status: 'auto_ok',
-      detection_method: 'promo_system_rebuild_legacy_adapter_v1',
+      detection_method: `promo_system_rebuild_${masterEvidence.method}`,
       benefit_confidence: evidenceConfidence,
       price_status: 'auto_ok',
       title_status: 'auto_ok',
@@ -182,9 +199,9 @@ export async function buildLegacyUploadPlan(dataset: PromoDataset): Promise<Lega
       base_unit_price: amount,
       unit_label: unit,
       master_product_id: master.id,
-      master_match_score: master.isNew ? 100 : Math.max(34, evidenceConfidence),
-      master_match_margin: master.isNew ? 100 : Math.max(3, Math.min(100, evidenceConfidence)),
-      title_consensus_score: master.isNew ? 100 : evidenceConfidence,
+      master_match_score: masterEvidence.score,
+      master_match_margin: masterEvidence.margin,
+      title_consensus_score: masterEvidence.score,
       master_is_new: master.isNew,
       master_canonical_name: group.sku.canonicalName,
       master_normalized_key: master.key,
