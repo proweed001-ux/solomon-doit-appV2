@@ -82,7 +82,7 @@ function mapColumns(row: Cell[]): ColumnMap {
     const candidates = aliases[key].map(compact);
     const exact = values.findIndex(value => candidates.includes(value));
     if (exact >= 0) return exact;
-    const partial = values.findIndex(value => candidates.some(candidate => value.includes(candidate) || candidate.includes(value)));
+    const partial = values.findIndex(value => value.length >= 4 && candidates.some(candidate => value.includes(candidate)));
     return partial >= 0 ? partial : null;
   };
   return {
