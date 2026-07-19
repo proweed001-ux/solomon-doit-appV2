@@ -228,10 +228,17 @@ export function createProductMasterTextMatcher(existingSkus: Sku[]): ProductMast
   return (observedInput, sourceTextInput) => matchPreparedProductMasterByText(observedInput, sourceTextInput, preparedMasters);
 }
 
+const MATCHER_CACHE = new WeakMap<Sku[], ProductMasterTextMatcher>();
+
 export function matchProductMasterByText(
   observedInput: Sku,
   sourceTextInput: string,
   existingSkus: Sku[],
 ): MasterTextMatch {
-  return createProductMasterTextMatcher(existingSkus)(observedInput, sourceTextInput);
+  let matcher = MATCHER_CACHE.get(existingSkus);
+  if (!matcher) {
+    matcher = createProductMasterTextMatcher(existingSkus);
+    MATCHER_CACHE.set(existingSkus, matcher);
+  }
+  return matcher(observedInput, sourceTextInput);
 }
