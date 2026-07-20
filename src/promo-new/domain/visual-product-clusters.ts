@@ -8,6 +8,7 @@ import type { VisualProductSignature } from './visual-product-signatures';
 const MIN_PRODUCT_SIMILARITY = 0.72;
 const MIN_TITLE_SIMILARITY = 0.76;
 const MIN_COMBINED_SIMILARITY = 0.82;
+const STRONG_COMBINED_SIMILARITY = 0.94;
 const MIN_NEIGHBOUR_MARGIN = 0.015;
 const MAX_NEIGHBOUR_RANK = 2;
 
@@ -74,23 +75,16 @@ function identityConflict(left: Sku, right: Sku): boolean {
   if (a.productType && b.productType && a.productType !== b.productType) return true;
   if (a.sizeValue > 0 && b.sizeValue > 0) {
     if (a.sizeUnit && b.sizeUnit && a.sizeUnit !== b.sizeUnit) return true;
-    const difference = Math.abs(a.sizeValue - b.sizeValue);
-    if (difference > 0.05) return true;
+    if (Math.abs(a.sizeValue - b.sizeValue) > 0.05) return true;
   }
   if (a.packQuantity > 1 && b.packQuantity > 1 && a.packQuantity !== b.packQuantity) return true;
-  if (variantConflict(a.variant, b.variant)) return true;
-  return false;
+  return variantConflict(a.variant, b.variant);
 }
 
 function evidenceFor(card: ImportedCardCandidate, existingSkus: Sku[], signature: VisualProductSignature): CardVisualEvidence {
   const sku = createSkuCandidate(card.productText || '');
   const match = matchProductMasterByText(sku, card.productText || '', existingSkus);
-  return {
-    card,
-    sku,
-    master: match.status === 'matched' && match.sku ? match.sku : null,
-    signature,
-  };
+  return { card, sku, master: match.status === 'matched' && match.sku ? match.sku : null, signature };
 }
 
 function pairEvidence(left: CardVisualEvidence, right: CardVisualEvidence): PairEvidence | null {
@@ -105,8 +99,7 @@ function pairEvidence(left: CardVisualEvidence, right: CardVisualEvidence): Pair
   const eligible = product >= (sameMaster ? 0.68 : MIN_PRODUCT_SIMILARITY)
     && (title >= MIN_TITLE_SIMILARITY || sameMaster)
     && combined >= (sameMaster ? 0.78 : MIN_COMBINED_SIMILARITY);
-  if (!eligible) return null;
-  return { left: -1, right: -1, title, product, combined };
+  return eligible ? { left: -1, right: -1, title, product, combined } : null;
 }
 
 class UnionFind {
@@ -204,7 +197,7 @@ export function buildVisualProductClusters(
     const leftMargin = pair.combined - (leftRanked[MAX_NEIGHBOUR_RANK]?.combined || 0);
     const rightMargin = pair.combined - (rightRanked[MAX_NEIGHBOUR_RANK]?.combined || 0);
     const sameMaster = Boolean(evidence[pair.left].master && evidence[pair.right].master && evidence[pair.left].master?.id === evidence[pair.right].master?.id);
-    return sameMaster || (leftMargin >= MIN_NEIGHBOUR_MARGIN && rightMargin >= MIN_NEIGHBOUR_MARGIN);
+    return sameMaster || pair.combined >= STRONG_COMBINED_SIMILARITY || (leftMargin >= MIN_NEIGHBOUR_MARGIN && rightMargin >= MIN_NEIGHBOUR_MARGIN);
   }).sort((a, b) => b.combined - a.combined || b.product - a.product);
 
   const union = new UnionFind(evidence.length);
