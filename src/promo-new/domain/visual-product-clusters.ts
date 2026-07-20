@@ -12,11 +12,25 @@ const STRONG_COMBINED_SIMILARITY = 0.94;
 const MIN_NEIGHBOUR_MARGIN = 0.015;
 const MAX_NEIGHBOUR_RANK = 2;
 
+const EXPLICIT_VARIANTS: Array<{ canonical: string; patterns: RegExp[] }> = [
+  { canonical: 'SUPER_CLICK', patterns: [/SUPER\s*CLICK/iu, /ซุปเปอร์\s*คลิ(?:ก|๊ก)/iu] },
+  { canonical: 'SUPER_THIN', patterns: [/SUPER\s*THIN/iu, /ซุปเปอร์\s*ธิน/iu] },
+  { canonical: 'VECTOR', patterns: [/VECTOR/iu, /เวคเตอร์/iu] },
+  { canonical: 'BLUE_2', patterns: [/BLUE\s*(?:II|2|TWO)/iu, /บลู\s*(?:ทู|2)/iu] },
+  { canonical: 'BLUE_3', patterns: [/BLUE\s*(?:III|3|THREE)/iu, /บลู\s*(?:ทรี|3)/iu] },
+  { canonical: 'HANDLE', patterns: [/RAZOR\s*HANDLE/iu, /ด้าม(?:มีด)?/iu] },
+  { canonical: 'BLADE', patterns: [/\bBLADES?\b/iu, /ใบมีด/iu] },
+  { canonical: 'KERATIN', patterns: [/KERATIN/iu, /เคราติน/iu] },
+  { canonical: 'COLLAGEN', patterns: [/COLLAGEN/iu, /คอลลาเจน/iu] },
+  { canonical: 'MICELLAR', patterns: [/MICELLAR/iu, /ไมเซลล่า|ไมเซล่า/iu] },
+];
+
 interface CardVisualEvidence {
   card: ImportedCardCandidate;
   sku: Sku;
   master: Sku | null;
   signature: VisualProductSignature;
+  explicitVariants: string[];
 }
 
 interface PairEvidence {
@@ -50,18 +64,19 @@ function compact(value: unknown): string {
   return normalizeProductText(value).toUpperCase().replace(/[^A-Z0-9ก-๙&]+/gu, '');
 }
 
+function explicitVariants(value: string): string[] {
+  return EXPLICIT_VARIANTS.filter(variant => variant.patterns.some(pattern => pattern.test(value))).map(variant => variant.canonical);
+}
+
+function explicitVariantConflict(left: CardVisualEvidence, right: CardVisualEvidence): boolean {
+  if (!left.explicitVariants.length || !right.explicitVariants.length) return false;
+  return !left.explicitVariants.some(value => right.explicitVariants.includes(value));
+}
+
 function variantConflict(left: string | null, right: string | null): boolean {
   const a = compact(left);
   const b = compact(right);
   if (!a || !b || a === b || a.includes(b) || b.includes(a)) return false;
-  const discriminators = [
-    'SUPERCLICK', 'ซุปเปอร์คลิก', 'ซุปเปอร์คลิ๊ก', 'SUPERTHIN', 'ซุปเปอร์ธิน',
-    'VECTOR', 'เวคเตอร์', 'BLUETWO', 'บลูทู', 'BLUETHREE', 'บลูทรี',
-    'HANDLE', 'ด้าม', 'BLADE', 'ใบมีด', 'KERATIN', 'คอลลาเจน', 'ไมเซล่า',
-  ].map(compact);
-  const leftTokens = discriminators.filter(token => a.includes(token));
-  const rightTokens = discriminators.filter(token => b.includes(token));
-  if (leftTokens.length || rightTokens.length) return leftTokens.join('|') !== rightTokens.join('|');
   const maximum = Math.max(a.length, b.length);
   let common = 0;
   for (let index = 0; index < Math.min(a.length, b.length); index += 1) if (a[index] === b[index]) common += 1;
@@ -81,17 +96,28 @@ function identityConflict(left: Sku, right: Sku): boolean {
   return variantConflict(a.variant, b.variant);
 }
 
+function cardConflict(left: CardVisualEvidence, right: CardVisualEvidence): boolean {
+  if (explicitVariantConflict(left, right)) return true;
+  if (identityConflict(left.master || left.sku, right.master || right.sku)) return true;
+  return Boolean(left.master && right.master && left.master.id !== right.master.id);
+}
+
 function evidenceFor(card: ImportedCardCandidate, existingSkus: Sku[], signature: VisualProductSignature): CardVisualEvidence {
   const sku = createSkuCandidate(card.productText || '');
   const match = matchProductMasterByText(sku, card.productText || '', existingSkus);
-  return { card, sku, master: match.status === 'matched' && match.sku ? match.sku : null, signature };
+  return {
+    card,
+    sku,
+    master: match.status === 'matched' && match.sku ? match.sku : null,
+    signature,
+    explicitVariants: explicitVariants(card.productText || ''),
+  };
 }
 
 function pairEvidence(left: CardVisualEvidence, right: CardVisualEvidence): PairEvidence | null {
   if (!left.card.classId || !right.card.classId || left.card.classId === right.card.classId) return null;
   if (!left.signature.title || !left.signature.product || !right.signature.title || !right.signature.product) return null;
-  if (identityConflict(left.master || left.sku, right.master || right.sku)) return null;
-  if (left.master && right.master && left.master.id !== right.master.id) return null;
+  if (cardConflict(left, right)) return null;
   const title = visualSimilarity(left.signature.title, right.signature.title);
   const product = visualSimilarity(left.signature.product, right.signature.product);
   const combined = title * 0.62 + product * 0.38;
@@ -165,8 +191,7 @@ export function buildVisualProductClusters(
     for (let right = left + 1; right < evidence.length; right += 1) {
       if (!evidence[left].card.classId || evidence[left].card.classId === evidence[right].card.classId) continue;
       comparedPairs += 1;
-      if (identityConflict(evidence[left].master || evidence[left].sku, evidence[right].master || evidence[right].sku)
-        || (evidence[left].master && evidence[right].master && evidence[left].master?.id !== evidence[right].master?.id)) {
+      if (cardConflict(evidence[left], evidence[right])) {
         rejectedConflicts += 1;
         continue;
       }
@@ -193,11 +218,13 @@ export function buildVisualProductClusters(
     const rightRanked = rankedByCard.get(pair.right) || [];
     const leftRank = leftRanked.indexOf(pair);
     const rightRank = rightRanked.indexOf(pair);
-    if (leftRank < 0 || rightRank < 0 || leftRank >= MAX_NEIGHBOUR_RANK || rightRank >= MAX_NEIGHBOUR_RANK) return false;
+    if (leftRank < 0 || rightRank < 0) return false;
+    const sameMaster = Boolean(evidence[pair.left].master && evidence[pair.right].master && evidence[pair.left].master?.id === evidence[pair.right].master?.id);
+    if (sameMaster || pair.combined >= STRONG_COMBINED_SIMILARITY) return true;
+    if (leftRank >= MAX_NEIGHBOUR_RANK || rightRank >= MAX_NEIGHBOUR_RANK) return false;
     const leftMargin = pair.combined - (leftRanked[MAX_NEIGHBOUR_RANK]?.combined || 0);
     const rightMargin = pair.combined - (rightRanked[MAX_NEIGHBOUR_RANK]?.combined || 0);
-    const sameMaster = Boolean(evidence[pair.left].master && evidence[pair.right].master && evidence[pair.left].master?.id === evidence[pair.right].master?.id);
-    return sameMaster || pair.combined >= STRONG_COMBINED_SIMILARITY || (leftMargin >= MIN_NEIGHBOUR_MARGIN && rightMargin >= MIN_NEIGHBOUR_MARGIN);
+    return leftMargin >= MIN_NEIGHBOUR_MARGIN && rightMargin >= MIN_NEIGHBOUR_MARGIN;
   }).sort((a, b) => b.combined - a.combined || b.product - a.product);
 
   const union = new UnionFind(evidence.length);
@@ -212,10 +239,7 @@ export function buildVisualProductClusters(
     let conflict = false;
     for (let left = 0; left < candidate.length && !conflict; left += 1) {
       for (let right = left + 1; right < candidate.length; right += 1) {
-        if (identityConflict(evidence[candidate[left]].master || evidence[candidate[left]].sku, evidence[candidate[right]].master || evidence[candidate[right]].sku)) {
-          conflict = true;
-          break;
-        }
+        if (cardConflict(evidence[candidate[left]], evidence[candidate[right]])) { conflict = true; break; }
       }
     }
     if (conflict || !clusterPairStats(candidate, pairByKey)) continue;
