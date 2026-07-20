@@ -4,15 +4,12 @@ import test from 'node:test';
 
 const read = (path: string): string => fs.readFileSync(path, 'utf8');
 
-test('JUL26 targeted repair is wired before Scope resolution and grouping', () => {
+test('runtime name-only grouping does not wire workbook Scope repair', () => {
   const worker = read('src/promo-new/admin/grouping-worker.ts');
-  const repairCall = worker.indexOf('repairCardsWithMasterBackedScopes(');
-  const scopeCall = worker.indexOf('resolveTextFirstScopesSafely(workingCards');
-  const groupingCall = worker.indexOf('groupImportedCards(');
-  assert.ok(repairCall >= 0);
-  assert.ok(scopeCall > repairCall);
-  assert.ok(groupingCall > repairCall);
-  assert.match(worker, /const workingCards = repaired\.cards/u);
+  assert.doesNotMatch(worker, /repairCardsWithMasterBackedScopes/u);
+  assert.doesNotMatch(worker, /resolveTextFirstScopesSafely|resolveScopesSafely/u);
+  assert.match(worker, /rawText: card\.productText \|\| ''/u);
+  assert.match(worker, /grouping:mode:name_only/u);
 });
 
 test('card header OCR requires repeated size evidence and reaches the actual size line', () => {
@@ -23,10 +20,12 @@ test('card header OCR requires repeated size evidence and reaches the actual siz
   assert.doesNotMatch(source, /if \(bestScore >= 112\) return recognized\.join/u);
 });
 
-test('legacy Product Master repair reparses canonical name instead of trusting legacy identity fields', () => {
+test('legacy Product Master repair remains isolated and reparses canonical names safely', () => {
   const source = read('src/promo-new/domain/master-backed-card-repair.ts');
+  const worker = read('src/promo-new/admin/grouping-worker.ts');
   assert.match(source, /\[master\.canonicalName, \.\.\.master\.evidence\]/u);
   assert.match(source, /parsed: createSkuCandidate\(evidence\)/u);
   assert.match(source, /master\.parsed\.identity/u);
   assert.doesNotMatch(source, /const identity = master\.original\.identity/u);
+  assert.doesNotMatch(worker, /master-backed-card-repair/u);
 });
