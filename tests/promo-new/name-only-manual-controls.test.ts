@@ -41,6 +41,7 @@ test('name-only mode leaves Promotion Family unassigned for manual dropdown sele
 
 test('runtime grouping cannot use stored prices, CSV families, visual evidence or full-card text', () => {
   const worker = readFileSync('src/promo-new/admin/grouping-worker.ts', 'utf8');
+  const client = readFileSync('src/promo-new/admin/grouping-client.ts', 'utf8');
   assert.match(worker, /rawText: card\.productText \|\| ''/u);
   assert.match(worker, /payload\.existingSkus,[\s\n]*\[\],[\s\n]*\[\],[\s\n]*\{\},[\s\n]*noScopes/u);
   assert.match(worker, /grouping:price_manual_admin/u);
@@ -48,6 +49,10 @@ test('runtime grouping cannot use stored prices, CSV families, visual evidence o
   assert.match(worker, /grouping:full_card_text_disabled/u);
   assert.doesNotMatch(worker, /payload\.storedPrices,[\s\n]*payload\.promotionFamilies/u);
   assert.doesNotMatch(worker, /resolveTextFirstScopesSafely|resolveScopesSafely|applyClassMatrixRecovery|repairCardsWithMasterBackedScopes/u);
+  assert.match(client, /storedPrices: \[\]/u);
+  assert.match(client, /promotionFamilies: \[\]/u);
+  assert.match(client, /visualSignatures: \{\}/u);
+  assert.match(client, /โดยไม่ส่งรูป ราคา หรือโปรโมชั่น/u);
 });
 
 test('Admin retains manual price input and CSV/XLSM Promotion Family dropdown', () => {
