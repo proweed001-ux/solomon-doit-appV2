@@ -2,6 +2,7 @@ import GroupingWorker from './grouping-worker?worker&inline';
 import type { GroupingResult } from '../domain/grouping';
 import type { PromotionFamily, Sku } from '../domain/types';
 import type { StoredPrice } from '../domain/pricing';
+import { buildVisualProductSignatures, type VisualProductSignature } from '../domain/visual-product-signatures';
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 import type { GroupingWorkerRequest, GroupingWorkerResponse } from './grouping-worker';
 import { prepareGroupingWorkerCards, restoreGroupingResultImages } from './grouping-transport';
@@ -15,11 +16,10 @@ export interface RunGroupingInput {
   monthKey: string;
   cards: ImportedCardCandidate[];
   existingSkus: Sku[];
-  // Kept temporarily for caller compatibility. These values are deliberately
-  // discarded before Worker transport in name-only mode.
+  // Kept for Admin compatibility. Price and Promotion Family are never sent to grouping.
   storedPrices?: StoredPrice[];
   promotionFamilies?: PromotionFamily[];
-  visualSignatures?: Record<string, string>;
+  visualSignatures?: Record<string, VisualProductSignature>;
   onProgress?: (message: string) => void;
 }
 
@@ -47,8 +47,11 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
   if (!Array.isArray(input.existingSkus) || input.existingSkus.length === 0) {
     throw new Error('product_master_required_before_grouping');
   }
+  input.onProgress?.(`Product Master พร้อม ${input.existingSkus.length} รายการ · กำลังสร้างลายนิ้วมือภาพ`);
+  const visualSignatures = input.visualSignatures || await buildVisualProductSignatures(input.cards, (completed, total) => {
+    input.onProgress?.(`สร้างลายนิ้วมือชื่อและรูปสินค้า ${completed}/${total}`);
+  });
   const prepared = prepareGroupingWorkerCards(input.cards);
-  input.onProgress?.(`Product Master พร้อม ${input.existingSkus.length} รายการ · จัดกลุ่มจากชื่อมุมขวาบนเท่านั้น`);
   const worker = createInlineWorker();
 
   return new Promise((resolve, reject) => {
@@ -90,7 +93,7 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
       if (message.type === 'ready') {
         if (requestSent) return;
         requestSent = true;
-        lastWorkerMessage = 'Worker พร้อมและกำลังรับชื่อสินค้า';
+        lastWorkerMessage = 'Worker พร้อมและกำลังรับลายนิ้วมือภาพ';
         window.clearTimeout(readyTimer);
         const request: GroupingWorkerRequest = {
           type: 'group',
@@ -100,11 +103,11 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
             existingSkus: input.existingSkus,
             storedPrices: [],
             promotionFamilies: [],
-            visualSignatures: {},
+            visualSignatures,
           },
         };
         try {
-          input.onProgress?.(`Inline Worker พร้อม · ส่ง ${prepared.cards.length} การ์ดโดยไม่ส่งรูป ราคา หรือโปรโมชั่น`);
+          input.onProgress?.(`Inline Worker พร้อม · ส่ง ${prepared.cards.length} การ์ดและลายนิ้วมือ โดยไม่ส่งรูป ราคา หรือโปรโมชั่น`);
           worker.postMessage(request);
         } catch (error) {
           finish(() => reject(error instanceof Error ? error : new Error(String(error))));
