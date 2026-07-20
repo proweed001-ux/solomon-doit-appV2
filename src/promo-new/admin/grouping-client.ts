@@ -27,19 +27,21 @@ function validHex(value: unknown): value is string {
   return typeof value === 'string' && value.length >= 64 && value.length % 2 === 0 && /^[0-9a-f]+$/iu.test(value);
 }
 
+function validVisualProductSignature(value: unknown): value is VisualProductSignature {
+  if (!value || typeof value !== 'object') return false;
+  const signature = value as Partial<VisualProductSignature>;
+  return validHex(signature.title)
+    && validHex(signature.product)
+    && Number.isFinite(signature.quality)
+    && Number(signature.quality) > 0;
+}
+
 export function visualProductSignaturesComplete(
   cards: ImportedCardCandidate[],
   signatures: Record<string, VisualProductSignature> | null | undefined,
 ): signatures is Record<string, VisualProductSignature> {
   if (!signatures || cards.length === 0) return false;
-  return cards.every(card => {
-    const signature = signatures[card.cardId];
-    return Boolean(signature
-      && validHex(signature.title)
-      && validHex(signature.product)
-      && Number.isFinite(signature.quality)
-      && signature.quality > 0);
-  });
+  return cards.every(card => validVisualProductSignature(signatures[card.cardId]));
 }
 
 function createInlineWorker(): Worker {
@@ -69,7 +71,7 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
   if (!input.cards.length) throw new Error('cards_required_before_grouping');
 
   input.onProgress?.(`Product Master พร้อม ${input.existingSkus.length} รายการ · ตรวจลายนิ้วมือภาพ`);
-  let visualSignatures = input.visualSignatures;
+  let visualSignatures: Record<string, VisualProductSignature> | undefined = input.visualSignatures;
   if (!visualProductSignaturesComplete(input.cards, visualSignatures)) {
     input.onProgress?.(`ลายนิ้วมือเดิมไม่ครบ · สร้างใหม่จากรูป ${input.cards.length} การ์ด`);
     visualSignatures = await buildVisualProductSignatures(input.cards, (completed, total) => {
@@ -77,10 +79,8 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
     });
   }
   if (!visualProductSignaturesComplete(input.cards, visualSignatures)) {
-    const completed = input.cards.filter(card => {
-      const signature = visualSignatures?.[card.cardId];
-      return Boolean(signature && validHex(signature.title) && validHex(signature.product) && signature.quality > 0);
-    }).length;
+    const map = visualSignatures as Record<string, VisualProductSignature> | undefined;
+    const completed = input.cards.filter(card => validVisualProductSignature(map?.[card.cardId])).length;
     throw new Error(`visual_signatures_incomplete:${completed}/${input.cards.length}`);
   }
 
