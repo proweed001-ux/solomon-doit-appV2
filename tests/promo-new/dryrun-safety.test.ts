@@ -38,7 +38,7 @@ test('cache rejects results created before line-position single-pass OCR', () =>
   assert.match(cache, /PROMO_TEST_PIPELINE_VERSION = 'text-first-product-master-v3-line-position-single-pass'/u);
   assert.match(cache, /record\.schemaVersion === PROMO_TEST_CACHE_SCHEMA_VERSION/u);
   assert.match(cache, /record\.pipelineVersion === PROMO_TEST_PIPELINE_VERSION/u);
-  assert.match(cache, /visualSignatures: \{\}/u);
+  assert.match(cache, /visualSignatures: input\.visualSignatures \|\| \{\}/u);
   assert.doesNotMatch(cache, /cache_visual_signatures_incomplete/u);
   assert.doesNotMatch(cache, /signaturesComplete/u);
 });
