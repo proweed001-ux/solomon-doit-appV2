@@ -85,3 +85,13 @@ test('image similarity alone cannot auto-group cards without a usable identity a
   const result = buildVisualProductClusters(input, [], signatures(input));
   assert.equal(result.clusters.length, 0);
 });
+
+test('an anchored product cannot pull a completely unidentified card into its cluster', () => {
+  const input = [
+    card('card-1', 'HFSS', 'VICKS ยาบาล์ม 25 กรัม'),
+    card('card-2', 'HFSM', 'อ่านข้อความไม่ได้'),
+  ];
+  const result = buildVisualProductClusters(input, [], signatures(input));
+  assert.equal(result.clusters.length, 0);
+  assert.equal(result.assignments.size, 0);
+});
