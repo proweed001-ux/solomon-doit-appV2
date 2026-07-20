@@ -44,6 +44,8 @@ function imported(): PdfImportResult {
   };
 }
 
+const signature = (title: string, product: string, quality = 0.5) => ({ title, product, quality });
+
 test('HFS-WH remains recoverable as HFSM but cannot become a strong Class anchor', () => {
   const weak = classifyClassText('HFS-WH');
   assert.equal(weak.classId, 'HFSM');
@@ -77,12 +79,13 @@ test('cash discount cannot exceed the gross amount', () => {
   assert.equal(result.cashDiscount, 200);
 });
 
-test('cached visual signatures reject empty, short and malformed values', () => {
+test('cached visual signatures reject empty, short, malformed and zero-quality values', () => {
   const data = imported();
-  assert.equal(visualSignaturesComplete(data, { 'CARD-A': '' }), false);
-  assert.equal(visualSignaturesComplete(data, { 'CARD-A': 'aabb' }), false);
-  assert.equal(visualSignaturesComplete(data, { 'CARD-A': 'z'.repeat(64) }), false);
-  assert.equal(visualSignaturesComplete(data, { 'CARD-A': 'ab'.repeat(32) }), true);
+  assert.equal(visualSignaturesComplete(data, { 'CARD-A': signature('', '', 0) }), false);
+  assert.equal(visualSignaturesComplete(data, { 'CARD-A': signature('aabb', 'aabb') }), false);
+  assert.equal(visualSignaturesComplete(data, { 'CARD-A': signature('z'.repeat(64), 'ab'.repeat(32)) }), false);
+  assert.equal(visualSignaturesComplete(data, { 'CARD-A': signature('ab'.repeat(32), 'cd'.repeat(32), 0) }), false);
+  assert.equal(visualSignaturesComplete(data, { 'CARD-A': signature('ab'.repeat(32), 'cd'.repeat(32)) }), true);
 });
 
 test('PDF importer enforces byte, page, card and duplicate limits before accepting output', () => {
