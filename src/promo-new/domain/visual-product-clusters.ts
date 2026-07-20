@@ -18,8 +18,6 @@ const EXPLICIT_VARIANTS: Array<{ canonical: string; patterns: RegExp[] }> = [
   { canonical: 'VECTOR', patterns: [/VECTOR/iu, /เวคเตอร์/iu] },
   { canonical: 'BLUE_2', patterns: [/BLUE\s*(?:II|2|TWO)/iu, /บลู\s*(?:ทู|2)/iu] },
   { canonical: 'BLUE_3', patterns: [/BLUE\s*(?:III|3|THREE)/iu, /บลู\s*(?:ทรี|3)/iu] },
-  { canonical: 'HANDLE', patterns: [/RAZOR\s*HANDLE/iu, /ด้าม(?:มีด)?/iu] },
-  { canonical: 'BLADE', patterns: [/\bBLADES?\b/iu, /ใบมีด/iu] },
   { canonical: 'KERATIN', patterns: [/KERATIN/iu, /เคราติน/iu] },
   { canonical: 'COLLAGEN', patterns: [/COLLAGEN/iu, /คอลลาเจน/iu] },
   { canonical: 'MICELLAR', patterns: [/MICELLAR/iu, /ไมเซลล่า|ไมเซล่า/iu] },
