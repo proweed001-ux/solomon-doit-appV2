@@ -35,7 +35,12 @@ workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
   try {
     const totalStarted = performance.now();
     const payload = event.data.payload;
-    const workingCards = payload.cards;
+    const workingCards = payload.cards.map(card => ({
+      ...card,
+      // Grouping is intentionally name-only. Never fall back to full-card text,
+      // because it contains prices and promotion wording from other zones.
+      rawText: card.productText || '',
+    }));
     const noScopes = new Map<string, ScopeResolution>();
 
     progress('กำลังจับกลุ่มจากชื่อสินค้ามุมขวาบนและ Product Master เท่านั้น');
@@ -90,6 +95,7 @@ workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
       'grouping:promotion_family_manual_admin',
       'grouping:scope_matching_disabled',
       'grouping:visual_matching_disabled',
+      'grouping:full_card_text_disabled',
       `grouping:worker_elapsed_ms:${Math.max(0, Math.round(performance.now() - totalStarted))}`,
     ])];
     workerScope.postMessage({ type: 'result', result } satisfies GroupingWorkerResponse);
