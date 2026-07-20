@@ -13,8 +13,8 @@ const MIN_NEIGHBOUR_MARGIN = 0.015;
 const MAX_NEIGHBOUR_RANK = 2;
 
 const EXPLICIT_VARIANTS: Array<{ canonical: string; patterns: RegExp[] }> = [
-  { canonical: 'SUPER_CLICK', patterns: [/SUPER\s*CLICK/iu, /ซุปเปอร์\s*คลิ(?:ก|๊ก)/iu] },
-  { canonical: 'SUPER_THIN', patterns: [/SUPER\s*THIN/iu, /ซุปเปอร์\s*ธิน/iu] },
+  { canonical: 'SUPERCLICK', patterns: [/SUPER\s*CLICK/iu, /ซุปเปอร์\s*คลิ(?:ก|๊ก)/iu] },
+  { canonical: 'SUPERTHIN', patterns: [/SUPER\s*THIN/iu, /ซุปเปอร์\s*ธิน/iu] },
   { canonical: 'VECTOR', patterns: [/VECTOR/iu, /เวคเตอร์/iu] },
   { canonical: 'BLUE_2', patterns: [/BLUE\s*(?:II|2|TWO)/iu, /บลู\s*(?:ทู|2)/iu] },
   { canonical: 'BLUE_3', patterns: [/BLUE\s*(?:III|3|THREE)/iu, /บลู\s*(?:ทรี|3)/iu] },
