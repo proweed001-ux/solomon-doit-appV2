@@ -26,19 +26,21 @@ test('all rebuild Preview modes hide write controls and API blocks write calls i
   assert.match(api, /export async function publishVersion[\s\S]*?assertWritableRuntime\(\)/u);
 });
 
-test('grouping stops before fallback OCR when Product Master is unavailable', () => {
+test('grouping stops before visual work when Product Master is unavailable', () => {
   const client = read('src/promo-new/admin/grouping-client.ts');
   assert.match(client, /input\.existingSkus\.length === 0/u);
   assert.match(client, /product_master_required_before_grouping/u);
 });
 
-test('cache rejects results created before line-position single-pass OCR', () => {
+test('cache rejects pre-visual-first records and fingerprints are rebuilt when incomplete', () => {
   const cache = read('src/promo-new/admin/test-cache.ts');
-  assert.match(cache, /PROMO_TEST_CACHE_SCHEMA_VERSION = 4/u);
-  assert.match(cache, /PROMO_TEST_PIPELINE_VERSION = 'text-first-product-master-v3-line-position-single-pass'/u);
+  const client = read('src/promo-new/admin/grouping-client.ts');
+  assert.match(cache, /PROMO_TEST_CACHE_SCHEMA_VERSION = 5/u);
+  assert.match(cache, /PROMO_TEST_PIPELINE_VERSION = 'visual-first-anchored-v1-single-pass-rebuild-fingerprints'/u);
   assert.match(cache, /record\.schemaVersion === PROMO_TEST_CACHE_SCHEMA_VERSION/u);
   assert.match(cache, /record\.pipelineVersion === PROMO_TEST_PIPELINE_VERSION/u);
-  assert.match(cache, /visualSignatures: input\.visualSignatures \|\| \{\}/u);
-  assert.doesNotMatch(cache, /cache_visual_signatures_incomplete/u);
-  assert.doesNotMatch(cache, /signaturesComplete/u);
+  assert.match(client, /visualProductSignaturesComplete/u);
+  assert.match(client, /buildVisualProductSignatures/u);
+  assert.match(client, /visual_signatures_incomplete/u);
+  assert.match(client, /product_master_required_before_grouping/u);
 });
