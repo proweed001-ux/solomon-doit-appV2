@@ -9,7 +9,7 @@ const required = [
   'src/promo-new/shared/api.ts', 'src/promo-new/import/pdf-importer.ts', 'src/promo-new/import/card-header-ocr.ts',
   'src/promo-new/import/ocr-items.ts', 'src/promo-new/import/workbook-parser.ts', 'src/promo-new/import/workbook-safety.ts',
   'src/promo-new/admin/grouping-worker.ts', 'src/promo-new/admin/test-cache.ts',
-  'src/promo-new/domain/master-backed-card-repair.ts', 'src/promo-new/domain/master-match-audit.ts',
+  'src/promo-new/domain/auto-match.ts', 'src/promo-new/domain/master-backed-card-repair.ts', 'src/promo-new/domain/master-match-audit.ts',
   'src/promo-new/domain/master-text-matcher.ts', 'vite.promo-new.config.ts',
   'scripts/prepare-sheetjs-lock.mjs',
   'docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md',
@@ -94,10 +94,22 @@ check(!workbookParser.includes('candidate.includes(value)'), 'workbook_reverse_p
 check(workbookParser.includes("carriedFamilyId = '';\n      carriedName = '';\n      carriedScope = '';"), 'workbook_blank_row_carry_reset_missing');
 
 const groupingWorker = read('src/promo-new/admin/grouping-worker.ts');
-check(groupingWorker.includes('repairCardsWithMasterBackedScopes('), 'master_backed_scope_repair_not_wired');
-check(groupingWorker.indexOf('repairCardsWithMasterBackedScopes(') < groupingWorker.indexOf('resolveTextFirstScopesSafely(workingCards'), 'master_backed_scope_repair_must_precede_scope');
+check(groupingWorker.includes("rawText: card.productText || ''"), 'name_only_full_card_text_guard_missing');
+check(groupingWorker.includes('grouping:mode:name_only'), 'name_only_mode_marker_missing');
+check(groupingWorker.includes('grouping:price_manual_admin'), 'manual_price_marker_missing');
+check(groupingWorker.includes('grouping:promotion_family_manual_admin'), 'manual_promotion_marker_missing');
+check(groupingWorker.includes('grouping:scope_matching_disabled'), 'scope_disabled_marker_missing');
+check(groupingWorker.includes('grouping:visual_matching_disabled'), 'visual_disabled_marker_missing');
 check(groupingWorker.includes('await attachMasterMatchAuditEvidenceAsync('), 'chunked_master_audit_not_wired');
-check(groupingWorker.includes('ตรวจหลักฐาน Product Master ${state.processed}/${state.total} กลุ่ม'), 'master_audit_progress_missing');
+check(groupingWorker.includes('ตรวจชื่อกับ Product Master ${state.processed}/${state.total} กลุ่ม'), 'name_only_master_audit_progress_missing');
+check(!/resolveTextFirstScopesSafely|resolveScopesSafely|applyClassMatrixRecovery|repairCardsWithMasterBackedScopes/u.test(groupingWorker), 'forbidden_scope_or_visual_grouping_reintroduced');
+check(/payload\.existingSkus,\s*\[\],\s*\[\],\s*\{\},\s*noScopes/u.test(groupingWorker), 'manual_price_promotion_empty_inputs_missing');
+
+const autoMatch = read('src/promo-new/domain/auto-match.ts');
+check(autoMatch.includes("dataset.warnings.includes('grouping:mode:name_only')"), 'manual_promotion_auto_assign_guard_missing');
+check(autoMatch.includes('promotion_family_manual_selection_required'), 'manual_promotion_warning_missing');
+check(/promotionFamilyId: null, promotionTiers: \[\]/u.test(autoMatch), 'manual_promotion_card_reset_missing');
+
 const targetedRepair = read('src/promo-new/domain/master-backed-card-repair.ts');
 check(targetedRepair.includes('[master.canonicalName, ...master.evidence]'), 'legacy_master_canonical_reparse_missing');
 check(targetedRepair.includes("'ocr_size_conflicts_workbook_scope'"), 'conflicting_ocr_size_quarantine_missing');
@@ -147,6 +159,10 @@ check(adminSource.includes('publishVersion'), 'admin_manual_publish_flow_missing
 check(adminSource.includes('previewChecked'), 'admin_preview_gate_missing');
 check(adminSource.includes('assertReadyForPublish'), 'admin_preview_validation_missing');
 check(adminSource.includes('fetchPromoMasterData'), 'admin_master_data_load_missing');
+check(adminSource.includes('<option value="">เลือกจาก CSV/XLSM</option>'), 'manual_promotion_dropdown_missing');
+check(adminSource.includes('ราคากลางต่อชิ้น'), 'manual_price_input_missing');
+check(adminSource.includes('setCentralPrice(group.price, amount)'), 'manual_price_apply_missing');
+check(adminSource.includes('applyPromotionFamily(priced.group, priced.cards, family)'), 'manual_promotion_apply_missing');
 
 const rollback = read('supabase/rollback/20260716083231_promo_system_rebuild.sql');
 check(rollback.includes('drop table if exists public.promo_new_cards;'), 'rollback_cards_missing');
@@ -193,4 +209,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: line-level positional product-name OCR, single-pass cache generation, targeted size consensus, legacy Product Master repair, patched SheetJS lock, workbook ZIP/range/encoding bounds, chunked Worker audit, brand-indexed Product Master, commit Build ID, auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
+console.log('Promo new security/static checks passed: name-only grouping, manual admin price and Promotion Family selection, no price/tier/scope/visual/raw-card grouping evidence, line-level positional OCR, single-pass cache generation, Product Master audit, patched SheetJS lock, workbook ZIP/range/encoding bounds, commit Build ID, auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
