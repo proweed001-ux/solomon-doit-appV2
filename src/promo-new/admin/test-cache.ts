@@ -5,9 +5,9 @@ const DB_NAME = 'solomon-promo-new-test-cache';
 const DB_VERSION = 1;
 const STORE_NAME = 'runs';
 const LATEST_KEY = 'latest';
-const SUMMARY_KEY = 'promo-new-test-cache-summary-v3';
-export const PROMO_TEST_CACHE_SCHEMA_VERSION = 3 as const;
-export const PROMO_TEST_PIPELINE_VERSION = 'text-first-product-master-v2-ocr-size-consensus' as const;
+const SUMMARY_KEY = 'promo-new-test-cache-summary-v4';
+export const PROMO_TEST_CACHE_SCHEMA_VERSION = 4 as const;
+export const PROMO_TEST_PIPELINE_VERSION = 'text-first-product-master-v3-line-position-single-pass' as const;
 
 interface StoredFile {
   name: string;
@@ -143,7 +143,7 @@ function storedFile(file: File): StoredFile {
     name: file.name,
     type: file.type || 'application/octet-stream',
     lastModified: file.lastModified || Date.now(),
-    blob: file.slice(0, file.size, file.type || 'application/octet-stream'),
+    blob: file,
   };
 }
 
@@ -151,18 +151,12 @@ function restoredFile(file: StoredFile): File {
   return new File([file.blob], file.name, { type: file.type, lastModified: file.lastModified });
 }
 
-function dataUrlBytes(value: string): number {
-  if (!value.startsWith('data:')) return value.length * 2;
-  const comma = value.indexOf(',');
-  return comma < 0 ? value.length * 2 : Math.ceil((value.length - comma - 1) * 0.75);
+function estimatedBytes(input: SavePromoTestCacheInput): number {
+  const images = input.imported.cards.reduce((total, card) => total + card.imageUrl.length * 0.75, 0);
+  return Math.round(input.pdf.size + input.workbook.size + images);
 }
 
-function estimatedBytes(record: StoredPromoTestCache): number {
-  const images = record.imported?.cards.reduce((sum, card) => sum + dataUrlBytes(card.imageUrl), 0) || 0;
-  return record.pdf.blob.size + record.workbook.blob.size + images;
-}
-
-function summaryOf(record: StoredPromoTestCache): PromoTestCacheSummary {
+function summaryFrom(record: StoredPromoTestCache): PromoTestCacheSummary {
   return {
     savedAt: record.savedAt,
     monthKey: record.monthKey,
@@ -170,110 +164,109 @@ function summaryOf(record: StoredPromoTestCache): PromoTestCacheSummary {
     pdfName: record.pdf.name,
     workbookName: record.workbook.name,
     cardCount: record.imported?.cards.length || 0,
-    estimatedBytes: estimatedBytes(record),
+    estimatedBytes: record.pdf.blob.size + record.workbook.blob.size + (record.imported?.cards.reduce((total, card) => total + card.imageUrl.length * 0.75, 0) || 0),
   };
 }
 
-function saveSummary(summary: PromoTestCacheSummary | null): void {
+function writeSummary(summary: PromoTestCacheSummary | null): void {
   try {
-    if (summary) localStorage.setItem(SUMMARY_KEY, JSON.stringify(summary));
-    else localStorage.removeItem(SUMMARY_KEY);
+    if (!summary) localStorage.removeItem(SUMMARY_KEY);
+    else localStorage.setItem(SUMMARY_KEY, JSON.stringify(summary));
   } catch {
-    // IndexedDB remains the source of truth.
+    // IndexedDB remains the source of truth when localStorage is unavailable.
   }
 }
 
-function isQuotaError(error: unknown): boolean {
-  return error instanceof DOMException && ['QuotaExceededError', 'NS_ERROR_DOM_QUOTA_REACHED'].includes(error.name);
-}
-
-async function requestPersistentStorage(): Promise<void> {
-  try { await navigator.storage?.persist?.(); } catch { /* best effort */ }
+export function readPromoTestCacheSummary(): PromoTestCacheSummary | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(SUMMARY_KEY) || 'null') as PromoTestCacheSummary | null;
+    return value?.savedAt && value?.pdfName && value?.workbookName ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function savePromoTestCache(input: SavePromoTestCacheInput): Promise<PromoTestCacheSummary> {
-  await requestPersistentStorage();
-  const base = {
-    key: LATEST_KEY as typeof LATEST_KEY,
+  const savedAt = new Date().toISOString();
+  const full: StoredPromoTestCache = {
+    key: LATEST_KEY,
     schemaVersion: PROMO_TEST_CACHE_SCHEMA_VERSION,
     pipelineVersion: PROMO_TEST_PIPELINE_VERSION,
-    savedAt: new Date().toISOString(),
+    savedAt,
     monthKey: input.monthKey,
     ocrEnabled: input.ocrEnabled,
+    mode: 'full',
     pdf: storedFile(input.pdf),
     workbook: storedFile(input.workbook),
-  };
-  const full: StoredPromoTestCache = {
-    ...base,
-    mode: 'full',
     imported: input.imported,
     parsedWorkbook: input.parsedWorkbook,
-    visualSignatures: {},
+    visualSignatures: input.visualSignatures || {},
   };
   try {
     await putRecord(full);
-    const summary = summaryOf(full);
-    saveSummary(summary);
+    const summary = summaryFrom(full);
+    writeSummary(summary);
     return summary;
   } catch (error) {
-    if (!isQuotaError(error)) throw error;
+    const name = String((error as DOMException)?.name || '');
+    const message = String((error as Error)?.message || '');
+    if (!/quota|space|storage/i.test(`${name} ${message}`)) throw error;
     const sourceOnly: StoredPromoTestCache = {
-      ...base,
+      ...full,
       mode: 'source_only',
       imported: null,
       parsedWorkbook: null,
       visualSignatures: null,
     };
     await putRecord(sourceOnly);
-    const summary = summaryOf(sourceOnly);
-    saveSummary(summary);
+    const summary = summaryFrom(sourceOnly);
+    writeSummary(summary);
     return summary;
   }
 }
 
 export async function loadPromoTestCache(): Promise<LoadedPromoTestCache | null> {
-  const raw = await getRecord();
-  if (!isCurrentRecord(raw)) {
-    if (raw) await deleteRecord();
-    saveSummary(null);
+  const value = await getRecord();
+  if (!isCurrentRecord(value)) {
+    if (value) await deleteRecord();
+    writeSummary(null);
     return null;
   }
-
-  const summary = summaryOf(raw);
-  saveSummary(summary);
+  const summary = summaryFrom(value);
+  writeSummary(summary);
   return {
     summary,
-    monthKey: raw.monthKey,
-    ocrEnabled: raw.ocrEnabled,
-    pdf: restoredFile(raw.pdf),
-    workbook: restoredFile(raw.workbook),
-    imported: raw.imported,
-    parsedWorkbook: raw.parsedWorkbook,
-    visualSignatures: {},
-    warnings: [`cache_pipeline:${PROMO_TEST_PIPELINE_VERSION}`],
+    monthKey: value.monthKey,
+    ocrEnabled: value.ocrEnabled,
+    pdf: restoredFile(value.pdf),
+    workbook: restoredFile(value.workbook),
+    imported: value.imported,
+    parsedWorkbook: value.parsedWorkbook,
+    visualSignatures: value.visualSignatures,
+    warnings: [
+      `cache:pipeline:${value.pipelineVersion}`,
+      `cache:mode:${value.mode}`,
+      'cache:read_once_from_indexeddb',
+      ...(value.mode === 'source_only' ? ['cache:source_only_reprocess_required'] : []),
+    ],
   };
-}
-
-export function readPromoTestCacheSummary(): PromoTestCacheSummary | null {
-  try {
-    const value = localStorage.getItem(SUMMARY_KEY);
-    return value ? JSON.parse(value) as PromoTestCacheSummary : null;
-  } catch {
-    return null;
-  }
-}
-
-export async function refreshPromoTestCacheSummary(): Promise<PromoTestCacheSummary | null> {
-  return readPromoTestCacheSummary();
 }
 
 export async function clearPromoTestCache(): Promise<void> {
   await deleteRecord();
-  saveSummary(null);
+  writeSummary(null);
 }
 
 export function formatCacheSize(bytes: number): string {
-  if (!(bytes > 0)) return '0 MB';
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (!(bytes > 0)) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let index = 0;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+  return `${value.toFixed(index ? 1 : 0)} ${units[index]}`;
 }
+
+export const estimatePromoTestCacheBytes = estimatedBytes;
