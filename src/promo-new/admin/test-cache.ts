@@ -1,3 +1,4 @@
+import type { VisualProductSignature } from '../domain/visual-product-signatures';
 import type { PdfImportResult } from '../import/pdf-importer';
 import type { WorkbookParseResult } from '../import/workbook-parser';
 
@@ -5,9 +6,9 @@ const DB_NAME = 'solomon-promo-new-test-cache';
 const DB_VERSION = 1;
 const STORE_NAME = 'runs';
 const LATEST_KEY = 'latest';
-const SUMMARY_KEY = 'promo-new-test-cache-summary-v4';
-export const PROMO_TEST_CACHE_SCHEMA_VERSION = 4 as const;
-export const PROMO_TEST_PIPELINE_VERSION = 'text-first-product-master-v3-line-position-single-pass' as const;
+const SUMMARY_KEY = 'promo-new-test-cache-summary-v5';
+export const PROMO_TEST_CACHE_SCHEMA_VERSION = 5 as const;
+export const PROMO_TEST_PIPELINE_VERSION = 'visual-first-anchored-v1-single-pass-rebuild-fingerprints' as const;
 
 interface StoredFile {
   name: string;
@@ -17,6 +18,8 @@ interface StoredFile {
 }
 
 export type PromoTestCacheMode = 'full' | 'source_only';
+
+type VisualSignatureMap = Record<string, VisualProductSignature>;
 
 interface StoredPromoTestCache {
   key: typeof LATEST_KEY;
@@ -30,7 +33,7 @@ interface StoredPromoTestCache {
   workbook: StoredFile;
   imported: PdfImportResult | null;
   parsedWorkbook: WorkbookParseResult | null;
-  visualSignatures: Record<string, string> | null;
+  visualSignatures: VisualSignatureMap | null;
 }
 
 export interface PromoTestCacheSummary {
@@ -51,7 +54,7 @@ export interface LoadedPromoTestCache {
   workbook: File;
   imported: PdfImportResult | null;
   parsedWorkbook: WorkbookParseResult | null;
-  visualSignatures: Record<string, string> | null;
+  visualSignatures: VisualSignatureMap | null;
   warnings: string[];
 }
 
@@ -62,7 +65,7 @@ export interface SavePromoTestCacheInput {
   workbook: File;
   imported: PdfImportResult;
   parsedWorkbook: WorkbookParseResult;
-  visualSignatures?: Record<string, string>;
+  visualSignatures?: VisualSignatureMap;
 }
 
 function ensureIndexedDb(): IDBFactory {
@@ -247,6 +250,7 @@ export async function loadPromoTestCache(): Promise<LoadedPromoTestCache | null>
       `cache:pipeline:${value.pipelineVersion}`,
       `cache:mode:${value.mode}`,
       'cache:read_once_from_indexeddb',
+      'cache:visual_fingerprints_revalidated_or_rebuilt_before_grouping',
       ...(value.mode === 'source_only' ? ['cache:source_only_reprocess_required'] : []),
     ],
   };
@@ -258,15 +262,11 @@ export async function clearPromoTestCache(): Promise<void> {
 }
 
 export function formatCacheSize(bytes: number): string {
-  if (!(bytes > 0)) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let value = bytes;
-  let index = 0;
-  while (value >= 1024 && index < units.length - 1) {
-    value /= 1024;
-    index += 1;
-  }
-  return `${value.toFixed(index ? 1 : 0)} ${units[index]}`;
+  if (!Number.isFinite(bytes) || bytes <= 0) return '-';
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export const estimatePromoTestCacheBytes = estimatedBytes;
+export function estimatePromoTestCacheBytes(input: SavePromoTestCacheInput): number {
+  return estimatedBytes(input);
+}
