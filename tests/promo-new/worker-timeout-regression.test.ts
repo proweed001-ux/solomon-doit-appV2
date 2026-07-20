@@ -81,19 +81,18 @@ test('indexed text-first resolver remains bounded for legacy/manual tools', asyn
   assert.ok(elapsed < 5_000, `indexed_text_first_scope_too_slow:${elapsed.toFixed(1)}ms`);
 });
 
-test('runtime Worker is name-only, ignores price/promotion evidence and retains timeout guards', () => {
+test('runtime Worker uses anchored visual fingerprints while retaining timeout and manual-control guards', () => {
   const worker = readFileSync('src/promo-new/admin/grouping-worker.ts', 'utf8');
   const client = readFileSync('src/promo-new/admin/grouping-client.ts', 'utf8');
 
-  assert.doesNotMatch(worker, /resolveTextFirstScopesSafely/u);
-  assert.doesNotMatch(worker, /resolveScopesSafely/u);
-  assert.doesNotMatch(worker, /applyClassMatrixRecovery/u);
-  assert.doesNotMatch(worker, /repairCardsWithMasterBackedScopes/u);
+  assert.doesNotMatch(worker, /resolveTextFirstScopesSafely|resolveScopesSafely|applyClassMatrixRecovery|repairCardsWithMasterBackedScopes/u);
   assert.match(worker, /rawText: card\.productText \|\| ''/u);
+  assert.match(worker, /buildVisualProductClusters/u);
   assert.match(worker, /groupImportedCards\([\s\S]*?payload\.existingSkus,[\s\n]*\[\],[\s\n]*\[\],[\s\n]*\{\},[\s\n]*noScopes/u);
-  assert.match(worker, /ไม่ใช้ราคา โปรโมชั่น Tier Scope หรือรูปภาพเป็นหลักฐานจัดกลุ่ม/u);
-  assert.match(worker, /grouping:mode:name_only/u);
+  assert.match(worker, /โดยไม่ใช้ราคา โปรโมชั่น หรือ Scope/u);
+  assert.match(worker, /grouping:mode:visual_first_anchored/u);
   assert.match(worker, /ตรวจชื่อกับ Product Master เสร็จ/u);
+  assert.match(client, /buildVisualProductSignatures/u);
   assert.match(client, /GROUPING_STALL_TIMEOUT_MS/u);
   assert.match(client, /GROUPING_HARD_TIMEOUT_MS/u);
   assert.doesNotMatch(client, /new Error\('grouping_worker_timeout'\)/u);
