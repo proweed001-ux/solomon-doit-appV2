@@ -100,6 +100,18 @@ function cardConflict(left: CardVisualEvidence, right: CardVisualEvidence): bool
   return Boolean(left.master && right.master && left.master.id !== right.master.id);
 }
 
+function hasMinimumIdentityEvidence(evidence: CardVisualEvidence): boolean {
+  if (evidence.master) return true;
+  const identity = evidence.sku.identity;
+  return Boolean(
+    identity.brand
+    || identity.productType
+    || identity.sizeValue > 0
+    || identity.variant
+    || evidence.explicitVariants.length,
+  );
+}
+
 function evidenceFor(card: ImportedCardCandidate, existingSkus: Sku[], signature: VisualProductSignature): CardVisualEvidence {
   const sku = createSkuCandidate(card.productText || '');
   const match = matchProductMasterByText(sku, card.productText || '', existingSkus);
@@ -115,6 +127,7 @@ function evidenceFor(card: ImportedCardCandidate, existingSkus: Sku[], signature
 function pairEvidence(left: CardVisualEvidence, right: CardVisualEvidence): PairEvidence | null {
   if (!left.card.classId || !right.card.classId || left.card.classId === right.card.classId) return null;
   if (!left.signature.title || !left.signature.product || !right.signature.title || !right.signature.product) return null;
+  if (!hasMinimumIdentityEvidence(left) || !hasMinimumIdentityEvidence(right)) return null;
   if (cardConflict(left, right)) return null;
   const title = visualSimilarity(left.signature.title, right.signature.title);
   const product = visualSimilarity(left.signature.product, right.signature.product);
