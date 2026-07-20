@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export const PROMO_BUILD_FLAVOR = 'NAME-ONLY-MANUAL-CONTROLS' as const;
+export const PROMO_BUILD_FLAVOR = 'VISUAL-FIRST-ANCHORED-MANUAL-CONTROLS' as const;
 
 function promoBuildIdPlugin(): Plugin {
   const commit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
