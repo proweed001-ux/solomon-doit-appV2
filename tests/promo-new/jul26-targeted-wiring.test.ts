@@ -4,12 +4,13 @@ import test from 'node:test';
 
 const read = (path: string): string => fs.readFileSync(path, 'utf8');
 
-test('runtime name-only grouping does not wire workbook Scope repair', () => {
+test('runtime visual-first grouping does not wire workbook Scope repair', () => {
   const worker = read('src/promo-new/admin/grouping-worker.ts');
   assert.doesNotMatch(worker, /repairCardsWithMasterBackedScopes/u);
   assert.doesNotMatch(worker, /resolveTextFirstScopesSafely|resolveScopesSafely/u);
   assert.match(worker, /rawText: card\.productText \|\| ''/u);
-  assert.match(worker, /grouping:mode:name_only/u);
+  assert.match(worker, /buildVisualProductClusters/u);
+  assert.match(worker, /grouping:mode:visual_first_anchored/u);
 });
 
 test('card header OCR requires repeated size evidence and reaches the actual size line', () => {
