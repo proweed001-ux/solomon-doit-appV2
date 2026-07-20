@@ -144,6 +144,22 @@ export function autoAssignPromotionFamilies(dataset: PromoDataset): {
   ambiguous: number;
   unmatched: number;
 } {
+  if (dataset.warnings.includes('grouping:mode:name_only')) {
+    const productGroups = dataset.productGroups.map(group => ({ ...group, promotionFamilyId: null }));
+    const cards = dataset.cards.map(card => ({ ...card, promotionFamilyId: null, promotionTiers: [] }));
+    return {
+      dataset: {
+        ...dataset,
+        cards,
+        productGroups,
+        warnings: [...new Set([...dataset.warnings, 'promotion_family_manual_selection_required'])],
+      },
+      matched: 0,
+      ambiguous: 0,
+      unmatched: productGroups.length,
+    };
+  }
+
   let cards = dataset.cards;
   let matched = 0;
   let ambiguous = 0;
