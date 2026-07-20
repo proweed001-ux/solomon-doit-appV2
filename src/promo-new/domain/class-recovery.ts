@@ -8,9 +8,9 @@ export interface CardClassRecoveryResult {
   warnings: string[];
 }
 
-export function recoverCachedCardClasses(
+export function recoverCachedCardClasses<T>(
   cards: ImportedCardCandidate[],
-  visualSignatures: Record<string, string> = {},
+  visualSignatures: Record<string, T> = {},
 ): CardClassRecoveryResult {
   const cardsByPage = new Map<number, ImportedCardCandidate[]>();
   for (const card of cards) {
