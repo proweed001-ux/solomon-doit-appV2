@@ -23,6 +23,25 @@ export interface RunGroupingInput {
   onProgress?: (message: string) => void;
 }
 
+function validHex(value: unknown): value is string {
+  return typeof value === 'string' && value.length >= 64 && value.length % 2 === 0 && /^[0-9a-f]+$/iu.test(value);
+}
+
+export function visualProductSignaturesComplete(
+  cards: ImportedCardCandidate[],
+  signatures: Record<string, VisualProductSignature> | null | undefined,
+): signatures is Record<string, VisualProductSignature> {
+  if (!signatures || cards.length === 0) return false;
+  return cards.every(card => {
+    const signature = signatures[card.cardId];
+    return Boolean(signature
+      && validHex(signature.title)
+      && validHex(signature.product)
+      && Number.isFinite(signature.quality)
+      && signature.quality > 0);
+  });
+}
+
 function createInlineWorker(): Worker {
   if (typeof Worker === 'undefined') throw new Error('browser_worker_unavailable');
   try {
@@ -47,10 +66,24 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
   if (!Array.isArray(input.existingSkus) || input.existingSkus.length === 0) {
     throw new Error('product_master_required_before_grouping');
   }
-  input.onProgress?.(`Product Master พร้อม ${input.existingSkus.length} รายการ · กำลังสร้างลายนิ้วมือภาพ`);
-  const visualSignatures = input.visualSignatures || await buildVisualProductSignatures(input.cards, (completed, total) => {
-    input.onProgress?.(`สร้างลายนิ้วมือชื่อและรูปสินค้า ${completed}/${total}`);
-  });
+  if (!input.cards.length) throw new Error('cards_required_before_grouping');
+
+  input.onProgress?.(`Product Master พร้อม ${input.existingSkus.length} รายการ · ตรวจลายนิ้วมือภาพ`);
+  let visualSignatures = input.visualSignatures;
+  if (!visualProductSignaturesComplete(input.cards, visualSignatures)) {
+    input.onProgress?.(`ลายนิ้วมือเดิมไม่ครบ · สร้างใหม่จากรูป ${input.cards.length} การ์ด`);
+    visualSignatures = await buildVisualProductSignatures(input.cards, (completed, total) => {
+      input.onProgress?.(`สร้างลายนิ้วมือชื่อและรูปสินค้า ${completed}/${total}`);
+    });
+  }
+  if (!visualProductSignaturesComplete(input.cards, visualSignatures)) {
+    const completed = input.cards.filter(card => {
+      const signature = visualSignatures?.[card.cardId];
+      return Boolean(signature && validHex(signature.title) && validHex(signature.product) && signature.quality > 0);
+    }).length;
+    throw new Error(`visual_signatures_incomplete:${completed}/${input.cards.length}`);
+  }
+
   const prepared = prepareGroupingWorkerCards(input.cards);
   const worker = createInlineWorker();
 
@@ -107,7 +140,7 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
           },
         };
         try {
-          input.onProgress?.(`Inline Worker พร้อม · ส่ง ${prepared.cards.length} การ์ดและลายนิ้วมือ โดยไม่ส่งรูป ราคา หรือโปรโมชั่น`);
+          input.onProgress?.(`Inline Worker พร้อม · ส่ง ${prepared.cards.length} การ์ดและลายนิ้วมือครบ โดยไม่ส่งรูป ราคา หรือโปรโมชั่น`);
           worker.postMessage(request);
         } catch (error) {
           finish(() => reject(error instanceof Error ? error : new Error(String(error))));
