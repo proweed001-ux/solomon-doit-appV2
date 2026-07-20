@@ -144,7 +144,8 @@ export function autoAssignPromotionFamilies(dataset: PromoDataset): {
   ambiguous: number;
   unmatched: number;
 } {
-  if (dataset.warnings.includes('grouping:mode:name_only')) {
+  const manualMode = dataset.warnings.some(warning => warning === 'grouping:mode:name_only' || warning === 'grouping:mode:visual_first_anchored');
+  if (manualMode) {
     const productGroups = dataset.productGroups.map(group => ({ ...group, promotionFamilyId: null }));
     const cards = dataset.cards.map(card => ({ ...card, promotionFamilyId: null, promotionTiers: [] }));
     return {
