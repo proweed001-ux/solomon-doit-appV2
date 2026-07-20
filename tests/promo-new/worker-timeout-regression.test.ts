@@ -63,7 +63,7 @@ function card(index: number): ImportedCardCandidate {
   };
 }
 
-test('indexed text-first resolver handles 212 cards in chunks and skips unrelated brands', async () => {
+test('indexed text-first resolver remains bounded for legacy/manual tools', async () => {
   const cards = Array.from({ length: 212 }, (_, index) => card(index));
   const families = Array.from({ length: 600 }, (_, index) => family(index));
   const updates: TextFirstScopeProgress[] = [];
@@ -81,17 +81,20 @@ test('indexed text-first resolver handles 212 cards in chunks and skips unrelate
   assert.ok(elapsed < 5_000, `indexed_text_first_scope_too_slow:${elapsed.toFixed(1)}ms`);
 });
 
-test('worker reuses scope resolutions, streams chunk progress and uses inactivity timeout', () => {
+test('runtime Worker is name-only, ignores price/promotion evidence and retains timeout guards', () => {
   const worker = readFileSync('src/promo-new/admin/grouping-worker.ts', 'utf8');
   const client = readFileSync('src/promo-new/admin/grouping-client.ts', 'utf8');
-  const scope = readFileSync('src/promo-new/domain/scope-safety.ts', 'utf8');
 
-  assert.match(worker, /await resolveTextFirstScopesSafely/u);
-  assert.match(worker, /เทียบ Scope \$\{state\.processed\}\/\$\{state\.total\}/u);
-  assert.match(worker, /matrix\.resolutions,\s*\n\s*\);/u);
-  assert.match(worker, /ตรวจหลักฐาน Product Master เสร็จ/u);
+  assert.doesNotMatch(worker, /resolveTextFirstScopesSafely/u);
+  assert.doesNotMatch(worker, /resolveScopesSafely/u);
+  assert.doesNotMatch(worker, /applyClassMatrixRecovery/u);
+  assert.doesNotMatch(worker, /repairCardsWithMasterBackedScopes/u);
+  assert.match(worker, /rawText: card\.productText \|\| ''/u);
+  assert.match(worker, /groupImportedCards\([\s\S]*?payload\.existingSkus,[\s\n]*\[\],[\s\n]*\[\],[\s\n]*\{\},[\s\n]*noScopes/u);
+  assert.match(worker, /ไม่ใช้ราคา โปรโมชั่น Tier Scope หรือรูปภาพเป็นหลักฐานจัดกลุ่ม/u);
+  assert.match(worker, /grouping:mode:name_only/u);
+  assert.match(worker, /ตรวจชื่อกับ Product Master เสร็จ/u);
   assert.match(client, /GROUPING_STALL_TIMEOUT_MS/u);
   assert.match(client, /GROUPING_HARD_TIMEOUT_MS/u);
   assert.doesNotMatch(client, /new Error\('grouping_worker_timeout'\)/u);
-  assert.match(scope, /if \(!hasVisualEvidence\(cards, visualSignatures\)\) return resolutions;/u);
 });
