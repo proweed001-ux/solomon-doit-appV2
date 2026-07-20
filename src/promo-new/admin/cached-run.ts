@@ -15,6 +15,10 @@ export function currentCachePipelineWarning(): string {
   return `cache:pipeline:${PROMO_TEST_PIPELINE_VERSION}`;
 }
 
+function containsFallbackOcrResult(imported: PdfImportResult): boolean {
+  return imported.warnings.some(warning => warning.startsWith('adaptive_header_ocr_attempted:'));
+}
+
 function validVisualSignature(value: unknown): value is string {
   if (typeof value !== 'string' || value.length < 64 || value.length % 2 !== 0) return false;
   for (let index = 0; index < value.length; index += 1) {
@@ -39,6 +43,9 @@ export function prepareCachedRun(
   importedInput: PdfImportResult,
   visualSignaturesInput: Record<string, string>,
 ): PreparedCachedRun {
+  if (containsFallbackOcrResult(importedInput)) {
+    throw new Error('cache_reprocess_required_single_pass_ocr');
+  }
   const imported: PdfImportResult = {
     ...importedInput,
     cards: importedInput.cards.map(card => ({
@@ -58,6 +65,7 @@ export function prepareCachedRun(
     pipelineVersion: PROMO_TEST_PIPELINE_VERSION,
     warnings: [
       currentCachePipelineWarning(),
+      'cache:ocr_mode:single_pass_only',
       `cache:class_recovered_cards:${recovery.changedCards}`,
       `cache:class_recovered_pages:${recovery.recoveredPages}`,
     ],
