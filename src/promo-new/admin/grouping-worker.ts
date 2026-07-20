@@ -2,6 +2,8 @@
 
 import { groupImportedCards } from '../domain/grouping';
 import { attachMasterMatchAuditEvidenceAsync } from '../domain/master-match-audit';
+import { buildVisualProductClusters } from '../domain/visual-product-clusters';
+import type { VisualProductSignature } from '../domain/visual-product-signatures';
 import type { PromotionFamily, Sku } from '../domain/types';
 import type { StoredPrice } from '../domain/pricing';
 import type { ScopeResolution } from '../domain/scope-matcher';
@@ -15,7 +17,7 @@ export interface GroupingWorkerRequest {
     existingSkus: Sku[];
     storedPrices: StoredPrice[];
     promotionFamilies: PromotionFamily[];
-    visualSignatures: Record<string, string>;
+    visualSignatures: Record<string, VisualProductSignature>;
   };
 }
 
@@ -35,16 +37,21 @@ workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
   try {
     const totalStarted = performance.now();
     const payload = event.data.payload;
-    const workingCards = payload.cards.map(card => ({
+    const nameOnlyCards = payload.cards.map(card => ({
       ...card,
-      // Grouping is intentionally name-only. Never fall back to full-card text,
-      // because it contains prices and promotion wording from other zones.
+      // Full-card text contains price and promotion wording. It is never used as identity evidence.
       rawText: card.productText || '',
     }));
     const noScopes = new Map<string, ScopeResolution>();
 
-    progress('กำลังจับกลุ่มจากชื่อสินค้ามุมขวาบนและ Product Master เท่านั้น');
-    progress('ไม่ใช้ราคา โปรโมชั่น Tier Scope หรือรูปภาพเป็นหลักฐานจัดกลุ่ม');
+    progress('กำลังรวมสินค้าจากภาพชื่อและรูปสินค้า โดยไม่ใช้ราคา โปรโมชั่น หรือ Scope');
+    const visualStarted = performance.now();
+    const visual = buildVisualProductClusters(nameOnlyCards, payload.existingSkus, payload.visualSignatures);
+    const clusteredCards = nameOnlyCards.map(card => {
+      const cluster = visual.assignments.get(card.cardId);
+      return cluster ? { ...card, productText: cluster.representativeText, rawText: cluster.representativeText } : card;
+    });
+    progress(`Visual-first เสร็จ ${seconds(visualStarted)} · ${visual.clusters.length} กลุ่ม · ${visual.assignments.size} การ์ด`);
 
     const originalEvidence = new Map(payload.cards.map(card => [card.cardId, {
       productText: card.productText,
@@ -55,14 +62,14 @@ workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
     const groupingStarted = performance.now();
     let result = groupImportedCards(
       payload.monthKey,
-      workingCards,
+      clusteredCards,
       payload.existingSkus,
       [],
       [],
       {},
       noScopes,
     );
-    progress(`สร้าง SKU และ Product Group จากชื่อเสร็จ ${seconds(groupingStarted)} · ${result.groups.length} กลุ่ม · unresolved ${result.diagnostics.unresolved}`);
+    progress(`สร้าง SKU และ Product Group เสร็จ ${seconds(groupingStarted)} · ${result.groups.length} กลุ่ม · unresolved ${result.diagnostics.unresolved}`);
 
     result.cards = result.cards.map(card => {
       const original = originalEvidence.get(card.id);
@@ -80,7 +87,7 @@ workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
     const auditStarted = performance.now();
     result = await attachMasterMatchAuditEvidenceAsync(
       result,
-      workingCards,
+      clusteredCards,
       payload.existingSkus,
       [],
       {},
@@ -90,12 +97,17 @@ workerScope.onmessage = async (event: MessageEvent<GroupingWorkerRequest>) => {
     progress(`ตรวจชื่อกับ Product Master เสร็จ ${seconds(auditStarted)} · รวม ${seconds(totalStarted)}`);
     result.warnings = [...new Set([
       ...result.warnings,
-      'grouping:mode:name_only',
+      'grouping:mode:visual_first_anchored',
+      'grouping:visual_uses_title_and_product_only',
       'grouping:price_manual_admin',
       'grouping:promotion_family_manual_admin',
       'grouping:scope_matching_disabled',
-      'grouping:visual_matching_disabled',
       'grouping:full_card_text_disabled',
+      `grouping:visual_clusters:${visual.clusters.length}`,
+      `grouping:visual_clustered_cards:${visual.assignments.size}`,
+      `grouping:visual_compared_pairs:${visual.comparedPairs}`,
+      `grouping:visual_eligible_pairs:${visual.eligiblePairs}`,
+      `grouping:visual_rejected_conflicts:${visual.rejectedConflicts}`,
       `grouping:worker_elapsed_ms:${Math.max(0, Math.round(performance.now() - totalStarted))}`,
     ])];
     workerScope.postMessage({ type: 'result', result } satisfies GroupingWorkerResponse);
