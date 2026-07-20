@@ -15,9 +15,11 @@ export interface RunGroupingInput {
   monthKey: string;
   cards: ImportedCardCandidate[];
   existingSkus: Sku[];
-  storedPrices: StoredPrice[];
-  promotionFamilies: PromotionFamily[];
-  visualSignatures: Record<string, string>;
+  // Kept temporarily for caller compatibility. These values are deliberately
+  // discarded before Worker transport in name-only mode.
+  storedPrices?: StoredPrice[];
+  promotionFamilies?: PromotionFamily[];
+  visualSignatures?: Record<string, string>;
   onProgress?: (message: string) => void;
 }
 
@@ -46,7 +48,7 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
     throw new Error('product_master_required_before_grouping');
   }
   const prepared = prepareGroupingWorkerCards(input.cards);
-  input.onProgress?.(`Product Master พร้อม ${input.existingSkus.length} รายการ · กำลังเปิด Inline Worker`);
+  input.onProgress?.(`Product Master พร้อม ${input.existingSkus.length} รายการ · จัดกลุ่มจากชื่อมุมขวาบนเท่านั้น`);
   const worker = createInlineWorker();
 
   return new Promise((resolve, reject) => {
@@ -88,7 +90,7 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
       if (message.type === 'ready') {
         if (requestSent) return;
         requestSent = true;
-        lastWorkerMessage = 'Worker พร้อมและกำลังรับข้อมูล';
+        lastWorkerMessage = 'Worker พร้อมและกำลังรับชื่อสินค้า';
         window.clearTimeout(readyTimer);
         const request: GroupingWorkerRequest = {
           type: 'group',
@@ -96,13 +98,13 @@ export async function runGroupingInWorker(input: RunGroupingInput): Promise<Grou
             monthKey: input.monthKey,
             cards: prepared.cards,
             existingSkus: input.existingSkus,
-            storedPrices: input.storedPrices,
-            promotionFamilies: input.promotionFamilies,
-            visualSignatures: input.visualSignatures,
+            storedPrices: [],
+            promotionFamilies: [],
+            visualSignatures: {},
           },
         };
         try {
-          input.onProgress?.(`Inline Worker พร้อม · ส่ง ${prepared.cards.length} การ์ดโดยไม่คัดลอกรูป`);
+          input.onProgress?.(`Inline Worker พร้อม · ส่ง ${prepared.cards.length} การ์ดโดยไม่ส่งรูป ราคา หรือโปรโมชั่น`);
           worker.postMessage(request);
         } catch (error) {
           finish(() => reject(error instanceof Error ? error : new Error(String(error))));
