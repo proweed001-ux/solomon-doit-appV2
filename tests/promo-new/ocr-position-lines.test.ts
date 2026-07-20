@@ -3,6 +3,7 @@ import test from 'node:test';
 import { collectOcrItems } from '../../src/promo-new/import/ocr-items';
 
 const bbox = (x0: number, y0: number, x1: number, y1: number) => ({ x0, y0, x1, y1 });
+const clean = (value: string) => value.normalize('NFKC').replace(/\s+/g, ' ').trim();
 
 test('OCR collection prefers exact line boxes over a broad block spanning card fields', () => {
   const items = collectOcrItems([{
@@ -18,13 +19,13 @@ test('OCR collection prefers exact line boxes over a broad block spanning card f
   }]);
 
   assert.deepEqual(items.map(item => item.text), [
-    'ราคาแนะนำขายปลีก 25 บาท/ขวด',
-    'เฮดแอนด์โชว์เดอร์ แชมพู',
-    'ทุกสูตร ขนาด 65 มล.',
+    clean('ราคาแนะนำขายปลีก 25 บาท/ขวด'),
+    clean('เฮดแอนด์โชว์เดอร์ แชมพู'),
+    clean('ทุกสูตร ขนาด 65 มล.'),
   ]);
   assert.equal(items.some(item => item.text.includes('บาท/ขวด H&S')), false);
   assert.deepEqual(items[1], {
-    text: 'เฮดแอนด์โชว์เดอร์ แชมพู',
+    text: clean('เฮดแอนด์โชว์เดอร์ แชมพู'),
     x: 285,
     y: 18,
     width: 195,
@@ -58,8 +59,8 @@ test('top-right product zone receives name and size lines but excludes left pric
   });
 
   assert.deepEqual(inside.map(item => item.text), [
-    'เฮดแอนด์โชว์เดอร์ แชมพู',
-    'ทุกสูตร ขนาด 65 มล.',
+    clean('เฮดแอนด์โชว์เดอร์ แชมพู'),
+    clean('ทุกสูตร ขนาด 65 มล.'),
   ]);
 });
 
@@ -70,7 +71,7 @@ test('word boxes are used only when a Tesseract line box is unavailable', () => 
       { text: 'แชมพู', bbox: bbox(345, 20, 410, 40) },
     ],
   });
-  assert.deepEqual(items.map(item => item.text), ['H&S', 'แชมพู']);
+  assert.deepEqual(items.map(item => item.text), ['H&S', clean('แชมพู')]);
 });
 
 test('duplicate nested OCR lines are emitted once and remain reading-order sorted', () => {
@@ -79,5 +80,5 @@ test('duplicate nested OCR lines are emitted once and remain reading-order sorte
     { lines: [repeated] },
     { lines: [repeated, { text: 'PANTENE แชมพู', bbox: bbox(300, 20, 470, 45) }] },
   ]);
-  assert.deepEqual(items.map(item => item.text), ['PANTENE แชมพู', 'ขนาด 140 มล.']);
+  assert.deepEqual(items.map(item => item.text), [clean('PANTENE แชมพู'), clean('ขนาด 140 มล.')]);
 });
