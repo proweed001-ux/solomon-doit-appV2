@@ -42,9 +42,9 @@ test('async Product Master audit yields every 12 groups and preserves sync evide
   assert.ok(asyncResult.cards.every(card => card.evidence.masterMatchMethod === 'new_sku'));
 });
 
-test('name-only grouping Worker awaits chunked Product Master audit and forwards progress', () => {
+test('visual-first grouping Worker awaits chunked Product Master audit and forwards progress', () => {
   const worker = readFileSync('src/promo-new/admin/grouping-worker.ts', 'utf8');
   assert.match(worker, /await attachMasterMatchAuditEvidenceAsync\(/u);
   assert.match(worker, /ตรวจชื่อกับ Product Master \$\{state\.processed\}\/\$\{state\.total\} กลุ่ม/u);
-  assert.match(worker, /grouping:mode:name_only/u);
+  assert.match(worker, /grouping:mode:visual_first_anchored/u);
 });
