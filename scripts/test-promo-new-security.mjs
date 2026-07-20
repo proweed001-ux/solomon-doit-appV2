@@ -7,7 +7,7 @@ const required = [
   'dist/promo-admin-new.html', 'dist/promo-new.html', 'dist/assets/promo-new/admin.js', 'dist/assets/promo-new/frontend.js',
   'api/promo-new.js', 'api/promo-legacy-auth.js', 'api/_promo-new/supabase.js',
   'src/promo-new/shared/api.ts', 'src/promo-new/import/pdf-importer.ts', 'src/promo-new/import/card-header-ocr.ts',
-  'src/promo-new/import/workbook-parser.ts', 'src/promo-new/import/workbook-safety.ts',
+  'src/promo-new/import/ocr-items.ts', 'src/promo-new/import/workbook-parser.ts', 'src/promo-new/import/workbook-safety.ts',
   'src/promo-new/admin/grouping-worker.ts', 'src/promo-new/admin/test-cache.ts',
   'src/promo-new/domain/master-backed-card-repair.ts', 'src/promo-new/domain/master-match-audit.ts',
   'src/promo-new/domain/master-text-matcher.ts', 'vite.promo-new.config.ts',
@@ -58,6 +58,15 @@ check(pdfImporter.includes('MAX_PROMO_PDF_PAGES = 120'), 'pdf_page_limit_missing
 check(pdfImporter.includes('MAX_PROMO_PDF_CARDS = 2_000'), 'pdf_card_limit_missing');
 check(pdfImporter.includes("throw new Error('duplicate_card_id')"), 'pdf_duplicate_card_block_missing');
 check(pdfImporter.includes("throw new Error('duplicate_card_position')"), 'pdf_duplicate_position_block_missing');
+check(pdfImporter.includes('x: rect.x + rect.width * 0.38'), 'product_name_top_right_zone_missing');
+check(pdfImporter.includes('height: rect.height * 0.43'), 'product_name_header_height_missing');
+
+const ocrItems = read('src/promo-new/import/ocr-items.ts');
+check(ocrItems.includes('const lines = node.lines'), 'line_level_ocr_collection_missing');
+check(ocrItems.includes('const paragraphs = node.paragraphs'), 'paragraph_to_line_ocr_traversal_missing');
+check(ocrItems.includes('const words = node.words'), 'word_position_fallback_missing');
+check(ocrItems.includes('return output.sort((left, right) => left.y - right.y || left.x - right.x)'), 'ocr_reading_order_sort_missing');
+check(!/if \(text && bbox[\s\S]*return output/u.test(ocrItems), 'broad_block_ocr_short_circuit_reintroduced');
 
 const headerOcr = read('src/promo-new/import/card-header-ocr.ts');
 check(headerOcr.includes('chooseTrustedCardHeaderText'), 'ocr_size_consensus_selector_missing');
@@ -93,8 +102,8 @@ const targetedRepair = read('src/promo-new/domain/master-backed-card-repair.ts')
 check(targetedRepair.includes('[master.canonicalName, ...master.evidence]'), 'legacy_master_canonical_reparse_missing');
 check(targetedRepair.includes("'ocr_size_conflicts_workbook_scope'"), 'conflicting_ocr_size_quarantine_missing');
 const testCache = read('src/promo-new/admin/test-cache.ts');
-check(testCache.includes('PROMO_TEST_CACHE_SCHEMA_VERSION = 3'), 'ocr_consensus_cache_schema_missing');
-check(testCache.includes("PROMO_TEST_PIPELINE_VERSION = 'text-first-product-master-v2-ocr-size-consensus'"), 'ocr_consensus_cache_pipeline_missing');
+check(testCache.includes('PROMO_TEST_CACHE_SCHEMA_VERSION = 4'), 'line_position_cache_schema_missing');
+check(testCache.includes("PROMO_TEST_PIPELINE_VERSION = 'text-first-product-master-v3-line-position-single-pass'"), 'line_position_cache_pipeline_missing');
 
 const masterAudit = read('src/promo-new/domain/master-match-audit.ts');
 check(masterAudit.includes('AUDIT_CHUNK_SIZE = 12'), 'master_audit_chunk_size_missing');
@@ -184,4 +193,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: targeted OCR size consensus, legacy Product Master repair, cache generation, patched SheetJS lock, workbook ZIP/range/encoding bounds, chunked Worker audit, brand-indexed Product Master, commit Build ID, auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
+console.log('Promo new security/static checks passed: line-level positional product-name OCR, single-pass cache generation, targeted size consensus, legacy Product Master repair, patched SheetJS lock, workbook ZIP/range/encoding bounds, chunked Worker audit, brand-indexed Product Master, commit Build ID, auth limits, read-only writes, price conflict quarantine, PDF bounds, ready-only frontend, RLS/revokes, rollback, mobile assets, verified build pipeline, and legacy isolation.');
