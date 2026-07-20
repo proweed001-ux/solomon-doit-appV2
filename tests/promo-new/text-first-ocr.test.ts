@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { selectAdaptiveHeaderOcrTargets } from '../../src/promo-new/admin/adaptive-header-ocr';
+import { enrichAdaptiveCardHeaders, selectAdaptiveHeaderOcrTargets } from '../../src/promo-new/admin/adaptive-header-ocr';
 import type { GroupingResult } from '../../src/promo-new/domain/grouping';
 import { matchProductMasterByText, repairCommonProductOcr } from '../../src/promo-new/domain/master-text-matcher';
 import { createSkuCandidate } from '../../src/promo-new/domain/sku-identity';
-import type { ProductGroup, Sku } from '../../src/promo-new/domain/types';
+import type { Sku } from '../../src/promo-new/domain/types';
 import type { ImportedCardCandidate } from '../../src/promo-new/import/pdf-importer';
 
 function master(id: string, canonicalName: string, aliases: string[] = []): Sku {
@@ -110,37 +110,24 @@ test('keeps equal Product Master candidates ambiguous instead of guessing', () =
   assert.equal(result.sku, null);
 });
 
-test('fallback OCR selects only unresolved cards that still lack critical name evidence', () => {
+test('single-pass OCR never schedules unresolved cards for a second read', () => {
   const unresolved = card('CARD-1', 'H&S แชมพู', ['size_missing', 'size_unit_missing']);
-  const completeNew = card('CARD-2', 'H&S แชมพู 140 มล.');
-  const candidateGroup = {
-    id: 'group-2',
-    monthKey: 'PROMO-2026-07',
-    skuId: 'sku-2',
-    sku: { ...createSkuCandidate(completeNew.productText), status: 'candidate' as const },
-    cardIds: [completeNew.cardId],
-    classIds: ['HFSS'],
-    promotionFamilyId: null,
-    price: {
-      skuId: 'sku-2',
-      pdfSourcePrice: null,
-      centralOverridePrice: null,
-      effectivePrice: null,
-      source: 'missing' as const,
-      sourceReference: null,
-      updatedAt: null,
-    },
-    status: 'need_review' as const,
-    failureReasons: ['new_sku_requires_confirmation'],
-  } satisfies ProductGroup;
   const grouping = emptyGrouping({
-    groups: [candidateGroup],
     quarantineCards: [unresolved],
-    diagnostics: { masterText: 0, structuredScope: 0, visualConsensus: 0, exactIdentity: 1, unresolved: 1 },
+    diagnostics: { masterText: 0, structuredScope: 0, visualConsensus: 0, exactIdentity: 0, unresolved: 1 },
   });
-  const selection = selectAdaptiveHeaderOcrTargets([unresolved, completeNew], grouping);
-  assert.deepEqual([...selection.targetIds], ['CARD-1']);
-  assert.equal(selection.unresolvedTargets, 1);
+  const selection = selectAdaptiveHeaderOcrTargets([unresolved], grouping);
+  assert.equal(selection.targetIds.size, 0);
+  assert.equal(selection.unresolvedTargets, 0);
   assert.equal(selection.candidateTargets, 0);
   assert.equal(selection.skippedByExistingKnowledge, 1);
+  assert.equal(selection.unresolvedWithoutOcrBenefit, 1);
+});
+
+test('single-pass OCR guard rejects any attempted fallback OCR call', async () => {
+  const unresolved = card('CARD-1', 'H&S แชมพู', ['size_missing', 'size_unit_missing']);
+  await assert.rejects(
+    enrichAdaptiveCardHeaders([unresolved], new Set(['CARD-1'])),
+    /second_pass_ocr_disabled_single_pass_mode/u,
+  );
 });
