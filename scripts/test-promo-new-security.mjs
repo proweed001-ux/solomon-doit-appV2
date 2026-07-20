@@ -16,9 +16,10 @@ const required = [
   'src/promo-new/shared/api.ts', 'src/promo-new/import/pdf-importer.ts', 'src/promo-new/import/card-header-ocr.ts',
   'src/promo-new/import/ocr-items.ts', 'src/promo-new/import/workbook-parser.ts', 'src/promo-new/import/workbook-safety.ts',
   'src/promo-new/admin/grouping-client.ts', 'src/promo-new/admin/grouping-worker.ts', 'src/promo-new/admin/grouping-transport.ts',
-  'src/promo-new/admin/test-cache.ts', 'src/promo-new/domain/auto-match.ts', 'src/promo-new/domain/master-match-audit.ts',
-  'src/promo-new/domain/master-text-matcher.ts', 'src/promo-new/domain/visual-product-signatures.ts',
-  'src/promo-new/domain/visual-product-clusters.ts', 'vite.promo-new.config.ts', 'scripts/prepare-sheetjs-lock.mjs',
+  'src/promo-new/admin/test-cache.ts', 'src/promo-new/admin/cached-run.ts', 'src/promo-new/domain/auto-match.ts',
+  'src/promo-new/domain/master-match-audit.ts', 'src/promo-new/domain/master-text-matcher.ts',
+  'src/promo-new/domain/visual-product-signatures.ts', 'src/promo-new/domain/visual-product-clusters.ts',
+  'vite.promo-new.config.ts', 'scripts/prepare-sheetjs-lock.mjs',
   'docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md', 'supabase/migrations/20260716083231_promo_system_rebuild.sql',
   'supabase/rollback/20260716083231_promo_system_rebuild.sql',
 ];
@@ -75,14 +76,24 @@ check(workbookParser.includes('decodePromotionCsv(bytes)'), 'workbook_csv_decode
 
 const client = read('src/promo-new/admin/grouping-client.ts');
 const worker = read('src/promo-new/admin/grouping-worker.ts');
+const cache = read('src/promo-new/admin/test-cache.ts');
+const cachedRun = read('src/promo-new/admin/cached-run.ts');
 const signatures = read('src/promo-new/domain/visual-product-signatures.ts');
 const clusters = read('src/promo-new/domain/visual-product-clusters.ts');
 check(client.includes('buildVisualProductSignatures'), 'visual_signature_generation_not_wired');
+check(client.includes('visualProductSignaturesComplete'), 'visual_signature_completeness_guard_missing');
+check(client.includes('visual_signatures_incomplete'), 'incomplete_visual_signature_block_missing');
+check(client.includes('product_master_required_before_grouping'), 'product_master_zero_block_missing');
 check(client.includes('prepareGroupingWorkerCards(input.cards)'), 'image_strip_transport_missing');
 check(client.includes('storedPrices: []'), 'stored_price_must_not_enter_worker');
 check(client.includes('promotionFamilies: []'), 'promotion_family_must_not_enter_worker');
 check(client.includes('visualSignatures,'), 'visual_signature_transport_missing');
 check(client.includes('โดยไม่ส่งรูป ราคา หรือโปรโมชั่น'), 'visual_transport_boundary_message_missing');
+check(cache.includes('PROMO_TEST_CACHE_SCHEMA_VERSION = 5'), 'visual_first_cache_schema_v5_missing');
+check(cache.includes("PROMO_TEST_PIPELINE_VERSION = 'visual-first-anchored-v1-single-pass-rebuild-fingerprints'"), 'visual_first_cache_pipeline_missing');
+check(cache.includes('record.schemaVersion === PROMO_TEST_CACHE_SCHEMA_VERSION'), 'cache_schema_rejection_missing');
+check(cache.includes('record.pipelineVersion === PROMO_TEST_PIPELINE_VERSION'), 'cache_pipeline_rejection_missing');
+check(cachedRun.includes('cache:visual_fingerprints_missing_rebuild_required'), 'cached_fingerprint_rebuild_marker_missing');
 check(worker.includes("rawText: card.productText || ''"), 'full_card_text_guard_missing');
 check(worker.includes('buildVisualProductClusters'), 'visual_cluster_not_wired');
 check(worker.includes('grouping:mode:visual_first_anchored'), 'visual_first_mode_marker_missing');
@@ -138,7 +149,9 @@ const rollback = read('supabase/rollback/20260716083231_promo_system_rebuild.sql
 check(rollback.includes('drop table if exists public.promo_new_cards;'), 'rollback_cards_missing');
 
 const promoVite = read('vite.promo-new.config.ts');
-check(promoVite.includes("PROMO_BUILD_FLAVOR = 'VISUAL-FIRST-ANCHORED-MANUAL-CONTROLS'"), 'visual_first_build_flavor_missing');
+check(promoVite.includes("PROMO_BUILD_FLAVOR = 'VISUAL-FIRST-CACHE-V5-MANUAL-CONTROLS'"), 'visual_first_cache_v5_build_flavor_missing');
+check(promoVite.includes('fresh_run_must_build_visual_signatures'), 'admin_empty_visual_signature_patch_missing');
+check(promoVite.includes('cache_visual_rebuild_label'), 'admin_cache_rebuild_message_patch_missing');
 check(promoVite.includes('VERCEL_GIT_COMMIT_SHA'), 'deployment_build_id_sha_missing');
 const vercel = JSON.parse(read('vercel.json'));
 const packageJson = JSON.parse(read('package.json'));
@@ -154,7 +167,7 @@ check(packageJson.dependencies?.xlsx === 'https://cdn.sheetjs.com/xlsx-0.20.3/xl
 const builtPromoJsFiles = walk('dist/assets/promo-new').filter(file => file.endsWith('.js'));
 const builtPromoJs = builtPromoJsFiles.map(file => read(file)).join('\n');
 const buildCommit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
-check(builtPromoJs.includes(`PROMO-${buildCommit}-VISUAL-FIRST-ANCHORED-MANUAL-CONTROLS`), 'deployed_build_id_does_not_match_visual_first_commit');
+check(builtPromoJs.includes(`PROMO-${buildCommit}-VISUAL-FIRST-CACHE-V5-MANUAL-CONTROLS`), 'deployed_build_id_does_not_match_visual_first_cache_v5_commit');
 check(!builtPromoJs.includes('FINAL-UPLOAD-AUDIT-20260719-0031'), 'stale_build_id_reached_deployed_bundle');
 for (const file of builtPromoJsFiles) {
   const size = fs.statSync(path.join(root, file)).size;
@@ -167,4 +180,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: anchored visual-first grouping uses only title/product fingerprints, images are stripped before Worker transport, price and Promotion Family remain manual, Scope and full-card text are excluded, identity conflicts and one-card-per-Class guards are enforced, read-only writes and verified build protections remain active.');
+console.log('Promo new security/static checks passed: visual-first cache v5 rejects legacy records, requires Product Master and complete title/product fingerprints before Worker grouping, rebuilds missing fingerprints from cached card images, strips images before Worker transport, keeps price and Promotion Family manual, excludes Scope and full-card text, and retains read-only deployment guards.');
