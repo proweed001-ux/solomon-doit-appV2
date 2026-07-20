@@ -126,6 +126,7 @@ check(masterMatcher.includes('prepared.byBrand.get(brand)'), 'product_master_bra
 const promoVite = read('vite.promo-new.config.ts');
 check(promoVite.includes("name: 'promo-build-id'"), 'deployment_build_id_plugin_missing');
 check(promoVite.includes('VERCEL_GIT_COMMIT_SHA'), 'deployment_build_id_sha_missing');
+check(promoVite.includes("PROMO_BUILD_FLAVOR = 'NAME-ONLY-MANUAL-CONTROLS'"), 'name_only_build_flavor_missing');
 
 const frontend = read('src/promo-new/frontend/main.tsx');
 check(frontend.includes("card.status === 'ready'"), 'frontend_ready_only_filter_missing');
@@ -196,7 +197,7 @@ check(vercel.outputDirectory === 'dist', 'preview_output_directory_changed');
 const builtPromoJsFiles = walk('dist/assets/promo-new').filter(file => file.endsWith('.js'));
 const builtPromoJs = builtPromoJsFiles.map(file => read(file)).join('\n');
 const buildCommit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
-check(builtPromoJs.includes(`PROMO-${buildCommit}-OCR-SCOPE-TARGETED`), 'deployed_build_id_does_not_match_targeted_commit');
+check(builtPromoJs.includes(`PROMO-${buildCommit}-NAME-ONLY-MANUAL-CONTROLS`), 'deployed_build_id_does_not_match_name_only_commit');
 check(!builtPromoJs.includes('FINAL-UPLOAD-AUDIT-20260719-0031'), 'stale_build_id_reached_deployed_bundle');
 for (const file of builtPromoJsFiles) {
   const size = fs.statSync(path.join(root, file)).size;
