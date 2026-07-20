@@ -32,10 +32,10 @@ test('grouping stops before fallback OCR when Product Master is unavailable', ()
   assert.match(client, /product_master_required_before_grouping/u);
 });
 
-test('cache rejects OCR results created before repeated size consensus', () => {
+test('cache rejects results created before line-position single-pass OCR', () => {
   const cache = read('src/promo-new/admin/test-cache.ts');
-  assert.match(cache, /PROMO_TEST_CACHE_SCHEMA_VERSION = 3/u);
-  assert.match(cache, /PROMO_TEST_PIPELINE_VERSION = 'text-first-product-master-v2-ocr-size-consensus'/u);
+  assert.match(cache, /PROMO_TEST_CACHE_SCHEMA_VERSION = 4/u);
+  assert.match(cache, /PROMO_TEST_PIPELINE_VERSION = 'text-first-product-master-v3-line-position-single-pass'/u);
   assert.match(cache, /record\.schemaVersion === PROMO_TEST_CACHE_SCHEMA_VERSION/u);
   assert.match(cache, /record\.pipelineVersion === PROMO_TEST_PIPELINE_VERSION/u);
   assert.match(cache, /visualSignatures: \{\}/u);
