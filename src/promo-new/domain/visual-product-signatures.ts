@@ -1,59 +1,58 @@
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 
-const WORK_WIDTH = 96;
-const WORK_HEIGHT = 64;
-const SAMPLE_WIDTH = 24;
-const SAMPLE_HEIGHT = 16;
+const HASH_SIZE = 16;
+const DCT_SIZE = 64;
+const EDGE_WIDTH = 96;
+const EDGE_HEIGHT = 64;
 const IMAGE_DECODE_TIMEOUT_MS = 12_000;
 
-interface ViewSpec {
+export interface VisualProductSignature {
+  /** 16×16 perceptual hash encoded as 00/ff bytes. */
+  title: string;
+  /** 16×16 perceptual hash encoded as 00/ff bytes. */
+  product: string;
+  /** L2-normalized OpenCV-style HSV histogram: 24 hue × 12 saturation bins. */
+  colorHistogram: number[];
+  /** 6×4 spatial edge-density blocks. */
+  edgeHistogram: number[];
+  quality: number;
+}
+
+interface RelativeView {
   x: number;
   y: number;
   width: number;
   height: number;
-  mask?: Array<{ x: number; y: number; width: number; height: number }>;
 }
 
-export interface VisualProductSignature {
-  title: string;
-  product: string;
-  quality: number;
-}
+const TITLE_VIEW: RelativeView = { x: 0.44, y: 0, width: 0.555, height: 0.36 };
+const PRODUCT_VIEW: RelativeView = { x: 0.18, y: 0.10, width: 0.64, height: 0.78 };
 
-const TITLE_VIEW: ViewSpec = {
-  x: 0.38,
-  y: 0.01,
-  width: 0.60,
-  height: 0.42,
-};
-
-// These views keep the product pack and title while excluding the left price panel
-// and most of the lower-right promotion badge. No price or promotion text is encoded.
-const PRODUCT_VIEWS: ViewSpec[] = [
-  { x: 0.24, y: 0.17, width: 0.50, height: 0.54, mask: [{ x: 0.78, y: 0.68, width: 0.22, height: 0.32 }] },
-  { x: 0.20, y: 0.23, width: 0.58, height: 0.46, mask: [{ x: 0.80, y: 0.64, width: 0.20, height: 0.36 }] },
-  { x: 0.30, y: 0.16, width: 0.44, height: 0.58, mask: [{ x: 0.82, y: 0.67, width: 0.18, height: 0.33 }] },
-];
+const DCT_COS = Array.from({ length: HASH_SIZE }, (_, frequency) =>
+  Float64Array.from({ length: DCT_SIZE }, (_, position) =>
+    Math.cos(Math.PI * (2 * position + 1) * frequency / (2 * DCT_SIZE)),
+  ),
+);
+const DCT_SCALE = Float64Array.from({ length: HASH_SIZE }, (_, frequency) =>
+  frequency === 0 ? Math.sqrt(1 / DCT_SIZE) : Math.sqrt(2 / DCT_SIZE),
+);
 
 function loadImage(source: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     let settled = false;
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      image.onload = null;
+      image.onerror = null;
+      callback();
+    };
     const timer = window.setTimeout(() => finish(() => {
       image.src = '';
       reject(new Error('card_image_decode_timeout'));
     }), IMAGE_DECODE_TIMEOUT_MS);
-    const cleanup = () => {
-      image.onload = null;
-      image.onerror = null;
-      window.clearTimeout(timer);
-    };
-    const finish = (callback: () => void) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      callback();
-    };
     image.decoding = 'async';
     image.onload = () => finish(() => resolve(image));
     image.onerror = () => finish(() => reject(new Error('card_image_decode_failed')));
@@ -61,119 +60,209 @@ function loadImage(source: string): Promise<HTMLImageElement> {
   });
 }
 
-function clampByte(value: number): number {
-  return Math.max(0, Math.min(255, Math.round(value)));
-}
-
-function renderView(image: HTMLImageElement, spec: ViewSpec): HTMLCanvasElement {
+function cropView(image: HTMLImageElement, view: RelativeView): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
-  canvas.width = WORK_WIDTH;
-  canvas.height = WORK_HEIGHT;
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * view.width));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * view.height));
   const context = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
   if (!context) throw new Error('canvas_context_unavailable');
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = 'high';
   context.fillStyle = '#ffffff';
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.drawImage(
     image,
-    image.naturalWidth * spec.x,
-    image.naturalHeight * spec.y,
-    image.naturalWidth * spec.width,
-    image.naturalHeight * spec.height,
+    image.naturalWidth * view.x,
+    image.naturalHeight * view.y,
+    image.naturalWidth * view.width,
+    image.naturalHeight * view.height,
     0,
     0,
     canvas.width,
     canvas.height,
   );
-  context.fillStyle = '#ffffff';
-  for (const mask of spec.mask || []) {
-    context.fillRect(mask.x * canvas.width, mask.y * canvas.height, mask.width * canvas.width, mask.height * canvas.height);
-  }
   return canvas;
 }
 
-function featureBytes(canvas: HTMLCanvasElement, titleMode: boolean): { bytes: number[]; quality: number } {
-  const sample = document.createElement('canvas');
-  sample.width = SAMPLE_WIDTH;
-  sample.height = SAMPLE_HEIGHT;
-  const context = sample.getContext('2d', { alpha: false, willReadFrequently: true });
-  if (!context) return { bytes: [], quality: 0 };
+function resizedPixels(canvas: HTMLCanvasElement, width: number, height: number): Uint8ClampedArray {
+  const resized = document.createElement('canvas');
+  resized.width = width;
+  resized.height = height;
+  const context = resized.getContext('2d', { alpha: false, willReadFrequently: true });
+  if (!context) throw new Error('canvas_context_unavailable');
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
   context.fillStyle = '#ffffff';
-  context.fillRect(0, 0, sample.width, sample.height);
-  context.drawImage(canvas, 0, 0, sample.width, sample.height);
-  const { data } = context.getImageData(0, 0, sample.width, sample.height);
-  const bytes: number[] = [];
-  const rowInk = Array.from({ length: SAMPLE_HEIGHT }, () => 0);
-  const columnInk = Array.from({ length: SAMPLE_WIDTH }, () => 0);
-  const colorHistogram = Array.from({ length: 64 }, () => 0);
-  let inkCount = 0;
-
-  for (let y = 0; y < SAMPLE_HEIGHT; y += 1) {
-    for (let x = 0; x < SAMPLE_WIDTH; x += 1) {
-      const offset = (y * SAMPLE_WIDTH + x) * 4;
-      const red = data[offset];
-      const green = data[offset + 1];
-      const blue = data[offset + 2];
-      const maximum = Math.max(red, green, blue);
-      const minimum = Math.min(red, green, blue);
-      const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
-      const saturation = maximum - minimum;
-      const ink = titleMode ? luminance < 196 : luminance < 244 || saturation > 22;
-      const darkness = clampByte(255 - luminance);
-      bytes.push(titleMode ? darkness : clampByte(255 - red));
-      bytes.push(titleMode ? (ink ? 255 : 0) : clampByte(255 - green));
-      bytes.push(titleMode ? clampByte(saturation * 3) : clampByte(255 - blue));
-      bytes.push(ink ? 255 : 0);
-      if (!ink) continue;
-      rowInk[y] += 1;
-      columnInk[x] += 1;
-      inkCount += 1;
-      const redBin = Math.min(3, Math.floor(red / 64));
-      const greenBin = Math.min(3, Math.floor(green / 64));
-      const blueBin = Math.min(3, Math.floor(blue / 64));
-      colorHistogram[redBin * 16 + greenBin * 4 + blueBin] += 1;
-    }
-  }
-
-  bytes.push(...rowInk.map(value => clampByte(value / SAMPLE_WIDTH * 255)));
-  bytes.push(...columnInk.map(value => clampByte(value / SAMPLE_HEIGHT * 255)));
-  if (!titleMode) bytes.push(...colorHistogram.map(value => inkCount ? clampByte(value / inkCount * 255) : 0));
-  sample.width = 1;
-  sample.height = 1;
-  return { bytes, quality: inkCount / (SAMPLE_WIDTH * SAMPLE_HEIGHT) };
+  context.fillRect(0, 0, width, height);
+  context.drawImage(canvas, 0, 0, width, height);
+  const data = context.getImageData(0, 0, width, height).data;
+  resized.width = 1;
+  resized.height = 1;
+  return data;
 }
 
-function encode(bytes: number[]): string {
-  return bytes.map(value => clampByte(value).toString(16).padStart(2, '0')).join('');
+function rgbToOpenCvHsv(red: number, green: number, blue: number): [number, number, number] {
+  const r = red / 255;
+  const g = green / 255;
+  const b = blue / 255;
+  const maximum = Math.max(r, g, b);
+  const minimum = Math.min(r, g, b);
+  const difference = maximum - minimum;
+  let hue = 0;
+  if (difference > 0) {
+    if (maximum === r) hue = ((g - b) / difference) % 6;
+    else if (maximum === g) hue = (b - r) / difference + 2;
+    else hue = (r - g) / difference + 4;
+    hue *= 30;
+    if (hue < 0) hue += 180;
+  }
+  const saturation = maximum <= 0 ? 0 : difference / maximum * 255;
+  return [hue, saturation, maximum * 255];
+}
+
+/** Removes the saturated red/orange promotion graphics from the product view. */
+function maskPromotionRed(canvas: HTMLCanvasElement): void {
+  const context = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+  if (!context) throw new Error('canvas_context_unavailable');
+  const image = context.getImageData(0, 0, canvas.width, canvas.height);
+  const mask = new Uint8Array(canvas.width * canvas.height);
+  for (let index = 0; index < mask.length; index += 1) {
+    const offset = index * 4;
+    const [hue, saturation] = rgbToOpenCvHsv(image.data[offset], image.data[offset + 1], image.data[offset + 2]);
+    if (saturation > 150 && (hue < 35 || hue > 160)) mask[index] = 1;
+  }
+  const dilated = new Uint8Array(mask.length);
+  for (let y = 0; y < canvas.height; y += 1) {
+    for (let x = 0; x < canvas.width; x += 1) {
+      let active = false;
+      for (let dy = -2; dy <= 2 && !active; dy += 1) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= canvas.height) continue;
+        for (let dx = -2; dx <= 2; dx += 1) {
+          const xx = x + dx;
+          if (xx >= 0 && xx < canvas.width && mask[yy * canvas.width + xx]) { active = true; break; }
+        }
+      }
+      if (active) dilated[y * canvas.width + x] = 1;
+    }
+  }
+  for (let index = 0; index < dilated.length; index += 1) {
+    if (!dilated[index]) continue;
+    const offset = index * 4;
+    image.data[offset] = 255;
+    image.data[offset + 1] = 255;
+    image.data[offset + 2] = 255;
+    image.data[offset + 3] = 255;
+  }
+  context.putImageData(image, 0, 0);
+}
+
+function grayscale(data: Uint8ClampedArray, width: number, height: number): Float64Array {
+  const output = new Float64Array(width * height);
+  for (let index = 0; index < output.length; index += 1) {
+    const offset = index * 4;
+    output[index] = data[offset] * 0.299 + data[offset + 1] * 0.587 + data[offset + 2] * 0.114;
+  }
+  return output;
+}
+
+function median(values: number[]): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function perceptualHash(canvas: HTMLCanvasElement): string {
+  const gray = grayscale(resizedPixels(canvas, DCT_SIZE, DCT_SIZE), DCT_SIZE, DCT_SIZE);
+  const horizontal = Array.from({ length: HASH_SIZE }, () => new Float64Array(DCT_SIZE));
+  for (let frequency = 0; frequency < HASH_SIZE; frequency += 1) {
+    const cosine = DCT_COS[frequency];
+    for (let y = 0; y < DCT_SIZE; y += 1) {
+      let sum = 0;
+      const row = y * DCT_SIZE;
+      for (let x = 0; x < DCT_SIZE; x += 1) sum += gray[row + x] * cosine[x];
+      horizontal[frequency][y] = sum * DCT_SCALE[frequency];
+    }
+  }
+  const coefficients: number[] = [];
+  for (let vertical = 0; vertical < HASH_SIZE; vertical += 1) {
+    const cosine = DCT_COS[vertical];
+    for (let horizontalFrequency = 0; horizontalFrequency < HASH_SIZE; horizontalFrequency += 1) {
+      let sum = 0;
+      for (let y = 0; y < DCT_SIZE; y += 1) sum += horizontal[horizontalFrequency][y] * cosine[y];
+      coefficients.push(sum * DCT_SCALE[vertical]);
+    }
+  }
+  // Matches numpy median(dct[1:]): the first DCT row is excluded from the threshold calculation.
+  const threshold = median(coefficients.slice(HASH_SIZE));
+  return coefficients.map(value => value > threshold ? 'ff' : '00').join('');
+}
+
+function colorHistogram(canvas: HTMLCanvasElement): number[] {
+  const context = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+  if (!context) throw new Error('canvas_context_unavailable');
+  const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  const histogram = Array.from({ length: 24 * 12 }, () => 0);
+  for (let offset = 0; offset < data.length; offset += 4) {
+    const [hue, saturation, value] = rgbToOpenCvHsv(data[offset], data[offset + 1], data[offset + 2]);
+    if (value >= 250) continue;
+    const hueBin = Math.max(0, Math.min(23, Math.floor(hue / 180 * 24)));
+    const saturationBin = Math.max(0, Math.min(11, Math.floor(saturation / 256 * 12)));
+    histogram[hueBin * 12 + saturationBin] += 1;
+  }
+  const length = Math.sqrt(histogram.reduce((sum, value) => sum + value * value, 0));
+  return histogram.map(value => length ? value / length : 0);
+}
+
+function edgeHistogram(canvas: HTMLCanvasElement): number[] {
+  const gray = grayscale(resizedPixels(canvas, EDGE_WIDTH, EDGE_HEIGHT), EDGE_WIDTH, EDGE_HEIGHT);
+  const magnitude = new Float64Array(EDGE_WIDTH * EDGE_HEIGHT);
+  for (let y = 1; y < EDGE_HEIGHT - 1; y += 1) {
+    for (let x = 1; x < EDGE_WIDTH - 1; x += 1) {
+      const a = gray[(y - 1) * EDGE_WIDTH + x - 1];
+      const b = gray[(y - 1) * EDGE_WIDTH + x];
+      const c = gray[(y - 1) * EDGE_WIDTH + x + 1];
+      const d = gray[y * EDGE_WIDTH + x - 1];
+      const f = gray[y * EDGE_WIDTH + x + 1];
+      const g = gray[(y + 1) * EDGE_WIDTH + x - 1];
+      const h = gray[(y + 1) * EDGE_WIDTH + x];
+      const i = gray[(y + 1) * EDGE_WIDTH + x + 1];
+      const gx = -a + c - 2 * d + 2 * f - g + i;
+      const gy = -a - 2 * b - c + g + 2 * h + i;
+      magnitude[y * EDGE_WIDTH + x] = Math.sqrt(gx * gx + gy * gy);
+    }
+  }
+  const output: number[] = [];
+  for (let blockY = 0; blockY < 4; blockY += 1) {
+    for (let blockX = 0; blockX < 6; blockX += 1) {
+      let edgePixels = 0;
+      for (let y = blockY * 16; y < (blockY + 1) * 16; y += 1) {
+        for (let x = blockX * 16; x < (blockX + 1) * 16; x += 1) {
+          if (magnitude[y * EDGE_WIDTH + x] >= 160) edgePixels += 1;
+        }
+      }
+      output.push(edgePixels / 256);
+    }
+  }
+  return output;
 }
 
 export async function cardVisualProductSignature(imageUrl: string): Promise<VisualProductSignature> {
-  if (!imageUrl) return { title: '', product: '', quality: 0 };
+  if (!imageUrl) return { title: '', product: '', colorHistogram: [], edgeHistogram: [], quality: 0 };
   const image = await loadImage(imageUrl);
   try {
-    const titleCanvas = renderView(image, TITLE_VIEW);
-    const title = featureBytes(titleCanvas, true);
+    const titleCanvas = cropView(image, TITLE_VIEW);
+    const productCanvas = cropView(image, PRODUCT_VIEW);
+    maskPromotionRed(productCanvas);
+    const title = perceptualHash(titleCanvas);
+    const product = perceptualHash(productCanvas);
+    const histogram = colorHistogram(productCanvas);
+    const edges = edgeHistogram(productCanvas);
+    const quality = Number((histogram.reduce((sum, value) => sum + Number(value > 0), 0) / histogram.length).toFixed(4));
     titleCanvas.width = 1;
     titleCanvas.height = 1;
-
-    const productBytes: number[] = [];
-    const productQualities: number[] = [];
-    for (const view of PRODUCT_VIEWS) {
-      const canvas = renderView(image, view);
-      const feature = featureBytes(canvas, false);
-      productBytes.push(...feature.bytes);
-      productQualities.push(feature.quality);
-      canvas.width = 1;
-      canvas.height = 1;
-    }
-    return {
-      title: encode(title.bytes),
-      product: encode(productBytes),
-      quality: Number(((title.quality + productQualities.reduce((sum, value) => sum + value, 0) / PRODUCT_VIEWS.length) / 2).toFixed(4)),
-    };
+    productCanvas.width = 1;
+    productCanvas.height = 1;
+    return { title, product, colorHistogram: histogram, edgeHistogram: edges, quality };
   } finally {
     image.src = '';
   }
@@ -189,7 +278,7 @@ export async function buildVisualProductSignatures(
     try {
       output[card.cardId] = await cardVisualProductSignature(card.imageUrl);
     } catch {
-      output[card.cardId] = { title: '', product: '', quality: 0 };
+      output[card.cardId] = { title: '', product: '', colorHistogram: [], edgeHistogram: [], quality: 0 };
     }
     onProgress?.(index + 1, cards.length);
     if ((index + 1) % 4 === 0) await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
