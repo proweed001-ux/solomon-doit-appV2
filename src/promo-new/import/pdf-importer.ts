@@ -24,6 +24,8 @@ pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 export const MAX_PROMO_PDF_BYTES = 50 * 1024 * 1024;
 export const MAX_PROMO_PDF_PAGES = 120;
 export const MAX_PROMO_PDF_CARDS = 2_000;
+const STRUCTURAL_RENDER_WIDTH = 1_800;
+const TITLE_OCR_RENDER_WIDTH = 3_320;
 
 export interface ImportedCardCandidate {
   cardId: string;
@@ -189,9 +191,9 @@ function headerColorEvidence(canvas: HTMLCanvasElement): [number, number, number
   return count ? [Math.round(red / count), Math.round(green / count), Math.round(blue / count)] : null;
 }
 
-async function canvasFromPage(page: any): Promise<{ canvas: HTMLCanvasElement; viewport: any }> {
+async function canvasFromPage(page: any, targetWidth: number, maximumScale: number): Promise<{ canvas: HTMLCanvasElement; viewport: any }> {
   const base = page.getViewport({ scale: 1 });
-  const scale = Math.max(1.25, Math.min(2, 1800 / Math.max(1, base.width)));
+  const scale = Math.max(1.25, Math.min(maximumScale, targetWidth / Math.max(1, base.width)));
   const viewport = page.getViewport({ scale });
   const canvas = document.createElement('canvas');
   canvas.width = Math.ceil(viewport.width);
@@ -200,6 +202,10 @@ async function canvasFromPage(page: any): Promise<{ canvas: HTMLCanvasElement; v
   if (!context) throw new Error('canvas_context_unavailable');
   await page.render({ canvasContext: context, canvas, viewport }).promise;
   return { canvas, viewport };
+}
+
+function scaleRect(rect: Rect, scaleX: number, scaleY: number): Rect {
+  return { x: rect.x * scaleX, y: rect.y * scaleY, width: rect.width * scaleX, height: rect.height * scaleY };
 }
 
 export async function importPromotionPdf(file: File, options: ImportOptions): Promise<PdfImportResult> {
@@ -241,9 +247,9 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
   progress('loading', 0, `เปิด PDF ${document.numPages} หน้า`);
   try {
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-      progress('rendering', pageNumber, `กำลัง render หน้า ${pageNumber}/${document.numPages}`);
+      progress('rendering', pageNumber, `กำลัง render Structural Grid หน้า ${pageNumber}/${document.numPages}`);
       const page = await document.getPage(pageNumber);
-      const { canvas, viewport } = await canvasFromPage(page);
+      const { canvas, viewport } = await canvasFromPage(page, STRUCTURAL_RENDER_WIDTH, 2);
       const grid = detectCardGrid(canvas, pageNumber);
       if (cards.length + grid.regions.length > MAX_PROMO_PDF_CARDS) {
         canvas.width = 1;
@@ -274,14 +280,22 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       pageClassObservations.push({ page: pageNumber, texts: headerTexts, headerColor: headerColorEvidence(canvas), hasCards: grid.regions.length > 0 });
       if (grid.diagnostics.status !== 'ok') warnings.push(...grid.diagnostics.reasons.map(reason => `page:${pageNumber}:${reason}`));
 
+      let titleCanvas: HTMLCanvasElement | null = null;
+      if (!hasPdfText && options.enableOcr && grid.regions.length) {
+        progress('rendering', pageNumber, `หน้า ${pageNumber}: render ชื่อมุมขวาบน ${TITLE_OCR_RENDER_WIDTH}px`);
+        titleCanvas = (await canvasFromPage(page, TITLE_OCR_RENDER_WIDTH, 4)).canvas;
+      }
+      const titleScaleX = titleCanvas ? titleCanvas.width / canvas.width : 1;
+      const titleScaleY = titleCanvas ? titleCanvas.height / canvas.height : 1;
+
       for (const [index, bounds] of grid.regions.entries()) {
         const sequence = index + 1;
         let productText = hasPdfText ? textIn(textItems, cardProductTitleZone(bounds)) : '';
         let rawText = hasPdfText ? textIn(textItems, bounds) : '';
-        if (!hasPdfText && options.enableOcr) {
-          progress('ocr', pageNumber - 1 + (index + 1) / Math.max(1, grid.regions.length), `หน้า ${pageNumber}: OCR ชื่อมุมขวาบน ${index + 1}/${grid.regions.length}`);
+        if (!hasPdfText && options.enableOcr && titleCanvas) {
+          progress('ocr', pageNumber - 1 + (index + 1) / Math.max(1, grid.regions.length), `หน้า ${pageNumber}: OCR ชื่อมุมขวาบนความละเอียดต้นฉบับ ${index + 1}/${grid.regions.length}`);
           try {
-            productText = await recognizeCardProductTitle(await ensureWorker(), canvas, bounds);
+            productText = await recognizeCardProductTitle(await ensureWorker(), titleCanvas, scaleRect(bounds, titleScaleX, titleScaleY));
             rawText = productText;
           } catch {
             warnings.push(`page:${pageNumber}:card:${sequence}:product_title_ocr_failed`);
@@ -299,7 +313,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
           page: pageNumber,
           sequence,
           classId,
-          imageUrl: crop.toDataURL('image/webp', 0.82),
+          imageUrl: crop.toDataURL('image/webp', 0.92),
           rawText,
           productText,
           pageClassText: headerText,
@@ -310,6 +324,10 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
         });
         crop.width = 1;
         crop.height = 1;
+      }
+      if (titleCanvas) {
+        titleCanvas.width = 1;
+        titleCanvas.height = 1;
       }
 
       pages.push({
