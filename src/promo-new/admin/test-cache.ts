@@ -6,9 +6,9 @@ const DB_NAME = 'solomon-promo-new-test-cache';
 const DB_VERSION = 1;
 const STORE_NAME = 'runs';
 const LATEST_KEY = 'latest';
-const SUMMARY_KEY = 'promo-new-test-cache-summary-v5';
-export const PROMO_TEST_CACHE_SCHEMA_VERSION = 5 as const;
-export const PROMO_TEST_PIPELINE_VERSION = 'visual-first-anchored-v1-single-pass-rebuild-fingerprints' as const;
+const SUMMARY_KEY = 'promo-new-test-cache-summary-v6';
+export const PROMO_TEST_CACHE_SCHEMA_VERSION = 6 as const;
+export const PROMO_TEST_PIPELINE_VERSION = 'density-grid-v1-card-title-single-pass-visual-first' as const;
 
 interface StoredFile {
   name: string;
@@ -18,7 +18,6 @@ interface StoredFile {
 }
 
 export type PromoTestCacheMode = 'full' | 'source_only';
-
 type VisualSignatureMap = Record<string, VisualProductSignature>;
 
 interface StoredPromoTestCache {
@@ -77,9 +76,7 @@ function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = ensureIndexedDb().open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-        request.result.createObjectStore(STORE_NAME, { keyPath: 'key' });
-      }
+      if (!request.result.objectStoreNames.contains(STORE_NAME)) request.result.createObjectStore(STORE_NAME, { keyPath: 'key' });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error('indexeddb_open_failed'));
@@ -142,12 +139,7 @@ function isCurrentRecord(value: unknown): value is StoredPromoTestCache {
 }
 
 function storedFile(file: File): StoredFile {
-  return {
-    name: file.name,
-    type: file.type || 'application/octet-stream',
-    lastModified: file.lastModified || Date.now(),
-    blob: file,
-  };
+  return { name: file.name, type: file.type || 'application/octet-stream', lastModified: file.lastModified || Date.now(), blob: file };
 }
 
 function restoredFile(file: StoredFile): File {
@@ -190,12 +182,11 @@ export function readPromoTestCacheSummary(): PromoTestCacheSummary | null {
 }
 
 export async function savePromoTestCache(input: SavePromoTestCacheInput): Promise<PromoTestCacheSummary> {
-  const savedAt = new Date().toISOString();
   const full: StoredPromoTestCache = {
     key: LATEST_KEY,
     schemaVersion: PROMO_TEST_CACHE_SCHEMA_VERSION,
     pipelineVersion: PROMO_TEST_PIPELINE_VERSION,
-    savedAt,
+    savedAt: new Date().toISOString(),
     monthKey: input.monthKey,
     ocrEnabled: input.ocrEnabled,
     mode: 'full',
@@ -214,13 +205,7 @@ export async function savePromoTestCache(input: SavePromoTestCacheInput): Promis
     const name = String((error as DOMException)?.name || '');
     const message = String((error as Error)?.message || '');
     if (!/quota|space|storage/i.test(`${name} ${message}`)) throw error;
-    const sourceOnly: StoredPromoTestCache = {
-      ...full,
-      mode: 'source_only',
-      imported: null,
-      parsedWorkbook: null,
-      visualSignatures: null,
-    };
+    const sourceOnly: StoredPromoTestCache = { ...full, mode: 'source_only', imported: null, parsedWorkbook: null, visualSignatures: null };
     await putRecord(sourceOnly);
     const summary = summaryFrom(sourceOnly);
     writeSummary(summary);
@@ -250,7 +235,7 @@ export async function loadPromoTestCache(): Promise<LoadedPromoTestCache | null>
       `cache:pipeline:${value.pipelineVersion}`,
       `cache:mode:${value.mode}`,
       'cache:read_once_from_indexeddb',
-      'cache:visual_fingerprints_revalidated_or_rebuilt_before_grouping',
+      'cache:density_grid_card_title_fingerprints_validated',
       ...(value.mode === 'source_only' ? ['cache:source_only_reprocess_required'] : []),
     ],
   };
