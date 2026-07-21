@@ -329,7 +329,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     }
   } finally {
-    await worker?.terminate();
+    await (worker as Worker | null)?.terminate();
     await document.cleanup();
   }
 
