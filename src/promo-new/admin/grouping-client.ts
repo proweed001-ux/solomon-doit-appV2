@@ -27,11 +27,19 @@ function validHex(value: unknown): value is string {
   return typeof value === 'string' && value.length >= 64 && value.length % 2 === 0 && /^[0-9a-f]+$/iu.test(value);
 }
 
+function validNumberArray(value: unknown, expectedLength: number): value is number[] {
+  return Array.isArray(value)
+    && value.length === expectedLength
+    && value.every(item => Number.isFinite(item) && Number(item) >= 0);
+}
+
 function validVisualProductSignature(value: unknown): value is VisualProductSignature {
   if (!value || typeof value !== 'object') return false;
   const signature = value as Partial<VisualProductSignature>;
   return validHex(signature.title)
     && validHex(signature.product)
+    && validNumberArray(signature.colorHistogram, 24 * 12)
+    && validNumberArray(signature.edgeHistogram, 6 * 4)
     && Number.isFinite(signature.quality)
     && Number(signature.quality) > 0;
 }
