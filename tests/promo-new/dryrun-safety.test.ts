@@ -32,11 +32,11 @@ test('grouping stops before visual work when Product Master is unavailable', () 
   assert.match(client, /product_master_required_before_grouping/u);
 });
 
-test('cache rejects pre-visual-first records and fingerprints are rebuilt when incomplete', () => {
+test('cache rejects clipped-card records and fingerprints are rebuilt only from density-grid cards', () => {
   const cache = read('src/promo-new/admin/test-cache.ts');
   const client = read('src/promo-new/admin/grouping-client.ts');
-  assert.match(cache, /PROMO_TEST_CACHE_SCHEMA_VERSION = 5/u);
-  assert.match(cache, /PROMO_TEST_PIPELINE_VERSION = 'visual-first-anchored-v1-single-pass-rebuild-fingerprints'/u);
+  assert.match(cache, /PROMO_TEST_CACHE_SCHEMA_VERSION = 6/u);
+  assert.match(cache, /PROMO_TEST_PIPELINE_VERSION = 'density-grid-v1-card-title-single-pass-visual-first'/u);
   assert.match(cache, /record\.schemaVersion === PROMO_TEST_CACHE_SCHEMA_VERSION/u);
   assert.match(cache, /record\.pipelineVersion === PROMO_TEST_PIPELINE_VERSION/u);
   assert.match(client, /visualProductSignaturesComplete/u);
