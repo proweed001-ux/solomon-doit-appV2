@@ -10,7 +10,7 @@ import {
   type ResolvedPageClass,
 } from './class-id';
 import { makeCardId } from './card-id';
-import { collectOcrItems, type PositionedText } from './ocr-items';
+import type { PositionedText } from './ocr-items';
 import { assertProductMasterReady } from '../shared/runtime-readiness';
 
 export { classifyClassText, normalizeClassId, resolvePageClassSequence } from './class-id';
@@ -84,10 +84,10 @@ function textIn(items: PositionedText[], rect: Rect): string {
 
 function productZone(rect: Rect): Rect {
   return {
-    x: rect.x + rect.width * 0.38,
+    x: rect.x + rect.width * 0.32,
     y: rect.y,
-    width: rect.width * 0.62,
-    height: rect.height * 0.43,
+    width: rect.width * 0.67,
+    height: rect.height * 0.46,
   };
 }
 
@@ -106,9 +106,74 @@ async function pdfTextItems(page: any, viewport: any): Promise<PositionedText[]>
   });
 }
 
-async function pageOcr(worker: Worker, canvas: HTMLCanvasElement): Promise<PositionedText[]> {
-  const result = await worker.recognize(canvas, {}, { blocks: true });
-  return collectOcrItems((result.data as unknown as { blocks?: unknown }).blocks);
+function adaptiveThreshold(canvas: HTMLCanvasElement, radius = 15, offset = 11): void {
+  const context = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+  if (!context) throw new Error('canvas_context_unavailable');
+  const image = context.getImageData(0, 0, canvas.width, canvas.height);
+  const width = canvas.width;
+  const height = canvas.height;
+  const grayscale = new Uint8Array(width * height);
+  const stride = width + 1;
+  const integral = new Uint32Array((width + 1) * (height + 1));
+
+  for (let y = 0; y < height; y += 1) {
+    let rowSum = 0;
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      const pixel = index * 4;
+      const value = Math.round(image.data[pixel] * 0.299 + image.data[pixel + 1] * 0.587 + image.data[pixel + 2] * 0.114);
+      grayscale[index] = value;
+      rowSum += value;
+      integral[(y + 1) * stride + x + 1] = integral[y * stride + x + 1] + rowSum;
+    }
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    const top = Math.max(0, y - radius);
+    const bottom = Math.min(height, y + radius + 1);
+    for (let x = 0; x < width; x += 1) {
+      const left = Math.max(0, x - radius);
+      const right = Math.min(width, x + radius + 1);
+      const sum = integral[bottom * stride + right] - integral[top * stride + right] - integral[bottom * stride + left] + integral[top * stride + left];
+      const mean = sum / Math.max(1, (right - left) * (bottom - top));
+      const value = grayscale[y * width + x] < mean - offset ? 0 : 255;
+      const pixel = (y * width + x) * 4;
+      image.data[pixel] = value;
+      image.data[pixel + 1] = value;
+      image.data[pixel + 2] = value;
+      image.data[pixel + 3] = 255;
+    }
+  }
+  context.putImageData(image, 0, 0);
+}
+
+function preparedProductTitleCanvas(canvas: HTMLCanvasElement, bounds: Rect): HTMLCanvasElement {
+  const header = cropCanvas(canvas, productZone(bounds));
+  const output = document.createElement('canvas');
+  output.width = Math.max(1, Math.round(header.width * 4));
+  output.height = Math.max(1, Math.round(header.height * 4));
+  const context = output.getContext('2d', { alpha: false, willReadFrequently: true });
+  if (!context) throw new Error('canvas_context_unavailable');
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, output.width, output.height);
+  context.drawImage(header, 0, 0, output.width, output.height);
+  adaptiveThreshold(output);
+  header.width = 1;
+  header.height = 1;
+  return output;
+}
+
+async function productTitleOcr(worker: Worker, canvas: HTMLCanvasElement, bounds: Rect): Promise<string> {
+  const prepared = preparedProductTitleCanvas(canvas, bounds);
+  try {
+    const result = await worker.recognize(prepared);
+    return clean(result.data.text);
+  } finally {
+    prepared.width = 1;
+    prepared.height = 1;
+  }
 }
 
 function scaledHeaderVariant(canvas: HTMLCanvasElement, rect: Rect, mode: 'color' | 'threshold'): HTMLCanvasElement {
@@ -130,8 +195,8 @@ function scaledHeaderVariant(canvas: HTMLCanvasElement, rect: Rect, mode: 'color
       const green = image.data[offset + 1];
       const blue = image.data[offset + 2];
       const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
-      const saturation = Math.max(red, green, blue) - Math.min(red, green, blue);
-      const likelyWhiteLetter = luminance >= 165 && saturation <= 95;
+      const pixelSaturation = Math.max(red, green, blue) - Math.min(red, green, blue);
+      const likelyWhiteLetter = luminance >= 165 && pixelSaturation <= 95;
       const value = likelyWhiteLetter ? 0 : 255;
       image.data[offset] = value;
       image.data[offset + 1] = value;
@@ -201,9 +266,9 @@ function headerColorEvidence(canvas: HTMLCanvasElement): [number, number, number
     const b = data[offset + 2];
     const maximum = Math.max(r, g, b);
     const minimum = Math.min(r, g, b);
-    const saturation = maximum - minimum;
+    const pixelSaturation = maximum - minimum;
     const luminance = r * 0.299 + g * 0.587 + b * 0.114;
-    if (saturation < 35 || luminance < 35 || luminance > 225) continue;
+    if (pixelSaturation < 35 || luminance < 35 || luminance > 225) continue;
     red += r;
     green += g;
     blue += b;
@@ -249,10 +314,12 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
     if (!worker) {
       worker = await createWorker('eng+tha');
       workerLanguage = 'eng+tha';
+      await worker.setParameters({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1' });
     }
     if (workerLanguage !== 'eng+tha') {
       await worker.reinitialize('eng+tha');
       workerLanguage = 'eng+tha';
+      await worker.setParameters({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1' });
     }
     return worker;
   };
@@ -277,13 +344,9 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
         page.cleanup();
         throw new Error(`promo_pdf_card_limit:${cards.length + grid.regions.length}/${MAX_PROMO_PDF_CARDS}`);
       }
-      let textItems = await pdfTextItems(page, viewport);
-      let textMethod: 'pdf_text' | 'page_ocr' | 'none' = textItems.length ? 'pdf_text' : 'none';
-      if (!textItems.length && options.enableOcr) {
-        progress('ocr', pageNumber, `หน้า ${pageNumber}: ไม่มี text layer กำลัง OCR หน้าครั้งเดียว`);
-        textItems = await pageOcr(await ensureWorker(), canvas);
-        textMethod = textItems.length ? 'page_ocr' : 'none';
-      }
+      const textItems = await pdfTextItems(page, viewport);
+      const hasPdfText = textItems.length > 0;
+      let textMethod: 'pdf_text' | 'page_ocr' | 'none' = hasPdfText ? 'pdf_text' : options.enableOcr ? 'page_ocr' : 'none';
       const headerTexts: string[] = [];
       const pageTextHeader = textIn(textItems, pageHeaderZone(canvas.width, canvas.height));
       if (pageTextHeader) headerTexts.push(pageTextHeader);
@@ -309,8 +372,17 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       if (grid.diagnostics.status !== 'ok') warnings.push(...grid.diagnostics.reasons.map(reason => `page:${pageNumber}:${reason}`));
       for (const [index, bounds] of grid.regions.entries()) {
         const sequence = index + 1;
-        const productText = textIn(textItems, productZone(bounds));
-        const rawText = textIn(textItems, bounds);
+        let productText = hasPdfText ? textIn(textItems, productZone(bounds)) : '';
+        let rawText = hasPdfText ? textIn(textItems, bounds) : '';
+        if (!hasPdfText && options.enableOcr) {
+          progress('ocr', pageNumber - 1 + (index + 1) / Math.max(1, grid.regions.length), `หน้า ${pageNumber}: OCR ชื่อมุมขวาบน ${index + 1}/${grid.regions.length}`);
+          try {
+            productText = await productTitleOcr(await ensureWorker(), canvas, bounds);
+            rawText = productText;
+          } catch {
+            warnings.push(`page:${pageNumber}:card:${sequence}:product_title_ocr_failed`);
+          }
+        }
         const failureReasons = [
           ...(!classId ? ['class_missing'] : []),
           ...(!productText ? ['product_text_missing'] : []),
