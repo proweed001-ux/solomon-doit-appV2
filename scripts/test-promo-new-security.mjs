@@ -101,8 +101,8 @@ check(client.includes('storedPrices: []'), 'stored_price_must_not_enter_worker')
 check(client.includes('promotionFamilies: []'), 'promotion_family_must_not_enter_worker');
 check(client.includes('visualSignatures,'), 'visual_signature_transport_missing');
 check(client.includes('โดยไม่ส่งรูป ราคา หรือโปรโมชั่น'), 'visual_transport_boundary_message_missing');
-check(cache.includes('PROMO_TEST_CACHE_SCHEMA_VERSION = 5'), 'visual_first_cache_schema_v5_missing');
-check(cache.includes("PROMO_TEST_PIPELINE_VERSION = 'visual-first-anchored-v1-single-pass-rebuild-fingerprints'"), 'visual_first_cache_pipeline_missing');
+check(cache.includes('PROMO_TEST_CACHE_SCHEMA_VERSION = 6'), 'density_grid_cache_schema_v6_missing');
+check(cache.includes("PROMO_TEST_PIPELINE_VERSION = 'density-grid-v1-card-title-single-pass-visual-first'"), 'density_grid_cache_pipeline_missing');
 check(cache.includes('record.schemaVersion === PROMO_TEST_CACHE_SCHEMA_VERSION'), 'cache_schema_rejection_missing');
 check(cache.includes('record.pipelineVersion === PROMO_TEST_PIPELINE_VERSION'), 'cache_pipeline_rejection_missing');
 check(cachedRun.includes('cache:visual_fingerprints_missing_rebuild_required'), 'cached_fingerprint_rebuild_marker_missing');
@@ -161,7 +161,8 @@ const rollback = read('supabase/rollback/20260716083231_promo_system_rebuild.sql
 check(rollback.includes('drop table if exists public.promo_new_cards;'), 'rollback_cards_missing');
 
 const promoVite = read('vite.promo-new.config.ts');
-check(promoVite.includes("PROMO_BUILD_FLAVOR = 'VISUAL-FIRST-CACHE-V5-MANUAL-CONTROLS'"), 'visual_first_cache_v5_build_flavor_missing');
+const buildFlavor = 'DENSITY-GRID-CARD-TITLE-CACHE-V6-MANUAL-CONTROLS';
+check(promoVite.includes(`PROMO_BUILD_FLAVOR = '${buildFlavor}'`), 'density_grid_cache_v6_build_flavor_missing');
 check(promoVite.includes('fresh_run_must_build_visual_signatures'), 'admin_empty_visual_signature_patch_missing');
 check(promoVite.includes('cache_visual_rebuild_label'), 'admin_cache_rebuild_message_patch_missing');
 check(promoVite.includes('VERCEL_GIT_COMMIT_SHA'), 'deployment_build_id_sha_missing');
@@ -179,7 +180,7 @@ check(packageJson.dependencies?.xlsx === 'https://cdn.sheetjs.com/xlsx-0.20.3/xl
 const builtPromoJsFiles = walk('dist/assets/promo-new').filter(file => file.endsWith('.js'));
 const builtPromoJs = builtPromoJsFiles.map(file => read(file)).join('\n');
 const buildCommit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
-check(builtPromoJs.includes(`PROMO-${buildCommit}-VISUAL-FIRST-CACHE-V5-MANUAL-CONTROLS`), 'deployed_build_id_does_not_match_visual_first_cache_v5_commit');
+check(builtPromoJs.includes(`PROMO-${buildCommit}-${buildFlavor}`), 'deployed_build_id_does_not_match_density_grid_cache_v6_commit');
 check(!builtPromoJs.includes('FINAL-UPLOAD-AUDIT-20260719-0031'), 'stale_build_id_reached_deployed_bundle');
 for (const file of builtPromoJsFiles) {
   const size = fs.statSync(path.join(root, file)).size;
@@ -192,4 +193,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: density-based full-card detection preserves the right-side product title, each card title is OCRed once from a top-right adaptive-threshold crop, legacy whole-page product OCR is excluded, visual-first cache and Product Master guards remain active, price and Promotion Family remain manual, and read-only deployment protections remain intact.');
+console.log('Promo new security/static checks passed: density-grid cache v6 rejects clipped-card caches, full-card detection preserves the right-side product title, each card title is OCRed once from a top-right adaptive-threshold crop, legacy whole-page product OCR is excluded, visual-first and Product Master guards remain active, price and Promotion Family remain manual, and read-only deployment protections remain intact.');
