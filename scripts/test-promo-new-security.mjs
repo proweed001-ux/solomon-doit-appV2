@@ -63,10 +63,14 @@ check(titleOcr.includes('x: bounds.x + bounds.width * 0.32'), 'product_name_top_
 check(titleOcr.includes('height: bounds.height * 0.46'), 'product_name_header_height_missing');
 check(titleOcr.includes('adaptiveThreshold(output)'), 'adaptive_title_threshold_missing');
 check(titleOcr.includes('PSM.SPARSE_TEXT'), 'sparse_title_ocr_mode_missing');
-check(gridDetector.includes('detectCardRegionsFromWhiteMask'), 'density_card_detector_missing');
-check(gridDetector.includes('runsAbove(rowDensity, 0.105, 5'), 'density_row_threshold_missing');
-check(gridDetector.includes('runsAbove(smooth(columnDensity, 1), 0.11, 8'), 'density_column_threshold_missing');
-check(gridDetector.includes('return density'), 'density_detector_not_preferred');
+check(gridDetector.includes('detectCardRegionsFromWhiteMask'), 'structural_outer_panel_detector_missing');
+check(gridDetector.includes('referenceAnchorCandidates'), 'reference_anchor_guard_missing');
+check(gridDetector.includes('promotionAnchorCandidates'), 'promotion_anchor_guard_missing');
+check(gridDetector.includes('grid_anchor_set_invalid'), 'three_anchor_failure_marker_missing');
+check(gridDetector.includes('borderStripEvidence'), 'outer_border_evidence_guard_missing');
+check(gridDetector.includes('anchorValidatedCards'), 'anchor_completeness_guard_missing');
+check(gridDetector.includes('maximum > 185 && minimum > 150 && difference < 80'), 'white_panel_threshold_missing');
+check(gridDetector.includes('promo_grid_fail:page:'), 'grid_fail_closed_missing');
 
 const ocrItems = read('src/promo-new/import/ocr-items.ts');
 check(ocrItems.includes('const lines = node.lines'), 'line_level_ocr_collection_missing');
@@ -101,8 +105,8 @@ check(client.includes('storedPrices: []'), 'stored_price_must_not_enter_worker')
 check(client.includes('promotionFamilies: []'), 'promotion_family_must_not_enter_worker');
 check(client.includes('visualSignatures,'), 'visual_signature_transport_missing');
 check(client.includes('โดยไม่ส่งรูป ราคา หรือโปรโมชั่น'), 'visual_transport_boundary_message_missing');
-check(cache.includes('PROMO_TEST_CACHE_SCHEMA_VERSION = 6'), 'density_grid_cache_schema_v6_missing');
-check(cache.includes("PROMO_TEST_PIPELINE_VERSION = 'density-grid-v1-card-title-single-pass-visual-first'"), 'density_grid_cache_pipeline_missing');
+check(cache.includes('PROMO_TEST_CACHE_SCHEMA_VERSION = 6'), 'structural_grid_cache_schema_v6_missing');
+check(cache.includes("PROMO_TEST_PIPELINE_VERSION = 'density-grid-v1-card-title-single-pass-visual-first'"), 'structural_grid_cache_pipeline_missing');
 check(cache.includes('record.schemaVersion === PROMO_TEST_CACHE_SCHEMA_VERSION'), 'cache_schema_rejection_missing');
 check(cache.includes('record.pipelineVersion === PROMO_TEST_PIPELINE_VERSION'), 'cache_pipeline_rejection_missing');
 check(cachedRun.includes('cache:visual_fingerprints_missing_rebuild_required'), 'cached_fingerprint_rebuild_marker_missing');
@@ -161,8 +165,8 @@ const rollback = read('supabase/rollback/20260716083231_promo_system_rebuild.sql
 check(rollback.includes('drop table if exists public.promo_new_cards;'), 'rollback_cards_missing');
 
 const promoVite = read('vite.promo-new.config.ts');
-const buildFlavor = 'DENSITY-GRID-CARD-TITLE-CACHE-V6-MANUAL-CONTROLS';
-check(promoVite.includes(`PROMO_BUILD_FLAVOR = '${buildFlavor}'`), 'density_grid_cache_v6_build_flavor_missing');
+const buildFlavor = 'THREE-ANCHOR-GRID-CARD-TITLE-CACHE-V6-MANUAL-CONTROLS';
+check(promoVite.includes(`PROMO_BUILD_FLAVOR = '${buildFlavor}'`), 'three_anchor_grid_build_flavor_missing');
 check(promoVite.includes('fresh_run_must_build_visual_signatures'), 'admin_empty_visual_signature_patch_missing');
 check(promoVite.includes('cache_visual_rebuild_label'), 'admin_cache_rebuild_message_patch_missing');
 check(promoVite.includes('VERCEL_GIT_COMMIT_SHA'), 'deployment_build_id_sha_missing');
@@ -180,7 +184,7 @@ check(packageJson.dependencies?.xlsx === 'https://cdn.sheetjs.com/xlsx-0.20.3/xl
 const builtPromoJsFiles = walk('dist/assets/promo-new').filter(file => file.endsWith('.js'));
 const builtPromoJs = builtPromoJsFiles.map(file => read(file)).join('\n');
 const buildCommit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
-check(builtPromoJs.includes(`PROMO-${buildCommit}-${buildFlavor}`), 'deployed_build_id_does_not_match_density_grid_cache_v6_commit');
+check(builtPromoJs.includes(`PROMO-${buildCommit}-${buildFlavor}`), 'deployed_build_id_does_not_match_three_anchor_commit');
 check(!builtPromoJs.includes('FINAL-UPLOAD-AUDIT-20260719-0031'), 'stale_build_id_reached_deployed_bundle');
 for (const file of builtPromoJsFiles) {
   const size = fs.statSync(path.join(root, file)).size;
@@ -193,4 +197,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: density-grid cache v6 rejects clipped-card caches, full-card detection preserves the right-side product title, each card title is OCRed once from a top-right adaptive-threshold crop, legacy whole-page product OCR is excluded, visual-first and Product Master guards remain active, price and Promotion Family remain manual, and read-only deployment protections remain intact.');
+console.log('Promo new security/static checks passed: three-anchor Structural Grid requires one complete outer card panel, exactly one lower-left reference panel and exactly one lower-right red promotion panel before card OCR; per-card title OCR remains single-pass, visual-first and Product Master guards remain active, price and Promotion Family remain manual, and read-only deployment protections remain intact.');
