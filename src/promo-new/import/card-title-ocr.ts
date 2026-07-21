@@ -137,7 +137,7 @@ function recognizedVariantTexts(resultData: unknown, panelHeight: number): strin
 
 export async function configureCardTitleOcr(worker: Worker): Promise<void> {
   await worker.setParameters({
-    tessedit_pageseg_mode: PSM.SPARSE_TEXT,
+    tessedit_pageseg_mode: PSM.SPARSE_TEXT as PSM,
     preserve_interword_spaces: '1',
   });
 }
