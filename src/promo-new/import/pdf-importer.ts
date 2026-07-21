@@ -10,6 +10,7 @@ import {
   type ResolvedPageClass,
 } from './class-id';
 import { makeCardId } from './card-id';
+import { cardProductTitleZone, configureCardTitleOcr, recognizeCardProductTitle } from './card-title-ocr';
 import type { PositionedText } from './ocr-items';
 import { assertProductMasterReady } from '../shared/runtime-readiness';
 
@@ -72,6 +73,7 @@ interface ImportOptions {
 }
 
 const clean = (value: unknown) => String(value || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+
 function inside(item: PositionedText, rect: Rect): boolean {
   const centerX = item.x + item.width / 2;
   const centerY = item.y + item.height / 2;
@@ -80,15 +82,6 @@ function inside(item: PositionedText, rect: Rect): boolean {
 
 function textIn(items: PositionedText[], rect: Rect): string {
   return clean(items.filter(item => inside(item, rect)).sort((a, b) => a.y - b.y || a.x - b.x).map(item => item.text).join(' '));
-}
-
-function productZone(rect: Rect): Rect {
-  return {
-    x: rect.x + rect.width * 0.32,
-    y: rect.y,
-    width: rect.width * 0.67,
-    height: rect.height * 0.46,
-  };
 }
 
 function pageHeaderZone(width: number, height: number): Rect {
@@ -104,76 +97,6 @@ async function pdfTextItems(page: any, viewport: any): Promise<PositionedText[]>
     const height = Math.max(1, Math.abs(Number(item.height || item.transform?.[3] || 1) * viewport.scale));
     return [{ text, x: point[0], y: point[1] - height, width: Math.max(1, Number(item.width || 1) * viewport.scale), height }];
   });
-}
-
-function adaptiveThreshold(canvas: HTMLCanvasElement, radius = 15, offset = 11): void {
-  const context = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
-  if (!context) throw new Error('canvas_context_unavailable');
-  const image = context.getImageData(0, 0, canvas.width, canvas.height);
-  const width = canvas.width;
-  const height = canvas.height;
-  const grayscale = new Uint8Array(width * height);
-  const stride = width + 1;
-  const integral = new Uint32Array((width + 1) * (height + 1));
-
-  for (let y = 0; y < height; y += 1) {
-    let rowSum = 0;
-    for (let x = 0; x < width; x += 1) {
-      const index = y * width + x;
-      const pixel = index * 4;
-      const value = Math.round(image.data[pixel] * 0.299 + image.data[pixel + 1] * 0.587 + image.data[pixel + 2] * 0.114);
-      grayscale[index] = value;
-      rowSum += value;
-      integral[(y + 1) * stride + x + 1] = integral[y * stride + x + 1] + rowSum;
-    }
-  }
-
-  for (let y = 0; y < height; y += 1) {
-    const top = Math.max(0, y - radius);
-    const bottom = Math.min(height, y + radius + 1);
-    for (let x = 0; x < width; x += 1) {
-      const left = Math.max(0, x - radius);
-      const right = Math.min(width, x + radius + 1);
-      const sum = integral[bottom * stride + right] - integral[top * stride + right] - integral[bottom * stride + left] + integral[top * stride + left];
-      const mean = sum / Math.max(1, (right - left) * (bottom - top));
-      const value = grayscale[y * width + x] < mean - offset ? 0 : 255;
-      const pixel = (y * width + x) * 4;
-      image.data[pixel] = value;
-      image.data[pixel + 1] = value;
-      image.data[pixel + 2] = value;
-      image.data[pixel + 3] = 255;
-    }
-  }
-  context.putImageData(image, 0, 0);
-}
-
-function preparedProductTitleCanvas(canvas: HTMLCanvasElement, bounds: Rect): HTMLCanvasElement {
-  const header = cropCanvas(canvas, productZone(bounds));
-  const output = document.createElement('canvas');
-  output.width = Math.max(1, Math.round(header.width * 4));
-  output.height = Math.max(1, Math.round(header.height * 4));
-  const context = output.getContext('2d', { alpha: false, willReadFrequently: true });
-  if (!context) throw new Error('canvas_context_unavailable');
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = 'high';
-  context.fillStyle = '#ffffff';
-  context.fillRect(0, 0, output.width, output.height);
-  context.drawImage(header, 0, 0, output.width, output.height);
-  adaptiveThreshold(output);
-  header.width = 1;
-  header.height = 1;
-  return output;
-}
-
-async function productTitleOcr(worker: Worker, canvas: HTMLCanvasElement, bounds: Rect): Promise<string> {
-  const prepared = preparedProductTitleCanvas(canvas, bounds);
-  try {
-    const result = await worker.recognize(prepared);
-    return clean(result.data.text);
-  } finally {
-    prepared.width = 1;
-    prepared.height = 1;
-  }
 }
 
 function scaledHeaderVariant(canvas: HTMLCanvasElement, rect: Rect, mode: 'color' | 'threshold'): HTMLCanvasElement {
@@ -196,8 +119,7 @@ function scaledHeaderVariant(canvas: HTMLCanvasElement, rect: Rect, mode: 'color
       const blue = image.data[offset + 2];
       const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
       const pixelSaturation = Math.max(red, green, blue) - Math.min(red, green, blue);
-      const likelyWhiteLetter = luminance >= 165 && pixelSaturation <= 95;
-      const value = likelyWhiteLetter ? 0 : 255;
+      const value = luminance >= 165 && pixelSaturation <= 95 ? 0 : 255;
       image.data[offset] = value;
       image.data[offset + 1] = value;
       image.data[offset + 2] = value;
@@ -211,18 +133,8 @@ function scaledHeaderVariant(canvas: HTMLCanvasElement, rect: Rect, mode: 'color
 }
 
 function preparedHeaderCanvases(canvas: HTMLCanvasElement): HTMLCanvasElement[] {
-  const tokenRect = {
-    x: canvas.width * 0.085,
-    y: canvas.height * 0.055,
-    width: canvas.width * 0.31,
-    height: canvas.height * 0.13,
-  };
-  const broadRect = {
-    x: canvas.width * 0.025,
-    y: canvas.height * 0.015,
-    width: canvas.width * 0.44,
-    height: canvas.height * 0.18,
-  };
+  const tokenRect = { x: canvas.width * 0.085, y: canvas.height * 0.055, width: canvas.width * 0.31, height: canvas.height * 0.13 };
+  const broadRect = { x: canvas.width * 0.025, y: canvas.height * 0.015, width: canvas.width * 0.44, height: canvas.height * 0.18 };
   return [
     scaledHeaderVariant(canvas, tokenRect, 'color'),
     scaledHeaderVariant(canvas, tokenRect, 'threshold'),
@@ -304,22 +216,16 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
     await (document as unknown as { destroy: () => Promise<void> }).destroy();
     throw new Error(`promo_pdf_page_limit:${pageCount}/${MAX_PROMO_PDF_PAGES}`);
   }
+
   const cards: ImportedCardCandidate[] = [];
   const pages: PdfImportResult['pages'] = [];
   const pageClassObservations: PageClassObservation[] = [];
   const warnings: string[] = [];
   let worker: Worker | null = null;
-  let workerLanguage: 'eng+tha' | null = null;
   const ensureWorker = async (): Promise<Worker> => {
     if (!worker) {
       worker = await createWorker('eng+tha');
-      workerLanguage = 'eng+tha';
-      await worker.setParameters({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1' });
-    }
-    if (workerLanguage !== 'eng+tha') {
-      await worker.reinitialize('eng+tha');
-      workerLanguage = 'eng+tha';
-      await worker.setParameters({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1' });
+      await configureCardTitleOcr(worker);
     }
     return worker;
   };
@@ -331,6 +237,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
     elapsedMs: Math.round(performance.now() - started),
     message,
   });
+
   progress('loading', 0, `เปิด PDF ${document.numPages} หน้า`);
   try {
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
@@ -344,9 +251,10 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
         page.cleanup();
         throw new Error(`promo_pdf_card_limit:${cards.length + grid.regions.length}/${MAX_PROMO_PDF_CARDS}`);
       }
+
       const textItems = await pdfTextItems(page, viewport);
       const hasPdfText = textItems.length > 0;
-      let textMethod: 'pdf_text' | 'page_ocr' | 'none' = hasPdfText ? 'pdf_text' : options.enableOcr ? 'page_ocr' : 'none';
+      const textMethod: 'pdf_text' | 'page_ocr' | 'none' = hasPdfText ? 'pdf_text' : options.enableOcr ? 'page_ocr' : 'none';
       const headerTexts: string[] = [];
       const pageTextHeader = textIn(textItems, pageHeaderZone(canvas.width, canvas.height));
       if (pageTextHeader) headerTexts.push(pageTextHeader);
@@ -354,30 +262,26 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       if (grid.regions.length && options.enableOcr && (!classEvidence.classId || classEvidence.confidence < 0.9)) {
         progress('ocr', pageNumber, `หน้า ${pageNumber}: จำแนก Class จากหัวซ้ายบน`);
         try {
-          const classTexts = await headerClassOcr(await ensureWorker(), canvas);
-          headerTexts.push(...classTexts);
+          headerTexts.push(...await headerClassOcr(await ensureWorker(), canvas));
           classEvidence = classifyClassText(headerTexts);
         } catch {
           warnings.push(`page:${pageNumber}:class_header_ocr_failed`);
         }
       }
+
       const classId = classEvidence.classId;
       const headerText = clean(headerTexts.join(' | '));
-      pageClassObservations.push({
-        page: pageNumber,
-        texts: headerTexts,
-        headerColor: headerColorEvidence(canvas),
-        hasCards: grid.regions.length > 0,
-      });
+      pageClassObservations.push({ page: pageNumber, texts: headerTexts, headerColor: headerColorEvidence(canvas), hasCards: grid.regions.length > 0 });
       if (grid.diagnostics.status !== 'ok') warnings.push(...grid.diagnostics.reasons.map(reason => `page:${pageNumber}:${reason}`));
+
       for (const [index, bounds] of grid.regions.entries()) {
         const sequence = index + 1;
-        let productText = hasPdfText ? textIn(textItems, productZone(bounds)) : '';
+        let productText = hasPdfText ? textIn(textItems, cardProductTitleZone(bounds)) : '';
         let rawText = hasPdfText ? textIn(textItems, bounds) : '';
         if (!hasPdfText && options.enableOcr) {
           progress('ocr', pageNumber - 1 + (index + 1) / Math.max(1, grid.regions.length), `หน้า ${pageNumber}: OCR ชื่อมุมขวาบน ${index + 1}/${grid.regions.length}`);
           try {
-            productText = await productTitleOcr(await ensureWorker(), canvas, bounds);
+            productText = await recognizeCardProductTitle(await ensureWorker(), canvas, bounds);
             rawText = productText;
           } catch {
             warnings.push(`page:${pageNumber}:card:${sequence}:product_title_ocr_failed`);
@@ -407,6 +311,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
         crop.width = 1;
         crop.height = 1;
       }
+
       pages.push({
         page: pageNumber,
         classId,
@@ -424,7 +329,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     }
   } finally {
-    await (worker as Worker | null)?.terminate();
+    await worker?.terminate();
     await document.cleanup();
   }
 
