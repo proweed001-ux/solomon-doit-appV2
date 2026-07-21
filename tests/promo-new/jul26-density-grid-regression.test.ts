@@ -27,7 +27,7 @@ function maskPage(width: number, height: number, rows: Array<Array<{ x: number; 
   return mask;
 }
 
-test('density grid retains complete cards despite disconnected white content and mixed four/five-card rows', () => {
+test('structural grid retains complete cards despite internal image holes and mixed four/five-card rows', () => {
   const width = 1200;
   const height = 650;
   const rows = [
@@ -45,7 +45,7 @@ test('density grid retains complete cards despite disconnected white content and
   }
 });
 
-test('JUL26 detector constants and observed page row counts stay explicit', () => {
+test('JUL26 structural detector requires outer panel, reference panel and red promotion anchor', () => {
   const expected = [
     [4, 4, 4], [4, 4, 4], [4, 2], [4, 4, 4], [4, 4, 4], [4, 4],
     [4, 4, 4], [4, 4, 4], [4, 4, 5], [4, 5, 5], [5, 4, 4], [4, 4, 5],
@@ -53,8 +53,12 @@ test('JUL26 detector constants and observed page row counts stay explicit', () =
   ];
   assert.equal(expected.flat().reduce((sum, count) => sum + count, 0), 212);
   const source = readFileSync('src/promo-new/import/grid-detector.ts', 'utf8');
-  assert.match(source, /runsAbove\(rowDensity, 0\.105, 5/u);
-  assert.match(source, /runsAbove\(smooth\(columnDensity, 1\), 0\.11, 8/u);
+  assert.match(source, /maximum > 185 && minimum > 150 && difference < 80/u);
+  assert.match(source, /referenceAnchorCandidates/u);
+  assert.match(source, /promotionAnchorCandidates/u);
+  assert.match(source, /grid_anchor_set_invalid/u);
+  assert.match(source, /borderStripEvidence/u);
+  assert.match(source, /anchorValidatedCards/u);
 });
 
 test('single-pass product OCR crops the verified top-right name and size area', () => {
