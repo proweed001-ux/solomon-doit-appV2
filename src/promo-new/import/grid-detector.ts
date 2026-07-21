@@ -355,6 +355,7 @@ export function detectCardGrid(canvas: HTMLCanvasElement, page: number): GridRes
 
   if (anchorValidatedCards !== interiorRegions.length) structuralReasons.push('grid_anchor_validation_incomplete');
   const reasons = [...new Set(structuralReasons)];
+  if (reasons.length) throw new Error(`promo_grid_fail:page:${page}:${reasons.join(',')}`);
   const outerRegions = expandToOuterBorders(base.regions, canvas.width, canvas.height);
   return {
     regions: outerRegions,
