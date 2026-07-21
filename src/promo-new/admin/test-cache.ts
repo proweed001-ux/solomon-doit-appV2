@@ -6,9 +6,9 @@ const DB_NAME = 'solomon-promo-new-test-cache';
 const DB_VERSION = 1;
 const STORE_NAME = 'runs';
 const LATEST_KEY = 'latest';
-const SUMMARY_KEY = 'promo-new-test-cache-summary-v6';
-export const PROMO_TEST_CACHE_SCHEMA_VERSION = 6 as const;
-export const PROMO_TEST_PIPELINE_VERSION = 'density-grid-v1-card-title-single-pass-visual-first' as const;
+const SUMMARY_KEY = 'promo-new-test-cache-summary-v7';
+export const PROMO_TEST_CACHE_SCHEMA_VERSION = 7 as const;
+export const PROMO_TEST_PIPELINE_VERSION = 'structural-grid-v2-native-title-3320-consensus-v1' as const;
 
 interface StoredFile {
   name: string;
@@ -235,7 +235,7 @@ export async function loadPromoTestCache(): Promise<LoadedPromoTestCache | null>
       `cache:pipeline:${value.pipelineVersion}`,
       `cache:mode:${value.mode}`,
       'cache:read_once_from_indexeddb',
-      'cache:density_grid_card_title_fingerprints_validated',
+      'cache:native_title_3320_consensus_fingerprints_validated',
       ...(value.mode === 'source_only' ? ['cache:source_only_reprocess_required'] : []),
     ],
   };
