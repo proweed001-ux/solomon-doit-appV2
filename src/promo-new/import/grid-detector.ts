@@ -15,6 +15,10 @@ export interface GridDiagnostics {
   confidence: number;
   status: 'ok' | 'need_review';
   reasons: string[];
+  outerCandidateCount?: number;
+  anchorValidatedCards?: number;
+  referenceAnchorCount?: number;
+  promotionAnchorCount?: number;
 }
 
 export interface GridResult {
@@ -22,8 +26,19 @@ export interface GridResult {
   diagnostics: GridDiagnostics;
 }
 
+interface PixelComponent {
+  rect: Rect;
+  pixels: number;
+}
+
+interface PageMasks {
+  image: Uint8ClampedArray;
+  white: Uint8Array;
+  referenceYellow: Uint8Array;
+  promotionRed: Uint8Array;
+}
+
 const clamp = (value: number, minimum: number, maximum: number) => Math.max(minimum, Math.min(maximum, value));
-const saturation = (red: number, green: number, blue: number) => Math.max(red, green, blue) - Math.min(red, green, blue);
 
 export function clipRect(rect: Rect, width: number, height: number): Rect {
   const x = clamp(Math.round(rect.x), 0, Math.max(0, width - 1));
@@ -48,179 +63,118 @@ function intersection(left: Rect, right: Rect): number {
   return Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
 }
 
-function removeNested(regions: Rect[]): Rect[] {
-  const kept: Rect[] = [];
-  for (const region of [...regions].sort((a, b) => b.width * b.height - a.width * a.height)) {
-    const area = region.width * region.height;
-    const nested = kept.some(container => intersection(region, container) / Math.max(1, area) > 0.84);
-    if (!nested) kept.push(region);
+function componentFill(component: PixelComponent): number {
+  return component.pixels / Math.max(1, component.rect.width * component.rect.height);
+}
+
+function buildPageMasks(canvas: HTMLCanvasElement): PageMasks {
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) return {
+    image: new Uint8ClampedArray(),
+    white: new Uint8Array(),
+    referenceYellow: new Uint8Array(),
+    promotionRed: new Uint8Array(),
+  };
+  const image = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  const size = canvas.width * canvas.height;
+  const white = new Uint8Array(size);
+  const referenceYellow = new Uint8Array(size);
+  const promotionRed = new Uint8Array(size);
+  const contentTop = Math.floor(canvas.height * 0.19);
+
+  for (let index = 0; index < size; index += 1) {
+    const offset = index * 4;
+    const red = image[offset];
+    const green = image[offset + 1];
+    const blue = image[offset + 2];
+    const maximum = Math.max(red, green, blue);
+    const minimum = Math.min(red, green, blue);
+    const difference = maximum - minimum;
+    const y = Math.floor(index / canvas.width);
+
+    if (y >= contentTop && maximum > 185 && minimum > 150 && difference < 80) white[index] = 1;
+    if (red > 170 && green > 125 && blue < 135 && red - blue > 55 && green - blue > 35) referenceYellow[index] = 1;
+    if (red > 150 && red - green > 35 && red - blue > 35) promotionRed[index] = 1;
   }
-  return kept.sort((a, b) => a.y - b.y || a.x - b.x);
+  return { image, white, referenceYellow, promotionRed };
 }
 
-function smooth(values: number[], radius: number): number[] {
-  const prefix = [0];
-  for (const value of values) prefix.push(prefix[prefix.length - 1] + value);
-  return values.map((_, index) => {
-    const left = Math.max(0, index - radius);
-    const right = Math.min(values.length, index + radius + 1);
-    return (prefix[right] - prefix[left]) / Math.max(1, right - left);
-  });
-}
+function connectedComponents(mask: Uint8Array, width: number, height: number): PixelComponent[] {
+  if (width < 1 || height < 1 || mask.length !== width * height) return [];
+  const seen = new Uint8Array(mask.length);
+  const queue = new Int32Array(mask.length);
+  const output: PixelComponent[] = [];
 
-function runsAbove(values: number[], threshold: number, minimumLength: number, start = 0, end = values.length): Array<[number, number]> {
-  const output: Array<[number, number]> = [];
-  let cursor = Math.max(0, start);
-  const limit = Math.min(values.length, end);
-  while (cursor < limit) {
-    if (values[cursor] < threshold) {
-      cursor += 1;
-      continue;
+  for (let start = 0; start < mask.length; start += 1) {
+    if (!mask[start] || seen[start]) continue;
+    let head = 0;
+    let tail = 0;
+    queue[tail++] = start;
+    seen[start] = 1;
+    let pixels = 0;
+    let minimumX = start % width;
+    let maximumX = minimumX;
+    let minimumY = Math.floor(start / width);
+    let maximumY = minimumY;
+
+    while (head < tail) {
+      const current = queue[head++];
+      const x = current % width;
+      const y = Math.floor(current / width);
+      pixels += 1;
+      minimumX = Math.min(minimumX, x);
+      maximumX = Math.max(maximumX, x);
+      minimumY = Math.min(minimumY, y);
+      maximumY = Math.max(maximumY, y);
+
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (!dx && !dy) continue;
+          const nextX = x + dx;
+          const nextY = y + dy;
+          if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) continue;
+          const next = nextY * width + nextX;
+          if (!mask[next] || seen[next]) continue;
+          seen[next] = 1;
+          queue[tail++] = next;
+        }
+      }
     }
-    const first = cursor;
-    while (cursor < limit && values[cursor] >= threshold) cursor += 1;
-    if (cursor - first >= minimumLength) output.push([first, cursor]);
+
+    output.push({
+      rect: { x: minimumX, y: minimumY, width: maximumX - minimumX + 1, height: maximumY - minimumY + 1 },
+      pixels,
+    });
   }
   return output;
 }
 
-function nearWhiteMask(canvas: HTMLCanvasElement): Uint8Array {
-  const context = canvas.getContext('2d', { willReadFrequently: true });
-  if (!context) return new Uint8Array();
-  const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
-  const mask = new Uint8Array(canvas.width * canvas.height);
-  for (let index = 0; index < mask.length; index += 1) {
-    const offset = index * 4;
-    const red = data[offset];
-    const green = data[offset + 1];
-    const blue = data[offset + 2];
-    if (red > 202 && green > 202 && blue > 190 && saturation(red, green, blue) < 58) mask[index] = 1;
-  }
-  return mask;
-}
-
 /**
- * Detect complete card rectangles from horizontal and vertical white-density runs.
- * Promotion cards contain disconnected text, bottles and price blocks, so connected
- * components can shrink or drift into the card content. Density runs retain the full
- * white card panel and therefore preserve the product name on the right edge.
+ * Finds the complete white interior of each promotion card. The class-coloured
+ * outer border isolates every white panel, so full-resolution connected
+ * components preserve the complete card geometry without reading any text.
  */
 export function detectCardRegionsFromWhiteMask(mask: Uint8Array, width: number, height: number): Rect[] {
-  if (width < 1 || height < 1 || mask.length !== width * height) return [];
-  const rowCounts = Array.from({ length: height }, () => 0);
-  for (let y = 0; y < height; y += 1) {
-    const offset = y * width;
-    let count = 0;
-    for (let x = 0; x < width; x += 1) count += mask[offset + x];
-    rowCounts[y] = count / width;
-  }
-  const rowDensity = smooth(rowCounts, 2);
-  const rowRuns = runsAbove(rowDensity, 0.105, 5, Math.floor(height * 0.18), Math.ceil(height * 0.985));
-  const regions: Rect[] = [];
-
-  for (const [rowStart, rowEnd] of rowRuns) {
-    const y = Math.max(0, rowStart - 8);
-    const bottom = Math.min(height, rowEnd + 8);
-    const rowHeight = bottom - y;
-    if (rowHeight < height * 0.10 || rowHeight > height * 0.34) continue;
-    const columnDensity = Array.from({ length: width }, () => 0);
-    for (let x = 0; x < width; x += 1) {
-      let count = 0;
-      for (let py = y; py < bottom; py += 1) count += mask[py * width + x];
-      columnDensity[x] = count / rowHeight;
-    }
-    const columnRuns = runsAbove(smooth(columnDensity, 1), 0.11, 8);
-    for (const [columnStart, columnEnd] of columnRuns) {
-      const x = Math.max(0, columnStart - 10);
-      const right = Math.min(width, columnEnd + 10);
-      const cardWidth = right - x;
-      if (cardWidth < width * 0.12 || cardWidth > width * 0.30) continue;
-      const center = x + cardWidth / 2;
-      if (center < width * 0.04 || center > width * 0.96) continue;
-      regions.push(clipRect({ x, y, width: cardWidth, height: rowHeight }, width, height));
-    }
-  }
-
-  return removeNested(regions);
-}
-
-function connectedWhiteComponents(canvas: HTMLCanvasElement): Rect[] {
-  const context = canvas.getContext('2d', { willReadFrequently: true });
-  if (!context) return [];
-  const top = Math.round(canvas.height * 0.11);
-  const height = canvas.height - top;
-  const data = context.getImageData(0, top, canvas.width, height).data;
-  const step = Math.max(3, Math.round(canvas.width / 430));
-  const sampleWidth = Math.ceil(canvas.width / step);
-  const sampleHeight = Math.ceil(height / step);
-  const mask = new Uint8Array(sampleWidth * sampleHeight);
-  const seen = new Uint8Array(mask.length);
-  for (let sy = 0; sy < sampleHeight; sy += 1) {
-    for (let sx = 0; sx < sampleWidth; sx += 1) {
-      const x = Math.min(canvas.width - 1, sx * step);
-      const y = Math.min(height - 1, sy * step);
-      const offset = (y * canvas.width + x) * 4;
-      const red = data[offset];
-      const green = data[offset + 1];
-      const blue = data[offset + 2];
-      if (red > 202 && green > 202 && blue > 190 && saturation(red, green, blue) < 58) mask[sy * sampleWidth + sx] = 1;
-    }
-  }
-
-  const output: Rect[] = [];
-  const minimumSamples = Math.max(35, Math.round(mask.length * 0.0022));
-  for (let sy = 0; sy < sampleHeight; sy += 1) {
-    for (let sx = 0; sx < sampleWidth; sx += 1) {
-      const start = sy * sampleWidth + sx;
-      if (!mask[start] || seen[start]) continue;
-      const queue: number[] = [start];
-      seen[start] = 1;
-      let cursor = 0;
-      let count = 0;
-      let minX = sx;
-      let maxX = sx;
-      let minY = sy;
-      let maxY = sy;
-      while (cursor < queue.length) {
-        const current = queue[cursor++];
-        const x = current % sampleWidth;
-        const y = Math.floor(current / sampleWidth);
-        count += 1;
-        minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y);
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx < 0 || ny < 0 || nx >= sampleWidth || ny >= sampleHeight) continue;
-          const next = ny * sampleWidth + nx;
-          if (mask[next] && !seen[next]) {
-            seen[next] = 1;
-            queue.push(next);
-          }
-        }
-      }
-      if (count < minimumSamples) continue;
-      output.push(clipRect({
-        x: minX * step,
-        y: top + minY * step,
-        width: (maxX - minX + 1) * step,
-        height: (maxY - minY + 1) * step,
-      }, canvas.width, canvas.height));
-    }
-  }
-  return removeNested(output).filter(region => (
-    region.width >= canvas.width * 0.075
-    && region.width <= canvas.width * 0.34
-    && region.height >= canvas.height * 0.065
-    && region.height <= canvas.height * 0.34
-  ));
+  return connectedComponents(mask, width, height)
+    .filter(component => {
+      const region = component.rect;
+      const aspect = region.width / Math.max(1, region.height);
+      return region.y >= height * 0.18
+        && region.width >= width * 0.12
+        && region.width <= width * 0.35
+        && region.height >= height * 0.12
+        && region.height <= height * 0.35
+        && aspect >= 1
+        && aspect <= 2.1
+        && componentFill(component) >= 0.5;
+    })
+    .map(component => component.rect)
+    .sort((left, right) => left.y - right.y || left.x - right.x);
 }
 
 export function groupIntoRows(regions: Rect[]): Rect[][] {
   if (!regions.length) return [];
-  const tolerance = Math.max(14, median(regions.map(region => region.height)) * 0.34);
+  const tolerance = Math.max(10, median(regions.map(region => region.height)) * 0.22);
   const rows: Array<{ center: number; items: Rect[] }> = [];
   for (const region of [...regions].sort((a, b) => a.y - b.y || a.x - b.x)) {
     const center = region.y + region.height / 2;
@@ -235,6 +189,94 @@ export function groupIntoRows(regions: Rect[]): Rect[][] {
   return rows.sort((a, b) => a.center - b.center).map(row => row.items.sort((a, b) => a.x - b.x));
 }
 
+function componentCenteredInside(component: PixelComponent, region: Rect): boolean {
+  const centerX = component.rect.x + component.rect.width / 2;
+  const centerY = component.rect.y + component.rect.height / 2;
+  return centerX >= region.x && centerX <= region.x + region.width && centerY >= region.y && centerY <= region.y + region.height;
+}
+
+function relativeRect(component: PixelComponent, region: Rect): Rect {
+  return {
+    x: (component.rect.x - region.x) / Math.max(1, region.width),
+    y: (component.rect.y - region.y) / Math.max(1, region.height),
+    width: component.rect.width / Math.max(1, region.width),
+    height: component.rect.height / Math.max(1, region.height),
+  };
+}
+
+function referenceAnchorCandidates(components: PixelComponent[], region: Rect): PixelComponent[] {
+  return components.filter(component => {
+    if (!componentCenteredInside(component, region) || componentFill(component) < 0.5) return false;
+    const relative = relativeRect(component, region);
+    return relative.x < 0.25
+      && relative.y > 0.55
+      && relative.width > 0.08
+      && relative.width < 0.28
+      && relative.height > 0.08
+      && relative.height < 0.30;
+  });
+}
+
+function promotionAnchorCandidates(components: PixelComponent[], region: Rect): PixelComponent[] {
+  return components.filter(component => {
+    if (!componentCenteredInside(component, region) || componentFill(component) < 0.5) return false;
+    const relative = relativeRect(component, region);
+    return relative.x > 0.48
+      && relative.y > 0.42
+      && relative.width > 0.18
+      && relative.width < 0.48
+      && relative.height > 0.18
+      && relative.height < 0.48;
+  });
+}
+
+function borderStripEvidence(image: Uint8ClampedArray, pageWidth: number, pageHeight: number, region: Rect): number {
+  if (!image.length) return 0;
+  const stripX = Math.max(2, Math.round(region.width * 0.014));
+  const stripY = Math.max(2, Math.round(region.height * 0.022));
+  const expanded = clipRect({
+    x: region.x - stripX,
+    y: region.y - stripY,
+    width: region.width + stripX * 2,
+    height: region.height + stripY * 2,
+  }, pageWidth, pageHeight);
+  let evidence = 0;
+  let sampled = 0;
+  const sample = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= pageWidth || y >= pageHeight) return;
+    const offset = (y * pageWidth + x) * 4;
+    const red = image[offset];
+    const green = image[offset + 1];
+    const blue = image[offset + 2];
+    const maximum = Math.max(red, green, blue);
+    const minimum = Math.min(red, green, blue);
+    if (maximum - minimum > 30 || maximum < 155) evidence += 1;
+    sampled += 1;
+  };
+  const horizontalStep = Math.max(1, Math.round(region.width / 100));
+  const verticalStep = Math.max(1, Math.round(region.height / 60));
+  for (let x = expanded.x; x < expanded.x + expanded.width; x += horizontalStep) {
+    sample(x, expanded.y);
+    sample(x, expanded.y + expanded.height - 1);
+  }
+  for (let y = expanded.y; y < expanded.y + expanded.height; y += verticalStep) {
+    sample(expanded.x, y);
+    sample(expanded.x + expanded.width - 1, y);
+  }
+  return evidence / Math.max(1, sampled);
+}
+
+function expandToOuterBorders(regions: Rect[], width: number, height: number): Rect[] {
+  const paddingX = Math.max(2, Math.round(median(regions.map(region => region.width)) * 0.018));
+  const paddingY = Math.max(2, Math.round(median(regions.map(region => region.height)) * 0.025));
+  return regions.map(region => clipRect({
+    x: region.x - paddingX,
+    y: region.y - paddingY,
+    width: region.width + paddingX * 2,
+    height: region.height + paddingY * 2,
+  }, width, height));
+}
+
 export function evaluateGrid(regions: Rect[], page: number, pageWidth: number, pageHeight: number): GridResult {
   const rows = groupIntoRows(regions);
   const rowCounts = rows.map(row => row.length);
@@ -243,15 +285,30 @@ export function evaluateGrid(regions: Rect[], page: number, pageWidth: number, p
   if (!regions.length) reasons.push('card_grid_not_found');
   if (detectedColumns > 0 && detectedColumns < 2) reasons.push('too_few_columns');
   if (detectedColumns > 10) reasons.push('too_many_columns');
-  if (regions.some(region => region.width / Math.max(1, region.height) < 0.45 || region.width / Math.max(1, region.height) > 2.2)) reasons.push('card_aspect_outlier');
+  if (regions.some(region => region.width / Math.max(1, region.height) < 1 || region.width / Math.max(1, region.height) > 2.1)) reasons.push('card_aspect_outlier');
+
   const widthMedian = median(regions.map(region => region.width));
   const heightMedian = median(regions.map(region => region.height));
   const outliers = regions.filter(region => (
-    region.width < widthMedian * 0.62 || region.width > widthMedian * 1.38
-    || region.height < heightMedian * 0.62 || region.height > heightMedian * 1.38
+    region.width < widthMedian * 0.72 || region.width > widthMedian * 1.28
+    || region.height < heightMedian * 0.82 || region.height > heightMedian * 1.18
   )).length;
   if (outliers) reasons.push('card_size_outlier');
-  const confidence = Math.max(0, Math.min(1, 0.98 - reasons.length * 0.18 - outliers * 0.04));
+
+  for (const row of rows) {
+    const rowY = median(row.map(region => region.y));
+    const rowHeight = median(row.map(region => region.height));
+    if (row.some(region => Math.abs(region.y - rowY) > Math.max(4, rowHeight * 0.06))) reasons.push('row_alignment_outlier');
+  }
+  for (let left = 0; left < regions.length; left += 1) {
+    for (let right = left + 1; right < regions.length; right += 1) {
+      const smaller = Math.min(regions[left].width * regions[left].height, regions[right].width * regions[right].height);
+      if (intersection(regions[left], regions[right]) / Math.max(1, smaller) > 0.02) reasons.push('card_overlap');
+    }
+  }
+
+  const uniqueReasons = [...new Set(reasons)];
+  const confidence = Math.max(0, Math.min(1, 0.99 - uniqueReasons.length * 0.18 - outliers * 0.03));
   return {
     regions: rows.flat(),
     diagnostics: {
@@ -262,16 +319,56 @@ export function evaluateGrid(regions: Rect[], page: number, pageWidth: number, p
       detectedRows: rows.length,
       rowCounts,
       confidence: Number(confidence.toFixed(3)),
-      status: reasons.length ? 'need_review' : 'ok',
-      reasons: [...new Set(reasons)],
+      status: uniqueReasons.length ? 'need_review' : 'ok',
+      reasons: uniqueReasons,
     },
   };
 }
 
 export function detectCardGrid(canvas: HTMLCanvasElement, page: number): GridResult {
-  const density = evaluateGrid(detectCardRegionsFromWhiteMask(nearWhiteMask(canvas), canvas.width, canvas.height), page, canvas.width, canvas.height);
-  if (density.regions.length >= 2 && density.diagnostics.detectedColumns >= 2 && density.diagnostics.detectedColumns <= 10) return density;
-  return evaluateGrid(connectedWhiteComponents(canvas), page, canvas.width, canvas.height);
+  const masks = buildPageMasks(canvas);
+  const interiorRegions = detectCardRegionsFromWhiteMask(masks.white, canvas.width, canvas.height);
+  const base = evaluateGrid(interiorRegions, page, canvas.width, canvas.height);
+  const referenceComponents = connectedComponents(masks.referenceYellow, canvas.width, canvas.height);
+  const promotionComponents = connectedComponents(masks.promotionRed, canvas.width, canvas.height);
+  const structuralReasons = [...base.diagnostics.reasons];
+  let anchorValidatedCards = 0;
+  let referenceAnchorCount = 0;
+  let promotionAnchorCount = 0;
+
+  interiorRegions.forEach((region, index) => {
+    const references = referenceAnchorCandidates(referenceComponents, region);
+    const promotions = promotionAnchorCandidates(promotionComponents, region);
+    referenceAnchorCount += references.length;
+    promotionAnchorCount += promotions.length;
+    const outerEvidence = borderStripEvidence(masks.image, canvas.width, canvas.height, region);
+    if (references.length !== 1 || promotions.length !== 1) {
+      structuralReasons.push(`grid_anchor_set_invalid:${index + 1}:reference=${references.length}:promotion=${promotions.length}`);
+      return;
+    }
+    if (outerEvidence < 0.45) {
+      structuralReasons.push(`grid_outer_border_missing:${index + 1}`);
+      return;
+    }
+    anchorValidatedCards += 1;
+  });
+
+  if (anchorValidatedCards !== interiorRegions.length) structuralReasons.push('grid_anchor_validation_incomplete');
+  const reasons = [...new Set(structuralReasons)];
+  const outerRegions = expandToOuterBorders(base.regions, canvas.width, canvas.height);
+  return {
+    regions: outerRegions,
+    diagnostics: {
+      ...base.diagnostics,
+      confidence: reasons.length ? Math.min(base.diagnostics.confidence, 0.25) : base.diagnostics.confidence,
+      status: reasons.length ? 'need_review' : 'ok',
+      reasons,
+      outerCandidateCount: interiorRegions.length,
+      anchorValidatedCards,
+      referenceAnchorCount,
+      promotionAnchorCount,
+    },
+  };
 }
 
 export function cropCanvas(canvas: HTMLCanvasElement, rect: Rect, padding = 0): HTMLCanvasElement {
