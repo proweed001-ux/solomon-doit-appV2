@@ -13,7 +13,6 @@ function maskPage(width: number, height: number, rows: Array<Array<{ x: number; 
       for (let py = y; py < y + cardHeight; py += 1) {
         for (let px = card.x; px < card.x + card.width; px += 1) mask[py * width + px] = 1;
       }
-      // Product, title and promotion blocks create disconnected holes inside a real card.
       for (const hole of [
         { x: card.x + 18, y: y + 18, width: 42, height: 74 },
         { x: card.x + 82, y: y + 10, width: 76, height: 17 },
@@ -60,7 +59,10 @@ test('JUL26 detector constants and observed page row counts stay explicit', () =
 
 test('single-pass product OCR crops the verified top-right name and size area', () => {
   const zone = cardProductTitleZone({ x: 100, y: 50, width: 300, height: 180 });
-  assert.deepEqual(zone, { x: 196, y: 50, width: 201, height: 82.80000000000001 });
+  assert.equal(zone.x, 196);
+  assert.equal(zone.y, 50);
+  assert.equal(zone.width, 201);
+  assert.ok(Math.abs(zone.height - 82.8) < 1e-9);
   const importer = readFileSync('src/promo-new/import/pdf-importer.ts', 'utf8');
   assert.match(importer, /recognizeCardProductTitle\(await ensureWorker\(\), canvas, bounds\)/u);
   assert.doesNotMatch(importer, /pageOcr\(/u);
