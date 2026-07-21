@@ -12,9 +12,9 @@ export interface VisualProductSignature {
   /** 16×16 perceptual hash encoded as 00/ff bytes. */
   product: string;
   /** L2-normalized OpenCV-style HSV histogram: 24 hue × 12 saturation bins. */
-  colorHistogram: number[];
+  colorHistogram?: number[];
   /** 6×4 spatial edge-density blocks. */
-  edgeHistogram: number[];
+  edgeHistogram?: number[];
   quality: number;
 }
 
@@ -118,7 +118,6 @@ function rgbToOpenCvHsv(red: number, green: number, blue: number): [number, numb
   return [hue, saturation, maximum * 255];
 }
 
-/** Removes the saturated red/orange promotion graphics from the product view. */
 function maskPromotionRed(canvas: HTMLCanvasElement): void {
   const context = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
   if (!context) throw new Error('canvas_context_unavailable');
@@ -192,7 +191,6 @@ function perceptualHash(canvas: HTMLCanvasElement): string {
       coefficients.push(sum * DCT_SCALE[vertical]);
     }
   }
-  // Matches numpy median(dct[1:]): the first DCT row is excluded from the threshold calculation.
   const threshold = median(coefficients.slice(HASH_SIZE));
   return coefficients.map(value => value > threshold ? 'ff' : '00').join('');
 }
