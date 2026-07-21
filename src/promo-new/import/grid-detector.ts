@@ -266,15 +266,51 @@ function borderStripEvidence(image: Uint8ClampedArray, pageWidth: number, pageHe
   return evidence / Math.max(1, sampled);
 }
 
-function expandToOuterBorders(regions: Rect[], width: number, height: number): Rect[] {
+/**
+ * Expands white interiors to include the coloured outer card border while
+ * clipping every side to the midpoint of the nearest neighbouring gap. This
+ * preserves complete borders but guarantees that one crop cannot include any
+ * pixels from the card beside or above/below it.
+ */
+export function expandToOuterBorders(regions: Rect[], width: number, height: number): Rect[] {
+  if (!regions.length) return [];
   const paddingX = Math.max(2, Math.round(median(regions.map(region => region.width)) * 0.018));
   const paddingY = Math.max(2, Math.round(median(regions.map(region => region.height)) * 0.025));
-  return regions.map(region => clipRect({
-    x: region.x - paddingX,
-    y: region.y - paddingY,
-    width: region.width + paddingX * 2,
-    height: region.height + paddingY * 2,
-  }, width, height));
+  const rows = groupIntoRows(regions);
+  const rowTop = rows.map(row => Math.min(...row.map(region => region.y)));
+  const rowBottom = rows.map(row => Math.max(...row.map(region => region.y + region.height)));
+  const output: Rect[] = [];
+
+  rows.forEach((row, rowIndex) => {
+    const topLimit = rowIndex > 0
+      ? Math.floor((rowBottom[rowIndex - 1] + rowTop[rowIndex]) / 2)
+      : 0;
+    const bottomLimit = rowIndex < rows.length - 1
+      ? Math.ceil((rowBottom[rowIndex] + rowTop[rowIndex + 1]) / 2)
+      : height;
+
+    row.forEach((region, columnIndex) => {
+      const previous = columnIndex > 0 ? row[columnIndex - 1] : null;
+      const next = columnIndex < row.length - 1 ? row[columnIndex + 1] : null;
+      const leftLimit = previous
+        ? Math.floor((previous.x + previous.width + region.x) / 2)
+        : 0;
+      const rightLimit = next
+        ? Math.ceil((region.x + region.width + next.x) / 2)
+        : width;
+      const desiredLeft = region.x - paddingX;
+      const desiredTop = region.y - paddingY;
+      const desiredRight = region.x + region.width + paddingX;
+      const desiredBottom = region.y + region.height + paddingY;
+      const left = Math.max(leftLimit, desiredLeft);
+      const top = Math.max(topLimit, desiredTop);
+      const right = Math.min(rightLimit, desiredRight);
+      const bottom = Math.min(bottomLimit, desiredBottom);
+      output.push(clipRect({ x: left, y: top, width: right - left, height: bottom - top }, width, height));
+    });
+  });
+
+  return output;
 }
 
 export function evaluateGrid(regions: Rect[], page: number, pageWidth: number, pageHeight: number): GridResult {
@@ -357,6 +393,10 @@ export function detectCardGrid(canvas: HTMLCanvasElement, page: number): GridRes
   const reasons = [...new Set(structuralReasons)];
   if (reasons.length) throw new Error(`promo_grid_fail:page:${page}:${reasons.join(',')}`);
   const outerRegions = expandToOuterBorders(base.regions, canvas.width, canvas.height);
+  const expandedEvaluation = evaluateGrid(outerRegions, page, canvas.width, canvas.height);
+  if (expandedEvaluation.diagnostics.reasons.includes('card_overlap')) {
+    throw new Error(`promo_grid_fail:page:${page}:expanded_card_overlap`);
+  }
   return {
     regions: outerRegions,
     diagnostics: {
