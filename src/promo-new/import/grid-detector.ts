@@ -58,7 +58,93 @@ function removeNested(regions: Rect[]): Rect[] {
   return kept.sort((a, b) => a.y - b.y || a.x - b.x);
 }
 
-function whiteComponents(canvas: HTMLCanvasElement): Rect[] {
+function smooth(values: number[], radius: number): number[] {
+  const prefix = [0];
+  for (const value of values) prefix.push(prefix[prefix.length - 1] + value);
+  return values.map((_, index) => {
+    const left = Math.max(0, index - radius);
+    const right = Math.min(values.length, index + radius + 1);
+    return (prefix[right] - prefix[left]) / Math.max(1, right - left);
+  });
+}
+
+function runsAbove(values: number[], threshold: number, minimumLength: number, start = 0, end = values.length): Array<[number, number]> {
+  const output: Array<[number, number]> = [];
+  let cursor = Math.max(0, start);
+  const limit = Math.min(values.length, end);
+  while (cursor < limit) {
+    if (values[cursor] < threshold) {
+      cursor += 1;
+      continue;
+    }
+    const first = cursor;
+    while (cursor < limit && values[cursor] >= threshold) cursor += 1;
+    if (cursor - first >= minimumLength) output.push([first, cursor]);
+  }
+  return output;
+}
+
+function nearWhiteMask(canvas: HTMLCanvasElement): Uint8Array {
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) return new Uint8Array();
+  const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  const mask = new Uint8Array(canvas.width * canvas.height);
+  for (let index = 0; index < mask.length; index += 1) {
+    const offset = index * 4;
+    const red = data[offset];
+    const green = data[offset + 1];
+    const blue = data[offset + 2];
+    if (red > 202 && green > 202 && blue > 190 && saturation(red, green, blue) < 58) mask[index] = 1;
+  }
+  return mask;
+}
+
+/**
+ * Detect complete card rectangles from horizontal and vertical white-density runs.
+ * Promotion cards contain disconnected text, bottles and price blocks, so connected
+ * components can shrink or drift into the card content. Density runs retain the full
+ * white card panel and therefore preserve the product name on the right edge.
+ */
+export function detectCardRegionsFromWhiteMask(mask: Uint8Array, width: number, height: number): Rect[] {
+  if (width < 1 || height < 1 || mask.length !== width * height) return [];
+  const rowCounts = Array.from({ length: height }, () => 0);
+  for (let y = 0; y < height; y += 1) {
+    const offset = y * width;
+    let count = 0;
+    for (let x = 0; x < width; x += 1) count += mask[offset + x];
+    rowCounts[y] = count / width;
+  }
+  const rowDensity = smooth(rowCounts, 2);
+  const rowRuns = runsAbove(rowDensity, 0.105, 5, Math.floor(height * 0.18), Math.ceil(height * 0.985));
+  const regions: Rect[] = [];
+
+  for (const [rowStart, rowEnd] of rowRuns) {
+    const y = Math.max(0, rowStart - 8);
+    const bottom = Math.min(height, rowEnd + 8);
+    const rowHeight = bottom - y;
+    if (rowHeight < height * 0.10 || rowHeight > height * 0.34) continue;
+    const columnDensity = Array.from({ length: width }, () => 0);
+    for (let x = 0; x < width; x += 1) {
+      let count = 0;
+      for (let py = y; py < bottom; py += 1) count += mask[py * width + x];
+      columnDensity[x] = count / rowHeight;
+    }
+    const columnRuns = runsAbove(smooth(columnDensity, 1), 0.11, 8);
+    for (const [columnStart, columnEnd] of columnRuns) {
+      const x = Math.max(0, columnStart - 10);
+      const right = Math.min(width, columnEnd + 10);
+      const cardWidth = right - x;
+      if (cardWidth < width * 0.12 || cardWidth > width * 0.30) continue;
+      const center = x + cardWidth / 2;
+      if (center < width * 0.04 || center > width * 0.96) continue;
+      regions.push(clipRect({ x, y, width: cardWidth, height: rowHeight }, width, height));
+    }
+  }
+
+  return removeNested(regions);
+}
+
+function connectedWhiteComponents(canvas: HTMLCanvasElement): Rect[] {
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) return [];
   const top = Math.round(canvas.height * 0.11);
@@ -157,9 +243,6 @@ export function evaluateGrid(regions: Rect[], page: number, pageWidth: number, p
   if (!regions.length) reasons.push('card_grid_not_found');
   if (detectedColumns > 0 && detectedColumns < 2) reasons.push('too_few_columns');
   if (detectedColumns > 10) reasons.push('too_many_columns');
-  // A source page may intentionally mix four- and five-column rows. Card shape
-  // and size diagnostics below detect malformed components without assuming a
-  // fixed grid for every row.
   if (regions.some(region => region.width / Math.max(1, region.height) < 0.45 || region.width / Math.max(1, region.height) > 2.2)) reasons.push('card_aspect_outlier');
   const widthMedian = median(regions.map(region => region.width));
   const heightMedian = median(regions.map(region => region.height));
@@ -186,7 +269,9 @@ export function evaluateGrid(regions: Rect[], page: number, pageWidth: number, p
 }
 
 export function detectCardGrid(canvas: HTMLCanvasElement, page: number): GridResult {
-  return evaluateGrid(whiteComponents(canvas), page, canvas.width, canvas.height);
+  const density = evaluateGrid(detectCardRegionsFromWhiteMask(nearWhiteMask(canvas), canvas.width, canvas.height), page, canvas.width, canvas.height);
+  if (density.regions.length >= 2 && density.diagnostics.detectedColumns >= 2 && density.diagnostics.detectedColumns <= 10) return density;
+  return evaluateGrid(connectedWhiteComponents(canvas), page, canvas.width, canvas.height);
 }
 
 export function cropCanvas(canvas: HTMLCanvasElement, rect: Rect, padding = 0): HTMLCanvasElement {
