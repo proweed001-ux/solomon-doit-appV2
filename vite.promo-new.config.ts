@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export const PROMO_BUILD_FLAVOR = 'DENSITY-GRID-CARD-TITLE-CACHE-V6-MANUAL-CONTROLS' as const;
+export const PROMO_BUILD_FLAVOR = 'THREE-ANCHOR-GRID-CARD-TITLE-CACHE-V6-MANUAL-CONTROLS' as const;
 
 function replaceRequired(code: string, search: string, replacement: string, marker: string): string {
   if (!code.includes(search)) throw new Error(`promo_admin_runtime_marker_missing:${marker}`);
@@ -34,31 +34,31 @@ function promoBuildIdPlugin(): Plugin {
       next = replaceRequired(
         next,
         'OCR รอบหลักจากหน้า PDF ครั้งเดียว; OCR หัวขวาบนเพิ่มเฉพาะ unresolved หลังเทียบ Product Master',
-        'OCR ชื่อสินค้าจากมุมขวาบนครั้งเดียว หลังตรวจกรอบการ์ดเต็มด้วย Density Grid',
+        'ตรวจกรอบการ์ดจากกรอบนอก + ช่องอ้างอิงซ้ายล่าง + ช่องโปรโมชั่นสีแดง แล้ว OCR ชื่อมุมขวาบนครั้งเดียว',
         'single_pass_ocr_label',
       );
       next = replaceRequired(
         next,
         'การกดจากแคชจะไม่ OCR ซ้ำ ไม่สร้างลายนิ้วมือภาพ และอ่าน IndexedDB เพียงครั้งเดียว',
-        'แคชรุ่นเก่าที่ตัดชื่อด้านขวาถูกยกเลิก; แคชรุ่นนี้ใช้เฉพาะกรอบ Density Grid และลายนิ้วมือที่ตรวจครบ',
+        'แคชรุ่นเก่าที่ตัดกรอบไม่ตรงถูกยกเลิก; แคชรุ่นนี้ใช้เฉพาะ Structural Grid ที่ตรวจจุดอ้างอิงครบและลายนิ้วมือที่ตรวจครบ',
         'cache_visual_rebuild_label',
       );
       next = replaceRequired(
         next,
         'ใช้ชื่อสินค้า Product Master และ XLSM เป็นหลัก; รูปเก็บไว้แสดงและตรวจด้วยตา ไม่ใช้เป็นตัวระบุสินค้าถาวร',
-        'ใช้ชื่อมุมขวาบนจากกรอบการ์ดเต็ม Product Master และลายนิ้วมือรูปสินค้าเพื่อรวมข้าม Class; ราคาและ Promotion Family ให้แอดมินเลือกเอง',
+        'ใช้ชื่อมุมขวาบนจากกรอบการ์ดที่ผ่าน Structural Grid, Product Master และลายนิ้วมือรูปสินค้าเพื่อรวมข้าม Class; ราคาและ Promotion Family ให้แอดมินเลือกเอง',
         'visual_first_group_description',
       );
       next = replaceRequired(
         next,
         "'จัดกลุ่มจากข้อความ'",
-        "'จัดกลุ่มจาก Density Grid และชื่อสินค้า'",
+        "'จัดกลุ่มจาก Structural Grid และชื่อสินค้า'",
         'visual_first_progress_label',
       );
       next = replaceRequired(
         next,
         '`ประมวลผลข้อความแล้ว · OCR เพิ่ม ${adaptiveAttempted} ใบ · ดีขึ้น ${adaptiveImproved} ใบ`',
-        '`ประมวลผล Density Grid, OCR ชื่อรอบเดียว และ Visual-first แล้ว`',
+        '`ประมวลผล Structural Grid, OCR ชื่อรอบเดียว และ Visual-first แล้ว`',
         'single_pass_result_label',
       );
       return { code: next, map: null };
