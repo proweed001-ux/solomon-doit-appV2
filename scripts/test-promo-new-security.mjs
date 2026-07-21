@@ -14,7 +14,8 @@ const required = [
   'dist/promo-admin-new.html', 'dist/promo-new.html', 'dist/assets/promo-new/admin.js', 'dist/assets/promo-new/frontend.js',
   'api/promo-new.js', 'api/promo-legacy-auth.js', 'api/_promo-new/supabase.js',
   'src/promo-new/shared/api.ts', 'src/promo-new/import/pdf-importer.ts', 'src/promo-new/import/card-header-ocr.ts',
-  'src/promo-new/import/ocr-items.ts', 'src/promo-new/import/workbook-parser.ts', 'src/promo-new/import/workbook-safety.ts',
+  'src/promo-new/import/card-title-ocr.ts', 'src/promo-new/import/grid-detector.ts', 'src/promo-new/import/ocr-items.ts',
+  'src/promo-new/import/workbook-parser.ts', 'src/promo-new/import/workbook-safety.ts',
   'src/promo-new/admin/grouping-client.ts', 'src/promo-new/admin/grouping-worker.ts', 'src/promo-new/admin/grouping-transport.ts',
   'src/promo-new/admin/test-cache.ts', 'src/promo-new/admin/cached-run.ts', 'src/promo-new/domain/auto-match.ts',
   'src/promo-new/domain/master-match-audit.ts', 'src/promo-new/domain/master-text-matcher.ts',
@@ -48,13 +49,24 @@ check(sharedApi.includes('const LEGACY_WRITES_ENABLED = false'), 'legacy_writes_
 check(sharedApi.includes('legacy_write_disabled_pending_atomic_revision_staging'), 'legacy_write_block_reason_missing');
 
 const pdfImporter = read('src/promo-new/import/pdf-importer.ts');
+const titleOcr = read('src/promo-new/import/card-title-ocr.ts');
+const gridDetector = read('src/promo-new/import/grid-detector.ts');
 for (const guard of ['MAX_PROMO_PDF_BYTES = 50 * 1024 * 1024', 'MAX_PROMO_PDF_PAGES = 120', 'MAX_PROMO_PDF_CARDS = 2_000']) {
   check(pdfImporter.includes(guard), `pdf_guard_missing:${guard}`);
 }
 check(pdfImporter.includes("throw new Error('duplicate_card_id')"), 'pdf_duplicate_card_block_missing');
 check(pdfImporter.includes("throw new Error('duplicate_card_position')"), 'pdf_duplicate_position_block_missing');
-check(pdfImporter.includes('x: rect.x + rect.width * 0.38'), 'product_name_top_right_zone_missing');
-check(pdfImporter.includes('height: rect.height * 0.43'), 'product_name_header_height_missing');
+check(pdfImporter.includes('recognizeCardProductTitle'), 'per_card_title_ocr_not_wired');
+check(pdfImporter.includes('OCR ชื่อมุมขวาบน'), 'single_pass_title_progress_missing');
+check(!pdfImporter.includes('pageOcr('), 'whole_page_product_ocr_reintroduced');
+check(titleOcr.includes('x: bounds.x + bounds.width * 0.32'), 'product_name_top_right_zone_missing');
+check(titleOcr.includes('height: bounds.height * 0.46'), 'product_name_header_height_missing');
+check(titleOcr.includes('adaptiveThreshold(output)'), 'adaptive_title_threshold_missing');
+check(titleOcr.includes('PSM.SPARSE_TEXT'), 'sparse_title_ocr_mode_missing');
+check(gridDetector.includes('detectCardRegionsFromWhiteMask'), 'density_card_detector_missing');
+check(gridDetector.includes('runsAbove(rowDensity, 0.105, 5'), 'density_row_threshold_missing');
+check(gridDetector.includes('runsAbove(smooth(columnDensity, 1), 0.11, 8'), 'density_column_threshold_missing');
+check(gridDetector.includes('return density'), 'density_detector_not_preferred');
 
 const ocrItems = read('src/promo-new/import/ocr-items.ts');
 check(ocrItems.includes('const lines = node.lines'), 'line_level_ocr_collection_missing');
@@ -180,4 +192,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: visual-first cache v5 rejects legacy records, requires Product Master and complete title/product fingerprints before Worker grouping, rebuilds missing fingerprints from cached card images, strips images before Worker transport, keeps price and Promotion Family manual, excludes Scope and full-card text, and retains read-only deployment guards.');
+console.log('Promo new security/static checks passed: density-based full-card detection preserves the right-side product title, each card title is OCRed once from a top-right adaptive-threshold crop, legacy whole-page product OCR is excluded, visual-first cache and Product Master guards remain active, price and Promotion Family remain manual, and read-only deployment protections remain intact.');
