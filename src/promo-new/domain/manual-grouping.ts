@@ -8,6 +8,12 @@ export interface ManualGroupingResult {
   targetGroupId: string;
 }
 
+export interface ManualUnassignResult {
+  dataset: PromoDataset;
+  quarantine: ImportedCardCandidate[];
+  removedCardIds: string[];
+}
+
 type ManualTarget =
   | { groupId: string; skuId?: never }
   | { skuId: string; groupId?: never };
@@ -88,8 +94,26 @@ function moveCard(card: PromoCard, group: ProductGroup, dataset: PromoDataset): 
     price: group.price,
     status: 'need_review',
     evidence: { ...card.evidence, method: 'manual' },
-    failureReasons: card.failureReasons.filter(reason => !reason.startsWith('promotion_')),
+    failureReasons: card.failureReasons.filter(reason => !reason.startsWith('promotion_') && !reason.startsWith('duplicate_class:')),
   };
+}
+
+function rebuildGroups(groups: ProductGroup[], cards: PromoCard[], targetGroup?: ProductGroup): ProductGroup[] {
+  const seed = targetGroup && !groups.some(group => group.id === targetGroup.id)
+    ? [...groups, targetGroup]
+    : groups;
+  return seed.flatMap(group => {
+    const members = cards.filter(card => card.productGroupId === group.id);
+    if (!members.length) return [];
+    const base = targetGroup?.id === group.id ? targetGroup : group;
+    return [{
+      ...base,
+      cardIds: members.map(card => card.id),
+      classIds: [...new Set(members.flatMap(card => card.classId ? [card.classId] : []))].sort(),
+      status: 'need_review' as const,
+      failureReasons: base.failureReasons.filter(reason => !reason.startsWith('duplicate_class:')),
+    }];
+  });
 }
 
 export function assignCardsManually(
@@ -124,40 +148,17 @@ export function assignCardsManually(
     ...existingSelected.map(card => moveCard(card, targetGroup!, dataset)),
     ...quarantineSelected.map(card => cardFromQuarantine(card, targetGroup!, dataset)),
   ];
-  const targetCards = [...targetExisting, ...incoming];
-  const classes = targetCards.map(card => card.classId).filter((value): value is string => Boolean(value));
-  const duplicateClass = classes.find((classId, index) => classes.indexOf(classId) !== index);
-  if (duplicateClass) {
-    throw new Error(`รวมไม่ได้: กลุ่มปลายทางจะมี Class ${duplicateClass} ซ้ำกัน`);
+  const uniqueIncoming = new Map(incoming.map(card => [card.id, card]));
+  const targetCards = [...targetExisting, ...uniqueIncoming.values()];
+  if (new Set(targetCards.map(card => card.id)).size !== targetCards.length) {
+    throw new Error('รวมไม่ได้: พบการ์ดใบเดิมซ้ำในกลุ่มปลายทาง');
   }
 
-  const movedById = new Map(incoming.map(card => [card.id, card]));
+  const movedById = new Map(uniqueIncoming);
   const cards = dataset.cards.map(card => movedById.get(card.id) || card);
-  quarantineSelected.forEach(source => cards.push(movedById.get(source.cardId)!));
-
-  const groups: ProductGroup[] = [];
-  const groupSeed = dataset.productGroups.some(group => group.id === targetGroup!.id)
-    ? dataset.productGroups
-    : [...dataset.productGroups, targetGroup];
-  for (const group of groupSeed) {
-    const members = cards.filter(card => card.productGroupId === group.id);
-    if (!members.length) continue;
-    if (group.id === targetGroup.id) {
-      groups.push({
-        ...targetGroup,
-        cardIds: members.map(card => card.id),
-        classIds: [...new Set(members.flatMap(card => card.classId ? [card.classId] : []))].sort(),
-        status: 'need_review',
-        failureReasons: targetGroup.failureReasons.filter(reason => !reason.startsWith('duplicate_class:')),
-      });
-    } else {
-      groups.push({
-        ...group,
-        cardIds: members.map(card => card.id),
-        classIds: [...new Set(members.flatMap(card => card.classId ? [card.classId] : []))].sort(),
-      });
-    }
-  }
+  quarantineSelected.forEach(source => {
+    if (!cards.some(card => card.id === source.cardId)) cards.push(movedById.get(source.cardId)!);
+  });
 
   return {
     dataset: {
@@ -166,10 +167,58 @@ export function assignCardsManually(
         ? dataset.prices
         : [...dataset.prices, targetGroup.price],
       cards,
-      productGroups: groups,
+      productGroups: rebuildGroups(dataset.productGroups, cards, targetGroup),
     },
     quarantine: quarantine.filter(card => !selected.has(card.cardId)),
     movedCardIds: [...selected],
     targetGroupId: targetGroup.id,
+  };
+}
+
+function toImportedCard(card: PromoCard): ImportedCardCandidate {
+  const bounds = card.evidence.cropBounds || { x: 0, y: 0, width: 1, height: 1 };
+  const evidenceMethod = card.evidence.method === 'pdf_text' || card.evidence.method === 'page_ocr'
+    ? card.evidence.method
+    : 'none';
+  return {
+    cardId: card.id,
+    monthKey: card.monthKey,
+    page: card.page,
+    sequence: card.sequence,
+    classId: card.classId,
+    imageUrl: card.imageUrl || '',
+    rawText: card.evidence.rawText,
+    productText: card.evidence.productText,
+    pageClassText: card.evidence.pageClassText,
+    confidence: card.evidence.confidence,
+    evidenceMethod,
+    bounds,
+    failureReasons: ['manual_unassigned'],
+  };
+}
+
+export function unassignCardsManually(
+  dataset: PromoDataset,
+  quarantine: ImportedCardCandidate[],
+  selectedCardIds: Iterable<string>,
+): ManualUnassignResult {
+  const selected = new Set(selectedCardIds);
+  if (!selected.size) throw new Error('เลือกการ์ดในกลุ่มอย่างน้อย 1 ใบก่อนนำออก');
+  const removed = dataset.cards.filter(card => selected.has(card.id));
+  if (removed.length !== selected.size) throw new Error('นำออกได้เฉพาะการ์ดที่อยู่ในกลุ่มปัจจุบัน');
+  const cards = dataset.cards.filter(card => !selected.has(card.id));
+  const existingQuarantine = new Set(quarantine.map(card => card.cardId));
+  const nextQuarantine = [...quarantine];
+  for (const card of removed) {
+    if (!existingQuarantine.has(card.id)) nextQuarantine.push(toImportedCard(card));
+  }
+  return {
+    dataset: {
+      ...dataset,
+      cards,
+      productGroups: rebuildGroups(dataset.productGroups, cards),
+    },
+    quarantine: nextQuarantine,
+    removedCardIds: removed.map(card => card.id),
   };
 }
