@@ -1,12 +1,14 @@
 import { createHash } from 'node:crypto';
-import { buildLegacyMasterData } from './_promo-new/legacy-adapter.js';
+import { buildLegacyMasterData, toLegacyClassId, toLegacyMonthId } from './_promo-new/legacy-adapter.js';
 
 const SUPABASE_URL = 'https://saodmeoilixfdqentofp.supabase.co';
 const PUBLISHABLE_KEY = 'sb_publishable_JThYwAl_-askk_cIaCd75w_TCWK2BTT';
 const MAX_LOGIN_BODY_BYTES = 4_096;
 const MAX_MASTER_BODY_BYTES = 32_768;
+const MAX_GROUPING_BODY_BYTES = 512_000;
 const MAX_UPLOAD_KEY_LENGTH = 200;
 const ALLOWED_UNITS = new Set(['ชิ้น', 'ขวด', 'แพ็ค', 'กล่อง', 'ลัง', 'ซอง', 'ด้าม', 'ถุง', 'ชุด']);
+const MASTER_SKU_ID = /^MASTER-([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/iu;
 
 function json(res, status, body) {
   res.setHeader('Cache-Control', 'no-store');
@@ -22,7 +24,7 @@ function text(value) {
 function requestBodySize(req) {
   const declared = Number(req.headers['content-length']);
   if (Number.isFinite(declared) && declared >= 0) return declared;
-  try { return Buffer.byteLength(JSON.stringify(req.body || {}), 'utf8'); } catch { return MAX_MASTER_BODY_BYTES + 1; }
+  try { return Buffer.byteLength(JSON.stringify(req.body || {}), 'utf8'); } catch { return MAX_GROUPING_BODY_BYTES + 1; }
 }
 
 function normalizedKey(value) {
@@ -161,6 +163,77 @@ async function createMasterProduct(input, adminKey) {
   return { sku, created: Boolean(row.created) };
 }
 
+function validateGroupingInput(input) {
+  const monthId = toLegacyMonthId(text(input?.monthKey || input?.promoMonthId));
+  const groups = Array.isArray(input?.groups) ? input.groups : [];
+  if (!monthId) throw new Error('invalid_promo_month');
+  if (!groups.length || groups.length > 300) throw new Error('invalid_group_count');
+  let cardCount = 0;
+  const locators = new Set();
+  const validated = groups.map(group => {
+    const skuId = text(group?.skuId);
+    const masterMatch = skuId.match(MASTER_SKU_ID);
+    if (!masterMatch) throw new Error('group_master_product_required');
+    const cards = Array.isArray(group?.cards) ? group.cards : [];
+    if (!cards.length) throw new Error('group_has_no_cards');
+    const normalizedCards = cards.map(card => {
+      const classId = toLegacyClassId(text(card?.classId));
+      const page = Number(card?.page);
+      const sequence = Number(card?.sequence);
+      if (!classId || !Number.isInteger(page) || page < 1 || !Number.isInteger(sequence) || sequence < 1) {
+        throw new Error('invalid_card_locator');
+      }
+      const key = `${classId}|${page}|${sequence}`;
+      if (locators.has(key)) throw new Error('duplicate_card_in_snapshot');
+      locators.add(key);
+      cardCount += 1;
+      return { classId, page, sequence };
+    });
+    return { masterProductId: masterMatch[1].toLowerCase(), cards: normalizedCards };
+  });
+  if (cardCount < 1 || cardCount > 2000) throw new Error('invalid_card_count');
+  return { monthId, groups: validated, cardCount };
+}
+
+async function resolveGroupingCardIds(monthId, groups, expectedCardCount) {
+  const rows = await supabase(`/rest/v1/promo_cards?promo_month_id=eq.${encodeURIComponent(monthId)}&status=neq.inactive&select=card_id,class_id,page_no,card_no&order=class_id.asc,page_no.asc,card_no.asc&limit=2000`);
+  const cards = Array.isArray(rows) ? rows : [];
+  if (cards.length !== expectedCardCount) throw new Error(`grouping_snapshot_incomplete:${expectedCardCount}/${cards.length}`);
+  const byPage = new Map();
+  for (const card of cards) {
+    const key = `${text(card.class_id).toUpperCase()}|${Number(card.page_no)}`;
+    const list = byPage.get(key) || [];
+    list.push(card);
+    byPage.set(key, list);
+  }
+  for (const list of byPage.values()) list.sort((left, right) => Number(left.card_no) - Number(right.card_no));
+  return groups.map(group => ({
+    master_product_id: group.masterProductId,
+    card_ids: group.cards.map(locator => {
+      const list = byPage.get(`${locator.classId}|${locator.page}`) || [];
+      const row = list[locator.sequence - 1];
+      if (!row?.card_id) throw new Error(`card_locator_not_found:${locator.classId}:${locator.page}:${locator.sequence}`);
+      return text(row.card_id);
+    }),
+  }));
+}
+
+async function saveGroupingSnapshot(input, adminKey) {
+  const validated = validateGroupingInput(input);
+  const groups = await resolveGroupingCardIds(validated.monthId, validated.groups, validated.cardCount);
+  const rows = await supabase('/rest/v1/rpc/save_manual_promo_grouping_snapshot', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_promo_month_id: validated.monthId,
+      p_groups: groups,
+      p_auth_hash: sha256(adminKey),
+    }),
+  });
+  const row = Array.isArray(rows) ? rows[0] : rows;
+  if (!row || Number(row.card_count) !== validated.cardCount) throw new Error('grouping_snapshot_save_incomplete');
+  return { promoMonthId: validated.monthId, groupCount: Number(row.group_count), cardCount: Number(row.card_count) };
+}
+
 export default async function handler(req, res) {
   try {
     const action = text(req.query?.action || req.body?.action).toLowerCase();
@@ -196,12 +269,18 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true, data: await createMasterProduct(req.body?.product, adminKey) });
     }
 
+    if (req.method === 'POST' && action === 'save-grouping-snapshot') {
+      if (requestBodySize(req) > MAX_GROUPING_BODY_BYTES) return json(res, 413, { ok: false, error: 'request_body_too_large' });
+      const adminKey = await validateUploadKey(headerKey);
+      return json(res, 200, { ok: true, data: await saveGroupingSnapshot(req.body, adminKey) });
+    }
+
     if (req.method === 'POST' && action === 'logout') return json(res, 200, { ok: true });
     return json(res, 404, { ok: false, error: 'action_not_found' });
   } catch (error) {
     const message = String(error?.message || error || 'unknown_error');
     const authFailure = /invalid_upload_key|missing_admin_key|invalid_admin_key|supabase_401|supabase_403/.test(message);
-    const badRequest = /invalid_canonical_name|invalid_brand|invalid_product_type|invalid_sales_unit|invalid_size_value|invalid_pack_quantity|invalid_unit|invalid_normalized_key/.test(message);
+    const badRequest = /invalid_canonical_name|invalid_brand|invalid_product_type|invalid_sales_unit|invalid_size_value|invalid_pack_quantity|invalid_unit|invalid_normalized_key|invalid_promo_month|invalid_group_count|invalid_card_count|invalid_card_locator|duplicate_card_in_snapshot|group_master_product_required|group_has_no_cards|grouping_snapshot_incomplete|card_locator_not_found|active_master_product_not_found|card_not_found_for_month/.test(message);
     if (authFailure) return json(res, 401, { ok: false, error: 'invalid_upload_key' });
     if (badRequest) return json(res, 400, { ok: false, error: message.replace(/^supabase_\d+:/u, '') });
     return json(res, 503, { ok: false, error: 'promo_auth_unavailable' });
