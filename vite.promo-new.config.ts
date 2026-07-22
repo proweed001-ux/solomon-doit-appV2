@@ -20,7 +20,43 @@ function promoBuildIdPlugin(): Plugin {
     name: 'promo-build-id',
     enforce: 'pre',
     transform(code, id) {
-      if (!id.replace(/\\/g, '/').endsWith('/src/promo-new/admin/main.tsx')) return null;
+      const normalizedId = id.replace(/\\/g, '/');
+      if (normalizedId.endsWith('/src/promo-new/admin/manual-workbench.tsx')) {
+        let next = code;
+        next = replaceRequired(
+          next,
+          "const targetConfirmed = Boolean(targetGroup && confirmedLocks.has(targetGroup.id));",
+          "const targetConfirmed = !readOnly && Boolean(targetGroup && confirmedLocks.has(targetGroup.id));",
+          'preview_must_ignore_persisted_target_locks',
+        );
+        next = replaceRequired(
+          next,
+          "const sourceLocked = (card: CardView) => Boolean(card.groupId && confirmedLocks.has(card.groupId));",
+          "const sourceLocked = (card: CardView) => !readOnly && Boolean(card.groupId && confirmedLocks.has(card.groupId));",
+          'preview_must_ignore_persisted_source_locks',
+        );
+        next = replaceRequired(
+          next,
+          "setViewMode('suggested');",
+          "setViewMode('all');",
+          'manual_target_must_show_selectable_cards',
+        );
+        next = replaceRequired(
+          next,
+          '<select disabled={targetLocked} value={targetValue} onChange={event => setTargetValue(event.target.value)}>',
+          `<select disabled={targetLocked} value={targetValue} onChange={event => {
+            const value = event.target.value;
+            setTargetValue(value);
+            setTargetLocked(Boolean(value));
+            setSelectedIds([]);
+            setViewMode(value ? 'all' : 'unassigned');
+            onError('');
+          }}>`,
+          'manual_target_auto_lock_on_select',
+        );
+        return { code: next, map: null };
+      }
+      if (!normalizedId.endsWith('/src/promo-new/admin/main.tsx')) return null;
       const pattern = /const BUILD_ID = '[^']+';/u;
       if (!pattern.test(code)) throw new Error('promo_build_id_marker_missing');
       let next = code.replace(pattern, `const BUILD_ID = '${buildId}';`);
