@@ -1,11 +1,16 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export const PROMO_BUILD_FLAVOR = 'THREE-ANCHOR-GRID-CARD-TITLE-CACHE-V6-MANUAL-CONTROLS' as const;
+export const PROMO_BUILD_FLAVOR = 'THREE-ANCHOR-GRID-CARD-TITLE-CACHE-V7-MANUAL-WORKBENCH' as const;
 
 function replaceRequired(code: string, search: string, replacement: string, marker: string): string {
   if (!code.includes(search)) throw new Error(`promo_admin_runtime_marker_missing:${marker}`);
   return code.replace(search, replacement);
+}
+
+function replacePatternRequired(code: string, pattern: RegExp, replacement: string, marker: string): string {
+  if (!pattern.test(code)) throw new Error(`promo_admin_runtime_marker_missing:${marker}`);
+  return code.replace(pattern, replacement);
 }
 
 function promoBuildIdPlugin(): Plugin {
@@ -19,6 +24,40 @@ function promoBuildIdPlugin(): Plugin {
       const pattern = /const BUILD_ID = '[^']+';/u;
       if (!pattern.test(code)) throw new Error('promo_build_id_marker_missing');
       let next = code.replace(pattern, `const BUILD_ID = '${buildId}';`);
+      next = replaceRequired(
+        next,
+        "import { assertReadyForPublish } from '../domain/validation';",
+        "import { assertReadyForPublishMultiCard as assertReadyForPublish } from './validation-multi-card';",
+        'multi_card_validation_import',
+      );
+      next = replaceRequired(
+        next,
+        "import './admin.css';",
+        "import { ManualGroupingWorkbench } from './manual-workbench';\nimport './admin.css';",
+        'manual_workbench_import',
+      );
+      next = replacePatternRequired(
+        next,
+        /\{dataset && <section className="panel manual-panel">[\s\S]*?<\/section>\}/u,
+        `{dataset && <ManualGroupingWorkbench
+          dataset={dataset}
+          quarantine={quarantine}
+          adminKey={session?.accessToken || ''}
+          readOnly={demo || dryRun}
+          onDatasetChange={setDataset}
+          onQuarantineChange={setQuarantine}
+          onMessage={setMessage}
+          onError={setError}
+          onDirty={() => { setPreviewChecked(false); setSavedVersionId(null); }}
+        />}`,
+        'manual_workbench_panel',
+      );
+      next = replacePatternRequired(
+        next,
+        /\{!!quarantine\.length && <section className="panel"><div className="section-head"><div><h2>รายการที่ต้องแก้เฉพาะจุด<\/h2>[\s\S]*?<\/section>\}/u,
+        '{null}',
+        'legacy_quarantine_panel',
+      );
       next = replaceRequired(
         next,
         'visualSignatures: {},',
