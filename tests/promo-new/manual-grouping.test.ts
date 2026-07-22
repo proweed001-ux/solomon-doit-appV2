@@ -59,7 +59,7 @@ test('manual grouping merges cards and converts quarantine evidence', () => {
   assert.deepEqual(result.dataset.productGroups[0].classIds, ['HFSL', 'HFSM', 'HFSS']);
   assert.equal(result.quarantine.length, 0);
   assert.ok(result.dataset.cards.every(card => card.productGroupId === target.id));
-  assert.ok(result.dataset.cards.filter(card => card.id !== target.cardIds[0]).every(card => card.evidence.groupingMethod === 'manual'));
+  assert.ok(result.dataset.cards.filter(card => card.id !== target.cardIds[0]).every(card => card.evidence.method === 'manual'));
 });
 
 test('manual grouping refuses duplicate Class', () => {
