@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export const PROMO_BUILD_FLAVOR = 'THREE-ANCHOR-GRID-CARD-TITLE-CACHE-V7-MANUAL-WORKBENCH' as const;
+export const PROMO_BUILD_FLAVOR = 'THREE-ANCHOR-GRID-CARD-TITLE-CACHE-V6-MANUAL-CONTROLS' as const;
 
 function replaceRequired(code: string, search: string, replacement: string, marker: string): string {
   if (!code.includes(search)) throw new Error(`promo_admin_runtime_marker_missing:${marker}`);
