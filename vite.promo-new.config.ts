@@ -33,23 +33,33 @@ function promoBuildIdPlugin(): Plugin {
       next = replaceRequired(
         next,
         "import './admin.css';",
-        "import { ManualGroupingWorkbench } from './manual-workbench';\nimport './admin.css';",
+        "import { ManualGroupingWorkbench } from './manual-workbench';\nimport { GroupingSnapshotSave } from './grouping-snapshot-save';\nimport './admin.css';",
         'manual_workbench_import',
       );
       next = replacePatternRequired(
         next,
         /\{dataset && <section className="panel manual-panel">[\s\S]*?<\/section>\}/u,
-        `{dataset && <ManualGroupingWorkbench
-          dataset={dataset}
-          quarantine={quarantine}
-          adminKey={session?.accessToken || ''}
-          readOnly={demo || dryRun}
-          onDatasetChange={setDataset}
-          onQuarantineChange={setQuarantine}
-          onMessage={setMessage}
-          onError={setError}
-          onDirty={() => { setPreviewChecked(false); setSavedVersionId(null); }}
-        />}`,
+        `{dataset && <>
+          <ManualGroupingWorkbench
+            dataset={dataset}
+            quarantine={quarantine}
+            adminKey={session?.accessToken || ''}
+            readOnly={demo || dryRun}
+            onDatasetChange={setDataset}
+            onQuarantineChange={setQuarantine}
+            onMessage={setMessage}
+            onError={setError}
+            onDirty={() => { setPreviewChecked(false); setSavedVersionId(null); }}
+          />
+          <GroupingSnapshotSave
+            dataset={dataset}
+            quarantine={quarantine}
+            adminKey={session?.accessToken || ''}
+            readOnly={demo || dryRun}
+            onMessage={setMessage}
+            onError={setError}
+          />
+        </>}`,
         'manual_workbench_panel',
       );
       next = replacePatternRequired(
