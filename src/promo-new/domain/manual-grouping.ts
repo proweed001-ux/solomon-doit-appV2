@@ -64,8 +64,7 @@ function cardFromQuarantine(source: ImportedCardCandidate, group: ProductGroup, 
       productText: source.productText,
       pageClassText: source.pageClassText,
       confidence: source.confidence,
-      method: source.evidenceMethod,
-      groupingMethod: 'manual',
+      method: 'manual',
       cropBounds: {
         x: source.bounds.x,
         y: source.bounds.y,
@@ -88,7 +87,7 @@ function moveCard(card: PromoCard, group: ProductGroup, dataset: PromoDataset): 
     promotionTiers: tiers,
     price: group.price,
     status: 'need_review',
-    evidence: { ...card.evidence, groupingMethod: 'manual' },
+    evidence: { ...card.evidence, method: 'manual' },
     failureReasons: card.failureReasons.filter(reason => !reason.startsWith('promotion_')),
   };
 }
