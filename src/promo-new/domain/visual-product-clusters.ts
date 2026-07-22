@@ -13,8 +13,8 @@ const MIN_NEIGHBOUR_MARGIN = 0.015;
 const MAX_NEIGHBOUR_RANK = 2;
 
 const EXPLICIT_VARIANTS: Array<{ canonical: string; patterns: RegExp[] }> = [
-  { canonical: 'SUPERCLICK', patterns: [/SUPER\s*CLICK/iu, /ซุปเปอร์\s*คลิ(?:ก|๊ก)/iu] },
-  { canonical: 'SUPERTHIN', patterns: [/SUPER\s*THIN/iu, /ซุปเปอร์\s*ธิน/iu] },
+  { canonical: 'SUPERCLICK', patterns: [/SUPER\s*CLICK/iu, /ซุป(?:เปอร์|แปอร์|แบอร์|เบอร์)\s*คลิ(?:ก|๊ก)/iu] },
+  { canonical: 'SUPERTHIN', patterns: [/SUPER\s*THIN/iu, /(?:ซุป|ธป)?(?:เปอร์|แปอร์|เปเปอร์)\s*ธิน/iu] },
   { canonical: 'VECTOR', patterns: [/VECTOR/iu, /เวคเตอร์/iu] },
   { canonical: 'BLUE_2', patterns: [/BLUE\s*(?:II|2|TWO)/iu, /บลู\s*(?:ทู|2)/iu] },
   { canonical: 'BLUE_3', patterns: [/BLUE\s*(?:III|3|THREE)/iu, /บลู\s*(?:ทรี|3)/iu] },
@@ -81,7 +81,7 @@ function variantConflict(left: string | null, right: string | null): boolean {
   return maximum >= 5 && common / maximum < 0.45;
 }
 
-function identityConflict(left: Sku, right: Sku): boolean {
+function identityConflict(left: Sku, right: Sku, variantsAreMasterBacked = false): boolean {
   const a = left.identity;
   const b = right.identity;
   if (a.brand && b.brand && a.brand !== b.brand) return true;
@@ -91,12 +91,16 @@ function identityConflict(left: Sku, right: Sku): boolean {
     if (Math.abs(a.sizeValue - b.sizeValue) > 0.05) return true;
   }
   if (a.packQuantity > 1 && b.packQuantity > 1 && a.packQuantity !== b.packQuantity) return true;
-  return variantConflict(a.variant, b.variant);
+  // OCR residue is not reliable Variant evidence. It may differ on every
+  // Class of the same product (for example H&S 140 ml). Only a pair of
+  // Product Master identities may use the generic Variant comparison;
+  // recognized closed-set variants are guarded separately above.
+  return variantsAreMasterBacked && variantConflict(a.variant, b.variant);
 }
 
 function cardConflict(left: CardVisualEvidence, right: CardVisualEvidence): boolean {
   if (explicitVariantConflict(left, right)) return true;
-  if (identityConflict(left.master || left.sku, right.master || right.sku)) return true;
+  if (identityConflict(left.master || left.sku, right.master || right.sku, Boolean(left.master && right.master))) return true;
   return Boolean(left.master && right.master && left.master.id !== right.master.id);
 }
 
@@ -107,7 +111,6 @@ function hasMinimumIdentityEvidence(evidence: CardVisualEvidence): boolean {
     identity.brand
     || identity.productType
     || identity.sizeValue > 0
-    || identity.variant
     || evidence.explicitVariants.length,
   );
 }
