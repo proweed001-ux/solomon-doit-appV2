@@ -1,6 +1,13 @@
 import { execFileSync } from "node:child_process";
 
 const forbiddenPathPattern = /promo/i;
+const proScopePathPattern = /^(?:dist\/pro(?:\.html|\/)|dist\/assets\/pro\/|scripts\/(?:fixtures\/)?pro-|scripts\/test-pro-|tests\/pro\/|docs\/[^/]*PRO[^/]*|playwright\.pro\.config\.mjs$)/i;
+
+export function proScopeFiles(files) {
+  return [...new Set((files || []).map(String).filter(Boolean))].filter((file) =>
+    proScopePathPattern.test(file.replaceAll("\\", "/")),
+  );
+}
 
 export function forbiddenProScopeFiles(files) {
   return [...new Set((files || []).map(String).filter(Boolean))].filter((file) =>
@@ -72,6 +79,9 @@ export function verifyWorkingTreeScope(options = {}) {
   const baseSha = resolveComparisonBase(options);
   if (!baseSha) return { baseSha: "", changed: [], skipped: true };
   const changed = changedFilesFromBase(baseSha, options.cwd);
+  if (!proScopeFiles(changed).length) {
+    return { baseSha, changed, skipped: true, reason: "no_pro_files_changed" };
+  }
   assertProOnlyChanges(changed);
   return { baseSha, changed, skipped: false };
 }
