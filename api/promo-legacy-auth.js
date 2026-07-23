@@ -138,6 +138,23 @@ function validateMasterProduct(input) {
 
 async function createMasterProduct(input, adminKey) {
   const product = validateMasterProduct(input);
+  const identityFields = 'master_product_id,canonical_name,normalized_key,unit_label,status,created_from_month,updated_at,brand,product_type,variant,size_value,size_unit,sales_unit,pack_quantity';
+  const activeMasters = await supabase(`/rest/v1/promo_product_master?status=eq.active&select=${identityFields}&limit=500`);
+  const sameIdentity = (Array.isArray(activeMasters) ? activeMasters : []).find(row => (
+    normalizedKey(row.brand) === normalizedKey(product.brand)
+    && normalizedKey(row.product_type) === normalizedKey(product.productType)
+    && normalizedKey(row.variant) === normalizedKey(product.variant)
+    && Number(row.size_value || 0) === Number(product.sizeValue || 0)
+    && normalizedKey(row.size_unit) === normalizedKey(product.sizeUnit)
+    && normalizedKey(row.sales_unit || row.unit_label) === normalizedKey(product.salesUnit)
+    && Number(row.pack_quantity || 1) === product.packQuantity
+  ));
+  if (sameIdentity) {
+    const built = buildLegacyMasterData([sameIdentity], []);
+    let sku = applyStructuredIdentity(built.skus[0], sameIdentity);
+    sku = { ...sku, evidence: [...new Set([...(sku.evidence || []), product.canonicalName, ...product.aliases])] };
+    return { sku, created: false };
+  }
   const rows = await supabase('/rest/v1/rpc/create_promo_master_product', {
     method: 'POST',
     body: JSON.stringify({
