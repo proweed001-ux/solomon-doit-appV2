@@ -161,9 +161,22 @@ create table if not exists public.promo_new_audit_log (
 create index if not exists promo_new_cards_version_class_idx on public.promo_new_cards(version_id, class_id);
 create index if not exists promo_new_cards_sku_idx on public.promo_new_cards(sku_id);
 create index if not exists promo_new_cards_group_class_idx on public.promo_new_cards(product_group_id, class_id);
+create index if not exists promo_new_cards_month_idx on public.promo_new_cards(month_id);
+create index if not exists promo_new_cards_family_idx on public.promo_new_cards(promotion_family_id);
 create index if not exists promo_new_groups_version_idx on public.promo_new_product_groups(version_id);
+create index if not exists promo_new_groups_month_idx on public.promo_new_product_groups(month_id);
+create index if not exists promo_new_groups_sku_idx on public.promo_new_product_groups(sku_id);
+create index if not exists promo_new_groups_family_idx on public.promo_new_product_groups(promotion_family_id);
 create index if not exists promo_new_tiers_family_class_idx on public.promo_new_promotion_tiers(family_id, class_id, min_quantity);
 create index if not exists promo_new_audit_entity_idx on public.promo_new_audit_log(entity_type, entity_id, created_at desc);
+create index if not exists promo_new_audit_actor_idx on public.promo_new_audit_log(actor_id);
+create index if not exists promo_new_months_active_version_idx on public.promo_new_months(active_version_id);
+create index if not exists promo_new_versions_previous_idx on public.promo_new_versions(previous_version_id);
+create index if not exists promo_new_versions_created_by_idx on public.promo_new_versions(created_by);
+create index if not exists promo_new_admins_created_by_idx on public.promo_new_admins(created_by);
+create index if not exists promo_new_skus_created_by_idx on public.promo_new_skus(created_by);
+create index if not exists promo_new_skus_updated_by_idx on public.promo_new_skus(updated_by);
+create index if not exists promo_new_sku_prices_updated_by_idx on public.promo_new_sku_prices(updated_by);
 
 alter table public.promo_new_admins enable row level security;
 alter table public.promo_new_months enable row level security;
