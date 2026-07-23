@@ -9,6 +9,7 @@ import {
   doneSummary,
   lineVal,
 } from "../dist/assets/pro/print-model.js";
+import { billPagesHtml } from "../dist/assets/pro/print.js";
 import {
   createSelection,
   mapVal,
@@ -68,6 +69,11 @@ const modulePrintRows = moduleBills.flatMap((bill) =>
   bill.rows.map((row) => lineVal(bill.store, row)),
 );
 const done = doneSummary();
+const twoSheetHtml = billPagesHtml([
+  ...moduleBills,
+  ...moduleBills.map((bill) => ({ ...bill, storeSeq: 1 })),
+  ...moduleBills.map((bill) => ({ ...bill, storeSeq: 2 })),
+]);
 const telesaleRows = teleRows();
 const telesaleBills = new Set(
   telesaleRows.map((row) => [row.inv, row.store, row.tele, row.date].join("|")),
@@ -113,6 +119,11 @@ assert.equal(
   "Print model must use send quantities only",
 );
 assert.equal(done.storeTotal, fixture.expected.printStoreTotal);
+assert.equal(
+  (twoSheetHtml.match(/class="a4Sheet"/g) || []).length,
+  2,
+  "Print must keep two bills per A4 sheet",
+);
 assert.equal(telesaleRows.length, fixture.expected.teleRows);
 assert.equal(telesaleBills.size, fixture.expected.teleBills);
 assert.equal(
@@ -145,5 +156,6 @@ assert.match(appSource, /import "\.\/core\.js";/);
 assert.doesNotMatch(appSource, /pro-native-core\.js/);
 assert.match(coreSource, /currentStateSource: "state-module"/);
 assert.doesNotMatch(appSource, /pro-native-core-overrides\.js/);
+assert.doesNotMatch(appSource, /pro-print-(?:store-bills|mode-fixes|column-widths|a4-pro-fix)\.js/);
 
 console.log("Pro regression modules passed:", fixture.expected);

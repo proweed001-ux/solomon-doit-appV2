@@ -1,0 +1,1573 @@
+* {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f6f7f8;
+        color: #111827;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Tahoma,
+          sans-serif;
+        font-size: 14px;
+      }
+      .topbar {
+        min-height: 56px;
+        background: linear-gradient(90deg, #075424, #087b34);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 14px;
+        position: sticky;
+        top: 0;
+        z-index: 30;
+      }
+      .back {
+        color: #fff;
+        text-decoration: none;
+        font-weight: 900;
+      }
+      .title {
+        font-size: 17px;
+        font-weight: 950;
+      }
+      .wrap {
+        padding: 12px;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px #0f172a0d;
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+      .topGrid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 12px;
+      }
+      .uploadCard {
+        position: relative;
+      }
+      .uploadRow {
+        min-height: 44px;
+        border: 1px solid #d1d5db;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px;
+        background: #fff;
+      }
+      .fileName {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .tab {
+        height: 44px;
+      }
+      .filterGrid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .field label {
+        display: block;
+        font-size: 12px;
+        color: #374151;
+        font-weight: 900;
+        margin-bottom: 5px;
+      }
+      .field input {
+        width: 100%;
+        height: 42px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #fff;
+        padding: 0 10px;
+        font-weight: 800;
+      }
+      .pickBtn {
+        height: 38px;
+        border-radius: 8px;
+        font-weight: 950;
+        padding: 0 12px;
+        width: 100%;
+        text-align: left;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #111827;
+        background: #fff !important;
+        border: 1px solid #d1d5db !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+      }
+      .pickBtn b {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #111827 !important;
+      }
+      .searchLine {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .btnPair {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .summaryHead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 14px 0 8px;
+      }
+      .summaryHead h3 {
+        margin: 0;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+      .sum {
+        border-radius: 12px;
+        padding: 12px;
+        border: 1px solid #e5e7eb;
+        min-height: 82px;
+      }
+      .sum b {
+        display: block;
+        font-size: 13px;
+        margin-bottom: 8px;
+      }
+      .sum strong {
+        font-size: 21px;
+      }
+      .sum small {
+        display: block;
+        color: #6b7280;
+        margin-top: 5px;
+      }
+      .sblue {
+        background: #eff6ff;
+      }
+      .sgreen {
+        background: #ecfdf5;
+      }
+      .sorange {
+        background: #fff7ed;
+      }
+      .sgray {
+        background: #f8fafc;
+      }
+      .barline {
+        height: 5px;
+        background: #dbeafe;
+        border-radius: 99px;
+        margin-top: 12px;
+        overflow: hidden;
+      }
+      .barline i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: #22a6c7;
+      }
+      .tableCard {
+        padding: 0;
+        overflow: hidden;
+      }
+      .tableTop {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 14px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .sendBar {
+        display: grid;
+        grid-template-columns: 1fr 170px;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 14px;
+        background: #f0fdf4;
+        border-bottom: 1px solid #bbf7d0;
+      }
+      .sendLabel {
+        display: grid;
+        grid-template-columns: 86px 1fr;
+        gap: 8px;
+        align-items: center;
+        font-weight: 950;
+        color: #087b34;
+      }
+      .tableWrap {
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .tbl {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 560px;
+        font-size: 12px;
+      }
+      .tbl th,
+      .tbl td {
+        border-bottom: 1px solid #e5e7eb;
+        border-right: 1px solid #eef2f7;
+        padding: 6px 4px;
+        text-align: center;
+        background: #fff;
+      }
+      .tbl th {
+        background: #f8fafc;
+        color: #374151;
+        font-weight: 950;
+      }
+      .tbl td:nth-child(2),
+      .tbl th:nth-child(2) {
+        text-align: left;
+      }
+      .tbl input.pick {
+        width: 54px;
+        height: 32px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        text-align: center;
+        font-weight: 900;
+      }
+      .p b {
+        display: block;
+      }
+      .p small {
+        display: block;
+        color: #6b7280;
+      }
+      .bad {
+        color: #dc2626 !important;
+        font-weight: 900;
+      }
+      .blue {
+        color: #2563eb !important;
+        font-weight: 900;
+      }
+      .good {
+        color: #16a34a;
+        font-weight: 900;
+      }
+      .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 12px;
+        border-top: 1px solid #e5e7eb;
+      }
+      .page {
+        height: 32px;
+        border: 1px solid #d1d5db;
+        background: #fff;
+        border-radius: 7px;
+        font-weight: 900;
+        padding: 0 10px;
+      }
+      .page.on {
+        background: #087b34;
+        color: #fff;
+      }
+      .bottomBar {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .leftBtns {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .empty {
+        padding: 24px;
+        text-align: center;
+        color: #6b7280;
+      }
+      .hint {
+        display: block;
+        color: #6b7280;
+        font-size: 12px;
+        margin-top: 6px;
+      }
+      .cloudBox {
+        margin-top: 10px;
+        border: 1px solid #bbf7d0;
+        background: #f0fdf4;
+        border-radius: 12px;
+        padding: 10px;
+      }
+      .cloudHead {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+      }
+      .cloudMeta {
+        font-size: 12px;
+        color: #166534;
+        line-height: 1.55;
+        margin-top: 6px;
+        word-break: break-word;
+      }
+      .cloudBtns {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .fileBtn,
+      .cloudBtn,
+      .outline,
+      .clear,
+      .searchBtn,
+      .undo,
+      .reset,
+      .autosave,
+      .tab,
+      .page,
+      .teleBtn,
+      .devClose,
+      .insertDelBtn {
+        height: 38px;
+        padding: 0 12px;
+        border: 0 !important;
+        background: linear-gradient(
+          180deg,
+          #22c55e 0%,
+          #0b8f3a 58%,
+          #06652b 100%
+        ) !important;
+        color: #fff !important;
+        border-radius: 12px !important;
+        font-weight: 950 !important;
+        box-shadow:
+          0 3px 0 #03451e,
+          0 6px 10px rgba(3, 69, 30, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.48) !important;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.34) !important;
+        cursor: pointer !important;
+      }
+      .settingsGear {
+        width: 40px !important;
+        height: 40px !important;
+        border-radius: 999px !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 21px !important;
+        line-height: 1 !important;
+        background: #ffffff1a !important;
+        color: #fff !important;
+        border: 1px solid #ffffff55 !important;
+      }
+      .teleBtn {
+        background: linear-gradient(
+          180deg,
+          #a855f7 0%,
+          #7e22ce 58%,
+          #581c87 100%
+        ) !important;
+        box-shadow:
+          0 3px 0 #3b0764,
+          0 6px 10px rgba(88, 28, 135, 0.26),
+          inset 0 1px 0 rgba(255, 255, 255, 0.48) !important;
+      }
+      .tab.on,
+      .page.on,
+      .cloudBtn.main,
+      .searchBtn {
+        background: linear-gradient(
+          180deg,
+          #34d66d 0%,
+          #0a9f42 58%,
+          #06722f 100%
+        ) !important;
+      }
+      .devTeamBtn {
+        position: absolute;
+        right: 14px;
+        top: 12px;
+        width: 132px;
+        height: 42px;
+        border: 0;
+        background: linear-gradient(
+          180deg,
+          #22c55e 0%,
+          #0b8f3a 58%,
+          #06652b 100%
+        );
+        color: #fff;
+        border-radius: 12px;
+        font-size: 17px;
+        font-weight: 950;
+        box-shadow:
+          0 3px 0 #03451e,
+          0 6px 10px rgba(3, 69, 30, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.48);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.34);
+        cursor: pointer;
+      }
+      .drawerShade {
+        position: fixed;
+        inset: 0;
+        background: #0006;
+        z-index: 79;
+        display: none;
+      }
+      .drawer {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 84vh;
+        background: #fff;
+        z-index: 80;
+        border-radius: 18px 18px 0 0;
+        box-shadow: 0 -12px 40px #0004;
+        transform: translateY(105%);
+        transition: 0.18s;
+        display: flex;
+        flex-direction: column;
+      }
+      .drawer.on {
+        transform: translateY(0);
+      }
+      .drawerShade.on {
+        display: block;
+      }
+      .drawerHead {
+        padding: 12px 14px;
+        background: #0b6b31;
+        color: #fff;
+        border-radius: 18px 18px 0 0;
+        display: flex;
+        justify-content: space-between;
+      }
+      .drawerBody {
+        padding: 10px;
+        overflow: auto;
+      }
+      .teleBill {
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        margin-bottom: 10px;
+        overflow: hidden;
+        background: #fff;
+      }
+      .teleBillHead {
+        background: #f5f3ff;
+        padding: 9px 10px;
+        border-bottom: 1px solid #ddd6fe;
+      }
+      .teleTbl {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      .teleTbl th,
+      .teleTbl td {
+        border-bottom: 1px solid #eef2f7;
+        padding: 6px 5px;
+        text-align: center;
+      }
+      .detailBox {
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 8px;
+        margin-top: 6px;
+        font-size: 12px;
+        text-align: left;
+      }
+      .pickShade {
+        position: fixed;
+        inset: 0;
+        background: #0007;
+        z-index: 10000;
+        display: none;
+        align-items: flex-end;
+      }
+      .pickShade.on {
+        display: flex;
+      }
+      .pickPanel {
+        background: #fff;
+        width: 100%;
+        max-height: 86vh;
+        border-radius: 18px 18px 0 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .pickHead {
+        background: #087b34;
+        color: #fff;
+        padding: 12px 14px;
+        border-radius: 18px 18px 0 0;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .pickList {
+        padding: 8px;
+        overflow: auto;
+      }
+      .pickItem {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 12px;
+        border-bottom: 1px solid #eef2f7;
+        font-weight: 900;
+      }
+      .pickItem .box {
+        width: 22px;
+        height: 22px;
+        border: 2px solid #9ca3af;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .pickItem.on .box {
+        border-color: #087b34;
+        background: #087b34;
+        color: #fff;
+      }
+      .pickFoot {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+        padding: 10px;
+        border-top: 1px solid #e5e7eb;
+      }
+      .pickFoot button {
+        height: 42px;
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+        background: #fff;
+        font-weight: 950;
+      }
+      .pickFoot .ok {
+        background: #087b34;
+        color: #fff;
+        border-color: #087b34;
+      }
+      .devModal {
+        position: fixed;
+        inset: 0;
+        background: #0007;
+        z-index: 12000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+      }
+      .devModal.on {
+        display: flex;
+      }
+      .devPanel {
+        width: min(720px, 100%);
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: 0 20px 60px #0005;
+        overflow: hidden;
+      }
+      .devHead {
+        background: #087b34;
+        color: #fff;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-weight: 950;
+      }
+      .devBody {
+        padding: 16px;
+      }
+      .devPerson {
+        display: grid;
+        grid-template-columns: 1.25fr 230px;
+        gap: 16px;
+        align-items: center;
+        border: 1px solid #d1fae5;
+        background: #f0fdf4;
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 12px;
+      }
+      .devInfo b {
+        display: block;
+        font-size: 22px;
+        color: #064e3b;
+        margin-bottom: 10px;
+      }
+      .devCode {
+        display: inline-block;
+        background: #dcfce7;
+        color: #166534;
+        border: 1px solid #86efac;
+        border-radius: 999px;
+        padding: 6px 14px;
+        font-weight: 950;
+        margin-bottom: 10px;
+        font-size: 17px;
+      }
+      .devRole {
+        color: #374151;
+        font-weight: 900;
+        font-size: 17px;
+      }
+      .devPhotoFrame {
+        height: 155px;
+        border: 7px solid #22e070;
+        background: #ecfdf5;
+        border-radius: 4px;
+        overflow: hidden;
+        box-shadow: inset 0 0 0 1px #16a34a33;
+      }
+      .devPhotoFrame img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .devPhotoFrame .noPhoto {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #166534;
+        font-weight: 950;
+        text-align: center;
+        padding: 8px;
+      }
+      .printOverlay {
+        position: fixed;
+        inset: 0;
+        background: #fff;
+        z-index: 9999;
+        overflow: auto;
+        color: #000;
+      }
+      .printBar {
+        position: sticky;
+        top: 0;
+        background: #fff;
+        border-bottom: 1px solid #000;
+        padding: 8px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .printPage {
+        width: 194mm;
+        min-height: 281mm;
+        margin: 8px auto;
+        padding: 7mm;
+        background: #fff;
+      }
+      .printPage table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .printPage th,
+      .printPage td {
+        border: 1px solid #000;
+        padding: 4px;
+      }
+      @media (max-width: 720px) {
+        .wrap {
+          padding: 8px;
+        }
+        .topGrid,
+        .filterGrid,
+        .searchLine,
+        .summary,
+        .sendBar {
+          grid-template-columns: 1fr;
+        }
+        .tabs {
+          grid-template-columns: 1fr 1fr;
+        }
+        .title {
+          font-size: 15px;
+        }
+        .sendLabel {
+          grid-template-columns: 1fr;
+        }
+        .tbl {
+          min-width: 540px;
+        }
+        .p small {
+          font-size: 11px;
+        }
+        .devTeamBtn {
+          position: absolute;
+          right: 12px;
+          top: 10px;
+          width: 118px;
+          height: 38px;
+          font-size: 15.5px;
+        }
+        .devPerson {
+          grid-template-columns: 1fr 128px;
+          gap: 10px;
+          padding: 12px;
+        }
+        .devInfo b {
+          font-size: 17px;
+        }
+        .devCode,
+        .devRole {
+          font-size: 13px;
+        }
+        .devPhotoFrame {
+          height: 112px;
+          border-width: 5px;
+        }
+      }
+      @media print {
+        body > *:not(.printOverlay) {
+          display: none !important;
+        }
+        .printOverlay {
+          position: static;
+        }
+        .printBar {
+          display: none;
+        }
+        .printPage {
+          width: auto;
+          min-height: auto;
+          margin: 0;
+          padding: 0;
+        }
+      }
+      .orderTab,
+      .orderTab.on {
+        background: linear-gradient(
+          180deg,
+          #fb7185 0%,
+          #e11d48 58%,
+          #9f1239 100%
+        ) !important;
+        box-shadow:
+          0 3px 0 #7f1d1d,
+          0 6px 10px rgba(159, 18, 57, 0.28),
+          inset 0 1px 0 rgba(255, 255, 255, 0.48) !important;
+        color: #fff !important;
+      }
+      .modeTop {
+        display: grid !important;
+        grid-template-columns: 1fr auto !important;
+        gap: 8px !important;
+        align-items: start !important;
+      }
+      .modeTop .tabs {
+        grid-column: 1/-1 !important;
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 6px !important;
+        margin: 8px 0 0 !important;
+      }
+      .modeTop .tab {
+        height: 34px !important;
+        min-width: 0 !important;
+        padding: 0 4px !important;
+        border-radius: 10px !important;
+        font-size: 12.5px !important;
+        line-height: 1.05 !important;
+        white-space: normal !important;
+      }
+      .tableTitleBox {
+        min-width: 0;
+      }
+      @media (max-width: 720px) {
+        .modeTop {
+          grid-template-columns: 1fr !important;
+        }
+        .modeTop #displayActionButtons {
+          grid-column: 1/-1 !important;
+        }
+        .modeTop .tabs {
+          grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+        .modeTop .tab {
+          height: 34px !important;
+          font-size: 12px !important;
+          padding: 0 3px !important;
+        }
+      }
+      .resultsModeBtn {
+        position: absolute;
+        right: 154px;
+        top: 12px;
+        width: 112px;
+        height: 42px;
+        border: 0;
+        background: linear-gradient(
+          180deg,
+          #22c55e 0%,
+          #0b8f3a 58%,
+          #06652b 100%
+        );
+        color: #fff;
+        border-radius: 12px;
+        font-size: 17px;
+        font-weight: 950;
+        box-shadow:
+          0 3px 0 #03451e,
+          0 6px 10px rgba(3, 69, 30, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.48);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.34);
+        cursor: pointer;
+      }
+      .uploadCard h3 {
+        padding-right: 258px;
+      }
+      @media (max-width: 720px) {
+        .resultsModeBtn {
+          right: 140px;
+          top: 10px;
+          width: 96px;
+          height: 38px;
+          font-size: 15.5px;
+        }
+        .uploadCard h3 {
+          padding-right: 226px;
+        }
+      }
+      @media (max-width: 390px) {
+        .resultsModeBtn {
+          position: static;
+          width: 100%;
+          margin: 4px 0 8px;
+        }
+        .devTeamBtn {
+          position: static !important;
+          width: 100% !important;
+          margin-bottom: 8px !important;
+        }
+        .uploadCard h3 {
+          padding-right: 0;
+        }
+        .uploadCard {
+          display: grid;
+          gap: 8px;
+        }
+      }
+      .sendActionButtons {
+        grid-column: 1/-1;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px;
+        margin-top: 0;
+      }
+      .sendActionButtons button {
+        width: 100%;
+        height: 38px;
+        min-width: 0;
+        padding: 0 3px;
+        font-size: 11px;
+        line-height: 1.05;
+        white-space: normal;
+      }
+      @media (max-width: 720px) {
+        .sendActionButtons {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+        .sendActionButtons button {
+          height: 38px;
+          font-size: 10.8px;
+          padding: 0 2px;
+        }
+      }
+      .displayActionButtons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        align-items: center;
+      }
+      .displayActionButtons button {
+        width: 100%;
+        height: 40px;
+        white-space: nowrap;
+      }
+      @media (max-width: 720px) {
+        .displayActionButtons {
+          grid-column: 1/-1;
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .fuelBillBtn {
+        position: absolute;
+        right: 280px;
+        top: 12px;
+        width: 112px;
+        height: 42px;
+        border: 0;
+        background: linear-gradient(
+          180deg,
+          #f59e0b 0%,
+          #d97706 58%,
+          #92400e 100%
+        );
+        color: #fff;
+        border-radius: 12px;
+        font-size: 17px;
+        font-weight: 950;
+        box-shadow:
+          0 3px 0 #78350f,
+          0 6px 10px rgba(146, 64, 14, 0.26),
+          inset 0 1px 0 rgba(255, 255, 255, 0.48);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.34);
+        cursor: pointer;
+      }
+      #fuelBillBtn {
+        display: none !important;
+      }
+      body.fuelSecretOn #fuelBillBtn {
+        display: block !important;
+      }
+      .uploadCard h3 {
+        padding-right: 382px !important;
+      }
+      @media (max-width: 720px) {
+        .fuelBillBtn {
+          right: 244px;
+          top: 10px;
+          width: 96px;
+          height: 38px;
+          font-size: 15.5px;
+        }
+        .uploadCard h3 {
+          padding-right: 336px !important;
+        }
+      }
+      @media (max-width: 390px) {
+        .fuelBillBtn {
+          position: static !important;
+          width: 100% !important;
+          margin: 4px 0 8px !important;
+        }
+        .uploadCard h3 {
+          padding-right: 0 !important;
+        }
+      }
+
+.blue { color: #2563eb !important; font-weight: 900; }
+.tbl { min-width: 560px !important; font-size: 12px !important; }
+.tbl th, .tbl td { padding: 6px 4px !important; }
+.tbl input.pick { width: 54px !important; height: 32px !important; }
+.tableWrap { overflow-x: auto !important; }
+.insertDelBtn { margin-left: 8px; border: 1px solid #ef4444; background: #fef2f2; color: #dc2626; border-radius: 7px; padding: 2px 8px; font-size: 11px; font-weight: 950; }
+.r { text-align: right; }
+.c { text-align: center; }
+[contenteditable="true"] { outline: 1px dashed transparent; cursor: text; }
+[contenteditable="true"]:focus { outline: 1px dashed #2563eb; background: #eff6ff; }
+#diagBtn.settingsGear { width: 40px; height: 40px; border-radius: 999px; padding: 0 !important; display: flex; align-items: center; justify-content: center; font-size: 21px; line-height: 1; background: #ffffff1a !important; color: #fff !important; border: 1px solid #ffffff55 !important; }
+.displayActionButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; }
+.displayActionButtons button { width: 100%; height: 40px; white-space: nowrap; }
+.sendActionButtons { grid-column: 1/-1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 0; }
+.sendActionButtons button { width: 100%; height: 38px; min-width: 0; padding: 0 3px; font-size: 11px; line-height: 1.05; white-space: normal; }
+@keyframes ayaLetterWave { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(-5px); } 50% { transform: translateY(0); } 75% { transform: translateY(4px); } }
+.ayaBrandTitle { display: inline-flex !important; align-items: center !important; justify-content: center !important; font-family: "Arial Black", Impact, system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif !important; font-size: 21px !important; font-weight: 1000 !important; letter-spacing: .25px !important; line-height: 1 !important; color: #fff !important; -webkit-text-fill-color: #fff !important; background: none !important; text-shadow: 0 2px 3px rgba(0, 0, 0, .55) !important; white-space: nowrap !important; overflow: visible !important; }
+.ayaBrandTitle .ayaChar { display: inline-block !important; color: #fff !important; animation: ayaLetterWave 2.2s ease-in-out infinite !important; animation-delay: calc(var(--i) * .075s) !important; }
+.topbar { overflow: hidden !important; background: linear-gradient(90deg, #075424, #087b34) !important; }
+.devQrPoster { background: #fff; border: 0; border-radius: 0; box-shadow: none; margin: 4px auto 0; padding: 0 0 6px; text-align: center; width: 100%; }
+.devQrPosterTop { font-weight: 950; font-size: 18px; line-height: 1; color: #0f3f55; letter-spacing: .7px; margin: 0 auto 3px; }
+.devQrPosterLine { width: 168px; height: 4px; background: linear-gradient(90deg, #0f3f55 0 42%, #22c55e 42% 58%, #0f3f55 58% 100%); border-radius: 999px; margin: 0 auto 6px; }
+.devQrPosterFrame { display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 0; padding: 0; margin: 0 auto; }
+.devQrPosterFrame img { width: min(160px, 38vw); height: min(160px, 38vw); object-fit: contain; display: block; background: #fff; }
+.devQrPosterBrand { font-weight: 950; font-size: 34px; line-height: .9; color: #0f3f55; letter-spacing: 1.2px; margin: 3px auto 0; }
+.devQrPosterScan { font-weight: 900; font-size: 12px; color: #087b34; line-height: 1.1; margin-top: 5px; }
+.devQrPosterEmpty { width: min(160px, 38vw); height: min(160px, 38vw); display: flex; align-items: center; justify-content: center; text-align: center; border: 1px dashed #86efac; color: #166534; font-weight: 950; background: #fff; }
+@media (max-width: 720px) {
+  .wrap { padding: 8px !important; }
+  .tbl { min-width: 540px !important; }
+  .p small { font-size: 11px !important; }
+  .displayActionButtons { grid-column: 1/-1; grid-template-columns: 1fr 1fr; }
+  .sendActionButtons { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sendActionButtons button { height: 38px; font-size: 10.8px; padding: 0 2px; }
+  .ayaBrandTitle { font-size: 16.2px !important; letter-spacing: .05px !important; }
+  .ayaBrandTitle .ayaChar { animation-duration: 2.35s !important; animation-delay: calc(var(--i) * .065s) !important; }
+  .devQrPosterTop { font-size: 15px; }
+  .devQrPosterLine { width: 136px; height: 3px; }
+  .devQrPosterFrame img, .devQrPosterEmpty { width: min(132px, 35vw); height: min(132px, 35vw); }
+  .devQrPosterBrand { font-size: 27px; }
+  .devQrPosterScan { font-size: 10.5px; }
+}
+
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+.printMobileSafeA4 {
+  font-family: system-ui, Tahoma, sans-serif !important;
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+  background: #d1d5db !important;
+  color: #000 !important;
+}
+
+.printMobileSafeA4 .printBar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 5 !important;
+  background: #fff !important;
+  border-bottom: 1px solid #222 !important;
+  padding: 7px 8px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  font-size: 13px !important;
+  line-height: 1.2 !important;
+}
+
+.printMobileSafeA4 .printBar button {
+  font-size: 13px !important;
+  padding: 4px 10px !important;
+}
+
+.printMobileSafeA4 .a4Sheet {
+  width: min(194mm, 100vw) !important;
+  height: 277mm !important;
+  margin: 10mm auto !important;
+  padding: 0 !important;
+  background: #fff !important;
+  display: grid !important;
+  grid-template-rows: repeat(2, 138.5mm) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  page-break-after: always !important;
+  break-after: page !important;
+}
+
+.printMobileSafeA4 .receiptPage {
+  width: 100% !important;
+  height: 138.5mm !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 2.5mm 3.5mm !important;
+  background: #fff !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  border-bottom: 1px dashed #777 !important;
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.printMobileSafeA4 .receiptPage:nth-child(2n) {
+  border-bottom: 0 !important;
+}
+
+.printMobileSafeA4 .emptyBill {
+  visibility: hidden !important;
+}
+
+.printMobileSafeA4 .receiptTop {
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin: 0 0 3px !important;
+  padding: 0 0 2px !important;
+  border-bottom: 2px solid #111 !important;
+  flex: 0 0 auto !important;
+}
+
+.printMobileSafeA4 .titleWrap {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+.printMobileSafeA4 .receiptTitle {
+  font-size: 17px !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+  font-weight: 850 !important;
+  letter-spacing: 0 !important;
+}
+
+.printMobileSafeA4 .docBox {
+  flex: 0 0 auto !important;
+  text-align: right !important;
+  font-size: 10.2px !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+}
+
+.printMobileSafeA4 .metaGrid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, .9fr) minmax(0, .9fr) !important;
+  gap: 3px 5px !important;
+  margin: 0 0 4px !important;
+  padding: 3px 4px !important;
+  border: 1px solid #555 !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
+
+.printMobileSafeA4 .metaGrid div {
+  min-width: 0 !important;
+  min-height: 5mm !important;
+  font-size: 10.5px !important;
+  line-height: 1.38 !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.printMobileSafeA4 .metaGrid div:first-child span {
+  font-size: 12.7px !important;
+  font-weight: 800 !important;
+  line-height: 1.3 !important;
+}
+
+.printMobileSafeA4 .metaGrid div:first-child b {
+  font-size: 10.8px !important;
+}
+
+.printMobileSafeA4 .metaGrid b {
+  font-weight: 850 !important;
+  margin-right: 4px !important;
+  flex: 0 0 auto !important;
+}
+
+.printMobileSafeA4 .metaGrid span {
+  display: inline !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.printMobileSafeA4 .receiptTable {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  table-layout: fixed !important;
+  font-size: 10.2px !important;
+  height: 86mm !important;
+  flex: 1 1 auto !important;
+}
+
+.printMobileSafeA4 .receiptTable th,
+.printMobileSafeA4 .receiptTable td {
+  border: 1px solid #222 !important;
+  padding: 1.8px 2.6px !important;
+  line-height: 1.1 !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+}
+
+.printMobileSafeA4 .receiptTable th:nth-child(1),
+.printMobileSafeA4 .receiptTable td:nth-child(1) {
+  width: 24px !important;
+  text-align: center !important;
+}
+
+.printMobileSafeA4 .receiptTable th:nth-child(2),
+.printMobileSafeA4 .receiptTable td:nth-child(2) {
+  width: 58px !important;
+  text-align: center !important;
+}
+
+.printMobileSafeA4 .receiptTable th:nth-child(3),
+.printMobileSafeA4 .receiptTable td:nth-child(3) {
+  width: auto !important;
+  text-align: left !important;
+}
+
+.printMobileSafeA4 .receiptTable th:nth-child(4),
+.printMobileSafeA4 .receiptTable td:nth-child(4) {
+  width: 42px !important;
+}
+
+.printMobileSafeA4 .receiptTable th:nth-child(5),
+.printMobileSafeA4 .receiptTable td:nth-child(5) {
+  width: 52px !important;
+}
+
+.printMobileSafeA4 .receiptTable th:nth-child(6),
+.printMobileSafeA4 .receiptTable td:nth-child(6) {
+  width: 60px !important;
+}
+
+.printMobileSafeA4 .itemName {
+  white-space: normal !important;
+  word-break: break-word !important;
+  font-size: 12.7px !important;
+  font-weight: 800 !important;
+  line-height: 1.13 !important;
+  letter-spacing: -.05px !important;
+}
+
+.printMobileSafeA4 .blankLine td {
+  color: transparent !important;
+}
+
+.printMobileSafeA4 .noteBox {
+  margin-top: 2px !important;
+  min-height: 12px !important;
+  padding: 1.5px 4px !important;
+  border: 1px solid #999 !important;
+  font-size: 10px !important;
+  line-height: 1.1 !important;
+  flex: 0 0 auto !important;
+}
+
+.printMobileSafeA4 .signGrid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  margin-top: 6px !important;
+  gap: 26px !important;
+  flex: 0 0 auto !important;
+}
+
+.printMobileSafeA4 .signBox {
+  border-top: 1px solid #777 !important;
+  text-align: center !important;
+  font-size: 10px !important;
+  line-height: 1.1 !important;
+  padding-top: 2px !important;
+}
+
+.printMobileSafeA4 .totalRow td {
+  font-size: 10.2px !important;
+  font-weight: 850 !important;
+}
+
+@media print {
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .printMobileSafeA4 {
+    position: static !important;
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .printMobileSafeA4 .printBar {
+    display: none !important;
+  }
+
+  .printMobileSafeA4 .a4Sheet {
+    width: 194mm !important;
+    height: 277mm !important;
+    margin: 10mm 8mm !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .printMobileSafeA4 .a4Sheet:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  .printMobileSafeA4 .receiptPage {
+    height: 138.5mm !important;
+    margin: 0 !important;
+    padding: 2.5mm 3.5mm !important;
+    overflow: hidden !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+
+.proPrintGeneric {
+        position: fixed;
+        inset: 0;
+        z-index: 10020;
+        overflow: auto;
+        background: #e5e7eb;
+        color: #111;
+        font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+      }
+      .proPrintGeneric .printBar {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 10px;
+        background: #fff;
+        border-bottom: 1px solid #111;
+        font-size: 14px;
+        font-weight: 900;
+      }
+      .proPrintGeneric .printBar button {
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid #111;
+        background: #fff;
+        font-weight: 900;
+      }
+      .proPrintGeneric .receiptPage {
+        width: 194mm;
+        min-height: 277mm;
+        margin: 8mm auto;
+        padding: 8mm;
+        box-sizing: border-box;
+        background: #fff;
+      }
+      .proPrintGeneric.orderPrint .receiptPage {
+        min-height: auto;
+        margin-top: 3mm;
+        margin-bottom: 3mm;
+        padding-top: 4mm;
+        padding-bottom: 4mm;
+      }
+      .proPrintGeneric .receiptTop {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-end;
+        padding-bottom: 7px;
+        margin-bottom: 8px;
+        border-bottom: 2px solid #111;
+      }
+      .proPrintGeneric .receiptTitle {
+        margin: 0;
+        font-size: 23px;
+        line-height: 1.1;
+        font-weight: 950;
+      }
+      .proPrintGeneric .docBox {
+        font-size: 13px;
+        line-height: 1.45;
+        text-align: right;
+        white-space: nowrap;
+      }
+      .proPrintGeneric .metaGrid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px 12px;
+        border: 1px solid #111;
+        padding: 7px 8px;
+        margin-bottom: 9px;
+        font-size: 13.5px;
+        line-height: 1.35;
+      }
+      .proPrintGeneric .receiptTable {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 13.2px;
+        line-height: 1.25;
+      }
+      .proPrintGeneric .receiptTable th,
+      .proPrintGeneric .receiptTable td {
+        border: 1px solid #111;
+        padding: 4.6px 5px;
+        vertical-align: top;
+      }
+      .proPrintGeneric .receiptTable th {
+        background: #f3f4f6;
+        font-weight: 950;
+        text-align: center;
+      }
+      .proPrintGeneric .receiptTable th:first-child,
+      .proPrintGeneric .receiptTable td:first-child {
+        width: 34px;
+        text-align: center;
+      }
+      .proPrintGeneric .receiptTable th:nth-child(2),
+      .proPrintGeneric .receiptTable td:nth-child(2) {
+        width: auto;
+      }
+      .proPrintGeneric .receiptTable th:not(:nth-child(2)),
+      .proPrintGeneric .receiptTable td:not(:nth-child(2)) {
+        text-align: right;
+      }
+      .proPrintGeneric .receiptTable td:nth-child(2) {
+        text-align: left;
+        word-break: break-word;
+        font-size: 13.8px;
+        font-weight: 750;
+      }
+      .proPrintGeneric .totalRow td {
+        font-weight: 950;
+        background: #f9fafb;
+      }
+      .proPrintGeneric .noteBox {
+        border: 1px solid #777;
+        min-height: 28px;
+        margin-top: 10px;
+        padding: 6px 8px;
+        font-size: 13px;
+      }
+      .proPrintGeneric .signGrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 38px;
+        margin-top: 30px;
+      }
+      .proPrintGeneric .signBox {
+        border-top: 1px solid #111;
+        padding-top: 6px;
+        text-align: center;
+        font-size: 13px;
+      }
+      @media print {
+        body > *:not(.proPrintGeneric) { display: none !important; }
+        .proPrintGeneric {
+          position: static !important;
+          overflow: visible !important;
+          background: #fff !important;
+        }
+        .proPrintGeneric .printBar { display: none !important; }
+        .proPrintGeneric .receiptPage {
+          width: auto !important;
+          min-height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          box-shadow: none !important;
+        }
+        .proPrintGeneric.orderPrint .receiptPage {
+          padding-top: 4mm !important;
+          padding-bottom: 4mm !important;
+        }
+        .proPrintGeneric.orderPrint .receiptTable tr {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        .proPrintGeneric .receiptTable th {
+          background: #eee !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+      }
+
+.proPrintGeneric .receiptTable {
+        table-layout: fixed !important;
+      }
+      .proPrintGeneric .receiptTable th:first-child,
+      .proPrintGeneric .receiptTable td:first-child {
+        width: 8mm !important;
+        min-width: 8mm !important;
+        max-width: 8mm !important;
+        text-align: center !important;
+        padding-left: 2px !important;
+        padding-right: 2px !important;
+      }
+      .proPrintGeneric .receiptTable th:nth-child(2),
+      .proPrintGeneric .receiptTable td:nth-child(2) {
+        width: auto !important;
+        text-align: left !important;
+      }
+      .proPrintGeneric .receiptTable th:nth-child(3),
+      .proPrintGeneric .receiptTable td:nth-child(3) {
+        width: 22mm !important;
+        min-width: 22mm !important;
+        max-width: 22mm !important;
+        text-align: right !important;
+      }
+      .proPrintGeneric .receiptTable th:nth-child(4),
+      .proPrintGeneric .receiptTable td:nth-child(4) {
+        width: 30mm !important;
+        min-width: 30mm !important;
+        max-width: 30mm !important;
+        text-align: right !important;
+      }
+      .proPrintGeneric .receiptTable th,
+      .proPrintGeneric .receiptTable td {
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
+      }
+      .proPrintGeneric .receiptTable td:nth-child(2) {
+        font-size: 13.8px !important;
+        line-height: 1.22 !important;
+      }
+      .proPrintGeneric .receiptTable th:nth-child(3),
+      .proPrintGeneric .receiptTable th:nth-child(4) {
+        white-space: nowrap !important;
+      }
+      .proPrintGeneric .totalRow td:first-child {
+        text-align: right !important;
+      }
+      @media print {
+        .proPrintGeneric .receiptPage {
+          padding-top: 6mm !important;
+          padding-bottom: 6mm !important;
+          box-sizing: border-box !important;
+        }
+        .proPrintGeneric .receiptTable tr {
+          break-inside: avoid !important;
+          page-break-inside: avoid !important;
+        }
+      }
+
+@media print {
+        .printMobileSafeA4 .a4Sheet {
+          width: 210mm !important;
+          height: 296mm !important;
+          margin: 0 !important;
+          padding: 8mm 7mm !important;
+          display: flex !important;
+          flex-direction: column !important;
+          box-sizing: border-box !important;
+          overflow: hidden !important;
+          break-after: page !important;
+          page-break-after: always !important;
+        }
+        .printMobileSafeA4 .a4Sheet:last-child {
+          break-after: auto !important;
+          page-break-after: auto !important;
+        }
+        .printMobileSafeA4 .receiptPage {
+          height: 140mm !important;
+          flex: 0 0 140mm !important;
+          min-height: 0 !important;
+          margin: 0 !important;
+          padding: 2.5mm 3.5mm !important;
+          box-sizing: border-box !important;
+          overflow: hidden !important;
+          break-inside: avoid !important;
+          page-break-inside: avoid !important;
+        }
+      }

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 
 const root = process.cwd();
 const failures = [];
@@ -40,9 +41,8 @@ const required = [
   "dist/assets/pro/team.js",
   "dist/assets/pro/results-mode.js",
   "dist/assets/pro/print-model.js",
-  "dist/assets/pro-print-store-bills.js",
-  "dist/assets/pro-print-mode-fixes.js",
-  "dist/assets/pro-print.css",
+  "dist/assets/pro/print.js",
+  "dist/assets/pro/pro.css",
   "dist/assets/admin-upload-v001.js",
   "dist/assets/admin-json-v265.js",
   "dist/assets/admin-auth-v1.js",
@@ -86,18 +86,76 @@ mustNotContain("dist/assets/pro/app.js", 'import "../pro-native-core.js";');
 mustNotContain("dist/assets/pro/app.js", "pro-native-core-overrides.js");
 mustNotContain("dist/assets/pro/app.js", "pro-team-single.js");
 mustNotContain("dist/assets/pro/app.js", "pro-results-mode.js");
+mustNotContain("dist/assets/pro/app.js", "pro-print-store-bills.js");
+mustNotContain("dist/assets/pro/app.js", "pro-print-mode-fixes.js");
+mustNotContain("dist/assets/pro/app.js", "pro-print-column-widths.js");
+mustNotContain("dist/assets/pro/app.js", "pro-print-a4-pro-fix.js");
 mustContain("dist/assets/pro/core.js", 'currentStateSource: "state-module"');
 mustNotContain("dist/assets/pro/core.js", "MutationObserver");
 mustNotContain("dist/assets/pro/core.js", "setInterval");
 mustContain("dist/assets/pro/state.js", '"doit-core-unified-v1:" + state.key');
 mustContain("dist/assets/pro/print-model.js", "export const BILL_ROWS = 12");
 mustContain("dist/assets/pro/print-model.js", "export const BILLS_PER_A4 = 2");
-mustContain("dist/assets/pro-print-store-bills.js", "BILLS_PER_A4=2");
-mustContain("dist/assets/pro-print-store-bills.js", "BILL_ROWS=12");
-mustContain(
-  "dist/assets/pro-print-store-bills.js",
-  "window.DOIT_CORE_APP?.currentState?.()",
+mustContain("dist/assets/pro/print.js", "buildBills()");
+mustContain("dist/assets/pro/print.js", "BILLS_PER_A4");
+mustContain("dist/pro.html", 'href="/assets/pro/pro.css"');
+mustNotContain("dist/pro.html", "pro-print.css");
+
+const proHtmlScripts = read("dist/pro.html").match(/<script\b/gi) || [];
+check(proHtmlScripts.length === 1, "dist/pro.html must have exactly one script entry");
+
+const proModuleFiles = fs
+  .readdirSync(fp("dist/assets/pro"))
+  .filter((name) => name.endsWith(".js"));
+const activeProSource = proModuleFiles
+  .map((name) => read(path.join("dist/assets/pro", name)))
+  .join("\n");
+[
+  "document.open(",
+  "document.write(",
+  "document.close(",
+  "html.replace(",
+  "MutationObserver",
+  "setInterval(",
+  'createElement("script")',
+  "createElement('script')",
+  "pro-shell-v1028.html",
+  "pro-core-v4.js",
+  "pro-native-core.js",
+  "pro-native-core-overrides.js",
+].forEach((token) =>
+  check(!activeProSource.includes(token), `Active Pro modules must not contain: ${token}`),
 );
+check(
+  !/window\.[A-Za-z_$][\w$]*\s*=\s*function\b/.test(activeProSource),
+  "Active Pro modules must not monkey-patch window functions",
+);
+check(
+  proModuleFiles.filter((name) => /(?:fix|patch|override|hotfix|bridge)/i.test(name)).length === 0,
+  "Active Pro module filenames must not be fix, patch, override, hotfix, or bridge layers",
+);
+check(
+  (activeProSource.match(/export const state\s*=/g) || []).length === 1,
+  "Active Pro modules must have exactly one exported state owner",
+);
+
+try {
+  const base = execFileSync("git", ["merge-base", "HEAD", "origin/main"], {
+    encoding: "utf8",
+  }).trim();
+  const changed = execFileSync("git", ["diff", "--name-only", base], {
+    encoding: "utf8",
+  })
+    .trim()
+    .split("\n")
+    .filter(Boolean);
+  check(
+    !changed.some((name) => /(?:^|[\/_-])promo(?:tion)?(?:[\/_-]|\.|$)/i.test(name)),
+    "Pro refactor must not change promo or promotion files",
+  );
+} catch {
+  // The architecture checks remain deterministic outside a git checkout.
+}
 ["dist/pro.html"].forEach((p) => {
   mustNotContain(p, "raw.githubusercontent.com");
   mustNotContain(p, "cdn.jsdelivr.net/gh/proweed001-ux/solomon-doit-appV2");

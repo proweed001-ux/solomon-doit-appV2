@@ -17,9 +17,6 @@ import {
   TITLE,
   uniq,
   dlabel,
-  parseIso,
-  thaiDate,
-  prevDay,
 } from "./utils.js";
 import {
   state,
@@ -53,6 +50,7 @@ import {
   shipPool,
 } from "./filters.js";
 import { publicFetch, resolveCloudPayload } from "./data-source.js";
+import { preparePrint } from "./print.js";
 (() => {
   "use strict";
 
@@ -576,7 +574,6 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
   }
   function loadData(p, m = {}) {
     state.rows = arr(p).map(norm);
-    window.__doitCoreRows = state.rows;
     state.key = m.id || p?.version_id || m.file_name || "active";
     state.send = {};
     state.add = {};
@@ -669,182 +666,6 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
     msg("แทรกสินค้าแล้ว: " + name);
     render();
   }
-  function printRowsForPick() {
-    const poolMap = new Map(pickPool().map((g) => [g.poolKey, g])),
-      currentStore = rec(),
-      keys = [
-        ...new Set([
-          ...Object.keys(state.send),
-          ...Object.keys(state.add),
-          ...Object.keys(state.pull),
-        ]),
-      ],
-      out = [];
-    keys.forEach((k) => {
-      const parsed = parseKey(k);
-      if (!scopeOk(parsed) || parsed.store !== currentStore) return;
-      const g = poolMap.get(parsed.pk);
-      if (!g) return;
-      const s = mapVal(state.send, parsed.pk, currentStore),
-        a = mapVal(state.add, parsed.pk, currentStore),
-        p = mapVal(state.pull, parsed.pk, currentStore),
-        qty = s + a - p;
-      if (!qty) return;
-      out.push({
-        code: g.code || "",
-        name: g.sku,
-        qty,
-        unit: N(g.netUnit) * 1.07,
-        inserted: g.inserted,
-      });
-    });
-    return out.filter((x) => T(x.name) && N(x.qty) > 0);
-  }
-  function pickSaleDate() {
-    let d = parseIso(state.sel.dates[0]);
-    if (!d) {
-      const sr = sourceRows(),
-        ds = uniq(sr.map((r) => r.date)).sort();
-      d = parseIso(ds[0]);
-    }
-    return d ? thaiDate(prevDay(d)) : "-";
-  }
-  function printMetaPick(total) {
-    return [
-      ["ชื่อร้าน", rec() || "-"],
-      ["วันที่ขาย", pickSaleDate()],
-      ["วันที่ส่ง", thaiDate(new Date())],
-      ["รหัส PS", state.sel.ps.length ? state.sel.ps.join(", ") : "ทั้งหมด"],
-      ["ราคารวม", total + " บาท"],
-    ];
-  }
-  function tableRowsFromDom() {
-    return $$("#table tbody tr")
-      .map((tr) =>
-        [...tr.children].map((td) => {
-          const i = td.querySelector("input");
-          return i ? T(i.value) : T(td.innerText);
-        }),
-      )
-      .filter(
-        (r) =>
-          r.length &&
-          r.join("").trim() &&
-          !/ไม่มีข้อมูล|โหลดไฟล์|เลือก “ส่งให้ร้าน”/.test(r.join(" ")),
-      );
-  }
-  function tableHeadsFromDom() {
-    return $$("#table thead th")
-      .map((th) => T(th.innerText))
-      .filter(Boolean);
-  }
-  function defaultPrintMeta(title) {
-    return [
-      ["เอกสาร", title],
-      ["วันที่พิมพ์", thaiDate(new Date())],
-      [
-        "วันที่",
-        state.sel.dates.length
-          ? state.sel.dates.map(dlabel).join(", ")
-          : "ทั้งหมด",
-      ],
-      ["PS", state.sel.ps.length ? state.sel.ps.join(", ") : "ทั้งหมด"],
-      ["ส่งให้ร้าน", rec() || "-"],
-    ];
-  }
-  function openPrint(html) {
-    const ov = document.createElement("div");
-    ov.className = "printOverlay";
-    ov.innerHTML = `<div class="printBar"><b>ตรวจ/แก้ไขก่อนปริ้น</b><span><button onclick="this.closest('.printOverlay').remove()">ปิด</button> <button onclick="window.print()">ปริ้น</button></span></div>${html}`;
-    document.body.appendChild(ov);
-    return ov;
-  }
-  function formalPrint(title, heads, rows, opt = {}) {
-    if (!rows.length) return alert("ไม่มีข้อมูลสำหรับปริ้นในหน้า " + title);
-    const doc = "DOIT-" + Date.now().toString().slice(-8),
-      metaRows = opt.meta || defaultPrintMeta(title);
-    const m = metaRows
-      .map(
-        ([k, v]) =>
-          `<div contenteditable="true"><b>${E(k)}:</b> ${k === "ราคารวม" ? `<span id="ctxHeaderTotal">${E(v)}</span>` : E(v)}</div>`,
-      )
-      .join("");
-    const h = heads.map((x) => `<th>${E(x)}</th>`).join("");
-    const b = rows
-      .map(
-        (r, i) =>
-          `<tr data-line><td class="c">${i + 1}</td>${r.map((x, j) => `<td class="${j >= 2 ? "r" : ""} ${opt.calc && j === 2 ? "rq" : ""} ${opt.calc && j === 3 ? "ru" : ""} ${opt.calc && j === 4 ? "rt" : ""}" contenteditable="${opt.calc && j === 4 ? "false" : "true"}">${E(x)}</td>`).join("")}</tr>`,
-      )
-      .join("");
-    const foot = opt.total
-      ? `<tr class="totalRow"><td colspan="${heads.length}" class="r" contenteditable="true">รวมทั้งหมด</td><td class="r" id="ctxTotal">${E(opt.total)}</td></tr>`
-      : "";
-    const ov = openPrint(
-      `<section class="receiptPage"><div class="receiptTop"><div><h1 class="receiptTitle" contenteditable="true">${E(title)}</h1></div><div class="docBox"><div contenteditable="true"><b>เลขที่เอกสาร:</b> ${E(doc)}</div></div></div><div class="metaGrid">${m}</div><table class="receiptTable"><thead><tr><th style="width:36px">#</th>${h}</tr></thead><tbody>${b}${foot}</tbody></table><div class="noteBox" contenteditable="true">หมายเหตุ: </div><div class="signGrid"><div class="signBox" contenteditable="true">ผู้ส่งสินค้า / ผู้จัดทำ</div><div class="signBox" contenteditable="true">ผู้รับสินค้า</div></div></section>`,
-    );
-    if (opt.calc) {
-      const recalc = () => {
-        let total = 0;
-        ov.querySelectorAll("tr[data-line]").forEach((tr) => {
-          const q = N(tr.querySelector(".rq")?.textContent),
-            u = N(tr.querySelector(".ru")?.textContent),
-            t = q * u;
-          total += t;
-          const rt = tr.querySelector(".rt");
-          if (rt) rt.textContent = B(t);
-        });
-        const tt = ov.querySelector("#ctxTotal"),
-          hh = ov.querySelector("#ctxHeaderTotal");
-        if (tt) tt.textContent = B(total);
-        if (hh) hh.textContent = B(total) + " บาท";
-      };
-      ov.addEventListener("input", (e) => {
-        if (e.target.closest(".receiptTable")) recalc();
-      });
-      ov.addEventListener(
-        "blur",
-        (e) => {
-          if (e.target.closest(".receiptTable")) recalc();
-        },
-        true,
-      );
-      recalc();
-    }
-    return ov;
-  }
-  function printPick() {
-    const data = printRowsForPick(),
-      total = B(data.reduce((s, x) => s + x.qty * x.unit, 0)),
-      trs = data.map((x) => [
-        x.code,
-        x.name,
-        F(x.qty),
-        B(x.unit),
-        B(x.qty * x.unit),
-      ]);
-    formalPrint(
-      "บิลสินค้า/ ใบเสร็จ",
-      ["รหัส", "รายการสินค้า", "จำนวน", "ราคา/หน่วย", "รวมเงิน"],
-      trs,
-      {
-        calc: true,
-        total,
-        meta: printMetaPick(total),
-      },
-    );
-  }
-  function printPrep() {
-    if (state.mode === "pick") return printPick();
-    const title =
-      state.mode === "ship" ? "ใบส่งสินค้า / ใบเสร็จรับเงิน" : modeName();
-    let heads = tableHeadsFromDom(),
-      data = tableRowsFromDom();
-    if (state.mode === "remain") {
-      heads = heads.slice(1);
-      data = data.map((r) => r.slice(1));
-    }
-    formalPrint(title, heads, data);
-  }
   function exportCsv() {
     const csv =
       "\ufeff" +
@@ -918,14 +739,6 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
     document.title = TITLE;
     const t = document.querySelector(".topbar .title");
     if (!t) return;
-    let st = $("#ayaSeaWaveTitleCss");
-    if (!st) {
-      st = document.createElement("style");
-      st.id = "ayaSeaWaveTitleCss";
-      st.textContent =
-        '@keyframes ayaLetterWave{0%,100%{transform:translateY(0)}25%{transform:translateY(-5px)}50%{transform:translateY(0)}75%{transform:translateY(4px)}}.ayaBrandTitle{display:inline-flex!important;align-items:center!important;justify-content:center!important;font-family:"Arial Black",Impact,system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif!important;font-size:21px!important;font-weight:1000!important;letter-spacing:.25px!important;line-height:1!important;color:#fff!important;-webkit-text-fill-color:#fff!important;background:none!important;text-shadow:0 2px 3px rgba(0,0,0,.55)!important;white-space:nowrap!important;overflow:visible!important}.ayaBrandTitle .ayaChar{display:inline-block!important;color:#fff!important;animation:ayaLetterWave 2.2s ease-in-out infinite!important;animation-delay:calc(var(--i) * .075s)!important}.topbar{overflow:hidden!important;background:linear-gradient(90deg,#075424,#087b34)!important}@media(max-width:720px){.ayaBrandTitle{font-size:16.2px!important;letter-spacing:.05px!important}.ayaBrandTitle .ayaChar{animation-duration:2.35s!important;animation-delay:calc(var(--i) * .065s)!important}}';
-      document.head.appendChild(st);
-    }
     t.classList.add("ayaBrandTitle");
     t.setAttribute("aria-label", TITLE);
     t.innerHTML = [...TITLE]
@@ -936,13 +749,6 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
       .join("");
   }
   function fixUi() {
-    if (!$("#coreMobileTableCss")) {
-      const st = document.createElement("style");
-      st.id = "coreMobileTableCss";
-      st.textContent =
-        '.blue{color:#2563eb!important;font-weight:900}.tbl{min-width:560px!important;font-size:12px!important}.tbl th,.tbl td{padding:6px 4px!important}.tbl input.pick{width:54px!important;height:32px!important}.tableWrap{overflow-x:auto!important}.insertDelBtn{margin-left:8px;border:1px solid #ef4444;background:#fef2f2;color:#dc2626;border-radius:7px;padding:2px 8px;font-size:11px;font-weight:950}.receiptPage{font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;color:#111;width:194mm;min-height:281mm;margin:8px auto;padding:10mm;background:#fff}.receiptTop{display:flex;justify-content:space-between;gap:16px;border-bottom:3px solid #111;padding-bottom:10px;margin-bottom:12px}.receiptTitle{font-size:24px;font-weight:950;margin:0}.docBox{text-align:right;font-size:12px;line-height:1.7}.metaGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;border:1px solid #111;padding:8px;margin-bottom:12px}.metaGrid div{font-size:13px}.metaGrid b{display:inline-block;min-width:78px}.receiptTable{width:100%;border-collapse:collapse;font-size:12px}.receiptTable th{background:#f3f4f6}.receiptTable th,.receiptTable td{border:1px solid #111;padding:5px;vertical-align:top}.r{text-align:right}.c{text-align:center}.totalRow td{font-weight:950;background:#f9fafb}.noteBox{border:1px solid #9ca3af;padding:8px;margin-top:12px;min-height:38px;font-size:12px}.signGrid{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:32px}.signBox{text-align:center;border-top:1px solid #111;padding-top:8px;font-size:13px}[contenteditable="true"]{outline:1px dashed transparent;cursor:text}[contenteditable="true"]:focus{outline:1px dashed #2563eb;background:#eff6ff}@media(max-width:720px){.wrap{padding:8px!important}.tbl{min-width:540px!important}.p small{font-size:11px!important}}#diagBtn.settingsGear{width:40px;height:40px;border-radius:999px;padding:0!important;display:flex;align-items:center;justify-content:center;font-size:21px;line-height:1;background:#ffffff1a!important;color:#fff!important;border:1px solid #ffffff55!important}@media print{.printBar{display:none!important}.receiptPage{width:auto;min-height:auto;margin:0;padding:0}.receiptTable th{background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
-      document.head.appendChild(st);
-    }
     const os = document.querySelector('[data-pick="orderStores"]'),
       labEl = os?.closest(".field")?.querySelector("label");
     if (labEl) labEl.textContent = "ตัดร้านบิลจริง";
@@ -959,25 +765,7 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
         };
       }
     }
-    function moveDisplayExport() {
-      let st = $("#displayExportCss");
-      if (!st) {
-        st = document.createElement("style");
-        st.id = "displayExportCss";
-        st.textContent =
-          ".displayActionButtons{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center}.displayActionButtons button{width:100%;height:40px;white-space:nowrap}@media(max-width:720px){.displayActionButtons{grid-column:1/-1;grid-template-columns:1fr 1fr}}";
-        document.head.appendChild(st);
-      }
-    }
     function moveProActions() {
-      let st = $("#sendActionMoveCss");
-      if (!st) {
-        st = document.createElement("style");
-        st.id = "sendActionMoveCss";
-        st.textContent =
-          ".sendActionButtons{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:0}.sendActionButtons button{width:100%;height:38px;min-width:0;padding:0 3px;font-size:11px;line-height:1.05;white-space:normal}@media(max-width:720px){.sendActionButtons{grid-template-columns:repeat(4,minmax(0,1fr))}.sendActionButtons button{height:38px;font-size:10.8px;padding:0 2px}}";
-        document.head.appendChild(st);
-      }
       const bar = document.querySelector(".sendBar");
       const detail = $("#showDetailBtn");
       if (!bar || !detail) return;
@@ -994,7 +782,6 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
       });
     }
     moveProActions();
-    moveDisplayExport();
     const gear = $("#diagBtn");
     if (gear) {
       gear.textContent = "⚙";
@@ -1051,7 +838,8 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
       $("#teleDrawer").classList.remove("on");
     };
     $("#insertBtn").onclick = addInsert;
-    $("#prepPrint").onclick = printPrep;
+    $("#prepPrint").onclick = () =>
+      preparePrint({ mode: state.mode, title: modeName() });
     $("#exportCsv").onclick = exportCsv;
     const cs = $("#copySummary");
     if (cs) cs.onclick = copySummary;
@@ -1084,43 +872,40 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
           msg("เปลี่ยนโหมด: " + T(t.textContent));
         }),
     );
-    $("#diagBtn").onclick = () =>
-      alert(JSON.stringify(window.DOIT_CORE_APP.health(), null, 2));
+    $("#diagBtn").onclick = () => alert(JSON.stringify(health(), null, 2));
+  }
+  function health() {
+    const telesale = teleRows();
+    return {
+      rows: state.rows.length,
+      pickRows: sourceRows().length,
+      shipRows: shipPool().length,
+      distRows: sourceRows({ ignoreDate: true }).length,
+      teleRows: state.rows.filter((row) => row.isTele).length,
+      teleBills: teleBills().length,
+      teleQty: telesale.reduce((sum, row) => sum + N(row.qty), 0),
+      teleRaw: telesale.reduce((sum, row) => sum + N(row.rawAmt), 0),
+      teleVat: telesale.reduce(
+        (sum, row) => sum + (N(row.netAmt) || N(row.rawAmt)) * 1.07,
+        0,
+      ),
+      renderedTeleBills: $$(".teleBill").length,
+      telePage: state.telePage,
+      telePageSize: TELE_PAGE_SIZE,
+      receivers: state.sel.receivers,
+      manualKeys: Object.keys(state.send).length,
+      inserted: state.ins.length,
+      mode: state.mode,
+      bound: state.bound,
+      flow: "single-entry-single-state-single-render",
+      currentStateSource: "state-module",
+    };
   }
   window.DOIT_CORE_APP = {
     load: loadData,
     currentState,
-    health: () => {
-      const tr = teleRows();
-      return {
-        rows: state.rows.length,
-        pickRows: sourceRows().length,
-        shipRows: shipPool().length,
-        distRows: sourceRows({
-          ignoreDate: true,
-        }).length,
-        teleRows: state.rows.filter((r) => r.isTele).length,
-        teleBills: teleBills().length,
-        teleQty: tr.reduce((s, r) => s + N(r.qty), 0),
-        teleRaw: tr.reduce((s, r) => s + N(r.rawAmt), 0),
-        teleVat: tr.reduce(
-          (s, r) => s + (N(r.netAmt) || N(r.rawAmt)) * 1.07,
-          0,
-        ),
-        renderedTeleBills: $$(".teleBill").length,
-        telePage: state.telePage,
-        telePageSize: TELE_PAGE_SIZE,
-        receivers: state.sel.receivers,
-        manualKeys: Object.keys(state.send).length,
-        inserted: state.ins.length,
-        mode: state.mode,
-        bound: state.bound,
-        flow: "single-state-module-raw-net-v2",
-        currentStateSource: "state-module",
-      };
-    },
+    health,
   };
-  window.DOIT_JSON_APP = window.DOIT_CORE_APP;
   bind();
   check();
 })();
