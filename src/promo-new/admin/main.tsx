@@ -3,11 +3,10 @@ import { createRoot } from 'react-dom/client';
 import { AlertTriangle, CheckCircle2, Database, FileSpreadsheet, Layers3, LogOut, Save, Search, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 import type { PromoDataset, ProductGroup } from '../domain/types';
 import { autoAssignPromotionFamilies } from '../domain/auto-match';
-import { applyPromotionFamily } from '../domain/grouping';
-import { assignCardsManually } from '../domain/manual-grouping';
+import { applyPromotionFamily, applyPromotionFamilyToCard } from '../domain/grouping';
 import { applyPriceToGroup, setCentralPrice } from '../domain/pricing';
 import { confirmSkuCandidate } from '../domain/sku-identity';
-import { assertReadyForPublish } from '../domain/validation';
+import { assertReadyForPublishMultiCard as assertReadyForPublish } from './validation-multi-card';
 import { nextDraftVersion } from '../domain/versioning';
 import type { ImportedCardCandidate, PdfImportProgress, PdfImportResult } from '../import/pdf-importer';
 import type { WorkbookParseResult } from '../import/workbook-parser';
@@ -25,6 +24,8 @@ import {
   savePromoTestCache,
   type PromoTestCacheSummary,
 } from './test-cache';
+import { ManualGroupingWorkbench } from './manual-workbench';
+import { GroupingSnapshotSave } from './grouping-snapshot-save';
 import './admin.css';
 
 type Session = NonNullable<ReturnType<typeof loadSession>>;
@@ -81,19 +82,14 @@ function LoginPage({ onLogin, onDemo, allowDemo }: { onLogin: (session: Session)
   </section></main>;
 }
 
-function GroupEditor({ group, dataset, priceDraft, selectedCardIds, manualTargetLocked, isManualTarget, onPriceDraft, onConfirmSku, onApply, onToggleCard, onSelectGroup, onUseAsTarget }: {
+function GroupEditor({ group, dataset, priceDraft, onPriceDraft, onConfirmSku, onApply, onApplyCardPromotion }: {
   group: ProductGroup;
   dataset: PromoDataset;
   priceDraft: string;
-  selectedCardIds: Set<string>;
-  manualTargetLocked: boolean;
-  isManualTarget: boolean;
   onPriceDraft: (value: string) => void;
   onConfirmSku: () => void;
   onApply: (familyId: string, price: number) => void;
-  onToggleCard: (cardId: string) => void;
-  onSelectGroup: (cardIds: string[]) => void;
-  onUseAsTarget: () => void;
+  onApplyCardPromotion: (cardId: string, familyId: string) => void;
 }) {
   const [familyId, setFamilyId] = useState(group.promotionFamilyId || '');
   useEffect(() => setFamilyId(group.promotionFamilyId || ''), [group.promotionFamilyId]);
@@ -102,21 +98,31 @@ function GroupEditor({ group, dataset, priceDraft, selectedCardIds, manualTarget
   return <article className={`group-card ${group.status}`}>
     <div className="group-top">
       <div>
-        <div className="thumbs">{cards.map(card => <label className={`thumb selectable ${selectedCardIds.has(card.id) ? 'selected' : ''}`} key={card.id}><input className="card-check" type="checkbox" disabled={!manualTargetLocked || isManualTarget} checked={selectedCardIds.has(card.id)} onChange={() => onToggleCard(card.id)} />{card.imageUrl ? <img src={card.imageUrl} alt={card.id} loading="lazy" /> : <div className="empty">ไม่มีรูป</div>}<span>{card.classId}</span></label>)}</div>
+        <div className="thumbs">{cards.map(card => <div className="thumb" key={card.id}>
+          {card.imageUrl ? <img src={card.imageUrl} alt={card.id} loading="lazy" /> : <div className="empty">ไม่มีรูป</div>}
+          <span>{card.classId}</span>
+          <label className="field card-promotion-field">โปรโมชั่นของการ์ด
+            <select value={card.promotionFamilyId || ''} onChange={event => onApplyCardPromotion(card.id, event.target.value)}>
+              <option value="">ยังไม่เลือก</option>
+              {dataset.promotionFamilies
+                .filter(item => Boolean(card.classId && item.tiersByClass[card.classId]))
+                .map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </label>
+        </div>)}</div>
         <div className="product-name">{group.sku.canonicalName}</div>
-        <div className="manual-group-actions"><button className={`btn ${isManualTarget ? 'success' : 'soft'}`} onClick={onUseAsTarget}>{isManualTarget ? 'กลุ่มปลายทางที่ล็อกอยู่' : 'ใช้กลุ่มนี้เป็นปลายทาง'}</button><button className="btn soft" disabled={!manualTargetLocked || isManualTarget} onClick={() => onSelectGroup(group.cardIds)}>เลือกทั้งกลุ่มนี้</button></div>
-        <div className="tags"><span className="tag">{group.sku.code}</span><span className={`tag ${group.status === 'ready' ? 'good' : group.status === 'blocked' ? 'bad' : 'warn'}`}>{group.status}</span><span className="tag">{group.cardIds.length} การ์ด</span>{group.promotionFamilyId && <span className="tag good">Family จับแล้ว</span>}{group.classIds.map(classId => <span className="tag" key={classId}>{classId}</span>)}</div>
-        <div className="sku-meta"><span><b>แบรนด์:</b> {group.sku.identity.brand || '-'}</span><span><b>ชนิด:</b> {group.sku.identity.productType || '-'}</span><span><b>ขนาด:</b> {group.sku.identity.sizeValue || '-'} {group.sku.identity.sizeUnit}</span><span><b>หน่วย/Pack:</b> {group.sku.identity.salesUnit} × {group.sku.identity.packQuantity}</span><span><b>Variant:</b> {group.sku.identity.variant || '-'}</span><span><b>ราคาเดิม:</b> {money(group.price.effectivePrice?.amount)}</span></div>
+        <div className="tags"><span className="tag">{group.sku.code}</span><span className={`tag ${group.status === 'ready' ? 'good' : group.status === 'blocked' ? 'bad' : 'warn'}`}>{group.status}</span><span className="tag">{group.cardIds.length} การ์ด</span>{group.promotionFamilyId && <span className="tag good">Family เดียวกันทุกใบ</span>}{!group.promotionFamilyId && cards.some(card => card.promotionFamilyId) && <span className="tag warn">โปรโมชั่นต่างกันรายใบ</span>}{group.classIds.map(classId => <span className="tag" key={classId}>{classId}</span>)}</div>
+        <div className="sku-meta"><span><b>แบรนด์:</b> {group.sku.identity.brand || '-'}</span><span><b>ชนิด:</b> {group.sku.identity.productType || '-'}</span><span><b>ขนาด:</b> {group.sku.identity.sizeValue || '-'} {group.sku.identity.sizeUnit}</span><span><b>หน่วย/Pack:</b> {group.sku.identity.salesUnit} × {group.sku.identity.packQuantity}</span><span><b>Variant:</b> {group.sku.identity.variant || '-'}</span><span><b>ราคา:</b> {money(group.price.effectivePrice?.amount)}</span></div>
         {group.sku.status === 'candidate' && <button className="btn soft" style={{ marginTop: 10 }} onClick={onConfirmSku}>ยืนยันเป็น SKU ใหม่</button>}
         {group.sku.status === 'quarantine' && <div className="failure">ชื่อสินค้ายังไม่พอระบุ Product Master อย่างปลอดภัย</div>}
         {!!group.failureReasons.length && <div className="failure">{group.failureReasons.join(' · ')}</div>}
       </div>
       <div className="group-controls">
-        <label className="field">Promotion Family<select value={familyId} onChange={event => setFamilyId(event.target.value)}><option value="">เลือกจาก CSV/XLSM</option>{dataset.promotionFamilies.map(item => <option key={item.id} value={item.id}>{item.name} · {Object.keys(item.tiersByClass).join(', ')}</option>)}</select></label>
-        <div className="price-row"><label className="field">ราคากลางต่อชิ้น<input type="number" min="0.01" step="0.01" inputMode="decimal" value={priceDraft} onChange={event => onPriceDraft(event.target.value)} placeholder="0.00" /></label><label className="field">แหล่งราคา<input value={group.price.source === 'central_override' ? 'ราคากลางถาวร' : group.price.source === 'pdf' ? 'ราคา PDF' : 'ยังไม่มีราคา'} readOnly /></label></div>
-        <div className="price-source">ผูกกับ Product Master และใช้ราคาเดิมข้ามเดือน</div>
-        <div className="tier-preview">{family ? group.classIds.map(classId => <div className="tier-line" key={classId}><b>{classId}</b><span>{family.tiersByClass[classId]?.map(tier => tier.sourceText).join(' / ') || 'ไม่มี Class นี้ — จะ Block'}</span></div>) : <span>เลือก Promotion Family เพื่อดูเงื่อนไขแต่ละ Class</span>}</div>
-        <div className="control-actions"><button className="btn success" disabled={!familyId || !(Number(priceDraft) > 0)} onClick={() => onApply(familyId, Number(priceDraft))}>ใช้โปรและราคากับทุก Class</button></div>
+        <label className="field">Promotion Family สำหรับใช้กับทุกการ์ด<select value={familyId} onChange={event => setFamilyId(event.target.value)}><option value="">เลือกจาก CSV/XLSM</option>{dataset.promotionFamilies.map(item => <option key={item.id} value={item.id}>{item.name} · {Object.keys(item.tiersByClass).join(', ')}</option>)}</select></label>
+        <div className="price-row"><label className="field">ราคากลางต่อชิ้น<input type="number" min="0.01" step="0.01" inputMode="decimal" value={priceDraft} onChange={event => onPriceDraft(event.target.value)} placeholder="0.00" /></label><label className="field">แหล่งราคา<input value={group.price.source === 'central_override' ? 'คุณกรอกเอง' : 'ยังไม่มีราคา'} readOnly /></label></div>
+        <div className="price-source">ราคาเริ่มว่างและจะเปลี่ยนเมื่อคุณกรอกเองเท่านั้น</div>
+        <div className="tier-preview">{family ? group.classIds.map(classId => <div className="tier-line" key={classId}><b>{classId}</b><span>{family.tiersByClass[classId]?.map(tier => tier.sourceText).join(' / ') || 'ไม่มี Class นี้ — จะ Block'}</span></div>) : <span>เลือก Family ตรงการ์ดแต่ละใบ หรือเลือกด้านบนเพื่อใช้กับทุกใบ</span>}</div>
+        <div className="control-actions"><button className="btn success" disabled={!familyId || !(Number(priceDraft) > 0)} onClick={() => onApply(familyId, Number(priceDraft))}>ยืนยันราคาและใช้โปรนี้กับทุกการ์ด</button></div>
       </div>
     </div>
   </article>;
@@ -143,9 +149,6 @@ function AdminApp() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
-  const [manualSelection, setManualSelection] = useState<string[]>([]);
-  const [manualTarget, setManualTarget] = useState('');
-  const [manualTargetLocked, setManualTargetLocked] = useState(false);
   const [previewChecked, setPreviewChecked] = useState(false);
   const [savedVersionId, setSavedVersionId] = useState<string | null>(null);
 
@@ -187,7 +190,7 @@ function AdminApp() {
       existingSkus: master.skus,
       storedPrices: master.prices,
       promotionFamilies: parsedWorkbook.families,
-      visualSignatures: {},
+      visualSignatures: undefined,
       onProgress: workerMessage => setProgress({ phase: 'cards', page: 0.72, pageCount: 1, cards: imported.cards.length, elapsedMs: performance.now() - groupingStarted, message: `${progressPrefix} · ${workerMessage}` }),
     });
   };
@@ -204,7 +207,7 @@ function AdminApp() {
     groupedInput: GroupedResult | null = null,
   ) => {
     const master = masterInput || await loadMasterData();
-    const grouped = groupedInput || await runGrouping(imported, parsedWorkbook, master, artifactMonthKey, 'จัดกลุ่มจากข้อความ');
+    const grouped = groupedInput || await runGrouping(imported, parsedWorkbook, master, artifactMonthKey, 'จัดกลุ่มจาก Structural Grid และชื่อสินค้า');
     setProgress({ phase: 'cards', page: 0.92, pageCount: 1, cards: imported.cards.length, elapsedMs: 0, message: 'กำลังสร้างผลลัพธ์และ Promotion Family' });
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     const version = nextDraftVersion(artifactMonthKey, [], session?.user.id || null);
@@ -278,7 +281,7 @@ function AdminApp() {
       } catch (caught) {
         cacheWarnings.push(`browser_cache_save_failed:${errorText(caught)}`);
       }
-      await groupArtifacts(imported, parsedWorkbook, pdf.name, workbook.name, cacheWarnings, `ประมวลผลข้อความแล้ว · OCR เพิ่ม ${adaptiveAttempted} ใบ · ดีขึ้น ${adaptiveImproved} ใบ`, monthKey, master, grouped);
+      await groupArtifacts(imported, parsedWorkbook, pdf.name, workbook.name, cacheWarnings, `ประมวลผล Structural Grid, OCR ชื่อรอบเดียว และ Visual-first แล้ว`, monthKey, master, grouped);
     } catch (caught) {
       setProgress(null);
       setError(errorText(caught));
@@ -305,7 +308,7 @@ function AdminApp() {
       setWorkbook(cached.workbook);
       if (!cached.imported || !cached.parsedWorkbook) throw new Error('cache_source_only_reprocess_required');
       assertWorkbookReady(cached.parsedWorkbook);
-      const prepared = prepareCachedRun(cached.imported, {});
+      const prepared = prepareCachedRun(cached.imported, cached.visualSignatures || {});
       setProgress({ phase: 'cards', page: 0.3, pageCount: 1, cards: prepared.imported.cards.length, elapsedMs: performance.now() - started, message: `โหลดแคชแล้ว · Product Master ${master.skus.length} · แก้ Class ${prepared.changedClasses} การ์ดใน ${prepared.recoveredPages} หน้า` });
       await groupArtifacts(prepared.imported, cached.parsedWorkbook, cached.pdf.name, cached.workbook.name, ['grouping_rerun_from_browser_cache', ...cached.warnings, ...prepared.warnings], `จัดกลุ่มใหม่จากแคช · ใช้ข้อความและ Product Master · แก้ Class ${prepared.changedClasses} การ์ด`, cached.monthKey, master);
     } catch (caught) {
@@ -391,54 +394,28 @@ function AdminApp() {
     }
   });
 
-  const toggleManualCard = (cardId: string) => setManualSelection(current =>
-    current.includes(cardId) ? current.filter(id => id !== cardId) : [...current, cardId]);
 
-  const selectManualGroup = (cardIds: string[]) => setManualSelection(current => {
-    const next = new Set(current);
-    const allSelected = cardIds.every(id => next.has(id));
-    cardIds.forEach(id => allSelected ? next.delete(id) : next.add(id));
-    return [...next];
-  });
-
-  const lockManualTarget = (value: string) => {
-    if (!value) return;
-    setManualTarget(value);
-    setManualTargetLocked(true);
-    setManualSelection([]);
-    setError('');
-  };
-
-  const unlockManualTarget = () => {
-    setManualTargetLocked(false);
-    setManualSelection([]);
-  };
-
-  const applyManualGrouping = () => {
-    if (!dataset || !manualTargetLocked || !manualTarget) return;
-    const [kind, ...idParts] = manualTarget.split(':');
-    const id = idParts.join(':');
-    const target = kind === 'sku' ? { skuId: id } : { groupId: id };
+  const applyCardPromotion = (groupId: string, cardId: string, familyId: string) => setDataset(current => {
+    if (!current) return current;
+    const group = current.productGroups.find(item => item.id === groupId);
+    const family = familyId ? current.promotionFamilies.find(item => item.id === familyId) : null;
+    if (!group || (familyId && !family)) return current;
     try {
-      const targetName = kind === 'sku'
-        ? dataset.skus.find(item => item.id === id)?.canonicalName
-        : dataset.productGroups.find(item => item.id === id)?.sku.canonicalName;
-      if (!window.confirm(`ย้ายการ์ดที่เลือก ${manualSelection.length} ใบ เข้า “${targetName || 'กลุ่มที่เลือก'}” ใช่หรือไม่`)) return;
-      const result = assignCardsManually(dataset, quarantine, manualSelection, target);
-      setDataset(result.dataset);
-      setQuarantine(result.quarantine);
-      setManualSelection([]);
+      const promoted = applyPromotionFamilyToCard(group, current.cards, cardId, family || null);
       setPreviewChecked(false);
       setSavedVersionId(null);
-      setMessage(`จัดกลุ่มเองแล้ว ${result.movedCardIds.length} การ์ด · เหลือ Quarantine ${result.quarantine.length}`);
       setError('');
+      return {
+        ...current,
+        cards: promoted.cards,
+        productGroups: current.productGroups.map(item => item.id === groupId ? promoted.group : item),
+      };
     } catch (caught) {
       setError(errorText(caught));
+      return current;
     }
-  };
+  });
 
-  const selectedCardIds = useMemo(() => new Set(manualSelection), [manualSelection]);
-  const manualTargetGroupId = manualTarget.startsWith('group:') ? manualTarget.slice(6) : '';
 
   const visibleGroups = useMemo(() => (dataset?.productGroups || []).filter(group => {
     if (filter !== 'all' && group.status !== filter) return false;
@@ -522,7 +499,7 @@ function AdminApp() {
           <label className="field file-drop"><span><FileSpreadsheet size={16} /> เลือก CSV/XLSX/XLSM</span><input type="file" accept={PROMOTION_WORKBOOK_ACCEPT} onChange={selectWorkbook} /><small>{workbook ? `${workbook.name} · ${inspectPromotionWorkbookFile(workbook).label}` : 'รองรับ .csv, .xlsx, .xlsm และ .xls'}</small></label>
         </div>
         <div className="run-row">
-          <label className="field" style={{ flexDirection: 'row', alignItems: 'center' }}><input style={{ width: 18, height: 18 }} type="checkbox" checked={ocr} onChange={event => setOcr(event.target.checked)} /> OCR รอบหลักจากหน้า PDF ครั้งเดียว; OCR หัวขวาบนเพิ่มเฉพาะ unresolved หลังเทียบ Product Master</label>
+          <label className="field" style={{ flexDirection: 'row', alignItems: 'center' }}><input style={{ width: 18, height: 18 }} type="checkbox" checked={ocr} onChange={event => setOcr(event.target.checked)} /> ตรวจกรอบการ์ดจากกรอบนอก + ช่องอ้างอิงซ้ายล่าง + ช่องโปรโมชั่นสีแดง แล้ว OCR ชื่อมุมขวาบนครั้งเดียว</label>
           <button className="btn primary" disabled={busy || !pdf || !workbook || demo || !session} onClick={processFiles}>{busy ? 'กำลังประมวลผล...' : 'ประมวลผลไฟล์และบันทึกแคช'}</button>
         </div>
         <div style={{ marginTop: 12, padding: 12, border: '1px solid #dbe4ef', borderRadius: 12, background: '#f8fafc' }}>
@@ -536,21 +513,44 @@ function AdminApp() {
               <button className="btn soft" disabled={busy || demo} onClick={clearCachedRun}><Trash2 size={15} /> ล้างแคช</button>
             </div>
           </div>
-          <small>การกดจากแคชจะไม่ OCR ซ้ำ ไม่สร้างลายนิ้วมือภาพ และอ่าน IndexedDB เพียงครั้งเดียว</small>
+          <small>แคชรุ่นเก่าที่ตัดกรอบไม่ตรงถูกยกเลิก; แคชรุ่นนี้ใช้เฉพาะ Structural Grid ที่ตรวจจุดอ้างอิงครบและลายนิ้วมือที่ตรวจครบ</small>
         </div>
         <div className="progress"><i style={{ width: progress ? `${Math.max(3, progress.page / Math.max(1, progress.pageCount) * 100)}%` : '0%' }} /></div><div className="progress-meta"><span>{progress?.message || message}</span><span>{progress ? `${progress.cards} การ์ด · ${(progress.elapsedMs / 1000).toFixed(1)} วินาที` : ''}</span></div>
       </section>
       <section className="panel"><div className="summary"><div className="stat"><span>SKU</span><b>{dataset?.skus.length || 0}</b></div><div className="stat"><span>Product Group</span><b>{dataset?.productGroups.length || 0}</b></div><div className="stat"><span>การ์ด</span><b>{dataset?.cards.length || 0}</b></div><div className="stat"><span>พร้อมใช้</span><b>{ready}</b></div><div className="stat"><span>Block/Quarantine</span><b>{blocked + quarantine.length}</b></div></div></section>
-      {dataset && <section className="panel manual-panel"><div className="section-head"><div><h2>จัดกลุ่มเอง</h2><small>เลือกและล็อกกลุ่มปลายทางก่อน แล้วติ๊กการ์ดรายใบหรือเลือกทั้งกลุ่ม</small></div><span className={`tag ${manualTargetLocked ? 'good' : 'warn'}`}>{manualTargetLocked ? 'ล็อกปลายทางแล้ว' : 'ยังไม่ล็อกกลุ่ม'}</span></div>
-        <div className="manual-bar"><label className="field">กลุ่มสินค้าปลายทาง<select disabled={manualTargetLocked} value={manualTarget} onChange={event => setManualTarget(event.target.value)}><option value="">เลือกกลุ่มก่อน</option><optgroup label="กลุ่มของเดือนนี้">{dataset.productGroups.map(group => <option key={group.id} value={`group:${group.id}`}>{group.sku.canonicalName} · {group.classIds.join(', ') || 'ยังไม่มี Class'}</option>)}</optgroup><optgroup label="สร้างกลุ่มจาก Product Master">{dataset.skus.filter(sku => sku.status === 'active' && !dataset.productGroups.some(group => group.skuId === sku.id)).map(sku => <option key={sku.id} value={`sku:${sku.id}`}>{sku.canonicalName}</option>)}</optgroup></select></label>
-          <div className="manual-target-actions"><button className="btn primary" disabled={!manualTarget || manualTargetLocked} onClick={() => lockManualTarget(manualTarget)}>ล็อกกลุ่มนี้</button><button className="btn soft" disabled={!manualTargetLocked} onClick={unlockManualTarget}>เปลี่ยนกลุ่ม</button><button className="btn success" disabled={!manualTargetLocked || !manualSelection.length} onClick={applyManualGrouping}>เพิ่ม {manualSelection.length} การ์ดเข้ากลุ่ม</button></div>
-        </div>
-        <div className="manual-hint">{manualTargetLocked ? <>กลุ่มถูกล็อกแล้ว — เลือกการ์ดได้ทันที ระบบจะไม่ยอมให้มี Class ซ้ำ</> : <>ยังเลือกการ์ดไม่ได้ กรุณาเลือกกลุ่มสินค้าปลายทางแล้วกด “ล็อกกลุ่มนี้”</>}</div>
-      </section>}
-      <section className="panel"><div className="section-head"><div><h2><Layers3 size={19} /> Product Group</h2><small>ใช้ชื่อสินค้า Product Master และ XLSM เป็นหลัก; รูปเก็บไว้แสดงและตรวจด้วยตา ไม่ใช้เป็นตัวระบุสินค้าถาวร</small></div><span className="tag">{visibleGroups.length} กลุ่ม</span></div><div className="search-row"><label style={{ position: 'relative' }}><Search size={17} style={{ position: 'absolute', left: 12, top: 14, color: '#64748b' }} /><input style={{ paddingLeft: 38 }} value={search} onChange={event => setSearch(event.target.value)} placeholder="ค้นหาชื่อสินค้า แบรนด์ SKU หรือ Class" /></label><select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">ทุกสถานะ</option><option value="ready">พร้อมใช้</option><option value="need_review">ต้องตรวจ</option><option value="blocked">Block</option></select></div>
-        <div className="group-list">{dataset ? visibleGroups.map(group => <GroupEditor key={group.id} group={group} dataset={dataset} priceDraft={priceDrafts[group.id] ?? String(group.price.effectivePrice?.amount || '')} selectedCardIds={selectedCardIds} manualTargetLocked={manualTargetLocked} isManualTarget={group.id === manualTargetGroupId && manualTargetLocked} onPriceDraft={value => setPriceDrafts(current => ({ ...current, [group.id]: value }))} onConfirmSku={() => confirmSku(group.id)} onApply={(familyId, amount) => applyGroup(group.id, familyId, amount)} onToggleCard={toggleManualCard} onSelectGroup={selectManualGroup} onUseAsTarget={() => lockManualTarget(`group:${group.id}`)} />) : <div className="empty">เลือกไฟล์แล้วกดประมวลผล หรือกดตรวจและจัดกลุ่มจากแคช</div>}</div>
+      {dataset && <>
+        <ManualGroupingWorkbench
+          dataset={dataset}
+          quarantine={quarantine}
+          adminKey={session?.accessToken || ''}
+          readOnly={demo || dryRun}
+          onDatasetChange={setDataset}
+          onQuarantineChange={setQuarantine}
+          onMessage={setMessage}
+          onError={setError}
+          onDirty={() => { setPreviewChecked(false); setSavedVersionId(null); }}
+        />
+        <GroupingSnapshotSave
+          dataset={dataset}
+          quarantine={quarantine}
+          adminKey={session?.accessToken || ''}
+          readOnly={demo || dryRun}
+          onMessage={setMessage}
+          onError={setError}
+        />
+      </>}
+      <section className="panel"><div className="section-head"><div><h2><Layers3 size={19} /> Product Group</h2><small>ใช้ชื่อมุมขวาบนจากกรอบการ์ดที่ผ่าน Structural Grid, Product Master และลายนิ้วมือรูปสินค้าเพื่อรวมข้าม Class; ราคาและ Promotion Family ให้แอดมินเลือกเอง</small></div><span className="tag">{visibleGroups.length} กลุ่ม</span></div><div className="search-row"><label style={{ position: 'relative' }}><Search size={17} style={{ position: 'absolute', left: 12, top: 14, color: '#64748b' }} /><input style={{ paddingLeft: 38 }} value={search} onChange={event => setSearch(event.target.value)} placeholder="ค้นหาชื่อสินค้า แบรนด์ SKU หรือ Class" /></label><select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">ทุกสถานะ</option><option value="ready">พร้อมใช้</option><option value="need_review">ต้องตรวจ</option><option value="blocked">Block</option></select></div>
+        <div className="group-list">{dataset ? visibleGroups.map(group => <GroupEditor
+          key={group.id}
+          group={group}
+          dataset={dataset}
+          priceDraft={priceDrafts[group.id] ?? String(group.price.effectivePrice?.amount || '')}
+          onPriceDraft={value => setPriceDrafts(current => ({ ...current, [group.id]: value }))}
+          onConfirmSku={() => confirmSku(group.id)}
+          onApply={(familyId, amount) => applyGroup(group.id, familyId, amount)}
+          onApplyCardPromotion={(cardId, familyId) => applyCardPromotion(group.id, cardId, familyId)}
+        />) : <div className="empty">เลือกไฟล์แล้วกดประมวลผล หรือกดตรวจและจัดกลุ่มจากแคช</div>}</div>
       </section>
-      {!!quarantine.length && <section className="panel"><div className="section-head"><div><h2>รายการที่ต้องแก้เฉพาะจุด</h2><small>ล็อกกลุ่มปลายทางด้านบน แล้วติ๊กการ์ดจากรายการนี้เพื่อนำกลับเข้ากลุ่ม</small></div><span className="tag bad">{quarantine.length}</span></div><div className="quarantine">{quarantine.map(card => <label className={`quarantine-card selectable ${selectedCardIds.has(card.cardId) ? 'selected' : ''}`} key={card.cardId}><input className="card-check" type="checkbox" disabled={!manualTargetLocked} checked={selectedCardIds.has(card.cardId)} onChange={() => toggleManualCard(card.cardId)} /><img src={card.imageUrl} alt={card.cardId} /><b>{card.productText || 'อ่านชื่อสินค้าไม่ได้'}</b><small>{card.classId || 'ไม่มี Class'} · หน้า {card.page}</small><div className="failure">{card.failureReasons.join(' · ')}</div></label>)}</div></section>}
       <div className="footer-actions"><button className="btn soft" disabled={!dataset || busy || (!dryRun && !savedVersionId)} onClick={validatePreview}><CheckCircle2 size={16} /> {previewChecked ? 'ตรวจความพร้อมผ่าน' : 'ตรวจความพร้อมจริง'}</button><button className="btn primary" disabled={!dataset || !session || demo || dryRun || busy || Boolean(savedVersionId) || dataset.version.status === 'published'} onClick={save}><Save size={16} /> {savedVersionId ? 'Draft บันทึกแล้ว' : 'บันทึก Draft'}</button><button className="btn dark" disabled={!publishable} onClick={publish}>Publish เวอร์ชันนี้</button></div>
     </main>
   </div>;
