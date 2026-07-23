@@ -12,6 +12,7 @@ export function GroupingSnapshotSave({
   readOnly,
   onMessage,
   onError,
+  onSaved,
 }: {
   dataset: PromoDataset;
   quarantine: ImportedCardCandidate[];
@@ -19,6 +20,7 @@ export function GroupingSnapshotSave({
   readOnly: boolean;
   onMessage: (message: string) => void;
   onError: (message: string) => void;
+  onSaved?: (snapshot: PromoGroupingSnapshot) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [savedSignature, setSavedSignature] = useState('');
@@ -62,9 +64,10 @@ export function GroupingSnapshotSave({
           revision: Number(dataset.sourceDataset.snapshotRevision),
         }
         : null;
-      const snapshot = createManualGroupingSnapshot(dataset, savedSnapshot || persistedPrevious);
+      const snapshot = createManualGroupingSnapshot(dataset, persistedPrevious);
       const result = await savePromoGroupingSnapshot(snapshot, adminKey);
       setSavedSnapshot(result);
+      onSaved?.(result);
       setSavedSignature(signature);
       onMessage(`บันทึก Snapshot revision ${result.revision} แล้ว: ${result.cardCount} การ์ด · ${result.groups.length} กลุ่ม · ${new Date(result.savedAt).toLocaleString('th-TH')}`);
     } catch (error) {
