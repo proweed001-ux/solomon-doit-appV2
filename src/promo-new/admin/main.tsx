@@ -570,6 +570,15 @@ function AdminApp() {
           readOnly={demo || dryRun}
           onMessage={setMessage}
           onError={setError}
+          onSaved={snapshot => setDataset(current => current?.sourceDataset ? {
+            ...current,
+            sourceDataset: {
+              ...current.sourceDataset,
+              snapshotId: snapshot.snapshotId,
+              snapshotRevision: snapshot.revision,
+              snapshotSavedAt: snapshot.savedAt,
+            },
+          } : current)}
         />
       </>}
       <section className="panel"><div className="section-head"><div><h2><Layers3 size={19} /> Product Group</h2><small>ใช้ชื่อมุมขวาบนจากกรอบการ์ดที่ผ่าน Structural Grid, Product Master และลายนิ้วมือรูปสินค้าเพื่อรวมข้าม Class; ราคาและ Promotion Family ให้แอดมินเลือกเอง</small></div><span className="tag">{visibleGroups.length} กลุ่ม</span></div><div className="search-row"><label style={{ position: 'relative' }}><Search size={17} style={{ position: 'absolute', left: 12, top: 14, color: '#64748b' }} /><input style={{ paddingLeft: 38 }} value={search} onChange={event => setSearch(event.target.value)} placeholder="ค้นหาชื่อสินค้า แบรนด์ SKU หรือ Class" /></label><select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">ทุกสถานะ</option><option value="ready">พร้อมใช้</option><option value="need_review">ต้องตรวจ</option><option value="blocked">Block</option></select></div>
