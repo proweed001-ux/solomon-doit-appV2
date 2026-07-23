@@ -114,6 +114,7 @@ check(
   "npm run test:pro-architecture",
   "npm run test:pro-modules",
   "npm run test:pro-browser",
+  'git diff --check "$PRO_SMOKE_BASE_SHA"...HEAD',
 ].forEach((token) => mustContain(".github/workflows/web-ci.yml", token));
 
 // Pro stable guardrails.
