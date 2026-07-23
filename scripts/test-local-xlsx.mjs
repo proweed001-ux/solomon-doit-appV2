@@ -7,8 +7,6 @@ const pages = [
   'dist/admin.html',
   'dist/fuel.html',
   'dist/pick.html',
-  'dist/pro-native-phase4.html',
-  'dist/pro-native-test.html',
 ];
 const localUrl = '/assets/vendor/xlsx-0.18.5.full.min.js';
 

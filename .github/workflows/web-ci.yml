@@ -86,6 +86,8 @@ jobs:
         run: npm run test:pro-lazy
       - name: Local XLSX dependency
         run: npm run test:local-xlsx
+      - name: QA DOIT fixture
+        run: npm run test:qa-doit
       - name: Pro architecture guard
         run: npm run test:pro-architecture
       - name: Pro module syntax and imports

@@ -208,9 +208,18 @@ function rowsFromWorksheet(buffer) {
 }
 function counterTop(map, limit = 12) { return [...map.entries()].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]))).slice(0, limit).map(([key, count]) => ({ key, count })); }
 function checkPrintGuardrails() {
-  const js = fileText('dist/assets/pro-print-store-bills.js');
-  const css = fileText('dist/assets/pro-print.css');
-  return { billRows12: js.includes('const BILL_ROWS = 12'), billsPerA4Two: js.includes('const BILLS_PER_A4 = 2'), editKeyStable: js.includes("const EDIT_KEY = 'doit-pro-print-price-edits-v1'"), a4Css: css.includes('@page') && css.includes('.printMobileSafeA4') };
+  const model = fileText('dist/assets/pro/print-model.js');
+  const print = fileText('dist/assets/pro/print.js');
+  const css = fileText('dist/assets/pro/pro.css');
+  return {
+    billRows12: model.includes('export const BILL_ROWS = 12'),
+    billsPerA4Two: model.includes('export const BILLS_PER_A4 = 2'),
+    editKeyStable: model.includes('export const PRINT_EDIT_KEY = "doit-pro-print-price-edits-v1"'),
+    zeroQtyExcluded: model.includes('.filter((row) => T(row.name) && N(row.qty) > 0)'),
+    activeOverlay: print.includes('overlay.className = "printOverlay printMobileSafeA4"') && print.includes('buildBills()'),
+    a4Portrait: css.includes('@page') && css.includes('size: A4 portrait'),
+    billsPerSheetCss: css.includes('grid-template-rows: repeat(2, 138.5mm)'),
+  };
 }
 function summarize(rows, parseSource, pivotPath = '') {
   const parsed = [];
