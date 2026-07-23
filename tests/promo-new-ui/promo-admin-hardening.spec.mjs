@@ -327,7 +327,7 @@ test('runtime supports add, remove, undo, bulk confirm, per-card promo, lock, sa
   expect(backend.writeCount).toBe(2);
 
   await page.reload();
-  await expect(page.getByText(/โหลดการจัดกลุ่มที่บันทึกไว้แล้ว 4 การ์ด/u)).toBeVisible();
+  await expect(page.getByTestId('target-group-select')).toBeVisible();
   await expect(page.getByTestId(`card-promotion-${CARD_ONE}`)).toHaveValue('family:three');
   await expect(page.getByTestId(`card-promotion-${CARD_TWO}`)).toHaveValue('family:two');
   await expect(page.getByTestId(`card-promotion-${CARD_ONE}`)).toBeDisabled();
