@@ -55,6 +55,8 @@ check(legacyAuth.includes("action === 'load-grouping-snapshot'"), 'group_snapsho
 check(legacyAuth.includes("action === 'unlock-grouping-group'"), 'central_group_unlock_route_missing');
 check(legacyAuth.includes('PROMO_TEST_DATABASE'), 'test_database_flag_missing');
 check(legacyAuth.includes('hostname === productionHostname'), 'production_database_rejection_missing');
+check(legacyAuth.includes('function rpcBoolean(value)'), 'test_rpc_boolean_shape_guard_missing');
+check(legacyAuth.includes("action === 'runtime-status'"), 'runtime_backend_status_route_missing');
 check(legacyAuth.includes("testSupabase('/rest/v1/rpc/validate_promo_test_admin_key_v2'"), 'test_admin_key_validation_rpc_missing');
 check(legacyAuth.includes("testSupabase('/rest/v1/rpc/load_promo_test_master_data_v2'"), 'test_master_data_rpc_missing');
 check(!legacyAuth.includes("supabase('/rest/v1/rpc/save_manual_promo_grouping_snapshot'"), 'legacy_production_snapshot_write_reintroduced');

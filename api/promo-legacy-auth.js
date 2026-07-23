@@ -40,6 +40,12 @@ function testDatabaseEnabled() {
   return String(process.env.PROMO_TEST_DATABASE || '') === '1';
 }
 
+function rpcBoolean(value) {
+  return value === true
+    || (Array.isArray(value) && value.length === 1 && value[0] === true)
+    || (value && typeof value === 'object' && value.valid === true);
+}
+
 async function supabase(path, options = {}) {
   const response = await fetch(`${SUPABASE_URL}${path}`, {
     ...options,
@@ -112,7 +118,7 @@ async function validateUploadKey(adminKey) {
       method: 'POST',
       body: JSON.stringify({ p_auth_hash: sha256(key) }),
     });
-    if (valid !== true) throw new Error('invalid_upload_key');
+    if (!rpcBoolean(valid)) throw new Error('invalid_upload_key');
     return key;
   }
   const promoMonthId = await latestPublishedMonth();
@@ -334,6 +340,21 @@ export default async function handler(req, res) {
   try {
     const action = text(req.query?.action || req.body?.action).toLowerCase();
     const headerKey = text(req.headers['x-promo-admin-key']);
+
+    if (req.method === 'GET' && action === 'runtime-status') {
+      let testBackendConfigured = false;
+      try {
+        testBackend();
+        testBackendConfigured = true;
+      } catch {
+        testBackendConfigured = false;
+      }
+      return json(res, 200, {
+        ok: true,
+        testDatabaseEnabled: testDatabaseEnabled(),
+        testBackendConfigured,
+      });
+    }
 
     if (req.method === 'POST' && action === 'login') {
       if (requestBodySize(req) > MAX_LOGIN_BODY_BYTES) return json(res, 413, { ok: false, error: 'request_body_too_large' });
