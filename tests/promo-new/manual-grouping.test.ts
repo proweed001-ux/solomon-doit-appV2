@@ -95,3 +95,24 @@ test('manual unassign moves selected cards back to quarantine and removes an emp
   assert.equal(result.quarantine[0].cardId, removedId);
   assert.deepEqual(result.quarantine[0].failureReasons, ['manual_unassigned']);
 });
+
+
+test('manual changes invalidate persisted confirmation for every affected group', () => {
+  const { grouped, dataset } = datasetWith([
+    ['Pantene แชมพู Aqua 70 มล. ขวด', 'HFSS'],
+    ['Rejoice แชมพู Rich 120 มล. ขวด', 'HFSM'],
+  ]);
+  dataset.productGroups = dataset.productGroups.map(group => ({ ...group, manualConfirmed: true }));
+  const target = grouped.groups[0];
+  const source = grouped.groups[1];
+
+  const moved = assignCardsManually(dataset, [], [source.cardIds[0]], { groupId: target.id });
+  assert.equal(moved.dataset.productGroups[0].manualConfirmed, false);
+
+  const reconfirmed = {
+    ...moved.dataset,
+    productGroups: moved.dataset.productGroups.map(group => ({ ...group, manualConfirmed: true })),
+  };
+  const removed = unassignCardsManually(reconfirmed, [], [source.cardIds[0]]);
+  assert.equal(removed.dataset.productGroups[0].manualConfirmed, false);
+});
