@@ -22,7 +22,7 @@ export function GroupingSnapshotSave({
   const [busy, setBusy] = useState(false);
   const [savedSignature, setSavedSignature] = useState('');
   const signature = useMemo(() => dataset.productGroups
-    .map(group => `${group.skuId}:${group.cardIds.slice().sort().join(',')}`)
+    .map(group => `${group.skuId}:${group.manualConfirmed === true ? 'confirmed' : 'open'}:${group.cardIds.slice().sort().join(',')}`)
     .sort()
     .join('|'), [dataset.productGroups]);
   useEffect(() => {
@@ -31,12 +31,14 @@ export function GroupingSnapshotSave({
 
   const nonMasterGroups = dataset.productGroups.filter(group => !group.skuId.startsWith('MASTER-'));
   const duplicateCards = dataset.cards.length - new Set(dataset.cards.map(card => card.id)).size;
+  const unconfirmedGroups = dataset.productGroups.filter(group => group.cardIds.length > 0 && group.manualConfirmed !== true);
   const readyToSave = !readOnly
     && Boolean(adminKey)
     && dataset.cards.length > 0
     && quarantine.length === 0
     && nonMasterGroups.length === 0
-    && duplicateCards === 0;
+    && duplicateCards === 0
+    && unconfirmedGroups.length === 0;
 
   const save = async () => {
     if (!readyToSave || busy) return;
@@ -66,6 +68,7 @@ export function GroupingSnapshotSave({
           <span className={quarantine.length ? 'bad' : 'good'}>รอจัด {quarantine.length}</span>
           <span className={nonMasterGroups.length ? 'bad' : 'good'}>กลุ่มยังไม่บันทึก Master {nonMasterGroups.length}</span>
           <span className={duplicateCards ? 'bad' : 'good'}>การ์ดซ้ำ {duplicateCards}</span>
+          <span className={unconfirmedGroups.length ? 'bad' : 'good'}>กลุ่มยังไม่ยืนยัน {unconfirmedGroups.length}</span>
         </div>
       </div>
     </div>
@@ -75,6 +78,7 @@ export function GroupingSnapshotSave({
       {readOnly && <small>โหมด Preview/Dry-run ไม่เขียนฐานข้อมูล</small>}
       {!readOnly && quarantine.length > 0 && <small>ต้องจัดการ์ดที่เหลือให้หมดก่อน</small>}
       {!readOnly && nonMasterGroups.length > 0 && <small>สร้างหรือเลือก Product Master ให้ครบทุกกลุ่มก่อน</small>}
+      {!readOnly && unconfirmedGroups.length > 0 && <small>ต้องกดยืนยันทุกกลุ่มก่อนบันทึกทั้งเดือน</small>}
     </div>
   </section>;
 }
