@@ -46,8 +46,8 @@ create table if not exists public.promo_new_skus (
   brand text not null,
   product_type text not null,
   variant text,
-  size_value numeric(12,3) not null check (size_value > 0),
-  size_unit text not null,
+  size_value numeric(12,3),
+  size_unit text not null default '',
   sales_unit text not null,
   pack_quantity integer not null default 1 check (pack_quantity > 0),
   status text not null default 'active' check (status in ('active','candidate','quarantine')),
@@ -56,7 +56,12 @@ create table if not exists public.promo_new_skus (
   created_by uuid references auth.users(id),
   updated_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  check (
+    (size_value is not null and size_value > 0 and btrim(size_unit) <> '')
+    or
+    (size_value is null and nullif(btrim(coalesce(variant, '')), '') is not null)
+  )
 );
 
 create table if not exists public.promo_new_sku_prices (
@@ -244,7 +249,7 @@ begin
     ) values (
       v_item->>'id', v_item->>'code', v_item->>'canonicalName', v_item->>'identityKey',
       v_item #>> '{identity,brand}', v_item #>> '{identity,productType}', nullif(v_item #>> '{identity,variant}', ''),
-      (v_item #>> '{identity,sizeValue}')::numeric, v_item #>> '{identity,sizeUnit}', v_item #>> '{identity,salesUnit}',
+      nullif((v_item #>> '{identity,sizeValue}')::numeric, 0), coalesce(v_item #>> '{identity,sizeUnit}', ''), v_item #>> '{identity,salesUnit}',
       (v_item #>> '{identity,packQuantity}')::integer, v_item->>'status', coalesce(v_item->'evidence','[]'::jsonb),
       coalesce(v_item->'failureReasons','[]'::jsonb), p_actor_id, p_actor_id
     )
@@ -301,7 +306,14 @@ begin
   end loop;
 
   for v_item in select value from jsonb_array_elements(coalesce(p_payload->'productGroups', '[]'::jsonb)) loop
-    select id into v_sku_id from public.promo_new_skus where external_id = v_item->>'skuId' or identity_key = (v_item #>> '{sku,identityKey}') limit 1;
+    select id into v_sku_id
+    from public.promo_new_skus
+    where external_id = v_item->>'skuId'
+       or identity_key = coalesce(
+         nullif(v_item #>> '{sku,identityKey}', ''),
+         (select s->>'identityKey' from jsonb_array_elements(p_payload->'skus') s where s->>'id' = v_item->>'skuId' limit 1)
+       )
+    limit 1;
     select id into v_family_id from public.promo_new_promotion_families where version_id = v_version_id and external_id = v_item->>'promotionFamilyId';
     if v_sku_id is null then raise exception 'group_sku_missing'; end if;
     insert into public.promo_new_product_groups(
@@ -318,9 +330,24 @@ begin
 
   for v_item in select value from jsonb_array_elements(coalesce(p_payload->'cards', '[]'::jsonb)) loop
     if upper(v_item->>'monthKey') <> v_month_key then raise exception 'card_crosses_month'; end if;
-    select id into v_sku_id from public.promo_new_skus where external_id = v_item->>'skuId' limit 1;
-    select id, promotion_family_id into v_group_id, v_family_id from public.promo_new_product_groups where version_id = v_version_id and external_id = v_item->>'productGroupId';
+    select id into v_sku_id
+    from public.promo_new_skus
+    where external_id = v_item->>'skuId'
+       or identity_key = (
+         select s->>'identityKey'
+         from jsonb_array_elements(p_payload->'skus') s
+         where s->>'id' = v_item->>'skuId'
+         limit 1
+       )
+    limit 1;
+    select id into v_group_id
+    from public.promo_new_product_groups
+    where version_id = v_version_id and external_id = v_item->>'productGroupId';
+    select id into v_family_id
+    from public.promo_new_promotion_families
+    where version_id = v_version_id and external_id = v_item->>'promotionFamilyId';
     if v_sku_id is null or v_group_id is null then raise exception 'card_reference_missing'; end if;
+    if v_family_id is null then raise exception 'card_promotion_family_missing'; end if;
     insert into public.promo_new_cards(
       version_id, card_id, month_id, page_number, sequence_number, class_id, image_path,
       sku_id, product_group_id, promotion_family_id, pdf_source_price, central_override_price,

@@ -6,37 +6,45 @@ The prepared migration `supabase/migrations/20260716083231_promo_system_rebuild.
 must not be applied to Production in its current form. The rebuild Preview intentionally keeps
 `LEGACY_WRITES_ENABLED = false` and the API returns `legacy_revision_staging_not_installed`.
 
-## Confirmed blockers
+## Closed in isolated staging
 
-1. `promo_new_skus` requires a positive numeric size and non-empty size unit for every SKU.
-   The browser/domain contract now permits model-based products such as selected Gillette,
-   Oral-B, Olay, and package/model identities to use a confirmed variant instead of a numeric size.
+The prepared migration was applied only to the non-Production
+`solomon-promo-hardening-test` project on 2026-07-23. Its pgTAP suite passes **40/40** and now proves:
 
-2. The SKU upsert conflict target is `identity_key`, but the current save path resolves card
-   references by `external_id`. When an existing identity is submitted with a different external ID,
-   the upsert can retain the old external ID and the following card lookup can fail with
-   `card_reference_missing`.
+- a confirmed variant/model can identify a SKU when numeric size and size unit are absent;
+- SKU references resolve through stable `identity_key` when a later Draft submits a different
+  `external_id`;
+- multiple cards from the same Class can share one Product Group while retaining different
+  Promotion Families at Card level;
+- Draft save, Publish, Published catalog, second revision, and Rollback behavior;
+- a failed complete-save statement leaves no partial Version and does not change the Published
+  pointer; and
+- anonymous/authenticated roles cannot bypass the service-role write boundary.
 
-3. The SQL schema correctly permits only one Product Group per SKU per Version. Historical browser
-   grouping could create multiple groups for one existing Product Master. The current browser
-   validation now blocks this, but the migration still needs an end-to-end save test using real
-   legacy Product Master keys before installation.
+The SQL schema continues to enforce one Product Group per SKU per Version. Browser validation also
+blocks duplicate groups for the same Product Master before the SQL boundary.
 
-4. The SQL test file checks object existence and anonymous privileges only. It does not execute and
-   verify Draft save, optional-size SKU save, publish validation, rollback, or Published catalog
-   behavior.
+## Remaining blockers
 
-5. No atomic multi-batch upload/rollback contract has been proven. A failed later batch must not
+1. No atomic multi-batch upload/rollback contract has been proven. A failed later batch must not
    leave a partially visible Draft or change the status of the current Published month.
+
+2. The current migration has not been benchmarked with the real JUL26 212-card payload and the real
+   legacy Product Master identities in isolated staging.
+
+3. The current browser runtime deliberately keeps all legacy revision writes disabled. The tested
+   SQL function receives a complete Dataset in one transaction; the network upload path has not yet
+   been switched to that contract.
 
 ## Requirements before enabling writes
 
-- Align SQL optional-size constraints with the domain validation rules.
-- Resolve existing SKUs by stable identity/master ID, not a mutable external ID alone.
-- Save a complete revision into isolated staging before changing any Published pointer.
+- Keep SQL optional-size constraints aligned with the domain validation rules. **Passed in staging.**
+- Resolve existing SKUs by stable identity/master ID, not a mutable external ID alone. **Passed in staging.**
+- Save a complete revision into isolated staging before changing any Published pointer. **Passed for
+  the complete-Dataset SQL function.**
 - Make failed uploads fully retryable or removable without affecting the current Published version.
 - Add behavioral SQL tests for Draft, optional-size products, duplicate SKU/group protection,
-  publish gate, rollback, and public Published reads.
+  publish gate, rollback, and public Published reads. **40/40 passed in staging.**
 - Run the migration on a non-Production Supabase branch and benchmark a full 212-card JUL26 upload.
 - Obtain explicit approval before merging or applying the migration and before enabling network writes.
 
