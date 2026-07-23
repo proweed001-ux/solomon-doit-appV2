@@ -50,7 +50,7 @@ export function bindQuantityInputs({ inputs, onInput, onCommit }) {
       if (event.key !== "Enter") return;
       event.preventDefault();
       event.stopPropagation();
-      input.dispatchEvent(new Event("change", { bubbles: true }));
+      input.blur();
     };
   });
 }

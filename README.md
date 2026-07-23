@@ -7,11 +7,14 @@
 ```text
 Production: Pro Stable 1028 Native
 URL: https://solomon-doit-app-v2.vercel.app/pro.html?t=1028
-Status: ผ่าน production mobile QA
-Project Pro Native Core: COMPLETE
+Production commit: 8b982911f7b13e9c9231d8a12c78709f6a674324
+PR #64: merged
+Architecture: single entry / single state / single render
 ```
 
-ตอนนี้ production `pro-core-v4.js` เป็น native stack bootstrap แล้ว ไม่ใช้ legacy jsdelivr core fetch / eval / patch wrapper path
+หน้า Pro ตัวจริงเริ่มจาก `dist/pro.html` และโหลด `dist/assets/pro/app.js`
+เพียงจุดเดียว จากนั้น import โมดูลตามหน้าที่โดยตรง ไม่โหลด shell, core หรือ override
+รุ่นเก่ามาแปะทับภายหลัง
 
 ## ฟังก์ชันที่มี
 
@@ -74,6 +77,8 @@ docs/ROADMAP.md               แผนพัฒนาต่อ
 docs/QA_CHECKLIST.md          checklist ก่อน merge
 docs/REAL_FILE_QA.md          วิธีตรวจไฟล์ DOIT จริงโดยไม่ commit workbook
 docs/CLEANUP_AUDIT.md         บันทึก cleanup และ workflow ที่ลบ
+docs/PRO_LEGACY_MANIFEST.md   รายการไฟล์ Pro รุ่นเก่าที่ยังเก็บและเหตุผล
+docs/PRO_SINGLE_SOURCE_REPORT.md รายงานการย้าย Pro เป็น source เดียว
 ```
 
 ## โครงสร้างไฟล์สำคัญ
@@ -85,20 +90,25 @@ src/lib/analytics.ts              filter, aggregate, bill lines, CSV export
 src/lib/pricing.ts                สูตรราคาและปัดเศษ
 src/types.ts                      type กลางของระบบ
 dist/pro.html                     หน้า Pro production ปัจจุบัน
-dist/assets/pro-core-v4.js        native stack bootstrap สำหรับ Pro Stable 1028 Native
-dist/assets/pro-native-core.js    native core snapshot
-dist/assets/pro-native-core-overrides.js behavior bridge ที่ผ่าน production แล้ว
-dist/assets/pro-print-store-bills.js  logic เตรียมปริ้น Pro แยกตามร้าน
-dist/assets/pro-print.css         CSS ปริ้น A4 มือถือ 2 บิลต่อหน้า
+dist/assets/pro/app.js            JavaScript entry เพียงจุดเดียว
+dist/assets/pro/core.js           render flow และ event binding หลัก
+dist/assets/pro/state.js          State/Undo/Redo/LocalStorage owner เพียงชุดเดียว
+dist/assets/pro/parser-adapter.js อ่าน XLSX/XLSM และ normalize แถว
+dist/assets/pro/filters.js        filter และ aggregate ของหน้า Pro
+dist/assets/pro/print.js          print overlay และ A4 rendering
+dist/assets/pro/print-model.js    bill model: 12 รายการ/บิล, 2 บิล/A4
+dist/assets/pro/pro.css           CSS ของหน้า Pro และ print
 scripts/smoke-check.mjs           guardrail check
-scripts/qa-doit-file.mjs          ตรวจไฟล์ DOIT จริงแบบ local
+scripts/test-pro-regression.mjs   regression สูตร/State/print model
+tests/pro/pro-browser.spec.mjs    browser test มือถือ/Desktop/XLSX/XLSM/print
 ```
 
 ## แนวทางแก้ไขต่อจากนี้
 
 - ห้ามแก้ `main` ตรง ๆ ให้ใช้ branch/PR เสมอ
-- งานหลักควรแก้ใน `src/` ก่อน แล้วค่อย build
-- งานปริ้น Pro เฉพาะหน้าปัจจุบันถูกแยกไว้ที่ `dist/assets/pro-print-store-bills.js` และ `dist/assets/pro-print.css`
+- งานหน้า Pro ต้องแก้ในโมดูลเจ้าของภายใต้ `dist/assets/pro/`
+- งาน State แก้ `state.js`; งาน filter แก้ `filters.js`; งาน print แก้ `print.js`/`print-model.js`
+- ไฟล์ Core/Override/Print Fix รุ่นเก่าเป็น LEGACY และไม่ใช่ source ของหน้า Pro ตัวจริง
 - หลีกเลี่ยงการใส่ CSS/JS ใหม่ยาว ๆ ลงใน `dist/pro.html` โดยตรง
 - หลีกเลี่ยง workflow แบบ patch ไฟล์อัตโนมัติ เพราะเสี่ยงเขียนทับงานใหม่
 - งานที่แตะ parser / pricing / print ต้องตรวจด้วยไฟล์ DOIT จริงก่อน merge
@@ -126,8 +136,12 @@ npm run build
 ## วิธีตรวจ guardrail
 
 ```bash
-npm run smoke
+npm run verify
 ```
+
+`verify` รัน Smoke, scope guard, module regression, Telesale pagination,
+local XLSX, architecture/import checks และ Playwright browser regression จริง
+โดยไม่สั่ง build ที่เขียนทับ `dist`
 
 ## วิธีเทสกับไฟล์ DOIT ตัวจริง
 

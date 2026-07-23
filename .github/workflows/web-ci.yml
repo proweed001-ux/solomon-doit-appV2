@@ -6,11 +6,14 @@ on:
     paths:
       - "src/**"
       - "scripts/**"
+      - "tests/**"
       - "docs/**"
       - "dist/*.html"
       - "dist/assets/**"
+      - "README.md"
       - "package.json"
       - "package-lock.json"
+      - "playwright.pro.config.mjs"
       - "tsconfig*.json"
       - "vite.config.*"
       - ".github/workflows/web-ci.yml"
@@ -19,11 +22,14 @@ on:
     paths:
       - "src/**"
       - "scripts/**"
+      - "tests/**"
       - "docs/**"
       - "dist/*.html"
       - "dist/assets/**"
+      - "README.md"
       - "package.json"
       - "package-lock.json"
+      - "playwright.pro.config.mjs"
       - "tsconfig*.json"
       - "vite.config.*"
       - ".github/workflows/web-ci.yml"
@@ -33,13 +39,56 @@ permissions:
   contents: read
 
 jobs:
-  smoke:
+  pro-verification:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
+          cache: npm
+      - name: Resolve comparison base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            BASE_SHA="$PR_BASE_SHA"
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            BASE_SHA="$PUSH_BEFORE_SHA"
+          else
+            BASE_SHA="$(git rev-parse HEAD^)"
+          fi
+          if [[ -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
+            BASE_SHA="$(git rev-parse HEAD^)"
+          fi
+          if ! git cat-file -e "${BASE_SHA}^{commit}"; then
+            echo "Unable to resolve a valid comparison base: ${BASE_SHA}" >&2
+            exit 1
+          fi
+          echo "PRO_SMOKE_BASE_SHA=${BASE_SHA}" >> "$GITHUB_ENV"
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
       - name: Foundation smoke check
-        run: node scripts/smoke-check.mjs
+        run: npm run smoke
+      - name: Pro change-scope guard tests
+        run: npm run test:pro-scope
+      - name: Pro module regression
+        run: npm run test:pro-regression
+      - name: Pro Telesale lazy pagination
+        run: npm run test:pro-lazy
+      - name: Local XLSX dependency
+        run: npm run test:local-xlsx
+      - name: Pro architecture guard
+        run: npm run test:pro-architecture
+      - name: Pro module syntax and imports
+        run: npm run test:pro-modules
+      - name: Pro browser regression
+        run: npm run test:pro-browser

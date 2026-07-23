@@ -6,7 +6,10 @@
 
 Branch: `codex/pro-single-source-refactor`
 
-Draft PR: <https://github.com/proweed001-ux/solomon-doit-appV2/pull/64>
+PR: <https://github.com/proweed001-ux/solomon-doit-appV2/pull/64> — **Merged**
+
+Production commit หลัง Merge:
+`8b982911f7b13e9c9231d8a12c78709f6a674324`
 
 Preview ที่ใช้ QA โค้ด: <https://solomon-doit-app-v2-fdrb9uzk9-proweed-s-projects.vercel.app/pro.html?t=1028>
 
@@ -169,6 +172,16 @@ Regression fixture ล็อกกฎต่อไปนี้:
 | Active-path architecture guard | ผ่าน |
 | ตรวจ diff ชื่อไฟล์ `promo`/`promotion` | ไม่พบไฟล์เปลี่ยน |
 
+Follow-up hardening เพิ่มการบังคับตรวจใน CI ดังนี้:
+
+- Smoke change-scope guard รับ Base SHA ชัดเจนและ Fail หาก CI หา Base ไม่ได้
+- Test จำลองชื่อไฟล์ต้องห้ามต้อง Fail และ Pro-only paths ต้องผ่าน
+- Active import graph ครบ 18 โมดูล
+- Syntax check ทุก Active Pro module
+- Playwright ที่ Mobile 390×844 และ Desktop 1365×768
+- อัปโหลด fixture XLSX/XLSM ผ่าน file input จริง
+- Print overlay 25 รายการเป็น `[12, 12, 1]`, 3 บิล, 2 A4
+
 Smoke test ตรวจ dependency graph จาก `app.js` ต่อไปถึงทุก Active Pro module และปฏิเสธ:
 
 ```text
@@ -236,21 +249,25 @@ runtime monkey patch ของ Core
 
 ## ข้อจำกัดและความเสี่ยงที่ยังเหลือ
 
-1. Cloud browser ไม่มี API เปลี่ยน viewport จึงยังไม่ได้ทำ mobile emulation แบบระบุขนาดจริงในรอบนี้ ตรวจได้เฉพาะ responsive CSS และ flow เดียวกับ Desktop ต้องให้ผู้ใช้/QA เปิด Preview บนมือถือจริงก่อนอนุมัติ Merge
-2. Native file picker ของ Cloud browser ไม่ส่ง file-chooser event ให้ automation จึงยังไม่มีหลักฐานการเปิด fixture XLSX ผ่าน UI บน Preview ในรอบสุดท้าย แม้ `test:local-xlsx` และ parser regression จะผ่าน
-3. ยังไม่ได้กด OS print dialog จริง เพราะจะเป็น dialog ภายนอก browser automation; ตรวจถึง Print overlay, bill model และ A4 HTML/CSS
-4. Console มีข้อความ error จาก extension ที่มากับ Cloud browser แต่ URL ต้นทางเป็น `chrome-extension://...` ไม่ใช่หน้า Pro หรือ JavaScript ของแอป
-5. ไฟล์ legacy core/override/print patch ยังอยู่เพื่อไม่ทำลายหน้า preview/test เก่า แต่ถูกตัดออกจาก Active Pro runtime แล้ว ควรลบในงาน cleanup แยกหลังยืนยันว่าไม่ต้องเก็บหน้าทดสอบเก่า
-6. เอกสารเก่า `HANDOFF_1028_NATIVE.md`, `PROJECT_PRO_NATIVE_CORE.md`, `ROADMAP.md` และบางส่วนของ `QA_CHECKLIST.md` ยังบรรยายสถาปัตยกรรมก่อน refactor จึงควรถือรายงานนี้และ Active source เป็นข้อมูลล่าสุด งานนี้ไม่แก้เอกสารรวมเหล่านั้นเพื่อไม่ขยาย diff ไปยังหัวข้อระบบอื่น
+1. Browser automation ครอบคลุม viewport 390×844 และ 1365×768 แล้ว แต่ยัง
+   ต้องตรวจการแตะ/คีย์บนมือถือจริงก่อน Merge งาน UI สำคัญ
+2. XLSX และ XLSM fixture ผ่าน file input จริงแล้ว แต่ fixture ไม่ใช่ข้อมูล
+   Production; ควรตรวจไฟล์ DOIT ที่ได้รับอนุญาตสำหรับ QA เพิ่มด้วยคน
+3. ยังไม่ได้กด OS Print Preview จริง เพราะเป็น dialog นอก browser automation;
+   ผลที่ผ่านคือ Print model, overlay, A4 HTML/CSS, 12 รายการต่อบิล และ 2
+   บิลต่อ A4
+4. Legacy core/override/print files ยังอยู่เพราะหน้า checkpoint กับ QA script
+   รุ่นเก่ายังอ้าง ดู `docs/PRO_LEGACY_MANIFEST.md`
 
-ด้วยข้อ 1–4 ยังไม่ควร Merge เพียงเพราะ Preview เปิดได้ ต้องให้ QA บนมือถือจริงเปิดไฟล์ DOIT จริงหนึ่งไฟล์และดู Print Preview ของระบบปฏิบัติการก่อนอนุมัติสุดท้าย
+ห้ามตีความ Automated Print Test ว่า OS Print Preview ผ่าน
 
 ## จุด Rollback
 
-ถ้าต้องย้อนทั้งงาน ให้ย้อน branch กลับไปที่:
+Rollback point ของ Single Source ที่ Production ใช้อยู่:
 
 ```text
-367d17c6ca40bd9cdbe034fdde3dac50c67d9212
+8b982911f7b13e9c9231d8a12c78709f6a674324
 ```
 
-Production ไม่ถูกแก้, ไม่ Merge และไม่ Deploy Production ระหว่างงานนี้
+PR #64 ถูก Merge แล้วและ Production ใช้ commit ด้านบน งาน follow-up ต้องใช้
+Preview/Draft PR และห้าม Merge หรือ Deploy Production โดยไม่มีอนุมัติใหม่

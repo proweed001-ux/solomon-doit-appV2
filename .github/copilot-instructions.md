@@ -14,8 +14,8 @@ This project is a real sales-reporting web app for DOIT files. Prioritize correc
 The app reads DOIT / Excel / CSV files, parses pivotCache first when available, falls back to worksheets, summarizes sales, supports dashboard, drill-down, bill extraction, issue checking, and CSV export.
 
 ## Do not add extra complexity unless explicitly requested
-- Do not add test files, spec files, mock data, fixtures, or unit tests.
-- Do not add Vitest, Jest, Playwright, Cypress, or other test frameworks.
+- Do not add new test frameworks unless explicitly requested. The existing Pro Playwright and module tests are required guardrails and must remain active.
+- New Pro regressions should extend the existing fixture/tests instead of creating a second test stack.
 - Do not add new dependencies unless required and clearly explained.
 - Do not refactor the whole project when a small targeted fix is enough.
 - Do not create new package.json scripts unless necessary.
@@ -31,6 +31,35 @@ The app reads DOIT / Excel / CSV files, parses pivotCache first when available, 
 
 Keep heavy parsing, pricing, and aggregation logic out of App.tsx when possible.
 
+## Active Pro architecture
+
+The production Pro page does not use the React source above. Its only active path is:
+
+```text
+dist/pro.html
+  -> dist/assets/pro/app.js
+      -> dist/assets/pro/core.js
+      -> owner modules under dist/assets/pro/
+```
+
+Owner modules:
+
+- `state.js`: the only mutable Pro state, Undo/Redo and LocalStorage owner
+- `parser-adapter.js`: XLSX/XLSM parsing and row normalization
+- `filters.js`: filters and product grouping
+- `send-store.js`: “ส่งร้านนี้” and Enter/Next
+- `order.js`, `telesale.js`, `done.js`: their named views
+- `print.js` and `print-model.js`: the only active print implementation
+- `developer-qr.js`, `team.js`, `fuel-secret.js`: their named UI behavior
+- `pro.css`: active page and print styles
+
+Files outside `dist/assets/pro/` with old Pro core/override/print names are
+LEGACY. They are not active production source. Do not edit them to fix the
+current Pro page; see `docs/PRO_LEGACY_MANIFEST.md`.
+
+Never add fix, patch, override, hotfix, bridge, a dynamic script loader,
+MutationObserver repair, or setInterval core wait. Fix the owner module.
+
 ## Data rules
 - Main quantity field: ShipQtyPCS.
 - Amount should follow parser-supported sources such as TotInvc, InvoiceAmt, LineAmtBeforeDisc, Correct Amount, Amount, and Amt.
@@ -44,7 +73,7 @@ Use practical checks with real DOIT files instead of adding automated tests by d
 Useful commands:
 
 ```bash
-npm run build
+npm run verify
 ```
 
 ```bash
@@ -56,6 +85,8 @@ npm run check:doit
 ```
 
 Check that upload, totals, filters, bill extraction, export CSV, and mobile layout still work.
+For Pro work, do not run a build that writes over `dist`; CI verifies the existing
+active files directly.
 
 ## Response style
 - Reply in Thai unless the user asks otherwise.

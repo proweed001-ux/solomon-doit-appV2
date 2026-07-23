@@ -4,6 +4,38 @@ Cleanup round 5 records where the source is already safe enough and where future
 
 This round does not change runtime behavior.
 
+## Active Pro source map
+
+PR #64 ถูก Merge แล้วและ Production ใช้ commit
+`8b982911f7b13e9c9231d8a12c78709f6a674324`
+
+```text
+dist/pro.html
+  HTML entry ตัวจริง
+
+dist/assets/pro/app.js
+  App entry เพียงจุดเดียว
+
+dist/assets/pro/core.js
+  Main render/event flow
+
+dist/assets/pro/state.js
+  State/Undo/Redo/LocalStorage owner เพียงชุดเดียว
+
+dist/assets/pro/parser-adapter.js
+  Parser adapter
+
+dist/assets/pro/filters.js
+  Filter/grouping owner
+
+dist/assets/pro/print.js
+dist/assets/pro/print-model.js
+  Print owner เพียงชุดเดียว
+```
+
+Core/Override/Print Fix รุ่นเก่านอก `dist/assets/pro/` เป็น LEGACY ไม่ใช่
+Active Pro source ห้ามแก้ไฟล์เหล่านั้นเพื่อแก้หน้า Pro ปัจจุบัน
+
 ## Current source map
 
 ```text
@@ -83,17 +115,20 @@ src/lib/csv.ts
 
 Rule: bill line behavior must be checked with Pro print guardrails.
 
-## Do not refactor yet
+## Do not edit as Active Pro source
 
 ```text
-dist/pro.html
 dist/assets/pro-core-v4.js
+dist/assets/pro-native-core.js
+dist/assets/pro-native-core-overrides.js
 dist/assets/pro-print-store-bills.js
-dist/assets/pro-print.css
-src/lib/pricing.ts
+dist/assets/pro-print-mode-fixes.js
+dist/assets/pro-print-column-widths.js
+dist/assets/pro-print-a4-pro-fix.js
 ```
 
-Reason: these are small, production-sensitive, or already isolated enough for the current cleanup stage.
+Reason: เป็นไฟล์ Legacy ที่หน้า preview/test เก่ายังอ้างอยู่ ไม่ใช่ source
+ของ `/pro.html` ดู reference และแผนลบใน `docs/PRO_LEGACY_MANIFEST.md`
 
 ## Suggested order after this audit
 
@@ -110,6 +145,7 @@ Reason: these are small, production-sensitive, or already isolated enough for th
 
 ```text
 npm run smoke
+npm run verify
 node scripts/qa-doit-file.mjs "path/to/DOIT.xlsx"
 ```
 
