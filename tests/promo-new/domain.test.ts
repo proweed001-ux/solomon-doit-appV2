@@ -11,7 +11,7 @@ import { inspectPromotionWorkbookFile, validatePromotionWorkbookSignature } from
 import { parsePromotionTiers } from '../../src/promo-new/import/promotion-parser';
 import { evaluateGrid } from '../../src/promo-new/import/grid-detector';
 import { calculatePromotion } from '../../src/promo-new/domain/calculator';
-import { applyPromotionFamily, groupImportedCards } from '../../src/promo-new/domain/grouping';
+import { applyPromotionFamily, applyPromotionFamilyToCard, groupImportedCards } from '../../src/promo-new/domain/grouping';
 import { applyPriceToGroup, inheritedSkuPrice, setCentralPrice, type StoredPrice } from '../../src/promo-new/domain/pricing';
 import { confirmSkuCandidate, createSkuCandidate } from '../../src/promo-new/domain/sku-identity';
 import { activePublishedVersion, nextDraftVersion, publishedOnly, rollbackTarget } from '../../src/promo-new/domain/versioning';
@@ -343,4 +343,26 @@ test('Calculator เลือก Tier สูงสุดที่จำนวน
   assert.equal(result.grossAmount, 139.93);
   assert.equal(result.cashDiscount, 13.99);
   assert.equal(result.netAmount, 125.94);
+});
+
+
+test('การ์ด Class เดียวกันในกลุ่มเดียวเลือก Promotion Family ต่างกันได้', () => {
+  const grouped = groupImportedCards(MONTH, [imported('Pantene แชมพู Aqua 70 มล. ขวด', 'HFSS', 1)]);
+  const first = grouped.cards[0];
+  const second = { ...first, id: `${first.id}:second`, page: 2 };
+  const group = {
+    ...grouped.groups[0],
+    cardIds: [first.id, second.id],
+    classIds: ['HFSS'],
+  };
+  const familyA = family({ HFSS: 5 }, 'family:a');
+  const familyB = family({ HFSS: 12 }, 'family:b');
+
+  const firstApplied = applyPromotionFamilyToCard(group, [first, second], first.id, familyA);
+  const secondApplied = applyPromotionFamilyToCard(firstApplied.group, firstApplied.cards, second.id, familyB);
+
+  assert.equal(secondApplied.cards.find(card => card.id === first.id)?.promotionFamilyId, familyA.id);
+  assert.equal(secondApplied.cards.find(card => card.id === second.id)?.promotionFamilyId, familyB.id);
+  assert.equal(secondApplied.group.promotionFamilyId, null);
+  assert.equal(secondApplied.blockedClasses.length, 0);
 });
