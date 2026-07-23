@@ -599,10 +599,13 @@
       }
       .devPanel {
         width: min(720px, 100%);
+        max-height: calc(100dvh - 36px);
         background: #fff;
         border-radius: 18px;
         box-shadow: 0 20px 60px #0005;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
       }
       .devHead {
         background: #087b34;
@@ -612,9 +615,11 @@
         align-items: center;
         justify-content: space-between;
         font-weight: 950;
+        flex: 0 0 auto;
       }
       .devBody {
         padding: 16px;
+        overflow: auto;
       }
       .devPerson {
         display: grid;

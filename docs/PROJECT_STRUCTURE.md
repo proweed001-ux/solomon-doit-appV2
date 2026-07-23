@@ -1,111 +1,60 @@
 # Project Structure Index
 
-เอกสารนี้เป็นสารบัญโครงสร้างโปรเจกต์สำหรับงานต่อยอดในอนาคต
-
-## Runtime entry points
+## Active Pro files
 
 ```text
-src/main.tsx
-  จุดเริ่มของ React app
-
-src/App.tsx
-  UI หลักของเว็บ: upload, filter, summary, table, drill-down, copy, export
-
-dist/pro.html
-  หน้า Pro ที่ใช้งานจริงใน production ตอนนี้
+dist/pro.html                         Production HTML entry
+dist/assets/pro/app.js                Single module entry
+dist/assets/pro/core.js               Single main render flow
+dist/assets/pro/state.js              Single mutable state owner
+dist/assets/pro/data-source.js        Cloud read adapter
+dist/assets/pro/parser-adapter.js     DOIT XLSX/XLSM adapter
+dist/assets/pro/filters.js            Filter/group owner
+dist/assets/pro/send-store.js         Send-store/Enter/Next owner
+dist/assets/pro/order.js              Order owner
+dist/assets/pro/telesale.js           Telesale owner
+dist/assets/pro/done.js               Done owner
+dist/assets/pro/print-model.js         Print model owner
+dist/assets/pro/print.js               Print UI owner
+dist/assets/pro/developer-qr.js        Developer QR owner
+dist/assets/pro/team.js                Team modal owner
+dist/assets/pro/fuel-secret.js         Fuel secret owner
+dist/assets/pro/results-mode.js        Results owner
+dist/assets/pro/utils.js               Shared stateless helpers
+dist/assets/pro/pro.css                Active UI and Print CSS
+dist/assets/vendor/xlsx-0.18.5.full.min.js Local XLSX browser bundle
 ```
 
-## Core business logic
-
-```text
-src/lib/parser.ts
-  อ่าน Excel/CSV, pivot cache, normalize row เป็น ParsedRow
-
-src/lib/analytics.ts
-  รวมข้อมูล, filter, buildBillLines, export CSV
-
-src/lib/pricing.ts
-  safe number, qty, round money, unit price, line total
-
-src/types.ts
-  type กลางของระบบ
-```
-
-## Pro print layer
-
-```text
-dist/assets/pro-core-v4.js
-  wrapper โหลด legacy Pro core และโหลด print module/css
-
-dist/assets/pro-print-store-bills.js
-  logic เตรียมปริ้นแยกร้าน
-  guardrails: 12 rows per bill, 2 bills per A4, stable edit key
-
-dist/assets/pro-print.css
-  print CSS สำหรับ A4 และ mobile-safe print preview
-```
-
-## QA and guardrails
+## Pro tests and guards
 
 ```text
 scripts/smoke-check.mjs
-  ตรวจว่าไฟล์สำคัญอยู่ครบ และ guardrail สำคัญยังอยู่
-
-scripts/qa-doit-file.mjs
-  ตรวจไฟล์ DOIT จริงแบบ local โดยไม่ commit workbook เข้า GitHub
-
-docs/REAL_FILE_QA.md
-  วิธีใช้ real-file QA และกติกาไม่เอา workbook จริงขึ้น repo
+scripts/pro-change-scope.mjs
+scripts/test-pro-change-scope.mjs
+scripts/test-pro-regression.mjs
+scripts/test-pro-telesale-pagination.mjs
+scripts/test-local-xlsx.mjs
+scripts/test-pro-architecture.mjs
+scripts/test-pro-module-syntax.mjs
+scripts/fixtures/pro-browser-fixture.mjs
+tests/pro/pro-browser.spec.mjs
+playwright.pro.config.mjs
 ```
 
-## Documentation
+## Active CI
 
-```text
-docs/ARCHITECTURE.md
-  ภาพรวมสถาปัตยกรรมและกฎการแก้ระบบ
+`.github/workflows/web-ci.yml` resolve Base SHA, รัน `npm ci`, ติดตั้ง
+Chromium แล้วรัน Smoke, scope, regression, lazy pagination, local XLSX,
+architecture, module syntax/import และ Browser tests
 
-docs/FEATURE_RULES.md
-  กติกาก่อนเพิ่มฟีเจอร์หรือ refactor
+## Legacy Pro files
 
-docs/ROADMAP.md
-  ลำดับพัฒนาต่อ
+Core/Override/Print Fix รุ่นเก่าที่อยู่นอก `dist/assets/pro/` ไม่อยู่ใน
+Production import graph และห้ามใช้เป็น source แก้บั๊ก หน้า preview/test
+เก่าที่ยังอ้างไฟล์เหล่านั้นและเหตุผลที่ยังเก็บอยู่ระบุใน
+`docs/PRO_LEGACY_MANIFEST.md`
 
-docs/QA_CHECKLIST.md
-  checklist ก่อน merge งานที่กระทบการใช้งาน
+## Editing rule
 
-docs/CLEANUP_AUDIT.md
-  บันทึกงาน cleanup และเหตุผลที่ลบ workflow เก่า
-```
-
-## Active GitHub workflows
-
-```text
-.github/workflows/web-ci.yml
-  lightweight smoke CI สำหรับ PR และ main
-
-.github/workflows/build-android-apk.yml
-  build debug APK เมื่อสั่งเองหรือเมื่อแก้ android-apk
-```
-
-## Files that should not be edited casually
-
-```text
-dist/pro.html
-  หน้า production ปัจจุบัน ยาวและเสี่ยงสูง
-
-dist/assets/pro-core-v4.js
-  wrapper ที่ pin legacy core เดิม
-
-dist/assets/pro-print-store-bills.js
-  print behavior ที่ผู้ใช้ใช้งานจริง
-
-src/lib/parser.ts
-  logic อ่านไฟล์ DOIT จริง
-
-src/lib/pricing.ts
-  สูตรราคาและการปัดเศษ
-```
-
-## Cleanup rule
-
-ทำ cleanup ทีละก้อนเล็กผ่าน branch/PR เท่านั้น ห้ามรื้อ `dist/pro.html`, parser, pricing, หรือ print behavior พร้อมกันใน PR เดียว
+ปัญหาแต่ละส่วนต้องแก้ใน owner module ด้านบน ห้ามสร้าง fix, patch, override,
+hotfix, bridge, dynamic loader หรือ DOM observer เพื่อซ่อม Core

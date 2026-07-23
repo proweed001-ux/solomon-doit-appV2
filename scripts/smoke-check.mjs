@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { verifyWorkingTreeScope } from "./pro-change-scope.mjs";
 
 const root = process.cwd();
 const failures = [];
@@ -54,18 +54,58 @@ const required = [
   "src/lib/parser.ts",
   "src/lib/pricing.ts",
   "scripts/qa-doit-file.mjs",
+  "scripts/pro-change-scope.mjs",
+  "scripts/test-pro-change-scope.mjs",
+  "scripts/test-pro-architecture.mjs",
+  "scripts/test-pro-module-syntax.mjs",
+  "scripts/fixtures/pro-browser-fixture.mjs",
+  "tests/pro/pro-browser.spec.mjs",
+  "playwright.pro.config.mjs",
   ".github/workflows/web-ci.yml",
 ];
 required.forEach(mustExist);
 
 const pkg = JSON.parse(read("package.json"));
-["build", "smoke", "verify", "verify:react"].forEach((name) =>
+[
+  "build",
+  "smoke",
+  "verify",
+  "verify:react",
+  "test:pro-scope",
+  "test:pro-regression",
+  "test:pro-lazy",
+  "test:local-xlsx",
+  "test:pro-architecture",
+  "test:pro-modules",
+  "test:pro-browser",
+].forEach((name) =>
   check(Boolean(pkg.scripts?.[name]), `package.json missing script: ${name}`),
 );
 check(
-  pkg.scripts.verify === "npm run smoke",
-  "package.json verify must be smoke-only for Pro legacy",
+  [
+    "npm run smoke",
+    "npm run test:pro-scope",
+    "npm run test:pro-regression",
+    "npm run test:pro-lazy",
+    "npm run test:local-xlsx",
+    "npm run test:pro-architecture",
+    "npm run test:pro-modules",
+    "npm run test:pro-browser",
+  ].every((command) => pkg.scripts.verify.includes(command)),
+  "package.json verify must run the complete active Pro verification suite",
 );
+[
+  "fetch-depth: 0",
+  "PRO_SMOKE_BASE_SHA",
+  "npm ci",
+  "npm run smoke",
+  "npm run test:pro-regression",
+  "npm run test:pro-lazy",
+  "npm run test:local-xlsx",
+  "npm run test:pro-architecture",
+  "npm run test:pro-modules",
+  "npm run test:pro-browser",
+].forEach((token) => mustContain(".github/workflows/web-ci.yml", token));
 
 // Pro stable guardrails.
 mustContain("README.md", "Pro Stable 1028 Native");
@@ -140,21 +180,14 @@ check(
 );
 
 try {
-  const base = execFileSync("git", ["merge-base", "HEAD", "origin/main"], {
-    encoding: "utf8",
-  }).trim();
-  const changed = execFileSync("git", ["diff", "--name-only", base], {
-    encoding: "utf8",
-  })
-    .trim()
-    .split("\n")
-    .filter(Boolean);
-  check(
-    !changed.some((name) => /(?:^|[\/_-])promo(?:tion)?(?:[\/_-]|\.|$)/i.test(name)),
-    "Pro refactor must not change promo or promotion files",
-  );
-} catch {
-  // The architecture checks remain deterministic outside a git checkout.
+  const scope = verifyWorkingTreeScope({ cwd: root });
+  if (!scope.skipped) {
+    console.log(
+      `Pro change-scope guard checked ${scope.changed.length} file(s) from ${scope.baseSha}.`,
+    );
+  }
+} catch (error) {
+  check(false, error.message);
 }
 ["dist/pro.html"].forEach((p) => {
   mustNotContain(p, "raw.githubusercontent.com");
@@ -266,5 +299,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  "Smoke check passed: no known DOIT/Admin formula overlap, stale active-click flow, missing Performance active metadata patch, or direct storage delete guard violations.",
+  "Smoke check passed: Pro scope, architecture, DOIT/Admin formulas, Performance metadata, and storage guardrails are intact.",
 );

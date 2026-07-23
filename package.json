@@ -13,8 +13,12 @@
     "preview": "vite preview --host=0.0.0.0 --port=3000",
     "clean": "rimraf dist",
     "smoke": "node scripts/smoke-check.mjs",
-    "verify": "npm run smoke",
+    "verify": "npm run smoke && npm run test:pro-scope && npm run test:pro-regression && npm run test:pro-lazy && npm run test:local-xlsx && npm run test:pro-architecture && npm run test:pro-modules && npm run test:pro-browser",
     "verify:react": "npm run build && npm run smoke",
+    "test:pro-scope": "node scripts/test-pro-change-scope.mjs",
+    "test:pro-architecture": "node scripts/test-pro-architecture.mjs",
+    "test:pro-modules": "node scripts/test-pro-module-syntax.mjs",
+    "test:pro-browser": "playwright test --config=playwright.pro.config.mjs",
     "test:pro-lazy": "node scripts/test-pro-telesale-pagination.mjs",
     "test:pro-regression": "node scripts/test-pro-regression.mjs",
     "test:fuel-warning": "node scripts/test-fuel-warning.mjs",
@@ -33,6 +37,7 @@
     "jszip": "^3.10.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
     "tsx": "^4.21.0"
