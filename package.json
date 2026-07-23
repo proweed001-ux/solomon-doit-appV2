@@ -50,6 +50,7 @@
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
     "tsx": "^4.21.0",
-    "@playwright/test": "^1.61.1"
+    "@playwright/test": "^1.61.1",
+    "xlsx-legacy": "npm:xlsx@0.18.5"
   }
 }
