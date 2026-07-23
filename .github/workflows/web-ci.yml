@@ -14,6 +14,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "playwright.pro.config.mjs"
+      - "playwright.promo-new.config.mjs"
       - "tsconfig*.json"
       - "vite.config.*"
       - ".github/workflows/web-ci.yml"
@@ -30,6 +31,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "playwright.pro.config.mjs"
+      - "playwright.promo-new.config.mjs"
       - "tsconfig*.json"
       - "vite.config.*"
       - ".github/workflows/web-ci.yml"
@@ -92,3 +94,7 @@ jobs:
         run: npm run test:pro-modules
       - name: Pro browser regression
         run: npm run test:pro-browser
+      - name: Promo hardening verification
+        run: npm run verify:promo-new
+      - name: Promo browser regression
+        run: npm run test:promo-new-ui

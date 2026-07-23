@@ -24,22 +24,35 @@
     "test:fuel-warning": "node scripts/test-fuel-warning.mjs",
     "test:local-xlsx": "node scripts/test-local-xlsx.mjs",
     "test:admin-storage": "node scripts/test-admin-storage-guards.mjs",
-    "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\""
+    "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\"",
+    "build:promo-new": "vite build --config vite.promo-new.config.ts",
+    "typecheck:promo-new": "tsc --noEmit",
+    "test:promo-new": "node --import tsx --test tests/promo-new/*.test.ts",
+    "test:promo-new-ui": "playwright test --config=playwright.promo-new.config.mjs",
+    "verify:promo-new-ui": "npm run build:promo-new && npm run test:promo-new-ui",
+    "audit:promo-new": "npm audit --omit=dev --audit-level=high",
+    "inspect:promo-grid": "node --import tsx scripts/inspect-promo-grid.ts",
+    "inspect:promo-real-files": "node --import tsx scripts/inspect-promo-real-files.ts",
+    "test:promo-new-security": "node scripts/test-promo-new-security.mjs",
+    "verify:promo-new": "npm run typecheck:promo-new && npm run test:promo-new && npm run audit:promo-new && npm run build:promo-new && npm run test:promo-new-security"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.4",
-    "vite": "^6.2.3",
+    "vite": "^6.4.3",
     "typescript": "~5.8.2",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "lucide-react": "^0.546.0",
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "pdfjs-dist": "6.1.200",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "@playwright/test": "^1.61.1",
+    "xlsx-legacy": "npm:xlsx@0.18.5"
   }
 }
