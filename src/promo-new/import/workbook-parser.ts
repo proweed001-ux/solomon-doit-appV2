@@ -46,7 +46,7 @@ function hash(value: string): string {
 }
 
 const aliases: Record<keyof ColumnMap, string[]> = {
-  familyId: ['PROMOTIONFAMILY', 'FAMILYID', 'PROMOTIONGROUP', 'PROMOGROUP', 'รหัสกลุ่มโปรโมชั่น', 'กลุ่มโปรโมชั่น'],
+  familyId: ['INITIATIVEID', 'PROMOTIONFAMILY', 'FAMILYID', 'PROMOTIONGROUP', 'PROMOGROUP', 'รหัสกลุ่มโปรโมชั่น', 'กลุ่มโปรโมชั่น'],
   name: ['FAMILYNAME', 'PROMOTIONNAME', 'PROMONAME', 'ชื่อโปรโมชั่น', 'ชื่อกลุ่ม'],
   scope: ['PRODUCTSCOPE', 'PRODUCTDESCRIPTION', 'DESCRIPTION', 'ITEMDESCRIPTION', 'สินค้า', 'รายละเอียดสินค้า', 'ขอบเขตสินค้า'],
   classId: ['CLASS', 'CLASSID', 'CUSTOMERCLASS', 'STORECLASS', 'คลาส', 'ระดับร้าน'],
