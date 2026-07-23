@@ -1,5 +1,6 @@
 import type { PromoDataset, Sku } from '../domain/types';
 import type { ManualProductInput } from '../domain/manual-product';
+import type { PromoGroupingSnapshot } from '../domain/manual-snapshot';
 
 async function parseResponse<T>(response: Response): Promise<T> {
   const data = await response.json().catch(() => ({ ok: false, error: `http_${response.status}` }));
@@ -35,14 +36,25 @@ export async function createPromoMasterProduct(input: ManualProductInput, adminK
   return data.data;
 }
 
+export async function loadPromoGroupingSnapshot(monthKey: string, adminKey: string): Promise<PromoGroupingSnapshot | null> {
+  if (!adminKey) throw new Error('admin_session_required_for_grouping_load');
+  const url = new URL('/api/promo-legacy-auth', window.location.origin);
+  url.searchParams.set('action', 'load-grouping-snapshot');
+  url.searchParams.set('monthKey', monthKey);
+  const response = await fetch(url, { headers: { 'x-promo-admin-key': adminKey } });
+  const data = await parseResponse<{ ok: true; data: PromoGroupingSnapshot | null }>(response);
+  return data.data || null;
+}
+
 export async function savePromoGroupingSnapshot(dataset: PromoDataset, adminKey: string): Promise<{ promoMonthId: string; groupCount: number; cardCount: number }> {
   if (!adminKey) throw new Error('admin_session_required_for_grouping_save');
   const groups = dataset.productGroups.map(group => ({
     skuId: group.skuId,
-    cards: dataset.cards
+    cardIds: dataset.cards
       .filter(card => card.productGroupId === group.id)
-      .map(card => ({ classId: card.classId, page: card.page, sequence: card.sequence })),
-  })).filter(group => group.cards.length > 0);
+      .map(card => card.id),
+    confirmed: group.manualConfirmed === true,
+  })).filter(group => group.cardIds.length > 0);
   const url = new URL('/api/promo-legacy-auth', window.location.origin);
   url.searchParams.set('action', 'save-grouping-snapshot');
   const response = await fetch(url, {
