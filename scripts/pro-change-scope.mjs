@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 
 const forbiddenPathPattern = /promo/i;
-const proScopePathPattern = /^(?:dist\/pro(?:\.html|\/)|dist\/assets\/pro\/|scripts\/(?:fixtures\/)?pro-|scripts\/test-pro-|tests\/pro\/|docs\/[^/]*PRO[^/]*|playwright\.pro\.config\.mjs$)/i;
+const proScopePathPattern = /^(?:dist\/pro(?:\.html|\/)|dist\/assets\/pro\/)/i;
 
 export function proScopeFiles(files) {
   return [...new Set((files || []).map(String).filter(Boolean))].filter((file) =>
