@@ -1,19 +1,23 @@
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import assert from "node:assert/strict";
+import fs from "node:fs";
 
-const corePath = 'dist/assets/pro-native-core.js';
-const source = fs.readFileSync(corePath, 'utf8');
+const corePath = "dist/assets/pro/core.js";
+const source = fs.readFileSync(corePath, "utf8");
 
-assert.match(source, /const TELE_PAGE_SIZE=20;/, 'Telesale page size must stay at 20 bills');
 assert.match(
   source,
-  /if\(!drawer\?\.classList\.contains\('on'\)\)\{body\.innerHTML=.*?return\}/,
-  'Closed Telesale drawer must return before bill tables are built',
+  /const TELE_PAGE_SIZE = 20;/,
+  "Telesale page size must stay at 20 bills",
 );
 assert.match(
   source,
-  /bs\.slice\(start,start\+TELE_PAGE_SIZE\)/,
-  'Open Telesale drawer must render only the active page',
+  /if \(!drawer\?\.classList\.contains\("on"\)\) \{[\s\S]*?return;/,
+  "Closed Telesale drawer must return before bill tables are built",
+);
+assert.match(
+  source,
+  /bs\.slice\(start, start \+ TELE_PAGE_SIZE\)/,
+  "Open Telesale drawer must render only the active page",
 );
 
 const bills = Array.from({ length: 53 }, (_, billIndex) => ({
@@ -25,16 +29,21 @@ const bills = Array.from({ length: 53 }, (_, billIndex) => ({
   }),
 }));
 
-const summarize = list => list.reduce(
-  (total, bill) => bill.lines.reduce((sum, line) => ({
-    bills: total.bills,
-    lines: sum.lines + 1,
-    qty: sum.qty + line.qty,
-    raw: sum.raw + line.rawAmt,
-    vat: sum.vat + (line.netAmt || line.rawAmt) * 1.07,
-  }), total),
-  { bills: list.length, lines: 0, qty: 0, raw: 0, vat: 0 },
-);
+const summarize = (list) =>
+  list.reduce(
+    (total, bill) =>
+      bill.lines.reduce(
+        (sum, line) => ({
+          bills: total.bills,
+          lines: sum.lines + 1,
+          qty: sum.qty + line.qty,
+          raw: sum.raw + line.rawAmt,
+          vat: sum.vat + (line.netAmt || line.rawAmt) * 1.07,
+        }),
+        total,
+      ),
+    { bills: list.length, lines: 0, qty: 0, raw: 0, vat: 0 },
+  );
 
 const before = summarize(bills);
 const pages = [];
@@ -55,10 +64,13 @@ const after = pages.reduce(
   { bills: 0, lines: 0, qty: 0, raw: 0, vat: 0 },
 );
 
-assert.deepEqual(after, before, 'Pagination must not change Telesale totals');
-assert.deepEqual(pages.map(page => page.length), [20, 20, 13]);
+assert.deepEqual(after, before, "Pagination must not change Telesale totals");
+assert.deepEqual(
+  pages.map((page) => page.length),
+  [20, 20, 13],
+);
 
-console.log('Pro Telesale lazy pagination passed:', {
-  pageSizes: pages.map(page => page.length),
+console.log("Pro Telesale lazy pagination passed:", {
+  pageSizes: pages.map((page) => page.length),
   totals: before,
 });

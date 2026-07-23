@@ -25,8 +25,13 @@ const required = [
   "dist/admin-login.html",
   "dist/performance.html",
   "dist/assets/pro/app.js",
+  "dist/assets/pro/core.js",
+  "dist/assets/pro/state.js",
+  "dist/assets/pro/data-source.js",
+  "dist/assets/pro/parser-adapter.js",
+  "dist/assets/pro/filters.js",
+  "dist/assets/pro/utils.js",
   "dist/assets/pro/fuel-secret.js",
-  "dist/assets/pro-native-core.js",
   "dist/assets/pro-native-core-overrides.js",
   "dist/assets/pro-print-store-bills.js",
   "dist/assets/pro-print-mode-fixes.js",
@@ -69,7 +74,10 @@ mustNotContain("dist/pro.html", "document.close(");
 mustNotContain("dist/pro.html", "html.replace(");
 mustNotContain("dist/pro.html", "/assets/pro-core-v4.js");
 mustContain("dist/assets/pro/app.js", 'import "./bootstrap.js";');
-mustContain("dist/assets/pro-native-core.js", "currentStateSource");
+mustContain("dist/assets/pro/app.js", 'import "./core.js";');
+mustNotContain("dist/assets/pro/app.js", 'import "../pro-native-core.js";');
+mustContain("dist/assets/pro/core.js", 'currentStateSource: "state-module"');
+mustContain("dist/assets/pro/state.js", '"doit-core-unified-v1:" + state.key');
 mustContain("dist/assets/pro-print-store-bills.js", "BILLS_PER_A4=2");
 mustContain("dist/assets/pro-print-store-bills.js", "BILL_ROWS=12");
 mustContain(

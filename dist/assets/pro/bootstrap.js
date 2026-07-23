@@ -4,8 +4,8 @@ globalThis.TEAM_PUBLIC =
   "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/public/doit-files/team/";
 
 globalThis.DOIT_PRO_CORE_BOOT = {
-  version: "1028-single-entry-stage2",
-  mode: "single-module-entry",
+  version: "1028-single-state-stage3",
+  mode: "single-module-entry-state-owner",
   productionCandidate: false,
   legacyWrapperRemoved: true,
   singleEntry: true,

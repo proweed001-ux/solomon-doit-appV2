@@ -3,7 +3,7 @@ import "../vendor/xlsx-0.18.5.full.min.js";
 import "../pro-team-single.js";
 import "../pro-results-mode.js";
 import "../pro-print-store-bills.js";
-import "../pro-native-core.js";
+import "./core.js";
 import "../pro-native-core-overrides.js";
 import "../pro-print-mode-fixes.js";
 import "../pro-print-column-widths.js";
