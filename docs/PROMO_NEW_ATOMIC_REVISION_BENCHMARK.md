@@ -1,6 +1,6 @@
 # Promo New — atomic revision staging benchmark
 
-Updated: 2026-07-23 (Asia/Bangkok)
+Updated: 2026-07-24 (Asia/Bangkok)
 
 ## Scope and safety
 
@@ -65,6 +65,61 @@ Atomic failure test:
 - Remaining failed Card rows: 0
 - Existing Published pointers before and after the failed call were identical.
 
+## Reviewed JUL26 file-manifest benchmark
+
+This second benchmark used the actual JUL26 file identities and a card manifest reviewed directly
+against the rendered PDF pages. It is stronger than the synthetic scale test, but it is still **not**
+a claim that browser OCR or automatic grouping produced the final 42 groups without manual review.
+
+Source identity:
+
+- PDF: `6.Promotion Canvass Jul'26(5).pdf`
+- PDF SHA-256: `38b5785d521f63f97fd8586c228127671d872f42bf539a909a1999923add5837`
+- CSV export: `PROMO_Jul26.xlsm(1).csv`
+- CSV SHA-256: `8bbbc4828be03ccf7933f79fdaf1796f8054b1deae516f2c97953fb889401028`
+- PDF pages: 18
+- Stable Cards registered in isolated staging: 212
+- Reviewed Product Master destinations: 42
+- Classes: HFSS, HFSM, HFSL, HFSXL, HFSWS-S and HFSWS-L
+- Prices: intentionally empty because the administrator will enter them manually
+- Promotion Families/Tiers in this benchmark: deterministic staging placeholders used only to exercise
+  the per-Card contract; they do not certify the business promotion interpretation from the workbook
+
+Grouping Snapshot v2 round-trip:
+
+- Source Dataset ID: `c86a15df-9600-4da3-8393-b6157a279c61`
+- Snapshot ID: `bedb5f19-0e34-49db-8e54-606cd673268f`
+- Initial Save + Load: 42 Groups, 212 Assignments and 212 distinct Card UUIDs
+- Direct Save + Load database time observed: 32.643 ms
+- Central unlock changed revision 1 to revision 2 and cleared confirmed/locked for the selected group
+- Reconfirm + complete resave changed revision 2 to revision 3 in 37.992 ms
+- Reload of revision 3 restored 42 confirmed/locked Groups and all 212 distinct Card UUIDs
+
+Revision Draft transaction:
+
+- Version ID: `9116cfe1-2e9b-4ddd-8b59-846ab4e30745`
+- Result: Draft revision 1
+- Persisted Product Groups: 42
+- Persisted Cards: 212
+- Distinct stable Card UUIDs: 212
+- Distinct SKUs: 42
+- Promotion Families: 42
+- Per-Class staging tiers: 252
+- Direct database transaction time observed: 129.689 ms
+- A deliberately invalid Card → missing Group payload raised `card_reference_missing`
+- The failed Version left 0 Version, Group, Card and Family rows, confirming no partial write
+
+The real-file manifest exposed two Product Master identity defects before the successful Draft save:
+
+1. Legacy rows with no numeric size and no structured variant failed the confirmed-model/variant SKU
+   constraint.
+2. Two Downy 480 ml groups with different variants collided when Variant was missing.
+
+The hardening branch now preserves a parsed fallback size when structured `size_value` is null,
+preserves an existing fallback Variant, and supplies a canonical model fallback only for size-less
+legacy products. Dedicated regression tests cover H&S 65 ml, Gillette Super Click and the two Downy
+480 ml variants.
+
 ## Permissions and advisors
 
 The atomic staging RPC is executable by `anon` only because the Vercel adapter calls Supabase with the
@@ -83,14 +138,19 @@ bounded by the test-project guard plus the admin-key hash. It must not be copied
   deployed and POST-only.
 - Web CI run #545 passed Foundation smoke, Pro regression, Promo hardening verification and Promo
   browser regression.
+- Later Product Master fallback changes must use the CI and Preview results for their own final commit;
+  the earlier READY/CI evidence must not be reused as approval for newer code.
 
 ## Evidence not yet obtained
 
-1. The actual JUL26 PDF/XLSM pair has not completed a full 212-Card browser round-trip on isolated
-   staging. The real PDF reference remains 18 pages, expected 212 Cards, SHA-256
-   `38b5785d521f63f97fd8586c228127671d872f42bf539a909a1999923add5837`.
+1. The complete real PDF/XLSM pair has not yet completed an authenticated browser OCR → automatic
+   Product Master match → grouping → correction → network save round-trip. The reviewed 212-Card
+   manifest above validates conservation and database contracts, not automatic grouping quality.
 2. The current tool environment could not resolve the protected Vercel Preview hostname for a scripted
    POST, so browser-to-Vercel-to-Supabase network timing is not claimed. Direct staging RPC timing and
    deployed-route behavior are proven separately.
-3. The ordinary Promo UI still keeps legacy writes disabled. Do not enable the UI save/publish path or
+3. OCR runtime, direct Product Master matches, Scope matches, unresolved Cards, inherited/missing/
+   conflicting prices and Promotion Family ambiguity still require capture from the authenticated
+   browser run using the actual files.
+4. The ordinary Promo UI still keeps legacy writes disabled. Do not enable the UI save/publish path or
    apply these migrations to Production without explicit approval and a successful real-file run.
