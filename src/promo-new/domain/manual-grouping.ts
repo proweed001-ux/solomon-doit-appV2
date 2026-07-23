@@ -98,7 +98,12 @@ function moveCard(card: PromoCard, group: ProductGroup, dataset: PromoDataset): 
   };
 }
 
-function rebuildGroups(groups: ProductGroup[], cards: PromoCard[], targetGroup?: ProductGroup): ProductGroup[] {
+function rebuildGroups(
+  groups: ProductGroup[],
+  cards: PromoCard[],
+  targetGroup?: ProductGroup,
+  changedGroupIds: ReadonlySet<string> = new Set(),
+): ProductGroup[] {
   const seed = targetGroup && !groups.some(group => group.id === targetGroup.id)
     ? [...groups, targetGroup]
     : groups;
@@ -111,6 +116,7 @@ function rebuildGroups(groups: ProductGroup[], cards: PromoCard[], targetGroup?:
       cardIds: members.map(card => card.id),
       classIds: [...new Set(members.flatMap(card => card.classId ? [card.classId] : []))].sort(),
       status: 'need_review' as const,
+      manualConfirmed: changedGroupIds.has(group.id) ? false : base.manualConfirmed,
       failureReasons: base.failureReasons.filter(reason => !reason.startsWith('duplicate_class:')),
     }];
   });
@@ -154,6 +160,8 @@ export function assignCardsManually(
     throw new Error('รวมไม่ได้: พบการ์ดใบเดิมซ้ำในกลุ่มปลายทาง');
   }
 
+  const changedGroupIds = new Set(existingSelected.flatMap(card => card.productGroupId ? [card.productGroupId] : []));
+  changedGroupIds.add(targetGroup.id);
   const movedById = new Map(uniqueIncoming);
   const cards = dataset.cards.map(card => movedById.get(card.id) || card);
   quarantineSelected.forEach(source => {
@@ -167,7 +175,7 @@ export function assignCardsManually(
         ? dataset.prices
         : [...dataset.prices, targetGroup.price],
       cards,
-      productGroups: rebuildGroups(dataset.productGroups, cards, targetGroup),
+      productGroups: rebuildGroups(dataset.productGroups, cards, targetGroup, changedGroupIds),
     },
     quarantine: quarantine.filter(card => !selected.has(card.cardId)),
     movedCardIds: [...selected],
@@ -207,6 +215,7 @@ export function unassignCardsManually(
   const removed = dataset.cards.filter(card => selected.has(card.id));
   if (removed.length !== selected.size) throw new Error('นำออกได้เฉพาะการ์ดที่อยู่ในกลุ่มปัจจุบัน');
   const cards = dataset.cards.filter(card => !selected.has(card.id));
+  const changedGroupIds = new Set(removed.flatMap(card => card.productGroupId ? [card.productGroupId] : []));
   const existingQuarantine = new Set(quarantine.map(card => card.cardId));
   const nextQuarantine = [...quarantine];
   for (const card of removed) {
@@ -216,7 +225,7 @@ export function unassignCardsManually(
     dataset: {
       ...dataset,
       cards,
-      productGroups: rebuildGroups(dataset.productGroups, cards),
+      productGroups: rebuildGroups(dataset.productGroups, cards, undefined, changedGroupIds),
     },
     quarantine: nextQuarantine,
     removedCardIds: removed.map(card => card.id),
