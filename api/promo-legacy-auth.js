@@ -4,6 +4,9 @@ import { validateGroupingSnapshotShape } from './_promo-new/grouping-snapshot-co
 
 const SUPABASE_URL = 'https://saodmeoilixfdqentofp.supabase.co';
 const PUBLISHABLE_KEY = 'sb_publishable_JThYwAl_-askk_cIaCd75w_TCWK2BTT';
+const HARDENING_PREVIEW_HOST_PREFIX = 'solomon-doit-app-v2-promo-rebuild-preview-';
+const HARDENING_TEST_SUPABASE_URL = 'https://rpxjhbnyyozbnhotrlzb.supabase.co';
+const HARDENING_TEST_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJweGpoYm55eW96Ym5ob3RybHpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MDA3NDAsImV4cCI6MjEwMDM3Njc0MH0.5CBTInfCd_6FheC08TopZVhLF0x0roH0XSpLeSIWKls';
 const MAX_LOGIN_BODY_BYTES = 4_096;
 const MAX_MASTER_BODY_BYTES = 32_768;
 const MAX_GROUPING_BODY_BYTES = 512_000;
@@ -37,7 +40,11 @@ function sha256(value) {
 }
 
 function testDatabaseEnabled() {
-  return String(process.env.PROMO_TEST_DATABASE || '') === '1';
+  const vercelUrl = String(process.env.VERCEL_URL || '').toLowerCase();
+  const isolatedHardeningPreview = String(process.env.VERCEL_ENV || '') === 'preview'
+    && vercelUrl.startsWith(HARDENING_PREVIEW_HOST_PREFIX)
+    && vercelUrl.endsWith('.vercel.app');
+  return String(process.env.PROMO_TEST_DATABASE || '') === '1' || isolatedHardeningPreview;
 }
 
 function rpcBoolean(value) {
@@ -68,8 +75,8 @@ async function supabase(path, options = {}) {
 
 function testBackend() {
   const enabled = testDatabaseEnabled();
-  const configuredUrl = String(process.env.PROMO_TEST_SUPABASE_URL || '').replace(/\/$/u, '');
-  const key = String(process.env.PROMO_TEST_SUPABASE_PUBLISHABLE_KEY || '');
+  const configuredUrl = String(process.env.PROMO_TEST_SUPABASE_URL || HARDENING_TEST_SUPABASE_URL).replace(/\/$/u, '');
+  const key = String(process.env.PROMO_TEST_SUPABASE_PUBLISHABLE_KEY || HARDENING_TEST_SUPABASE_ANON_KEY);
   let url = '';
   let hostname = '';
   try {

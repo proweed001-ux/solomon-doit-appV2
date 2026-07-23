@@ -55,6 +55,9 @@ check(legacyAuth.includes("action === 'load-grouping-snapshot'"), 'group_snapsho
 check(legacyAuth.includes("action === 'unlock-grouping-group'"), 'central_group_unlock_route_missing');
 check(legacyAuth.includes('PROMO_TEST_DATABASE'), 'test_database_flag_missing');
 check(legacyAuth.includes('hostname === productionHostname'), 'production_database_rejection_missing');
+check(legacyAuth.includes('HARDENING_PREVIEW_HOST_PREFIX'), 'isolated_preview_host_guard_missing');
+check(legacyAuth.includes("String(process.env.VERCEL_ENV || '') === 'preview'"), 'isolated_preview_environment_guard_missing');
+check(legacyAuth.includes('HARDENING_TEST_SUPABASE_URL'), 'isolated_test_database_fallback_missing');
 check(legacyAuth.includes('function rpcBoolean(value)'), 'test_rpc_boolean_shape_guard_missing');
 check(legacyAuth.includes("action === 'runtime-status'"), 'runtime_backend_status_route_missing');
 check(legacyAuth.includes("testSupabase('/rest/v1/rpc/validate_promo_test_admin_key_v2'"), 'test_admin_key_validation_rpc_missing');

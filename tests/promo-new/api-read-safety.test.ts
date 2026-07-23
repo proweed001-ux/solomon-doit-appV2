@@ -23,6 +23,10 @@ test('upload-key auth limits request size and returns generic errors', () => {
   assert.match(source, /promo_test_backend_not_configured/u);
   assert.match(source, /hostname === productionHostname/u);
   assert.match(source, /testDatabaseEnabled\(\)/u);
+  assert.match(source, /HARDENING_PREVIEW_HOST_PREFIX/u);
+  assert.match(source, /String\(process\.env\.VERCEL_ENV \|\| ''\) === 'preview'/u);
+  assert.match(source, /vercelUrl\.startsWith\(HARDENING_PREVIEW_HOST_PREFIX\)/u);
+  assert.match(source, /HARDENING_TEST_SUPABASE_URL/u);
   assert.match(source, /function rpcBoolean\(value\)/u);
   assert.match(source, /action === 'runtime-status'/u);
   assert.match(source, /testBackendConfigured/u);
