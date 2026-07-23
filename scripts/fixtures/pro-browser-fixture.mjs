@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import XLSX from "xlsx";
+import XLSX from "xlsx-legacy";
 
 export const fixtureMeta = {
   date: "2026-07-15",

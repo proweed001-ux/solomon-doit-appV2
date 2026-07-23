@@ -1,7 +1,7 @@
 {
-  "buildCommand": "echo using verified prebuilt dist",
+  "buildCommand": "npm run verify:promo-new",
   "outputDirectory": "dist",
-  "installCommand": "echo skip install",
+  "installCommand": "node scripts/prepare-sheetjs-lock.mjs && npm ci --no-fund",
   "framework": null,
   "redirects": [
     {

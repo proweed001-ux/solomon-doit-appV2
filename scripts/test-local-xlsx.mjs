@@ -35,9 +35,9 @@ assert.doesNotMatch(
 );
 
 const deployed = fs.readFileSync('dist/assets/vendor/xlsx-0.18.5.full.min.js');
-const installed = fs.readFileSync('node_modules/xlsx/dist/xlsx.full.min.js');
+const installed = fs.readFileSync('node_modules/xlsx-legacy/dist/xlsx.full.min.js');
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
-assert.equal(digest(deployed), digest(installed), 'Vendored XLSX must match installed xlsx@0.18.5');
+assert.equal(digest(deployed), digest(installed), 'Vendored XLSX must match installed xlsx-legacy alias at 0.18.5');
 
 const context = {};
 vm.runInNewContext(deployed.toString('utf8'), context);
