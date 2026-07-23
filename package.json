@@ -16,6 +16,7 @@
     "verify": "npm run smoke",
     "verify:react": "npm run build && npm run smoke",
     "test:pro-lazy": "node scripts/test-pro-telesale-pagination.mjs",
+    "test:pro-regression": "node scripts/test-pro-regression.mjs",
     "test:fuel-warning": "node scripts/test-fuel-warning.mjs",
     "test:local-xlsx": "node scripts/test-local-xlsx.mjs",
     "test:admin-storage": "node scripts/test-admin-storage-guards.mjs",
