@@ -7,6 +7,25 @@ const entry = path.join(root, "dist/assets/pro/app.js");
 const proRoot = path.join(root, "dist/assets/pro");
 const read = (file) => fs.readFileSync(file, "utf8");
 const relative = (file) => path.relative(root, file).replaceAll("\\", "/");
+const removedProLegacyFiles = [
+  "dist/assets/pro-core-v4.js",
+  "dist/assets/pro-native-core.js",
+  "dist/assets/pro-native-core-overrides.js",
+  "dist/assets/pro-print-store-bills.js",
+  "dist/assets/pro-print-mode-fixes.js",
+  "dist/assets/pro-print-column-widths.js",
+  "dist/assets/pro-print-a4-pro-fix.js",
+  "dist/assets/pro-print.css",
+  "dist/assets/pro-team-single.js",
+  "dist/assets/pro-results-mode.js",
+  "dist/pro-native-test.html",
+  "dist/pro-native-phase4.html",
+  "dist/pro-native-ui.html",
+  "dist/assets/pro-action-dump.txt",
+];
+removedProLegacyFiles.forEach((file) =>
+  assert.ok(!fs.existsSync(path.join(root, file)), `Removed Pro Legacy file still exists: ${file}`),
+);
 const modulePattern =
   /(?:import\s+(?:[^;]*?\sfrom\s*)?|export\s+[^;]*?\sfrom\s*)["']([^"']+)["']/g;
 
@@ -83,6 +102,13 @@ const activeSource = activeProModules.map((file) => read(path.join(root, file)))
   "pro-print-mode-fixes.js",
   "pro-print-column-widths.js",
   "pro-print-a4-pro-fix.js",
+  "pro-print.css",
+  "pro-team-single.js",
+  "pro-results-mode.js",
+  "pro-native-test.html",
+  "pro-native-phase4.html",
+  "pro-native-ui.html",
+  "pro-action-dump.txt",
 ].forEach((token) =>
   assert.ok(!activeSource.includes(token), `Active graph contains forbidden token: ${token}`),
 );

@@ -293,6 +293,27 @@ mustContain("api/admin-storage.js", "method: 'DELETE'");
 mustNotContain("api/admin-storage.js", "SUPABASE_SERVICE_ROLE_KEY");
 mustNotContain("api/admin-storage.js", "service_role key");
 
+// Removed Pro Legacy files are intentionally retained here as a negative guard.
+const removedProLegacyFiles = [
+  "dist/assets/pro-core-v4.js",
+  "dist/assets/pro-native-core.js",
+  "dist/assets/pro-native-core-overrides.js",
+  "dist/assets/pro-print-store-bills.js",
+  "dist/assets/pro-print-mode-fixes.js",
+  "dist/assets/pro-print-column-widths.js",
+  "dist/assets/pro-print-a4-pro-fix.js",
+  "dist/assets/pro-print.css",
+  "dist/assets/pro-team-single.js",
+  "dist/assets/pro-results-mode.js",
+  "dist/pro-native-test.html",
+  "dist/pro-native-phase4.html",
+  "dist/pro-native-ui.html",
+  "dist/assets/pro-action-dump.txt",
+];
+removedProLegacyFiles.forEach((p) =>
+  check(!exists(p), `Removed Pro Legacy file must not exist: ${p}`),
+);
+
 // Remove stale high-risk files.
 [
   "dist/assets/pro-print-pro-fixes.js",

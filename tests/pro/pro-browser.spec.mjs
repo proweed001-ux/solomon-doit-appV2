@@ -21,6 +21,13 @@ const forbiddenRequestNames = [
   "pro-print-mode-fixes.js",
   "pro-print-column-widths.js",
   "pro-print-a4-pro-fix.js",
+  "pro-print.css",
+  "pro-team-single.js",
+  "pro-results-mode.js",
+  "pro-native-test.html",
+  "pro-native-phase4.html",
+  "pro-native-ui.html",
+  "pro-action-dump.txt",
 ];
 
 async function preparePage(page) {
