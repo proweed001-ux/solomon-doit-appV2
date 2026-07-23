@@ -293,6 +293,44 @@ const withoutPromotionBlockers = (reasons: string[]): string[] => reasons.filter
   && reason !== 'promotion_family_conflict'
 ));
 
+export function applyPromotionFamilyToCard(
+  group: ProductGroup,
+  allCards: PromoCard[],
+  cardId: string,
+  family: PromotionFamily | null,
+): { group: ProductGroup; cards: PromoCard[]; blockedClasses: string[] } {
+  const targetCard = allCards.find(card => card.id === cardId && group.cardIds.includes(card.id));
+  if (!targetCard || !targetCard.classId) throw new Error('promotion_card_not_found');
+  const baseFailures = withoutPromotionBlockers(targetCard.failureReasons);
+  const tiers = family?.tiersByClass[targetCard.classId] || [];
+  const familyFailures = family?.failureReasons.length ? [`promotion_family_needs_review:${family.id}`] : [];
+  const missingReason = !family || !tiers.length ? [`promotion_class_missing:${targetCard.classId}`] : [];
+  const cardFailures = [...new Set([...baseFailures, ...familyFailures, ...missingReason])];
+  const cards = allCards.map(card => card.id === targetCard.id ? {
+    ...card,
+    promotionFamilyId: family && tiers.length ? family.id : null,
+    promotionTiers: tiers,
+    failureReasons: cardFailures,
+    status: card.price.effectivePrice && group.sku.status === 'active' && tiers.length && !cardFailures.length ? 'ready' as const : 'need_review' as const,
+  } : card);
+  const members = cards.filter(card => group.cardIds.includes(card.id));
+  const familyIds = [...new Set(members.map(card => card.promotionFamilyId).filter((value): value is string => Boolean(value)))];
+  const missingCards = members.filter(card => !card.promotionFamilyId || !card.promotionTiers.length);
+  const groupFailures = withoutPromotionBlockers(group.failureReasons)
+    .filter(reason => !reason.startsWith('promotion_card_missing:'));
+  missingCards.forEach(card => groupFailures.push(`promotion_card_missing:${card.id}`));
+  const uniqueFailures = [...new Set(groupFailures)];
+  const nextGroup: ProductGroup = {
+    ...group,
+    promotionFamilyId: familyIds.length === 1 && missingCards.length === 0 ? familyIds[0] : null,
+    status: group.price.effectivePrice && group.sku.status === 'active' && members.every(card => card.status === 'ready') && !uniqueFailures.length
+      ? 'ready'
+      : missingReason.length ? 'blocked' : 'need_review',
+    failureReasons: uniqueFailures,
+  };
+  return { group: nextGroup, cards, blockedClasses: missingReason.length ? [targetCard.classId] : [] };
+}
+
 export function applyPromotionFamily(
   group: ProductGroup,
   allCards: PromoCard[],
