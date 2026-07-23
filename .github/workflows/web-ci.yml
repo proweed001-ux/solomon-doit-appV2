@@ -11,6 +11,7 @@ on:
       - "dist/*.html"
       - "dist/assets/**"
       - "README.md"
+      - "vercel.json"
       - "package.json"
       - "package-lock.json"
       - "playwright.pro.config.mjs"
@@ -27,6 +28,7 @@ on:
       - "dist/*.html"
       - "dist/assets/**"
       - "README.md"
+      - "vercel.json"
       - "package.json"
       - "package-lock.json"
       - "playwright.pro.config.mjs"
@@ -88,6 +90,8 @@ jobs:
         run: npm run test:local-xlsx
       - name: QA DOIT fixture
         run: npm run test:qa-doit
+      - name: Legacy checkpoint redirect config
+        run: npm run test:pro-redirects
       - name: Pro architecture guard
         run: npm run test:pro-architecture
       - name: Pro module syntax and imports

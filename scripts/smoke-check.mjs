@@ -55,6 +55,7 @@ const required = [
   "src/lib/pricing.ts",
   "scripts/qa-doit-file.mjs",
   "scripts/test-qa-doit.mjs",
+  "scripts/test-pro-redirects.mjs",
   "scripts/pro-change-scope.mjs",
   "scripts/test-pro-change-scope.mjs",
   "scripts/test-pro-architecture.mjs",
@@ -63,6 +64,7 @@ const required = [
   "tests/pro/pro-browser.spec.mjs",
   "playwright.pro.config.mjs",
   ".github/workflows/web-ci.yml",
+  "vercel.json",
 ];
 required.forEach(mustExist);
 
@@ -77,6 +79,7 @@ const pkg = JSON.parse(read("package.json"));
   "test:pro-lazy",
   "test:local-xlsx",
   "test:qa-doit",
+  "test:pro-redirects",
   "test:pro-architecture",
   "test:pro-modules",
   "test:pro-browser",
@@ -91,6 +94,7 @@ check(
     "npm run test:pro-lazy",
     "npm run test:local-xlsx",
     "npm run test:qa-doit",
+    "npm run test:pro-redirects",
     "npm run test:pro-architecture",
     "npm run test:pro-modules",
     "npm run test:pro-browser",
@@ -106,6 +110,7 @@ check(
   "npm run test:pro-lazy",
   "npm run test:local-xlsx",
   "npm run test:qa-doit",
+  "npm run test:pro-redirects",
   "npm run test:pro-architecture",
   "npm run test:pro-modules",
   "npm run test:pro-browser",
