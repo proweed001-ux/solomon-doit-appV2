@@ -112,6 +112,7 @@ export interface ProductGroup {
   price: SkuPrice;
   status: 'ready' | 'need_review' | 'blocked';
   failureReasons: string[];
+  manualConfirmed?: boolean;
 }
 
 export interface PromoVersion {
