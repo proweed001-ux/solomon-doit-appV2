@@ -22,6 +22,9 @@ test('upload-key auth limits request size and returns generic errors', () => {
   assert.match(source, /promo_auth_unavailable/u);
   assert.match(source, /promo_test_backend_not_configured/u);
   assert.match(source, /hostname === productionHostname/u);
+  assert.match(source, /testDatabaseEnabled\(\)/u);
+  assert.match(source, /testSupabase\('\/rest\/v1\/rpc\/validate_promo_test_admin_key_v2'/u);
+  assert.match(source, /testSupabase\('\/rest\/v1\/rpc\/load_promo_test_master_data_v2'/u);
   assert.match(source, /testSupabase\('\/rest\/v1\/rpc\/save_promo_grouping_snapshot_v2'/u);
   assert.match(source, /testSupabase\(`\/rest\/v1\/promo_product_master\?status=eq\.active/u);
   assert.match(source, /testSupabase\('\/rest\/v1\/rpc\/create_promo_master_product'/u);

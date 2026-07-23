@@ -24,6 +24,7 @@ const required = [
   'vite.promo-new.config.ts', 'scripts/prepare-sheetjs-lock.mjs',
   'docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md', 'supabase/migrations/20260716083231_promo_system_rebuild.sql',
   'supabase/migrations/20260723104837_promo_grouping_snapshot_v2.sql',
+  'supabase/migrations/20260723120500_harden_promo_grouping_snapshot_v2_permissions.sql',
   'supabase/rollback/20260716083231_promo_system_rebuild.sql',
 ];
 required.forEach(file => check(fs.existsSync(path.join(root, file)), `missing:${file}`));
@@ -54,6 +55,8 @@ check(legacyAuth.includes("action === 'load-grouping-snapshot'"), 'group_snapsho
 check(legacyAuth.includes("action === 'unlock-grouping-group'"), 'central_group_unlock_route_missing');
 check(legacyAuth.includes('PROMO_TEST_DATABASE'), 'test_database_flag_missing');
 check(legacyAuth.includes('hostname === productionHostname'), 'production_database_rejection_missing');
+check(legacyAuth.includes("testSupabase('/rest/v1/rpc/validate_promo_test_admin_key_v2'"), 'test_admin_key_validation_rpc_missing');
+check(legacyAuth.includes("testSupabase('/rest/v1/rpc/load_promo_test_master_data_v2'"), 'test_master_data_rpc_missing');
 check(!legacyAuth.includes("supabase('/rest/v1/rpc/save_manual_promo_grouping_snapshot'"), 'legacy_production_snapshot_write_reintroduced');
 check(legacyAuth.includes('sameIdentity'), 'structured_master_duplicate_guard_missing');
 
@@ -190,7 +193,15 @@ check(snapshotMigration.includes('snapshot_card_set_mismatch'), 'snapshot_exact_
 check(snapshotMigration.includes('group_not_confirmed_or_locked'), 'snapshot_server_lock_guard_missing');
 check(snapshotMigration.includes('locked_group_changed'), 'locked_group_mutation_guard_missing');
 check(snapshotMigration.includes('unlock_promo_grouping_group_v2'), 'central_group_unlock_rpc_missing');
+check(snapshotMigration.includes('validate_promo_test_admin_key_v2'), 'test_admin_key_validation_function_missing');
+check(snapshotMigration.includes('load_promo_test_master_data_v2'), 'test_master_data_function_missing');
 check(snapshotMigration.includes('TEST/STAGING ONLY'), 'snapshot_migration_environment_warning_missing');
+const snapshotPermissionMigration = read('supabase/migrations/20260723120500_harden_promo_grouping_snapshot_v2_permissions.sql');
+check(snapshotPermissionMigration.includes('promo_grouping_card_assignments_snapshot_group_idx'), 'snapshot_assignment_group_index_missing');
+check(snapshotPermissionMigration.includes('promo_test_key_is_valid(text) from public, anon, authenticated'), 'internal_test_key_function_acl_not_hardened');
+check(snapshotPermissionMigration.includes('to anon;'), 'snapshot_rpc_anon_grants_missing');
+check(!snapshotPermissionMigration.includes('to anon, authenticated;'), 'snapshot_rpc_authenticated_grant_reintroduced');
+check(snapshotPermissionMigration.match(/using \(false\)/gu)?.length === 6, 'snapshot_direct_access_deny_policies_missing');
 const stagingBlockers = read('docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md');
 check(stagingBlockers.includes('must not be applied to Production'), 'migration_blocker_notice_missing');
 check(stagingBlockers.includes('LEGACY_WRITES_ENABLED = false'), 'migration_write_guard_notice_missing');

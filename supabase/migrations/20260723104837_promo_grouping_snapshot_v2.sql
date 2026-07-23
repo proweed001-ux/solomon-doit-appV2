@@ -100,6 +100,47 @@ as $$
   );
 $$;
 
+create or replace function public.validate_promo_test_admin_key_v2(p_auth_hash text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.promo_test_key_is_valid(p_auth_hash);
+$$;
+
+create or replace function public.load_promo_test_master_data_v2(p_auth_hash text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_payload jsonb;
+begin
+  if not public.promo_test_key_is_valid(p_auth_hash) then
+    raise exception 'invalid_admin_key';
+  end if;
+
+  select dataset_payload
+    into v_payload
+  from public.promo_source_datasets
+  order by updated_at desc, created_at desc
+  limit 1;
+
+  if v_payload is null then
+    raise exception 'dataset_not_found';
+  end if;
+
+  return jsonb_build_object(
+    'skus', coalesce(v_payload #> '{dataset,skus}', '[]'::jsonb),
+    'prices', coalesce(v_payload #> '{dataset,prices}', '[]'::jsonb)
+  );
+end;
+$$;
+
 create or replace function public.load_promo_source_dataset_v2(
   p_dataset_id uuid,
   p_auth_hash text
@@ -525,11 +566,15 @@ end;
 $$;
 
 revoke all on function public.promo_test_key_is_valid(text) from public;
+revoke all on function public.validate_promo_test_admin_key_v2(text) from public;
+revoke all on function public.load_promo_test_master_data_v2(text) from public;
 revoke all on function public.load_promo_source_dataset_v2(uuid, text) from public;
 revoke all on function public.load_promo_grouping_snapshot_v2(text, uuid, text, integer, text) from public;
 revoke all on function public.save_promo_grouping_snapshot_v2(jsonb, text) from public;
 revoke all on function public.unlock_promo_grouping_group_v2(uuid, uuid, text, integer, text) from public;
 
+grant execute on function public.validate_promo_test_admin_key_v2(text) to anon, authenticated;
+grant execute on function public.load_promo_test_master_data_v2(text) to anon, authenticated;
 grant execute on function public.load_promo_source_dataset_v2(uuid, text) to anon, authenticated;
 grant execute on function public.load_promo_grouping_snapshot_v2(text, uuid, text, integer, text) to anon, authenticated;
 grant execute on function public.save_promo_grouping_snapshot_v2(jsonb, text) to anon, authenticated;

@@ -36,6 +36,10 @@ function sha256(value) {
   return createHash('sha256').update(String(value), 'utf8').digest('hex');
 }
 
+function testDatabaseEnabled() {
+  return String(process.env.PROMO_TEST_DATABASE || '') === '1';
+}
+
 async function supabase(path, options = {}) {
   const response = await fetch(`${SUPABASE_URL}${path}`, {
     ...options,
@@ -57,7 +61,7 @@ async function supabase(path, options = {}) {
 }
 
 function testBackend() {
-  const enabled = String(process.env.PROMO_TEST_DATABASE || '') === '1';
+  const enabled = testDatabaseEnabled();
   const configuredUrl = String(process.env.PROMO_TEST_SUPABASE_URL || '').replace(/\/$/u, '');
   const key = String(process.env.PROMO_TEST_SUPABASE_PUBLISHABLE_KEY || '');
   let url = '';
@@ -103,6 +107,14 @@ async function latestPublishedMonth() {
 async function validateUploadKey(adminKey) {
   const key = text(adminKey);
   if (!key || key.length > MAX_UPLOAD_KEY_LENGTH) throw new Error('invalid_upload_key');
+  if (testDatabaseEnabled()) {
+    const valid = await testSupabase('/rest/v1/rpc/validate_promo_test_admin_key_v2', {
+      method: 'POST',
+      body: JSON.stringify({ p_auth_hash: sha256(key) }),
+    });
+    if (valid !== true) throw new Error('invalid_upload_key');
+    return key;
+  }
   const promoMonthId = await latestPublishedMonth();
   await supabase('/functions/v1/promo-function-review', {
     method: 'POST',
@@ -130,7 +142,17 @@ function applyStructuredIdentity(sku, master) {
   };
 }
 
-async function masterData() {
+async function masterData(adminKey) {
+  if (testDatabaseEnabled()) {
+    const data = await testSupabase('/rest/v1/rpc/load_promo_test_master_data_v2', {
+      method: 'POST',
+      body: JSON.stringify({ p_auth_hash: sha256(adminKey) }),
+    });
+    if (!data || !Array.isArray(data.skus) || !Array.isArray(data.prices)) {
+      throw new Error('product_master_payload_invalid');
+    }
+    return data;
+  }
   const select = 'master_product_id,canonical_name,normalized_key,unit_label,status,created_from_month,updated_at,brand,product_type,variant,size_value,size_unit,sales_unit,pack_quantity';
   const [masters, prices, aliases] = await Promise.all([
     supabase(`/rest/v1/promo_product_master?status=eq.active&select=${select}&order=canonical_name.asc`),
@@ -334,7 +356,7 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET' && action === 'master-data') {
       await validateUploadKey(headerKey);
-      return json(res, 200, { ok: true, data: await masterData() });
+      return json(res, 200, { ok: true, data: await masterData(headerKey) });
     }
 
     if (req.method === 'GET' && action === 'load-grouping-snapshot') {
