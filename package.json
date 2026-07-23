@@ -28,6 +28,8 @@
     "build:promo-new": "vite build --config vite.promo-new.config.ts",
     "typecheck:promo-new": "tsc --noEmit",
     "test:promo-new": "node --import tsx --test tests/promo-new/*.test.ts",
+    "test:promo-new-ui": "playwright test --config=playwright.promo-new.config.mjs",
+    "verify:promo-new-ui": "npm run build:promo-new && npm run test:promo-new-ui",
     "audit:promo-new": "npm audit --omit=dev --audit-level=high",
     "inspect:promo-grid": "node --import tsx scripts/inspect-promo-grid.ts",
     "inspect:promo-real-files": "node --import tsx scripts/inspect-promo-real-files.ts",

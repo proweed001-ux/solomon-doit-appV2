@@ -7,9 +7,16 @@ import { hydrateManualGroupingSnapshot } from '../domain/manual-snapshot';
 import {
   createManualSku,
   ensureSkuInDataset,
+  findSimilarProductMasters,
   type ManualProductInput,
+  type SimilarMasterMatch,
 } from '../domain/manual-product';
-import { createPromoMasterProduct, fetchActivePromoMasterSkus, loadPromoGroupingSnapshot } from '../shared/master-api';
+import {
+  createPromoMasterProduct,
+  fetchActivePromoMasterSkus,
+  loadPromoGroupingSnapshot,
+  unlockPromoGroupingGroup,
+} from '../shared/master-api';
 import './manual-workbench.css';
 
 interface ManualGroupingWorkbenchProps {
@@ -27,6 +34,13 @@ interface ManualGroupingWorkbenchProps {
 interface Snapshot {
   dataset: PromoDataset;
   quarantine: ImportedCardCandidate[];
+}
+
+interface PendingBulkAction {
+  kind: 'assign' | 'remove';
+  ids: string[];
+  sourceNames: string[];
+  destinationName: string;
 }
 
 interface CardView {
@@ -117,6 +131,10 @@ export function ManualGroupingWorkbench({
   const [createBusy, setCreateBusy] = useState(false);
   const [form, setForm] = useState<ManualProductInput>(emptyForm());
   const [aliasText, setAliasText] = useState('');
+  const [pendingBulk, setPendingBulk] = useState<PendingBulkAction | null>(null);
+  const [pendingProduct, setPendingProduct] = useState<ManualProductInput | null>(null);
+  const [similarMatches, setSimilarMatches] = useState<SimilarMasterMatch[]>([]);
+  const [unlockingGroupId, setUnlockingGroupId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -140,22 +158,22 @@ export function ManualGroupingWorkbench({
     [masterSkus, dataset.skus],
   );
   const confirmedLocks = useMemo(
-    () => new Set(dataset.productGroups.filter(group => group.manualConfirmed === true).map(group => group.id)),
+    () => new Set(dataset.productGroups.filter(group => group.manualLocked === true).map(group => group.id)),
     [dataset.productGroups],
   );
 
   useEffect(() => {
-    if (!adminKey || !allMasterSkus.length) return;
+    if (readOnly || !adminKey || !allMasterSkus.length || !dataset.sourceDataset?.persisted) return;
     const allCardIds = [
       ...dataset.cards.map(card => card.id),
       ...quarantine.map(card => card.cardId),
     ].sort();
     if (!allCardIds.length) return;
-    const hydrationKey = `${dataset.version.monthKey}:${allCardIds.join('|')}`;
+    const hydrationKey = `${dataset.sourceDataset.datasetId}:${dataset.sourceDataset.fingerprint}:${dataset.sourceDataset.revision}`;
     if (hydrationKeyRef.current === hydrationKey) return;
     hydrationKeyRef.current = hydrationKey;
     let cancelled = false;
-    loadPromoGroupingSnapshot(dataset.version.monthKey, adminKey)
+    loadPromoGroupingSnapshot(dataset, adminKey)
       .then(snapshot => {
         if (cancelled || !snapshot?.groups.length) return;
         const hydrated = hydrateManualGroupingSnapshot(dataset, quarantine, snapshot, allMasterSkus);
@@ -168,7 +186,7 @@ export function ManualGroupingWorkbench({
         if (!cancelled) onError(`โหลดการจัดกลุ่มเดิมไม่สำเร็จ: ${String((error as Error)?.message || error)}`);
       });
     return () => { cancelled = true; };
-  }, [adminKey, allMasterSkus, dataset.version.monthKey, dataset.cards, quarantine]);
+  }, [readOnly, adminKey, allMasterSkus, dataset.version.monthKey, dataset.cards, quarantine, dataset.sourceDataset]);
 
   const groupsById = useMemo(() => new Map(dataset.productGroups.map(group => [group.id, group])), [dataset.productGroups]);
   const skusById = useMemo(() => new Map(allMasterSkus.map(sku => [sku.id, sku])), [allMasterSkus]);
@@ -225,15 +243,17 @@ export function ManualGroupingWorkbench({
 
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
   const sourceLocked = (card: CardView) => Boolean(card.groupId && confirmedLocks.has(card.groupId));
-  const selectableCards = visibleCards.filter(card => !sourceLocked(card) && card.groupId !== targetGroup?.id);
+  const selectableCards = visibleCards.filter(card => !sourceLocked(card));
   const allVisibleSelected = selectableCards.length > 0 && selectableCards.every(card => selected.has(card.id));
+  const movableSelectedIds = selectedIds.filter(id => cardViews.some(card => (
+    card.id === id && card.groupId !== targetGroup?.id
+  )));
   const targetCounts = targetGroup ? groupMemberCounts(targetGroup, dataset) : {};
 
   const toggleCard = (card: CardView) => {
     if (!targetLocked) return onError('เลือกกลุ่มปลายทางและกดล็อกก่อนเลือกการ์ด');
     if (targetConfirmed) return onError('กลุ่มปลายทางยืนยันแล้ว ต้องปลดล็อกกลุ่มก่อนแก้ไข');
     if (sourceLocked(card)) return onError(`การ์ดอยู่ในกลุ่มที่ยืนยันแล้ว: ${card.groupName}`);
-    if (card.groupId === targetGroup?.id) return;
     setSelectedIds(current => current.includes(card.id) ? current.filter(id => id !== card.id) : [...current, card.id]);
     onError('');
   };
@@ -262,10 +282,9 @@ export function ManualGroupingWorkbench({
     setViewMode('unassigned');
   };
 
-  const assignSelected = () => {
-    if (!targetLocked || !targetSku || !selectedIds.length) return;
+  const executeAssign = (ids: string[]) => {
+    if (!targetLocked || !targetSku || !ids.length) return;
     if (targetConfirmed) return onError('กลุ่มนี้ยืนยันแล้ว ต้องปลดล็อกก่อนเพิ่มการ์ด');
-    if (!window.confirm(`เพิ่ม/ย้ายการ์ดที่เลือก ${selectedIds.length} ใบ เข้า “${targetSku.canonicalName}” ใช่หรือไม่`)) return;
     try {
       pushHistory();
       let working = dataset;
@@ -273,7 +292,7 @@ export function ManualGroupingWorkbench({
       const result = assignCardsManually(
         working,
         quarantine,
-        selectedIds,
+        ids,
         target.kind === 'sku' ? { skuId: targetSku.id } : { groupId: target.id },
       );
       onDatasetChange(result.dataset);
@@ -290,12 +309,24 @@ export function ManualGroupingWorkbench({
     }
   };
 
-  const removeSelected = () => {
-    const assignedIds = selectedIds.filter(id => dataset.cards.some(card => card.id === id));
+  const assignSelected = () => {
+    if (!targetLocked || !targetSku || !movableSelectedIds.length) return;
+    if (movableSelectedIds.length > 1) {
+      const selectedCards = cardViews.filter(card => movableSelectedIds.includes(card.id));
+      setPendingBulk({
+        kind: 'assign',
+        ids: [...movableSelectedIds],
+        sourceNames: [...new Set(selectedCards.map(card => card.groupName))],
+        destinationName: targetSku.canonicalName,
+      });
+      return;
+    }
+    executeAssign(movableSelectedIds);
+  };
+
+  const executeRemove = (ids: string[]) => {
+    const assignedIds = ids.filter(id => dataset.cards.some(card => card.id === id));
     if (!assignedIds.length) return onError('เลือกการ์ดที่อยู่ในกลุ่มก่อนนำออก');
-    const lockedSource = assignedIds.map(id => dataset.cards.find(card => card.id === id)).find(card => card?.productGroupId && confirmedLocks.has(card.productGroupId));
-    if (lockedSource) return onError('มีการ์ดจากกลุ่มที่ยืนยันแล้ว กรุณาปลดล็อกกลุ่มนั้นก่อน');
-    if (!window.confirm(`นำการ์ดที่เลือก ${assignedIds.length} ใบออกจากกลุ่มและกลับไปรอจัดใช่หรือไม่`)) return;
     try {
       pushHistory();
       const result = unassignCardsManually(dataset, quarantine, assignedIds);
@@ -309,6 +340,24 @@ export function ManualGroupingWorkbench({
     } catch (error) {
       onError(String((error as Error)?.message || error));
     }
+  };
+
+  const removeSelected = () => {
+    const assignedIds = selectedIds.filter(id => dataset.cards.some(card => card.id === id));
+    if (!assignedIds.length) return onError('เลือกการ์ดที่อยู่ในกลุ่มก่อนนำออก');
+    const lockedSource = assignedIds.map(id => dataset.cards.find(card => card.id === id)).find(card => card?.productGroupId && confirmedLocks.has(card.productGroupId));
+    if (lockedSource) return onError('มีการ์ดจากกลุ่มที่ยืนยันแล้ว กรุณาปลดล็อกกลุ่มนั้นก่อน');
+    if (assignedIds.length > 1) {
+      const selectedCards = cardViews.filter(card => assignedIds.includes(card.id));
+      setPendingBulk({
+        kind: 'remove',
+        ids: assignedIds,
+        sourceNames: [...new Set(selectedCards.map(card => card.groupName))],
+        destinationName: 'รอจัดกลุ่ม',
+      });
+      return;
+    }
+    executeRemove(assignedIds);
   };
 
   const cleanDuplicateClassFlags = (groupId: string): PromoDataset => ({
@@ -327,12 +376,16 @@ export function ManualGroupingWorkbench({
 
   const confirmTargetGroup = () => {
     if (!targetGroup) return onError('ต้องมีการ์ดในกลุ่มก่อนยืนยัน');
+    const pendingPromotion = dataset.cards.find(card => (
+      card.productGroupId === targetGroup.id && (!card.promotionFamilyId || !card.promotionTiers.length)
+    ));
+    if (pendingPromotion) return onError(`ยังยืนยันไม่ได้: การ์ด ${pendingPromotion.id} รอตรวจโปรโมชั่น`);
     pushHistory();
     const cleaned = cleanDuplicateClassFlags(targetGroup.id);
     onDatasetChange({
       ...cleaned,
       productGroups: cleaned.productGroups.map(group => group.id === targetGroup.id
-        ? { ...group, manualConfirmed: true }
+        ? { ...group, manualConfirmed: true, manualLocked: true }
         : group),
     });
     setSelectedIds([]);
@@ -341,17 +394,41 @@ export function ManualGroupingWorkbench({
     onError('');
   };
 
-  const unlockTargetGroup = () => {
+  const unlockTargetGroup = async () => {
     if (!targetGroup) return;
-    pushHistory();
-    onDatasetChange({
-      ...dataset,
-      productGroups: dataset.productGroups.map(group => group.id === targetGroup.id
-        ? { ...group, manualConfirmed: false }
-        : group),
-    });
-    onDirty();
-    onMessage(`ปลดล็อกกลุ่ม ${targetGroup.sku.canonicalName} แล้ว`);
+    setUnlockingGroupId(targetGroup.id);
+    onError('');
+    try {
+      const persisted = !readOnly
+        && Boolean(dataset.sourceDataset?.snapshotId)
+        && Number.isInteger(dataset.sourceDataset?.snapshotRevision);
+      const centralSnapshot = persisted
+        ? await unlockPromoGroupingGroup(dataset, targetGroup.id, adminKey)
+        : null;
+      const centralGroup = centralSnapshot?.groups.find(group => group.groupId === targetGroup.id);
+      if (centralSnapshot && (!centralGroup || centralGroup.confirmed || centralGroup.locked)) {
+        throw new Error('grouping_snapshot_unlock_incomplete');
+      }
+      pushHistory();
+      onDatasetChange({
+        ...dataset,
+        sourceDataset: dataset.sourceDataset && centralSnapshot ? {
+          ...dataset.sourceDataset,
+          snapshotId: centralSnapshot.snapshotId,
+          snapshotRevision: centralSnapshot.revision,
+          snapshotSavedAt: centralSnapshot.savedAt,
+        } : dataset.sourceDataset,
+        productGroups: dataset.productGroups.map(group => group.id === targetGroup.id
+          ? { ...group, manualConfirmed: false, manualLocked: false }
+          : group),
+      });
+      onDirty();
+      onMessage(`ปลดล็อกกลุ่ม ${targetGroup.sku.canonicalName} แล้ว${centralSnapshot ? ` · revision ${centralSnapshot.revision}` : ''}`);
+    } catch (error) {
+      onError(`ปลดล็อกกลุ่มไม่สำเร็จ: ${String((error as Error)?.message || error)}`);
+    } finally {
+      setUnlockingGroupId('');
+    }
   };
 
   const undo = () => {
@@ -367,15 +444,24 @@ export function ManualGroupingWorkbench({
     onError('');
   };
 
-  const createNewMaster = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const selectExistingMaster = (sku: Sku) => {
+    const nextDataset = ensureSkuInDataset(dataset, sku);
+    pushHistory();
+    onDatasetChange(nextDataset);
+    setTargetValue(`sku:${sku.id}`);
+    setTargetLocked(true);
+    setViewMode('unassigned');
+    setShowCreate(false);
+    setPendingProduct(null);
+    setSimilarMatches([]);
+    onDirty();
+    onMessage(`เลือกใช้ Product Master เดิม “${sku.canonicalName}” แล้ว`);
+  };
+
+  const persistNewMaster = async (input: ManualProductInput) => {
     setCreateBusy(true);
     onError('');
     try {
-      const input: ManualProductInput = {
-        ...form,
-        aliases: aliasText.split(/[\n,]+/u).map(clean).filter(Boolean),
-      };
       let sku: Sku;
       let created = true;
       if (readOnly) {
@@ -394,6 +480,8 @@ export function ManualGroupingWorkbench({
       setTargetLocked(true);
       setViewMode('unassigned');
       setShowCreate(false);
+      setPendingProduct(null);
+      setSimilarMatches([]);
       setForm(emptyForm());
       setAliasText('');
       onDirty();
@@ -405,6 +493,21 @@ export function ManualGroupingWorkbench({
     }
   };
 
+  const createNewMaster = (event: React.FormEvent) => {
+    event.preventDefault();
+    const input: ManualProductInput = {
+      ...form,
+      aliases: aliasText.split(/[\n,]+/u).map(clean).filter(Boolean),
+    };
+    const matches = findSimilarProductMasters(input, allMasterSkus);
+    if (matches.length) {
+      setPendingProduct(input);
+      setSimilarMatches(matches);
+      return;
+    }
+    void persistNewMaster(input);
+  };
+
   return <section className="panel manual-workbench">
     <div className="section-head manual-title-row">
       <div>
@@ -412,7 +515,7 @@ export function ManualGroupingWorkbench({
         <small>Product Master ใช้งาน {allMasterSkus.length} กลุ่ม · เลือกปลายทางแล้วล็อกก่อนติ๊กการ์ด · กลุ่มเดียวมีหลายการ์ดจาก Class เดียวกันได้</small>
       </div>
       <div className="manual-title-actions">
-        <button className="btn soft" disabled={!history.length} onClick={undo}><Undo2 size={15} /> ย้อนกลับ</button>
+        <button className="btn soft" disabled={!history.length} title={!history.length ? 'ยังไม่มีการย้ายที่ย้อนกลับได้' : ''} onClick={undo}><Undo2 size={15} /> ย้อนกลับ</button>
         <button className="btn primary" onClick={() => setShowCreate(true)}><Plus size={15} /> เพิ่มกลุ่มใหม่</button>
       </div>
     </div>
@@ -427,7 +530,7 @@ export function ManualGroupingWorkbench({
 
     <div className="target-picker">
       <label className="field">กลุ่มสินค้าปลายทาง
-        <select disabled={targetLocked} value={targetValue} onChange={event => {
+        <select data-testid="target-group-select" disabled={targetLocked} title={targetLocked ? 'กด “เปลี่ยนปลายทาง” ก่อนเลือกกลุ่มอื่น' : ''} value={targetValue} onChange={event => {
           const value = event.target.value;
           setTargetValue(value);
           setTargetLocked(Boolean(value));
@@ -447,24 +550,24 @@ export function ManualGroupingWorkbench({
         </select>
       </label>
       <div className="target-actions">
-        <button className="btn primary" disabled={!targetValue || targetLocked} onClick={lockTarget}><Lock size={15} /> ล็อกเป็นปลายทาง</button>
-        <button className="btn soft" disabled={!targetLocked} onClick={changeTarget}>เปลี่ยนปลายทาง</button>
+        <button className="btn primary" disabled={!targetValue || targetLocked} title={!targetValue ? 'เลือกกลุ่มสินค้าก่อน' : targetLocked ? 'กลุ่มนี้เป็นปลายทางอยู่แล้ว' : ''} onClick={lockTarget}><Lock size={15} /> ล็อกเป็นปลายทาง</button>
+        <button className="btn soft" disabled={!targetLocked} title={!targetLocked ? 'ยังไม่ได้เลือกกลุ่มปลายทาง' : ''} onClick={changeTarget}>เปลี่ยนปลายทาง</button>
         {targetGroup && (targetConfirmed
-          ? <button className="btn soft" onClick={unlockTargetGroup}><Unlock size={15} /> ปลดล็อกกลุ่ม</button>
+          ? <button className="btn soft" disabled={unlockingGroupId === targetGroup.id} title={unlockingGroupId === targetGroup.id ? 'กำลังบันทึกสถานะปลดล็อกลงฐานกลาง' : ''} onClick={() => void unlockTargetGroup()}><Unlock size={15} /> {unlockingGroupId === targetGroup.id ? 'กำลังปลดล็อก...' : 'ปลดล็อกกลุ่ม'}</button>
           : <button className="btn success" onClick={confirmTargetGroup}><CheckCircle2 size={15} /> ยืนยันกลุ่ม</button>)}
       </div>
     </div>
 
-    {targetLocked && targetSku && <div className={`target-banner ${targetConfirmed ? 'confirmed' : ''}`}>
+    {targetLocked && targetSku && <div data-testid="target-group-banner" className={`target-banner ${targetConfirmed ? 'confirmed' : ''}`}>
       <div><b>{targetConfirmed ? 'กลุ่มยืนยันแล้ว' : 'กำลังจัดเข้า'}: {targetSku.canonicalName}</b><small>{targetGroup ? `${targetGroup.cardIds.length} การ์ด` : 'ยังไม่มีการ์ด'} · ราคายังว่างจนกว่าคุณกรอกเอง</small></div>
       <div className="class-counts">{CLASS_IDS.map(classId => <span key={classId}>{classId}: {targetCounts[classId] || 0}</span>)}</div>
     </div>}
 
     <div className="manual-toolbar">
       <div className="manual-tabs">
-        <button className={viewMode === 'suggested' ? 'active' : ''} onClick={() => setViewMode('suggested')} disabled={!targetLocked}>ระบบแนะนำ</button>
+        <button className={viewMode === 'suggested' ? 'active' : ''} title={!targetLocked ? 'เลือกกลุ่มปลายทางก่อน' : ''} onClick={() => setViewMode('suggested')} disabled={!targetLocked}>ระบบแนะนำ</button>
         <button className={viewMode === 'unassigned' ? 'active' : ''} onClick={() => setViewMode('unassigned')}>ยังไม่จัด</button>
-        <button className={viewMode === 'target' ? 'active' : ''} onClick={() => setViewMode('target')} disabled={!targetGroup}>ในกลุ่มนี้</button>
+        <button className={viewMode === 'target' ? 'active' : ''} title={!targetGroup ? 'กลุ่มปลายทางนี้ยังไม่มีการ์ด' : ''} onClick={() => setViewMode('target')} disabled={!targetGroup}>ในกลุ่มนี้</button>
         <button className={viewMode === 'all' ? 'active' : ''} onClick={() => setViewMode('all')}>ทั้งหมด</button>
       </div>
       <label className="manual-search"><Search size={16} /><input value={searchText} onChange={event => setSearchText(event.target.value)} placeholder="ค้นหาชื่อ OCR แบรนด์ หน้า หรือกลุ่ม" /></label>
@@ -472,16 +575,16 @@ export function ManualGroupingWorkbench({
     </div>
 
     <div className="selection-bar">
-      <button className="btn soft" disabled={!targetLocked || !selectableCards.length || targetConfirmed} onClick={toggleVisible}>{allVisibleSelected ? 'ยกเลิกที่แสดง' : `เลือกที่แสดง ${selectableCards.length} ใบ`}</button>
+      <button className="btn soft" disabled={!targetLocked || !selectableCards.length || targetConfirmed} title={!targetLocked ? 'เลือกกลุ่มปลายทางก่อน' : targetConfirmed ? 'กลุ่มปลายทางล็อกแล้ว' : !selectableCards.length ? 'ไม่มีการ์ดที่เลือกได้ในตัวกรองนี้' : ''} onClick={toggleVisible}>{allVisibleSelected ? `ยกเลิกที่แสดง ${selectableCards.length} ใบ` : `เลือกการ์ดที่แสดงทั้งหมด ${selectableCards.length} ใบ`}</button>
       <span>เลือกแล้ว <b>{selectedIds.length}</b> ใบ</span>
-      <button className="btn success" disabled={!targetLocked || !selectedIds.length || targetConfirmed} onClick={assignSelected}>เพิ่ม/ย้ายเข้ากลุ่ม</button>
-      <button className="btn danger" disabled={!selectedIds.some(id => dataset.cards.some(card => card.id === id))} onClick={removeSelected}><Trash2 size={15} /> นำออกจากกลุ่ม</button>
+      <button data-testid="move-selected" className="btn success" disabled={!targetLocked || !movableSelectedIds.length || targetConfirmed} title={!targetLocked ? 'เลือกกลุ่มปลายทางก่อน' : !movableSelectedIds.length ? 'เลือกการ์ดที่อยู่นอกกลุ่มปลายทางอย่างน้อย 1 ใบ' : targetConfirmed ? 'ปลดล็อกกลุ่มปลายทางก่อน' : ''} onClick={assignSelected}>เพิ่ม/ย้ายเข้ากลุ่ม</button>
+      <button data-testid="remove-selected" className="btn danger" disabled={!selectedIds.some(id => dataset.cards.some(card => card.id === id))} title={!selectedIds.some(id => dataset.cards.some(card => card.id === id)) ? 'เลือกการ์ดที่อยู่ในกลุ่มก่อน' : ''} onClick={removeSelected}><Trash2 size={15} /> นำออกจากกลุ่ม</button>
     </div>
 
     <div className="manual-card-grid">
       {visibleCards.map(card => {
-        const disabled = !targetLocked || targetConfirmed || sourceLocked(card) || card.groupId === targetGroup?.id;
-        return <label className={`manual-card ${selected.has(card.id) ? 'selected' : ''} ${disabled ? 'disabled' : ''}`} key={card.id}>
+        const disabled = !targetLocked || targetConfirmed || sourceLocked(card);
+        return <label data-testid={`manual-card-${card.id}`} title={sourceLocked(card) ? 'กลุ่มต้นทางล็อกแล้ว ต้องปลดล็อกก่อน' : targetConfirmed ? 'กลุ่มปลายทางล็อกแล้ว' : !targetLocked ? 'เลือกกลุ่มปลายทางก่อน' : card.groupId === targetGroup?.id ? 'เลือกเพื่อนำออกจากกลุ่มได้' : ''} className={`manual-card ${selected.has(card.id) ? 'selected' : ''} ${disabled ? 'disabled' : ''}`} key={card.id}>
           <input type="checkbox" checked={selected.has(card.id)} disabled={disabled} onChange={() => toggleCard(card)} />
           {card.imageUrl ? <img src={card.imageUrl} alt={card.id} loading="lazy" /> : <div className="manual-card-empty">ไม่มีรูป</div>}
           <div className="manual-card-body">
@@ -494,6 +597,41 @@ export function ManualGroupingWorkbench({
       })}
       {!visibleCards.length && <div className="manual-empty">ไม่พบการ์ดตามตัวกรองนี้</div>}
     </div>
+
+    {pendingBulk && <div className="manual-modal-backdrop" role="presentation">
+      <div className="manual-modal" role="dialog" aria-modal="true" aria-labelledby="bulk-confirm-title" data-testid="bulk-confirm-dialog">
+        <div className="manual-modal-head"><div><h3 id="bulk-confirm-title">ยืนยันการย้ายหลายการ์ด</h3><small>รายการนี้ย้อนกลับได้ด้วยปุ่ม “ย้อนกลับ”</small></div><button type="button" className="icon-btn" onClick={() => setPendingBulk(null)}><X size={18} /></button></div>
+        <div className="manual-modal-note">
+          <b>{pendingBulk.ids.length} การ์ด</b><br />
+          กลุ่มต้นทาง: {pendingBulk.sourceNames.join(', ') || 'ยังไม่จัดกลุ่ม'}<br />
+          กลุ่มปลายทาง: {pendingBulk.destinationName}
+        </div>
+        <div className="manual-modal-actions">
+          <button type="button" className="btn soft" onClick={() => setPendingBulk(null)}>ยกเลิก</button>
+          <button type="button" data-testid="confirm-bulk-move" className="btn primary" onClick={() => {
+            const action = pendingBulk;
+            setPendingBulk(null);
+            if (action.kind === 'assign') executeAssign(action.ids);
+            else executeRemove(action.ids);
+          }}>ยืนยัน {pendingBulk.ids.length} การ์ด</button>
+        </div>
+      </div>
+    </div>}
+
+    {pendingProduct && similarMatches.length > 0 && <div className="manual-modal-backdrop" role="presentation">
+      <div className="manual-modal" role="dialog" aria-modal="true" aria-labelledby="similar-master-title">
+        <div className="manual-modal-head"><div><h3 id="similar-master-title">พบ Product Master ใกล้เคียง</h3><small>โปรโมชั่นหรือ Class ต่างกันอย่างเดียวไม่ใช่สินค้าใหม่</small></div><button type="button" className="icon-btn" onClick={() => { setPendingProduct(null); setSimilarMatches([]); }}><X size={18} /></button></div>
+        <div className="similar-master-list">
+          {similarMatches.map(match => <button type="button" className="btn soft" key={match.sku.id} onClick={() => selectExistingMaster(match.sku)}>
+            ใช้ “{match.sku.canonicalName}” ({Math.round(match.score * 100)}%)
+          </button>)}
+        </div>
+        <div className="manual-modal-actions">
+          <button type="button" className="btn soft" onClick={() => { setPendingProduct(null); setSimilarMatches([]); }}>กลับไปแก้ชื่อ</button>
+          <button type="button" className="btn danger" disabled={createBusy} onClick={() => void persistNewMaster(pendingProduct)}>ยืนยันสร้างสินค้าใหม่จริง</button>
+        </div>
+      </div>
+    </div>}
 
     {showCreate && <div className="manual-modal-backdrop" role="presentation">
       <form className="manual-modal" onSubmit={createNewMaster}>

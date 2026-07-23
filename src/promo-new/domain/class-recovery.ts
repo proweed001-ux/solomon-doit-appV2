@@ -1,6 +1,5 @@
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 import { resolvePageClassSequence, type PageClassObservation } from '../import/class-id';
-import { makeCardId } from '../import/card-id';
 
 export interface CardClassRecoveryResult {
   changedCards: number;
@@ -39,10 +38,7 @@ export function recoverCachedCardClasses<T>(
     const oldId = card.cardId;
     const oldClass = card.classId;
     card.classId = pageClass.classId;
-    card.cardId = makeCardId(card.monthKey, card.classId, card.page, card.sequence);
     card.failureReasons = card.failureReasons.filter(reason => reason !== 'class_missing');
-    if (visualSignatures[oldId] && !visualSignatures[card.cardId]) visualSignatures[card.cardId] = visualSignatures[oldId];
-    if (oldId !== card.cardId) delete visualSignatures[oldId];
     changedCards += 1;
     recoveredPages.add(card.page);
     warnings.push(`card:${oldId}:class_recovered:${oldClass || 'missing'}->${card.classId}`);

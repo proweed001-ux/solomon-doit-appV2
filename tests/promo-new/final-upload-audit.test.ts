@@ -187,5 +187,6 @@ test('dry-run validates without Draft ID and write handlers block dry-run direct
   assert.match(main, /!dryRun && !savedVersionId/u);
   assert.match(main, /if \(!dataset \|\| !session \|\| demo \|\| dryRun\) return;/u);
   assert.match(main, /if \(!dataset \|\| !session \|\| demo \|\| dryRun \|\| !savedVersionId/u);
-  assert.match(main, /FINAL-UPLOAD-AUDIT-20260719/u);
+  assert.match(main, /โหมดทดลอง — ไม่บันทึกฐานข้อมูล/u);
+  assert.match(main, /readOnly=\{demo \|\| dryRun\}/u);
 });

@@ -97,21 +97,35 @@ test('manual unassign moves selected cards back to quarantine and removes an emp
 });
 
 
-test('manual changes invalidate persisted confirmation for every affected group', () => {
+test('locked groups reject direct handlers and unlocked changes invalidate persisted confirmation', () => {
   const { grouped, dataset } = datasetWith([
     ['Pantene แชมพู Aqua 70 มล. ขวด', 'HFSS'],
     ['Rejoice แชมพู Rich 120 มล. ขวด', 'HFSM'],
   ]);
-  dataset.productGroups = dataset.productGroups.map(group => ({ ...group, manualConfirmed: true }));
+  dataset.productGroups = dataset.productGroups.map(group => ({ ...group, manualConfirmed: true, manualLocked: true }));
   const target = grouped.groups[0];
   const source = grouped.groups[1];
 
-  const moved = assignCardsManually(dataset, [], [source.cardIds[0]], { groupId: target.id });
+  assert.throws(
+    () => assignCardsManually(dataset, [], [source.cardIds[0]], { groupId: target.id }),
+    /target_group_locked/u,
+  );
+  assert.throws(
+    () => unassignCardsManually(dataset, [], [source.cardIds[0]]),
+    /source_group_locked/u,
+  );
+
+  const unlocked = {
+    ...dataset,
+    productGroups: dataset.productGroups.map(group => ({ ...group, manualConfirmed: false, manualLocked: false })),
+  };
+  const moved = assignCardsManually(unlocked, [], [source.cardIds[0]], { groupId: target.id });
   assert.equal(moved.dataset.productGroups[0].manualConfirmed, false);
+  assert.equal(moved.dataset.productGroups[0].manualLocked, false);
 
   const reconfirmed = {
     ...moved.dataset,
-    productGroups: moved.dataset.productGroups.map(group => ({ ...group, manualConfirmed: true })),
+    productGroups: moved.dataset.productGroups.map(group => ({ ...group, manualConfirmed: false, manualLocked: false })),
   };
   const removed = unassignCardsManually(reconfirmed, [], [source.cardIds[0]]);
   assert.equal(removed.dataset.productGroups[0].manualConfirmed, false);

@@ -294,7 +294,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
         ];
         const crop = cropCanvas(canvas, bounds, Math.max(2, Math.round(bounds.width * 0.008)));
         cards.push({
-          cardId: makeCardId(monthKey, classId, pageNumber, sequence),
+          cardId: makeCardId(),
           monthKey,
           page: pageNumber,
           sequence,
@@ -350,7 +350,6 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
     const resolved = resolvedByPage.get(card.page);
     const previousClass = card.classId;
     card.classId = resolved?.classId || null;
-    card.cardId = makeCardId(monthKey, card.classId, card.page, card.sequence);
     card.failureReasons = card.failureReasons.filter(reason => reason !== 'class_missing');
     if (!card.classId) card.failureReasons.push('class_missing');
     if (!previousClass && card.classId) warnings.push(`card:${card.cardId}:class_recovered_without_product_confidence_boost`);

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { AlertTriangle, CheckCircle2, Database, FileSpreadsheet, Layers3, LogOut, Save, Search, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 import type { PromoDataset, ProductGroup } from '../domain/types';
 import { autoAssignPromotionFamilies } from '../domain/auto-match';
-import { applyPromotionFamily, applyPromotionFamilyToCard } from '../domain/grouping';
+import { applyPromotionFamilyToCard } from '../domain/grouping';
 import { applyPriceToGroup, setCentralPrice } from '../domain/pricing';
 import { confirmSkuCandidate } from '../domain/sku-identity';
 import { assertReadyForPublishMultiCard as assertReadyForPublish } from './validation-multi-card';
@@ -26,13 +26,14 @@ import {
 } from './test-cache';
 import { ManualGroupingWorkbench } from './manual-workbench';
 import { GroupingSnapshotSave } from './grouping-snapshot-save';
+import { loadPromoSourceDataset } from '../shared/master-api';
 import './admin.css';
 
 type Session = NonNullable<ReturnType<typeof loadSession>>;
 type MasterData = Awaited<ReturnType<typeof fetchPromoMasterData>>;
 type GroupedResult = Awaited<ReturnType<typeof runGroupingInWorker>>;
 
-const BUILD_ID = 'FINAL-UPLOAD-AUDIT-20260719-0031';
+const BUILD_ID = __PROMO_BUILD_ID__;
 const PROMO_CLASSES = new Set(['HFSS', 'HFSM', 'HFSL', 'HFSXL', 'HFSWS-S', 'HFSWS-L']);
 
 const defaultMonth = () => {
@@ -75,26 +76,24 @@ function LoginPage({ onLogin, onDemo, allowDemo }: { onLogin: (session: Session)
     {error && <div className="notice error">เข้าสู่ระบบไม่สำเร็จ: {error}</div>}
     <form onSubmit={submit}>
       <label className="field">รหัสอัปโหลด<input type="password" autoComplete="current-password" value={adminKey} onChange={event => setAdminKey(event.target.value)} required /></label>
-      <button className="btn primary" disabled={busy}>{busy ? 'กำลังตรวจสิทธิ์...' : 'เข้าสู่ระบบ'}</button>
+      <button className="btn primary" disabled={busy} title={busy ? 'กำลังตรวจสิทธิ์ กรุณารอสักครู่' : ''}>{busy ? 'กำลังตรวจสิทธิ์...' : 'เข้าสู่ระบบ'}</button>
     </form>
     {allowDemo && <><div className="divider">หรือ</div><button className="btn soft" style={{ width: '100%' }} onClick={onDemo}>ดู Preview แบบสาธิต (อ่านอย่างเดียว)</button></>}
     <div className="audit-note"><ShieldCheck size={14} /> โหมด Dry-run โหลด Product Master จริง แต่บล็อก Draft และ Publish</div>
   </section></main>;
 }
 
-function GroupEditor({ group, dataset, priceDraft, onPriceDraft, onConfirmSku, onApply, onApplyCardPromotion }: {
+function GroupEditor({ group, dataset, priceDraft, onPriceDraft, onConfirmSku, onApplyPrice, onApplyCardPromotion }: {
   group: ProductGroup;
   dataset: PromoDataset;
   priceDraft: string;
   onPriceDraft: (value: string) => void;
   onConfirmSku: () => void;
-  onApply: (familyId: string, price: number) => void;
+  onApplyPrice: (price: number) => void;
   onApplyCardPromotion: (cardId: string, familyId: string) => void;
 }) {
-  const [familyId, setFamilyId] = useState(group.promotionFamilyId || '');
-  useEffect(() => setFamilyId(group.promotionFamilyId || ''), [group.promotionFamilyId]);
   const cards = dataset.cards.filter(card => group.cardIds.includes(card.id));
-  const family = dataset.promotionFamilies.find(item => item.id === familyId);
+  const locked = Boolean(group.manualLocked || group.manualConfirmed);
   return <article className={`group-card ${group.status}`}>
     <div className="group-top">
       <div>
@@ -102,27 +101,33 @@ function GroupEditor({ group, dataset, priceDraft, onPriceDraft, onConfirmSku, o
           {card.imageUrl ? <img src={card.imageUrl} alt={card.id} loading="lazy" /> : <div className="empty">ไม่มีรูป</div>}
           <span>{card.classId}</span>
           <label className="field card-promotion-field">โปรโมชั่นของการ์ด
-            <select value={card.promotionFamilyId || ''} onChange={event => onApplyCardPromotion(card.id, event.target.value)}>
-              <option value="">ยังไม่เลือก</option>
+            <select
+              data-testid={`card-promotion-${card.id}`}
+              value={card.promotionFamilyId || ''}
+              disabled={locked}
+              title={locked ? 'กลุ่มล็อกแล้ว ต้องปลดล็อกก่อนเปลี่ยนโปรโมชั่น' : ''}
+              onChange={event => onApplyCardPromotion(card.id, event.target.value)}
+            >
+              <option value="">รอตรวจโปรโมชั่น</option>
               {dataset.promotionFamilies
                 .filter(item => Boolean(card.classId && item.tiersByClass[card.classId]))
                 .map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
+            {!card.promotionFamilyId && <small className="promotion-pending">รอตรวจโปรโมชั่น</small>}
           </label>
         </div>)}</div>
         <div className="product-name">{group.sku.canonicalName}</div>
-        <div className="tags"><span className="tag">{group.sku.code}</span><span className={`tag ${group.status === 'ready' ? 'good' : group.status === 'blocked' ? 'bad' : 'warn'}`}>{group.status}</span><span className="tag">{group.cardIds.length} การ์ด</span>{group.promotionFamilyId && <span className="tag good">Family เดียวกันทุกใบ</span>}{!group.promotionFamilyId && cards.some(card => card.promotionFamilyId) && <span className="tag warn">โปรโมชั่นต่างกันรายใบ</span>}{group.classIds.map(classId => <span className="tag" key={classId}>{classId}</span>)}</div>
+        <div className="tags"><span className="tag">{group.sku.code}</span><span className={`tag ${group.status === 'ready' ? 'good' : group.status === 'blocked' ? 'bad' : 'warn'}`}>{group.status}</span><span className="tag">{group.cardIds.length} การ์ด</span>{locked && <span className="tag good">ล็อกแล้ว</span>}{group.promotionFamilyId && <span className="tag good">Family เดียวกันทุกใบ</span>}{!group.promotionFamilyId && cards.some(card => card.promotionFamilyId) && <span className="tag warn">โปรโมชั่นต่างกันรายใบ</span>}{group.classIds.map(classId => <span className="tag" key={classId}>{classId}</span>)}</div>
         <div className="sku-meta"><span><b>แบรนด์:</b> {group.sku.identity.brand || '-'}</span><span><b>ชนิด:</b> {group.sku.identity.productType || '-'}</span><span><b>ขนาด:</b> {group.sku.identity.sizeValue || '-'} {group.sku.identity.sizeUnit}</span><span><b>หน่วย/Pack:</b> {group.sku.identity.salesUnit} × {group.sku.identity.packQuantity}</span><span><b>Variant:</b> {group.sku.identity.variant || '-'}</span><span><b>ราคา:</b> {money(group.price.effectivePrice?.amount)}</span></div>
         {group.sku.status === 'candidate' && <button className="btn soft" style={{ marginTop: 10 }} onClick={onConfirmSku}>ยืนยันเป็น SKU ใหม่</button>}
         {group.sku.status === 'quarantine' && <div className="failure">ชื่อสินค้ายังไม่พอระบุ Product Master อย่างปลอดภัย</div>}
         {!!group.failureReasons.length && <div className="failure">{group.failureReasons.join(' · ')}</div>}
       </div>
       <div className="group-controls">
-        <label className="field">Promotion Family สำหรับใช้กับทุกการ์ด<select value={familyId} onChange={event => setFamilyId(event.target.value)}><option value="">เลือกจาก CSV/XLSM</option>{dataset.promotionFamilies.map(item => <option key={item.id} value={item.id}>{item.name} · {Object.keys(item.tiersByClass).join(', ')}</option>)}</select></label>
         <div className="price-row"><label className="field">ราคากลางต่อชิ้น<input type="number" min="0.01" step="0.01" inputMode="decimal" value={priceDraft} onChange={event => onPriceDraft(event.target.value)} placeholder="0.00" /></label><label className="field">แหล่งราคา<input value={group.price.source === 'central_override' ? 'คุณกรอกเอง' : 'ยังไม่มีราคา'} readOnly /></label></div>
         <div className="price-source">ราคาเริ่มว่างและจะเปลี่ยนเมื่อคุณกรอกเองเท่านั้น</div>
-        <div className="tier-preview">{family ? group.classIds.map(classId => <div className="tier-line" key={classId}><b>{classId}</b><span>{family.tiersByClass[classId]?.map(tier => tier.sourceText).join(' / ') || 'ไม่มี Class นี้ — จะ Block'}</span></div>) : <span>เลือก Family ตรงการ์ดแต่ละใบ หรือเลือกด้านบนเพื่อใช้กับทุกใบ</span>}</div>
-        <div className="control-actions"><button className="btn success" disabled={!familyId || !(Number(priceDraft) > 0)} onClick={() => onApply(familyId, Number(priceDraft))}>ยืนยันราคาและใช้โปรนี้กับทุกการ์ด</button></div>
+        <div className="tier-preview">{cards.map(card => <div className="tier-line" key={card.id}><b>{card.classId}</b><span>{card.promotionTiers.map(tier => tier.sourceText).join(' / ') || 'รอตรวจโปรโมชั่น'}</span></div>)}</div>
+        <div className="control-actions"><button className="btn success" disabled={locked || !(Number(priceDraft) > 0)} title={locked ? 'กลุ่มล็อกแล้ว ต้องปลดล็อกก่อนเปลี่ยนราคา' : !(Number(priceDraft) > 0) ? 'กรอกราคามากกว่า 0' : ''} onClick={() => onApplyPrice(Number(priceDraft))}>บันทึกราคากลาง</button></div>
       </div>
     </div>
   </article>;
@@ -132,6 +137,7 @@ function AdminApp() {
   const params = new URLSearchParams(location.search);
   const demoFromUrl = params.get('demo') === '1';
   const dryRun = params.get('dryrun') === '1';
+  const requestedDatasetId = params.get('dataset') || '';
   const [session, setSession] = useState<Session | null>(loadSession());
   const [checking, setChecking] = useState(Boolean(session));
   const [demo, setDemo] = useState(demoFromUrl);
@@ -151,6 +157,7 @@ function AdminApp() {
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [previewChecked, setPreviewChecked] = useState(false);
   const [savedVersionId, setSavedVersionId] = useState<string | null>(null);
+  const [loadedDatasetId, setLoadedDatasetId] = useState('');
 
   const selectWorkbook = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selected = event.target.files?.[0] || null;
@@ -174,6 +181,25 @@ function AdminApp() {
       setSession(null);
     }).finally(() => setChecking(false));
   }, []);
+
+  useEffect(() => {
+    if (!session || !requestedDatasetId || loadedDatasetId === requestedDatasetId) return;
+    let cancelled = false;
+    setBusy(true);
+    loadPromoSourceDataset(requestedDatasetId, session.accessToken)
+      .then(result => {
+        if (cancelled) return;
+        setDataset(result.dataset);
+        setQuarantine(result.quarantine);
+        setMonthKey(result.dataset.version.monthKey);
+        setLoadedDatasetId(requestedDatasetId);
+        setMessage(`โหลด Dataset กลาง revision ${result.dataset.sourceDataset?.revision || '-'} · ${result.dataset.cards.length + result.quarantine.length} การ์ด`);
+        setError('');
+      })
+      .catch(caught => { if (!cancelled) setError(`โหลด Dataset กลางไม่สำเร็จ: ${errorText(caught)}`); })
+      .finally(() => { if (!cancelled) setBusy(false); });
+    return () => { cancelled = true; };
+  }, [session, requestedDatasetId, loadedDatasetId]);
 
   const loadMasterData = async (): Promise<MasterData> => {
     if (!session) throw new Error('admin_session_required_for_product_master');
@@ -221,6 +247,14 @@ function AdminApp() {
       cards: grouped.cards,
       productGroups: grouped.groups,
       promotionFamilies: parsedWorkbook.families,
+      sourceDataset: {
+        datasetId: crypto.randomUUID(),
+        fingerprint: '0'.repeat(64),
+        revision: 0,
+        cardIdsHash: '0'.repeat(64),
+        persisted: false,
+        savedAt: null,
+      },
       warnings: [...imported.warnings, ...parsedWorkbook.warnings, ...grouped.warnings, ...extraWarnings],
     };
     const automated = autoAssignPromotionFamilies(next);
@@ -350,14 +384,8 @@ function AdminApp() {
     if (!target) return current;
     try {
       const sku = confirmSkuCandidate(target.sku);
-      let nextGroup: ProductGroup = { ...target, sku, failureReasons: target.failureReasons.filter(reason => reason !== 'new_sku_requires_confirmation'), status: 'need_review' };
-      let cards = current.cards;
-      const family = current.promotionFamilies.find(item => item.id === nextGroup.promotionFamilyId);
-      if (family) {
-        const applied = applyPromotionFamily(nextGroup, cards, family);
-        nextGroup = applied.group;
-        cards = applied.cards;
-      }
+      const nextGroup: ProductGroup = { ...target, sku, failureReasons: target.failureReasons.filter(reason => reason !== 'new_sku_requires_confirmation'), status: 'need_review' };
+      const cards = current.cards.map(card => card.productGroupId === groupId ? { ...card, status: 'need_review' as const } : card);
       const groups = current.productGroups.map(group => group.id === groupId ? nextGroup : group);
       const skus = current.skus.map(item => item.id === sku.id ? sku : item);
       setPreviewChecked(false);
@@ -369,24 +397,29 @@ function AdminApp() {
     }
   });
 
-  const applyGroup = (groupId: string, familyId: string, amount: number) => setDataset(current => {
+  const applyGroupPrice = (groupId: string, amount: number) => setDataset(current => {
     if (!current) return current;
     const group = current.productGroups.find(item => item.id === groupId);
-    const family = current.promotionFamilies.find(item => item.id === familyId);
-    if (!group || !family) return current;
+    if (!group) return current;
+    if (group.manualLocked || group.manualConfirmed) {
+      setError('กลุ่มล็อกแล้ว ต้องปลดล็อกก่อนเปลี่ยนราคา');
+      return current;
+    }
     try {
       const price = setCentralPrice(group.price, amount);
       const priced = applyPriceToGroup(group, current.cards, price);
-      const promoted = applyPromotionFamily(priced.group, priced.cards, family);
-      if (promoted.blockedClasses.length) setError(`Block: CSV ไม่มี Class ${promoted.blockedClasses.join(', ')} สำหรับ ${group.sku.canonicalName}`);
-      else setError('');
+      setError('');
       setPreviewChecked(false);
       setSavedVersionId(null);
       return {
         ...current,
         prices: [...current.prices.filter(item => item.skuId !== price.skuId), price],
-        cards: promoted.cards,
-        productGroups: current.productGroups.map(item => item.id === groupId ? promoted.group : item),
+        cards: priced.cards,
+        productGroups: current.productGroups.map(item => item.id === groupId ? {
+          ...priced.group,
+          manualConfirmed: false,
+          manualLocked: false,
+        } : item),
       };
     } catch (caught) {
       setError(errorText(caught));
@@ -490,7 +523,7 @@ function AdminApp() {
     <header className="admin-hero"><div className="hero-inner"><div className="hero-row"><div><div className="eyebrow">PROMO SYSTEM REBUILD · {demo ? 'DEMO READ-ONLY' : dryRun ? 'FILE DRY-RUN' : 'AUTHENTICATED ADMIN'}</div><h1>จัดโปรโมชั่นเป็นกลุ่ม ไม่ไล่ติ๊กทีละการ์ด</h1><p>นำเข้า PDF + CSV/XLSM แล้วจัด SKU, Product Group, โปรราย Class และราคากลางในหน้าจอเดียว</p></div><div className="hero-actions"><a className="btn ghost" href="/promo-new.html?demo=1">ดูหน้าลูกค้า</a>{session && <button className="btn ghost" onClick={() => logout(session).finally(() => setSession(null))}><LogOut size={16} /> ออกจากระบบ</button>}</div></div></div></header>
     <main className="admin-main">
       {demo && <div className="notice warn">นี่คือข้อมูลสาธิตสำหรับตรวจ UI เท่านั้น ปุ่มบันทึก/Publish ถูกปิด และไม่มีการเชื่อม Production</div>}
-      {dryRun && <div className="notice warn">โหมดทดสอบไฟล์จริง · Build {BUILD_ID} · Product Master ก่อน PDF · ไม่เขียน Production</div>}
+      {dryRun && <div className="notice warn" data-testid="dryrun-banner"><b>โหมดทดลอง — ไม่บันทึกฐานข้อมูล</b> · Build {BUILD_ID} · state แยกจากโหมดจริงและไม่โหลดล็อกเดิม</div>}
       {error && <div className="notice error"><AlertTriangle size={15} /> {error}</div>}
       <section className="panel">
         <div className="step-grid">
@@ -500,7 +533,7 @@ function AdminApp() {
         </div>
         <div className="run-row">
           <label className="field" style={{ flexDirection: 'row', alignItems: 'center' }}><input style={{ width: 18, height: 18 }} type="checkbox" checked={ocr} onChange={event => setOcr(event.target.checked)} /> ตรวจกรอบการ์ดจากกรอบนอก + ช่องอ้างอิงซ้ายล่าง + ช่องโปรโมชั่นสีแดง แล้ว OCR ชื่อมุมขวาบนครั้งเดียว</label>
-          <button className="btn primary" disabled={busy || !pdf || !workbook || demo || !session} onClick={processFiles}>{busy ? 'กำลังประมวลผล...' : 'ประมวลผลไฟล์และบันทึกแคช'}</button>
+          <button className="btn primary" disabled={busy || !pdf || !workbook || demo || !session} title={demo ? 'โหมดสาธิตไม่รับไฟล์' : !session ? 'เข้าสู่ระบบก่อน' : !pdf || !workbook ? 'เลือก PDF และ CSV/XLSM ให้ครบ' : busy ? 'กำลังประมวลผล' : ''} onClick={processFiles}>{busy ? 'กำลังประมวลผล...' : 'ประมวลผลไฟล์และบันทึกแคช'}</button>
         </div>
         <div style={{ marginTop: 12, padding: 12, border: '1px solid #dbe4ef', borderRadius: 12, background: '#f8fafc' }}>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -509,8 +542,8 @@ function AdminApp() {
               <small>{cacheSummary ? `${cacheSummary.monthKey} · ${cacheSummary.pdfName} · ${cacheSummary.workbookName} · ${cacheSummary.cardCount || '-'} การ์ด · ${formatCacheSize(cacheSummary.estimatedBytes)} · ${cacheSummary.mode === 'full' ? 'พร้อมจัดกลุ่มใหม่' : 'เก็บเฉพาะไฟล์ ต้องประมวลผลใหม่'} · ${cacheDate(cacheSummary.savedAt)}` : 'ยังไม่มี summary หรือ localStorage ถูกล้าง — ปุ่มตรวจแคชจะตรวจ IndexedDB จริง'}</small>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn soft" disabled={busy || demo || !session} onClick={useCachedRun}><Database size={15} /> {busy ? 'กำลังทำงาน...' : 'ตรวจและจัดกลุ่มจากแคช'}</button>
-              <button className="btn soft" disabled={busy || demo} onClick={clearCachedRun}><Trash2 size={15} /> ล้างแคช</button>
+              <button className="btn soft" disabled={busy || demo || !session} title={demo ? 'โหมดสาธิตไม่ใช้แคช' : !session ? 'เข้าสู่ระบบก่อน' : busy ? 'กำลังทำงาน' : ''} onClick={useCachedRun}><Database size={15} /> {busy ? 'กำลังทำงาน...' : 'ตรวจและจัดกลุ่มจากแคช'}</button>
+              <button className="btn soft" disabled={busy || demo} title={demo ? 'โหมดสาธิตไม่มีแคชให้ล้าง' : busy ? 'รอให้งานปัจจุบันเสร็จก่อน' : ''} onClick={clearCachedRun}><Trash2 size={15} /> ล้างแคช</button>
             </div>
           </div>
           <small>แคชรุ่นเก่าที่ตัดกรอบไม่ตรงถูกยกเลิก; แคชรุ่นนี้ใช้เฉพาะ Structural Grid ที่ตรวจจุดอ้างอิงครบและลายนิ้วมือที่ตรวจครบ</small>
@@ -547,11 +580,11 @@ function AdminApp() {
           priceDraft={priceDrafts[group.id] ?? String(group.price.effectivePrice?.amount || '')}
           onPriceDraft={value => setPriceDrafts(current => ({ ...current, [group.id]: value }))}
           onConfirmSku={() => confirmSku(group.id)}
-          onApply={(familyId, amount) => applyGroup(group.id, familyId, amount)}
+          onApplyPrice={amount => applyGroupPrice(group.id, amount)}
           onApplyCardPromotion={(cardId, familyId) => applyCardPromotion(group.id, cardId, familyId)}
         />) : <div className="empty">เลือกไฟล์แล้วกดประมวลผล หรือกดตรวจและจัดกลุ่มจากแคช</div>}</div>
       </section>
-      <div className="footer-actions"><button className="btn soft" disabled={!dataset || busy || (!dryRun && !savedVersionId)} onClick={validatePreview}><CheckCircle2 size={16} /> {previewChecked ? 'ตรวจความพร้อมผ่าน' : 'ตรวจความพร้อมจริง'}</button><button className="btn primary" disabled={!dataset || !session || demo || dryRun || busy || Boolean(savedVersionId) || dataset.version.status === 'published'} onClick={save}><Save size={16} /> {savedVersionId ? 'Draft บันทึกแล้ว' : 'บันทึก Draft'}</button><button className="btn dark" disabled={!publishable} onClick={publish}>Publish เวอร์ชันนี้</button></div>
+      <div className="footer-actions"><button className="btn soft" disabled={!dataset || busy || (!dryRun && !savedVersionId)} title={!dataset ? 'ยังไม่มี Dataset' : busy ? 'กำลังทำงาน' : !dryRun && !savedVersionId ? 'Draft รุ่นเดิมถูกปิดอยู่' : ''} onClick={validatePreview}><CheckCircle2 size={16} /> {previewChecked ? 'ตรวจความพร้อมผ่าน' : 'ตรวจความพร้อมจริง'}</button><button className="btn primary" disabled={!dataset || !session || demo || dryRun || busy || Boolean(savedVersionId) || dataset.version.status === 'published'} title="Legacy Draft ถูกปิดจนกว่าจะผ่าน revision staging" onClick={save}><Save size={16} /> {savedVersionId ? 'Draft บันทึกแล้ว' : 'บันทึก Draft'}</button><button className="btn dark" disabled={!publishable} title={!publishable ? 'ต้องผ่าน Preview validation และ Legacy Publish ยังถูกปิดใน rebuild' : ''} onClick={publish}>Publish เวอร์ชันนี้</button></div>
     </main>
   </div>;
 }

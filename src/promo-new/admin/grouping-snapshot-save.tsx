@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Database, Save, ShieldCheck } from 'lucide-react';
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 import type { PromoDataset } from '../domain/types';
+import { createManualGroupingSnapshot, type PromoGroupingSnapshot } from '../domain/manual-snapshot';
 import { savePromoGroupingSnapshot } from '../shared/master-api';
 
 export function GroupingSnapshotSave({
@@ -21,24 +22,32 @@ export function GroupingSnapshotSave({
 }) {
   const [busy, setBusy] = useState(false);
   const [savedSignature, setSavedSignature] = useState('');
-  const signature = useMemo(() => dataset.productGroups
-    .map(group => `${group.skuId}:${group.manualConfirmed === true ? 'confirmed' : 'open'}:${group.cardIds.slice().sort().join(',')}`)
-    .sort()
-    .join('|'), [dataset.productGroups]);
+  const [savedSnapshot, setSavedSnapshot] = useState<PromoGroupingSnapshot | null>(null);
+  const signature = useMemo(() => [
+    dataset.sourceDataset?.fingerprint || 'unregistered',
+    ...dataset.productGroups.map(group => `${group.skuId}:${group.manualConfirmed === true ? 'confirmed' : 'open'}:${group.manualLocked === true ? 'locked' : 'editable'}:${group.cardIds.slice().sort().join(',')}`),
+    ...dataset.cards.map(card => `${card.id}:${card.promotionFamilyId || 'pending'}:${card.promotionTiers.map(tier => tier.id || tier.tierNo).join(',')}`),
+  ].sort().join('|'), [dataset.productGroups, dataset.cards, dataset.sourceDataset?.fingerprint]);
   useEffect(() => {
     if (savedSignature && savedSignature !== signature) setSavedSignature('');
   }, [signature, savedSignature]);
 
   const nonMasterGroups = dataset.productGroups.filter(group => !group.skuId.startsWith('MASTER-'));
   const duplicateCards = dataset.cards.length - new Set(dataset.cards.map(card => card.id)).size;
-  const unconfirmedGroups = dataset.productGroups.filter(group => group.cardIds.length > 0 && group.manualConfirmed !== true);
+  const unconfirmedGroups = dataset.productGroups.filter(group => (
+    group.cardIds.length > 0 && (group.manualConfirmed !== true || group.manualLocked !== true)
+  ));
+  const pendingPromotions = dataset.cards.filter(card => !card.promotionFamilyId || !card.promotionTiers.length);
+  const sourceNotPersisted = !dataset.sourceDataset?.persisted;
   const readyToSave = !readOnly
     && Boolean(adminKey)
+    && !sourceNotPersisted
     && dataset.cards.length > 0
     && quarantine.length === 0
     && nonMasterGroups.length === 0
     && duplicateCards === 0
-    && unconfirmedGroups.length === 0;
+    && unconfirmedGroups.length === 0
+    && pendingPromotions.length === 0;
 
   const save = async () => {
     if (!readyToSave || busy) return;
@@ -46,9 +55,18 @@ export function GroupingSnapshotSave({
     setBusy(true);
     onError('');
     try {
-      const result = await savePromoGroupingSnapshot(dataset, adminKey);
+      const persistedPrevious = dataset.sourceDataset?.snapshotId
+        && Number.isInteger(dataset.sourceDataset.snapshotRevision)
+        ? {
+          snapshotId: dataset.sourceDataset.snapshotId,
+          revision: Number(dataset.sourceDataset.snapshotRevision),
+        }
+        : null;
+      const snapshot = createManualGroupingSnapshot(dataset, savedSnapshot || persistedPrevious);
+      const result = await savePromoGroupingSnapshot(snapshot, adminKey);
+      setSavedSnapshot(result);
       setSavedSignature(signature);
-      onMessage(`บันทึกการจัดกลุ่มลงฐานกลางแล้ว: ${result.cardCount} การ์ด · ${result.groupCount} กลุ่ม · เดือน ${result.promoMonthId}`);
+      onMessage(`บันทึก Snapshot revision ${result.revision} แล้ว: ${result.cardCount} การ์ด · ${result.groups.length} กลุ่ม · ${new Date(result.savedAt).toLocaleString('th-TH')}`);
     } catch (error) {
       onError(String((error as Error)?.message || error));
     } finally {
@@ -68,17 +86,27 @@ export function GroupingSnapshotSave({
           <span className={quarantine.length ? 'bad' : 'good'}>รอจัด {quarantine.length}</span>
           <span className={nonMasterGroups.length ? 'bad' : 'good'}>กลุ่มยังไม่บันทึก Master {nonMasterGroups.length}</span>
           <span className={duplicateCards ? 'bad' : 'good'}>การ์ดซ้ำ {duplicateCards}</span>
-          <span className={unconfirmedGroups.length ? 'bad' : 'good'}>กลุ่มยังไม่ยืนยัน {unconfirmedGroups.length}</span>
+          <span className={unconfirmedGroups.length ? 'bad' : 'good'}>กลุ่มยังไม่ยืนยัน/ล็อก {unconfirmedGroups.length}</span>
+          <span className={pendingPromotions.length ? 'bad' : 'good'}>รอตรวจโปรโมชั่น {pendingPromotions.length}</span>
+          <span className={sourceNotPersisted ? 'bad' : 'good'}>Dataset กลาง {sourceNotPersisted ? 'ยังไม่ลงทะเบียน' : `revision ${dataset.sourceDataset?.revision}`}</span>
         </div>
       </div>
     </div>
     <div className="grouping-save-actions">
       {savedSignature === signature && <span className="saved-badge"><ShieldCheck size={15} /> บันทึกชุดนี้แล้ว</span>}
-      <button className="btn dark" disabled={!readyToSave || busy || savedSignature === signature} onClick={save}><Save size={16} /> {busy ? 'กำลังบันทึก...' : 'บันทึกการจัดกลุ่มทั้งเดือน'}</button>
+      <button
+        data-testid="save-grouping-snapshot"
+        className="btn dark"
+        disabled={!readyToSave || busy || savedSignature === signature}
+        title={!readyToSave ? 'ต้องใช้ Dataset กลาง การ์ดครบ โปรโมชั่นครบ และยืนยันพร้อมล็อกทุกกลุ่ม' : ''}
+        onClick={save}
+      ><Save size={16} /> {busy ? 'กำลังบันทึก...' : 'บันทึกการจัดกลุ่มทั้งเดือน'}</button>
       {readOnly && <small>โหมด Preview/Dry-run ไม่เขียนฐานข้อมูล</small>}
+      {!readOnly && sourceNotPersisted && <small>ต้องโหลด Dataset จากฐานทดสอบที่มี Database Card UUID ก่อน</small>}
       {!readOnly && quarantine.length > 0 && <small>ต้องจัดการ์ดที่เหลือให้หมดก่อน</small>}
       {!readOnly && nonMasterGroups.length > 0 && <small>สร้างหรือเลือก Product Master ให้ครบทุกกลุ่มก่อน</small>}
       {!readOnly && unconfirmedGroups.length > 0 && <small>ต้องกดยืนยันทุกกลุ่มก่อนบันทึกทั้งเดือน</small>}
+      {!readOnly && pendingPromotions.length > 0 && <small>ทุกการ์ดต้องเลือกโปรโมชั่นจนไม่เหลือ “รอตรวจโปรโมชั่น”</small>}
     </div>
   </section>;
 }

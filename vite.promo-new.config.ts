@@ -1,28 +1,15 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export const PROMO_BUILD_FLAVOR = 'DIRECT-MANUAL-SNAPSHOT-PER-CARD-V8' as const;
-
-function promoBuildIdPlugin(): Plugin {
-  const commit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
-  const buildId = `PROMO-${commit}-${PROMO_BUILD_FLAVOR}`;
-  return {
-    name: 'promo-build-id',
-    enforce: 'pre',
-    transform(code, id) {
-      const normalizedId = id.replace(/\\/g, '/');
-      if (!normalizedId.endsWith('/src/promo-new/admin/main.tsx')) return null;
-      const pattern = /const BUILD_ID = '[^']+';/u;
-      if (!pattern.test(code)) throw new Error('promo_build_id_marker_missing');
-      return { code: code.replace(pattern, `const BUILD_ID = '${buildId}';`), map: null };
-    },
-  };
-}
+export const PROMO_BUILD_FLAVOR = 'HARDENED-SNAPSHOT-V2-CARD-UUID-V9' as const;
+const commit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
+const buildId = `PROMO-${commit}-${PROMO_BUILD_FLAVOR}`;
 
 export default defineConfig({
-  plugins: [promoBuildIdPlugin(), react()],
+  plugins: [react()],
   define: {
     'process.env.NODE_ENV': JSON.stringify('production'),
+    __PROMO_BUILD_ID__: JSON.stringify(buildId),
   },
   publicDir: false,
   build: {

@@ -12,7 +12,7 @@ const walk = directory => fs.readdirSync(path.join(root, directory), { withFileT
 
 const required = [
   'dist/promo-admin-new.html', 'dist/promo-new.html', 'dist/assets/promo-new/admin.js', 'dist/assets/promo-new/frontend.js',
-  'api/promo-new.js', 'api/promo-legacy-auth.js', 'api/_promo-new/supabase.js',
+  'api/promo-new.js', 'api/promo-legacy-auth.js', 'api/_promo-new/supabase.js', 'api/_promo-new/grouping-snapshot-contract.js',
   'src/promo-new/shared/api.ts', 'src/promo-new/import/pdf-importer.ts', 'src/promo-new/import/card-header-ocr.ts',
   'src/promo-new/import/card-title-ocr.ts', 'src/promo-new/import/grid-detector.ts', 'src/promo-new/import/ocr-items.ts',
   'src/promo-new/import/workbook-parser.ts', 'src/promo-new/import/workbook-safety.ts',
@@ -23,6 +23,7 @@ const required = [
   'src/promo-new/domain/visual-product-signatures.ts', 'src/promo-new/domain/visual-product-clusters.ts',
   'vite.promo-new.config.ts', 'scripts/prepare-sheetjs-lock.mjs',
   'docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md', 'supabase/migrations/20260716083231_promo_system_rebuild.sql',
+  'supabase/migrations/20260723104837_promo_grouping_snapshot_v2.sql',
   'supabase/rollback/20260716083231_promo_system_rebuild.sql',
 ];
 required.forEach(file => check(fs.existsSync(path.join(root, file)), `missing:${file}`));
@@ -44,9 +45,14 @@ const legacyAuth = read('api/promo-legacy-auth.js');
 check(legacyAuth.includes('MAX_LOGIN_BODY_BYTES = 4_096'), 'upload_key_body_limit_missing');
 check(legacyAuth.includes('MAX_UPLOAD_KEY_LENGTH = 200'), 'upload_key_length_limit_missing');
 check(!/detail:\s*message/.test(legacyAuth), 'auth_internal_detail_exposed');
-check(legacyAuth.includes('group?.confirmed !== true'), 'group_snapshot_confirmation_guard_missing');
-check(legacyAuth.includes('group.cardIds'), 'stable_card_id_snapshot_missing');
+check(legacyAuth.includes('validateGroupingSnapshotShape(input)'), 'group_snapshot_shape_guard_missing');
+check(legacyAuth.includes("testSupabase('/rest/v1/rpc/save_promo_grouping_snapshot_v2'"), 'test_snapshot_rpc_missing');
+check(legacyAuth.includes("action === 'load-source-dataset'"), 'source_dataset_load_route_missing');
 check(legacyAuth.includes("action === 'load-grouping-snapshot'"), 'group_snapshot_load_route_missing');
+check(legacyAuth.includes("action === 'unlock-grouping-group'"), 'central_group_unlock_route_missing');
+check(legacyAuth.includes('PROMO_TEST_DATABASE'), 'test_database_flag_missing');
+check(legacyAuth.includes('hostname === productionHostname'), 'production_database_rejection_missing');
+check(!legacyAuth.includes("supabase('/rest/v1/rpc/save_manual_promo_grouping_snapshot'"), 'legacy_production_snapshot_write_reintroduced');
 check(legacyAuth.includes('sameIdentity'), 'structured_master_duplicate_guard_missing');
 
 const sharedApi = read('src/promo-new/shared/api.ts');
@@ -134,9 +140,9 @@ check(clusters.includes("'SUPERCLICK'"), 'gillette_super_click_guard_missing');
 check(clusters.includes("'SUPERTHIN'"), 'gillette_super_thin_guard_missing');
 
 const autoMatch = read('src/promo-new/domain/auto-match.ts');
-check(autoMatch.includes("warning === 'grouping:mode:visual_first_anchored'"), 'manual_promotion_visual_mode_guard_missing');
 check(autoMatch.includes('promotion_family_manual_selection_required'), 'manual_promotion_warning_missing');
-check(/promotionFamilyId: null, promotionTiers: \[\]/u.test(autoMatch), 'manual_promotion_card_reset_missing');
+check(/promotionFamilyId:\s*null,\s*promotionTiers:\s*\[\]/u.test(autoMatch), 'manual_promotion_card_reset_missing');
+check(!autoMatch.includes('applyPromotionFamily('), 'group_level_promotion_auto_apply_reintroduced');
 
 const masterAudit = read('src/promo-new/domain/master-match-audit.ts');
 check(masterAudit.includes('AUDIT_CHUNK_SIZE = 12'), 'master_audit_chunk_size_missing');
@@ -146,10 +152,9 @@ check(masterMatcher.includes('byBrand: Map<string, PreparedMaster[]>'), 'product
 check(masterMatcher.includes('prepared.byBrand.get(brand)'), 'product_master_brand_index_not_used');
 
 const adminSource = read('src/promo-new/admin/main.tsx');
-check(adminSource.includes('<option value="">เลือกจาก CSV/XLSM</option>'), 'manual_promotion_dropdown_missing');
+check(adminSource.includes('<option value="">รอตรวจโปรโมชั่น</option>'), 'per_card_promotion_pending_option_missing');
 check(adminSource.includes('ราคากลางต่อชิ้น'), 'manual_price_input_missing');
 check(adminSource.includes('setCentralPrice(group.price, amount)'), 'manual_price_apply_missing');
-check(adminSource.includes('applyPromotionFamily(priced.group, priced.cards, family)'), 'manual_promotion_apply_missing');
 check(adminSource.includes('assertReadyForPublish'), 'admin_preview_validation_missing');
 check(adminSource.includes('applyPromotionFamilyToCard'), 'per_card_promotion_apply_missing');
 check(adminSource.includes('<ManualGroupingWorkbench'), 'manual_workbench_not_directly_wired');
@@ -158,8 +163,8 @@ check(adminSource.includes('visualSignatures: undefined'), 'fresh_visual_signatu
 const manualWorkbench = read('src/promo-new/admin/manual-workbench.tsx');
 check(!manualWorkbench.includes('localStorage'), 'group_locks_must_not_be_browser_only');
 check(manualWorkbench.includes('loadPromoGroupingSnapshot'), 'saved_grouping_hydration_missing');
-check(manualWorkbench.includes('manualConfirmed: true'), 'persisted_group_confirmation_missing');
-check(manualWorkbench.includes('window.confirm'), 'manual_bulk_action_confirmation_missing');
+check(manualWorkbench.includes('manualConfirmed: true, manualLocked: true'), 'persisted_group_lock_missing');
+check(manualWorkbench.includes('data-testid="bulk-confirm-dialog"'), 'manual_bulk_action_confirmation_missing');
 
 const frontend = read('src/promo-new/frontend/main.tsx');
 check(frontend.includes("card.status === 'ready'"), 'frontend_ready_only_filter_missing');
@@ -172,6 +177,18 @@ for (const table of ['promo_new_admins','promo_new_months','promo_new_versions',
   check(migration.includes(`alter table public.${table} enable row level security;`), `rls_missing:${table}`);
   check(migration.includes(`revoke all on table public.${table} from public, anon, authenticated;`), `public_write_revoke_missing:${table}`);
 }
+check(!migration.includes('unique (product_group_id, class_id)'), 'same_class_multi_card_constraint_reintroduced');
+const snapshotMigration = read('supabase/migrations/20260723104837_promo_grouping_snapshot_v2.sql');
+for (const table of ['promo_source_datasets', 'promo_source_cards', 'promo_grouping_snapshots_v2', 'promo_grouping_snapshot_groups_v2', 'promo_grouping_card_assignments_v2']) {
+  check(snapshotMigration.includes(`alter table public.${table} enable row level security;`), `snapshot_rls_missing:${table}`);
+  check(snapshotMigration.includes(`revoke all on public.${table} from anon, authenticated;`), `snapshot_public_access_revoke_missing:${table}`);
+}
+check(snapshotMigration.includes('save_promo_grouping_snapshot_v2'), 'snapshot_transaction_rpc_missing');
+check(snapshotMigration.includes('snapshot_card_set_mismatch'), 'snapshot_exact_card_set_guard_missing');
+check(snapshotMigration.includes('group_not_confirmed_or_locked'), 'snapshot_server_lock_guard_missing');
+check(snapshotMigration.includes('locked_group_changed'), 'locked_group_mutation_guard_missing');
+check(snapshotMigration.includes('unlock_promo_grouping_group_v2'), 'central_group_unlock_rpc_missing');
+check(snapshotMigration.includes('TEST/STAGING ONLY'), 'snapshot_migration_environment_warning_missing');
 const stagingBlockers = read('docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md');
 check(stagingBlockers.includes('must not be applied to Production'), 'migration_blocker_notice_missing');
 check(stagingBlockers.includes('LEGACY_WRITES_ENABLED = false'), 'migration_write_guard_notice_missing');
@@ -179,10 +196,11 @@ const rollback = read('supabase/rollback/20260716083231_promo_system_rebuild.sql
 check(rollback.includes('drop table if exists public.promo_new_cards;'), 'rollback_cards_missing');
 
 const promoVite = read('vite.promo-new.config.ts');
-const buildFlavor = 'DIRECT-MANUAL-SNAPSHOT-PER-CARD-V8';
+const buildFlavor = 'HARDENED-SNAPSHOT-V2-CARD-UUID-V9';
 check(promoVite.includes(`PROMO_BUILD_FLAVOR = '${buildFlavor}'`), 'direct_manual_build_flavor_missing');
 check(!promoVite.includes('manual-workbench.tsx'), 'build_time_workbench_rewrite_reintroduced');
 check(!promoVite.includes('replaceRequired'), 'build_time_admin_source_rewrite_reintroduced');
+check(!/\btransform\s*\(/u.test(promoVite), 'vite_business_logic_transform_reintroduced');
 check(promoVite.includes('VERCEL_GIT_COMMIT_SHA'), 'deployment_build_id_sha_missing');
 const vercel = JSON.parse(read('vercel.json'));
 const packageJson = JSON.parse(read('package.json'));

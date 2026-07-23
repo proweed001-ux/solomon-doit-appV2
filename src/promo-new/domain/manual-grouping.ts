@@ -45,13 +45,13 @@ function groupForSku(dataset: PromoDataset, sku: Sku): ProductGroup {
     price,
     status: 'need_review',
     failureReasons: price.effectivePrice ? [] : ['central_price_missing'],
+    manualConfirmed: false,
+    manualLocked: false,
   };
 }
 
 function cardFromQuarantine(source: ImportedCardCandidate, group: ProductGroup, dataset: PromoDataset): PromoCard {
   if (!source.classId) throw new Error(`การ์ด ${source.cardId} ไม่มี Class จึงยังจัดกลุ่มไม่ได้`);
-  const family = dataset.promotionFamilies.find(item => item.id === group.promotionFamilyId);
-  const tiers = family?.tiersByClass[source.classId] || [];
   return {
     id: source.cardId,
     monthKey: dataset.version.monthKey,
@@ -61,8 +61,8 @@ function cardFromQuarantine(source: ImportedCardCandidate, group: ProductGroup, 
     imageUrl: source.imageUrl,
     skuId: group.skuId,
     productGroupId: group.id,
-    promotionFamilyId: tiers.length ? group.promotionFamilyId : null,
-    promotionTiers: tiers,
+    promotionFamilyId: null,
+    promotionTiers: [],
     price: group.price,
     status: 'need_review',
     evidence: {
@@ -78,24 +78,29 @@ function cardFromQuarantine(source: ImportedCardCandidate, group: ProductGroup, 
         height: source.bounds.height,
       },
     },
-    failureReasons: [],
+    failureReasons: ['promotion_pending_review'],
   };
 }
 
-function moveCard(card: PromoCard, group: ProductGroup, dataset: PromoDataset): PromoCard {
-  const family = dataset.promotionFamilies.find(item => item.id === group.promotionFamilyId);
-  const tiers = card.classId ? family?.tiersByClass[card.classId] || [] : [];
+function moveCard(card: PromoCard, group: ProductGroup): PromoCard {
   return {
     ...card,
     skuId: group.skuId,
     productGroupId: group.id,
-    promotionFamilyId: tiers.length ? group.promotionFamilyId : null,
-    promotionTiers: tiers,
+    promotionFamilyId: null,
+    promotionTiers: [],
     price: group.price,
     status: 'need_review',
     evidence: { ...card.evidence, method: 'manual' },
-    failureReasons: card.failureReasons.filter(reason => !reason.startsWith('promotion_') && !reason.startsWith('duplicate_class:')),
+    failureReasons: [...new Set([
+      ...card.failureReasons.filter(reason => !reason.startsWith('promotion_') && !reason.startsWith('duplicate_class:')),
+      'promotion_pending_review',
+    ])],
   };
+}
+
+function groupIsLocked(group: ProductGroup | undefined): boolean {
+  return Boolean(group?.manualLocked || group?.manualConfirmed);
 }
 
 function rebuildGroups(
@@ -117,6 +122,11 @@ function rebuildGroups(
       classIds: [...new Set(members.flatMap(card => card.classId ? [card.classId] : []))].sort(),
       status: 'need_review' as const,
       manualConfirmed: changedGroupIds.has(group.id) ? false : base.manualConfirmed,
+      manualLocked: changedGroupIds.has(group.id) ? false : base.manualLocked,
+      promotionFamilyId: (() => {
+        const families = [...new Set(members.map(card => card.promotionFamilyId).filter((value): value is string => Boolean(value)))];
+        return families.length === 1 && members.every(card => card.promotionFamilyId) ? families[0] : null;
+      })(),
       failureReasons: base.failureReasons.filter(reason => !reason.startsWith('duplicate_class:')),
     }];
   });
@@ -140,18 +150,23 @@ export function assignCardsManually(
     targetGroup = groupForSku(dataset, sku);
   }
   if (!targetGroup) throw new Error('ไม่พบกลุ่มปลายทางที่เลือก');
+  if (groupIsLocked(targetGroup)) throw new Error('target_group_locked');
 
   const existingSelected = dataset.cards.filter(card => selected.has(card.id));
   const quarantineSelected = quarantine.filter(card => selected.has(card.cardId));
   if (existingSelected.length + quarantineSelected.length !== selected.size) {
     throw new Error('มีการ์ดที่เลือกไม่อยู่ในชุดข้อมูลปัจจุบัน กรุณาเลือกใหม่');
   }
+  const lockedSource = existingSelected.find(card => groupIsLocked(
+    dataset.productGroups.find(group => group.id === card.productGroupId),
+  ));
+  if (lockedSource) throw new Error(`source_group_locked:${lockedSource.productGroupId}`);
 
   const selectedExistingIds = new Set(existingSelected.map(card => card.id));
   const targetExisting = dataset.cards.filter(card =>
     card.productGroupId === targetGroup!.id && !selectedExistingIds.has(card.id));
   const incoming = [
-    ...existingSelected.map(card => moveCard(card, targetGroup!, dataset)),
+    ...existingSelected.map(card => moveCard(card, targetGroup!)),
     ...quarantineSelected.map(card => cardFromQuarantine(card, targetGroup!, dataset)),
   ];
   const uniqueIncoming = new Map(incoming.map(card => [card.id, card]));
@@ -214,6 +229,10 @@ export function unassignCardsManually(
   if (!selected.size) throw new Error('เลือกการ์ดในกลุ่มอย่างน้อย 1 ใบก่อนนำออก');
   const removed = dataset.cards.filter(card => selected.has(card.id));
   if (removed.length !== selected.size) throw new Error('นำออกได้เฉพาะการ์ดที่อยู่ในกลุ่มปัจจุบัน');
+  const lockedSource = removed.find(card => groupIsLocked(
+    dataset.productGroups.find(group => group.id === card.productGroupId),
+  ));
+  if (lockedSource) throw new Error(`source_group_locked:${lockedSource.productGroupId}`);
   const cards = dataset.cards.filter(card => !selected.has(card.id));
   const changedGroupIds = new Set(removed.flatMap(card => card.productGroupId ? [card.productGroupId] : []));
   const existingQuarantine = new Set(quarantine.map(card => card.cardId));

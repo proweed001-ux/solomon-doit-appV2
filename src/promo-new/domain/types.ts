@@ -46,6 +46,7 @@ export interface SkuPrice {
 }
 
 export interface PromotionTier {
+  id?: string;
   tierNo: number;
   type: TierType;
   minQuantity: number;
@@ -85,6 +86,7 @@ export interface CardEvidence {
 }
 
 export interface PromoCard {
+  /** Stable UUID assigned by the central source-dataset registry. */
   id: string;
   monthKey: string;
   page: number;
@@ -113,6 +115,19 @@ export interface ProductGroup {
   status: 'ready' | 'need_review' | 'blocked';
   failureReasons: string[];
   manualConfirmed?: boolean;
+  manualLocked?: boolean;
+}
+
+export interface PromoSourceDatasetIdentity {
+  datasetId: string;
+  fingerprint: string;
+  revision: number;
+  cardIdsHash: string;
+  persisted: boolean;
+  savedAt: string | null;
+  snapshotId?: string;
+  snapshotRevision?: number;
+  snapshotSavedAt?: string;
 }
 
 export interface PromoVersion {
@@ -140,6 +155,7 @@ export interface PromoDataset {
   cards: PromoCard[];
   productGroups: ProductGroup[];
   promotionFamilies: PromotionFamily[];
+  sourceDataset?: PromoSourceDatasetIdentity;
   warnings: string[];
 }
 

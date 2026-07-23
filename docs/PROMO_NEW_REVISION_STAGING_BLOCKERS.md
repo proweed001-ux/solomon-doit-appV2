@@ -1,6 +1,6 @@
 # Promo New revision staging — blocked
 
-Updated: 2026-07-19
+Updated: 2026-07-23
 
 The prepared migration `supabase/migrations/20260716083231_promo_system_rebuild.sql`
 must not be applied to Production in its current form. The rebuild Preview intentionally keeps
@@ -40,5 +40,22 @@ must not be applied to Production in its current form. The rebuild Preview inten
 - Run the migration on a non-Production Supabase branch and benchmark a full 212-card JUL26 upload.
 - Obtain explicit approval before merging or applying the migration and before enabling network writes.
 
-Until all requirements pass, Draft, Publish, rollback, card-image uploads, Database writes, and
-Storage writes must remain disabled in the rebuild Preview.
+Until all requirements pass, legacy Draft, Publish, rollback, card-image uploads, and Production
+Database/Storage writes must remain disabled in the rebuild Preview.
+
+## Manual grouping Snapshot v2 (hardening branch)
+
+`supabase/migrations/20260723104837_promo_grouping_snapshot_v2.sql` is a separate
+TEST/STAGING-only migration. It must not be applied to Production without explicit approval.
+The matching API routes require all three environment variables below and reject the known
+Production Supabase URL:
+
+- `PROMO_TEST_DATABASE=1`
+- `PROMO_TEST_SUPABASE_URL`
+- `PROMO_TEST_SUPABASE_PUBLISHABLE_KEY`
+
+Snapshot v2 uses a registered source-dataset manifest, stable UUID Card IDs, exact Card ID set
+validation, per-card Promotion Family/Tier assignments, persisted confirmed/locked state, optimistic
+revision checks, and an explicit central unlock RPC. A locked group cannot be changed by submitting a
+replacement Snapshot; it must first be unlocked centrally. The legacy Draft/Publish path remains
+disabled through `LEGACY_WRITES_ENABLED = false`.

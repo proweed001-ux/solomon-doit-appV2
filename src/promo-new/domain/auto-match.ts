@@ -1,5 +1,4 @@
 import type { ProductGroup, PromoDataset, PromotionFamily } from './types';
-import { applyPromotionFamily } from './grouping';
 
 const normalize = (value: unknown): string => String(value || '')
   .normalize('NFKC')
@@ -144,53 +143,33 @@ export function autoAssignPromotionFamilies(dataset: PromoDataset): {
   ambiguous: number;
   unmatched: number;
 } {
-  const manualMode = dataset.warnings.some(warning => warning === 'grouping:mode:name_only' || warning === 'grouping:mode:visual_first_anchored');
-  if (manualMode) {
-    const productGroups = dataset.productGroups.map(group => ({ ...group, promotionFamilyId: null }));
-    const cards = dataset.cards.map(card => ({ ...card, promotionFamilyId: null, promotionTiers: [] }));
-    return {
-      dataset: {
-        ...dataset,
-        cards,
-        productGroups,
-        warnings: [...new Set([...dataset.warnings, 'promotion_family_manual_selection_required'])],
-      },
-      matched: 0,
-      ambiguous: 0,
-      unmatched: productGroups.length,
-    };
-  }
-
-  let cards = dataset.cards;
-  let matched = 0;
   let ambiguous = 0;
   let unmatched = 0;
   const warnings = [...dataset.warnings];
   const productGroups = dataset.productGroups.map(group => {
-    const assigned = group.promotionFamilyId
-      ? dataset.promotionFamilies.find(family => family.id === group.promotionFamilyId) || null
-      : null;
-    if (assigned) {
-      const applied = applyPromotionFamily(group, cards, assigned);
-      cards = applied.cards;
-      matched += 1;
-      return applied.group;
-    }
     const result = findPromotionFamily(group, dataset.promotionFamilies);
-    if (!result.match) {
-      if (result.ambiguous.length > 1) {
-        ambiguous += 1;
-        warnings.push(`group:${group.id}:promotion_family_ambiguous:${result.ambiguous.map(item => item.family.id).join(',')}`);
-      } else {
-        unmatched += 1;
-        warnings.push(`group:${group.id}:promotion_family_unmatched`);
-      }
-      return group;
+    if (result.ambiguous.length > 1) {
+      ambiguous += 1;
+      warnings.push(`group:${group.id}:promotion_family_ambiguous:${result.ambiguous.map(item => item.family.id).join(',')}`);
+    } else {
+      unmatched += 1;
+      if (result.match) warnings.push(`group:${group.id}:promotion_family_suggested:${result.match.family.id}`);
+      else warnings.push(`group:${group.id}:promotion_family_unmatched`);
     }
-    const applied = applyPromotionFamily(group, cards, result.match.family);
-    cards = applied.cards;
-    matched += 1;
-    return applied.group;
+    return {
+      ...group,
+      promotionFamilyId: null,
+      status: 'need_review' as const,
+      failureReasons: [...new Set([...(group.failureReasons || []).filter(reason => !reason.startsWith('promotion_')), 'promotion_pending_review'])],
+    };
   });
-  return { dataset: { ...dataset, cards, productGroups, warnings: [...new Set(warnings)] }, matched, ambiguous, unmatched };
+  const cards = dataset.cards.map(card => ({
+    ...card,
+    promotionFamilyId: null,
+    promotionTiers: [],
+    status: 'need_review' as const,
+    failureReasons: [...new Set([...(card.failureReasons || []).filter(reason => !reason.startsWith('promotion_')), 'promotion_pending_review'])],
+  }));
+  warnings.push('promotion_family_manual_selection_required');
+  return { dataset: { ...dataset, cards, productGroups, warnings: [...new Set(warnings)] }, matched: 0, ambiguous, unmatched };
 }

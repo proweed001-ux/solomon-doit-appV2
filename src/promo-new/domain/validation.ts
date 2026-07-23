@@ -119,9 +119,7 @@ export function validateGroup(group: ProductGroup, cards: PromoCard[]): string[]
   if (new Set(members.map(card => card.monthKey)).size !== 1 || members.some(card => card.monthKey !== group.monthKey)) errors.push('group_crosses_month');
   if (members.some(card => !card.classId)) errors.push('group_has_unknown_class');
   const memberClasses = members.map(card => card.classId as string);
-  if (new Set(memberClasses).size !== members.length) errors.push('group_has_duplicate_class_card');
   if (JSON.stringify([...new Set(memberClasses)].sort()) !== JSON.stringify([...new Set(group.classIds)].sort())) errors.push('group_class_ids_mismatch');
-  if (!group.promotionFamilyId) errors.push('promotion_family_missing');
   if (group.failureReasons.length) errors.push('group_has_failure_reasons');
   return unique(errors);
 }
@@ -183,7 +181,6 @@ export function validateDataset(dataset: PromoDataset): ValidationResult {
     else {
       if (!group.cardIds.includes(card.id)) cardErrors.push('card_not_listed_in_group');
       if (group.skuId !== card.skuId) cardErrors.push('card_group_sku_mismatch');
-      if (group.promotionFamilyId !== card.promotionFamilyId) cardErrors.push('card_group_family_mismatch');
     }
     const family = familyById.get(card.promotionFamilyId || '');
     if (!family) cardErrors.push('card_family_not_found');
@@ -198,9 +195,11 @@ export function validateDataset(dataset: PromoDataset): ValidationResult {
   dataset.productGroups.forEach(group => {
     validateGroup(group, dataset.cards).forEach(error => errors.push(`group:${group.id}:${error}`));
     if (!skuById.has(group.skuId)) errors.push(`group:${group.id}:sku_not_found`);
-    const family = familyById.get(group.promotionFamilyId || '');
-    if (!family) errors.push(`group:${group.id}:family_not_found`);
-    else if (group.classIds.some(classId => !family.tiersByClass[classId]?.length)) errors.push(`group:${group.id}:family_class_coverage_incomplete`);
+    if (group.promotionFamilyId) {
+      const family = familyById.get(group.promotionFamilyId);
+      if (!family) errors.push(`group:${group.id}:family_not_found`);
+      else if (group.classIds.some(classId => !family.tiersByClass[classId]?.length)) errors.push(`group:${group.id}:family_class_coverage_incomplete`);
+    }
   });
 
   if (dataset.version.status === 'published' && errors.length) errors.push('published_dataset_contains_blockers');

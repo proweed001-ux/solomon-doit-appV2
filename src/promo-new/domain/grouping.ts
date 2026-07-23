@@ -290,8 +290,13 @@ export function groupImportedCards(
 const withoutPromotionBlockers = (reasons: string[]): string[] => reasons.filter(reason => (
   !reason.startsWith('promotion_class_missing:')
   && !reason.startsWith('promotion_family_needs_review:')
+  && reason !== 'promotion_pending_review'
   && reason !== 'promotion_family_conflict'
 ));
+
+function assertPromotionEditable(group: ProductGroup): void {
+  if (group.manualLocked || group.manualConfirmed) throw new Error('group_locked');
+}
 
 export function applyPromotionFamilyToCard(
   group: ProductGroup,
@@ -299,6 +304,7 @@ export function applyPromotionFamilyToCard(
   cardId: string,
   family: PromotionFamily | null,
 ): { group: ProductGroup; cards: PromoCard[]; blockedClasses: string[] } {
+  assertPromotionEditable(group);
   const targetCard = allCards.find(card => card.id === cardId && group.cardIds.includes(card.id));
   if (!targetCard || !targetCard.classId) throw new Error('promotion_card_not_found');
   const baseFailures = withoutPromotionBlockers(targetCard.failureReasons);
@@ -336,6 +342,7 @@ export function applyPromotionFamily(
   allCards: PromoCard[],
   family: PromotionFamily,
 ): { group: ProductGroup; cards: PromoCard[]; blockedClasses: string[] } {
+  assertPromotionEditable(group);
   const blockedClasses = group.classIds.filter(classId => !family.tiersByClass[classId]?.length);
   const baseGroupFailures = withoutPromotionBlockers(group.failureReasons);
   if (blockedClasses.length) {

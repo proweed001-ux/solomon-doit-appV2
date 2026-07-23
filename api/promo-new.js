@@ -121,15 +121,13 @@ function validateDatasetPayload(dataset) {
     if (!memberCards.length) throw new Error(`group_cards_missing:${group.id}`);
     if (memberCards.some(card => card.skuId !== group.skuId)) throw new Error(`group_contains_different_sku:${group.id}`);
     const classes = memberCards.map(card => card.classId);
-    if (classes.some(classId => !classId) || new Set(classes).size !== classes.length) throw new Error(`group_class_invalid_or_duplicate:${group.id}`);
+    if (classes.some(classId => !classId)) throw new Error(`group_class_invalid:${group.id}`);
     if (group.status === 'ready') {
-      const family = familyById.get(group.promotionFamilyId);
       const price = priceBySku.get(group.skuId) || group.price;
       if (sku.status !== 'active' || hasReasons(sku.failureReasons)) throw new Error(`ready_group_sku_not_active:${group.id}`);
-      if (!family || hasReasons(family.failureReasons)) throw new Error(`ready_group_family_invalid:${group.id}`);
       if (hasReasons(group.failureReasons)) throw new Error(`ready_group_has_failure_reasons:${group.id}`);
       if (!positiveMoney(price?.effectivePrice)) throw new Error(`ready_group_price_missing:${group.id}`);
-      if (classes.some(classId => !family.tiersByClass?.[classId]?.length)) throw new Error(`ready_group_class_tier_missing:${group.id}`);
+      if (memberCards.some(card => card.status !== 'ready')) throw new Error(`ready_group_contains_unready_card:${group.id}`);
     }
   }
 

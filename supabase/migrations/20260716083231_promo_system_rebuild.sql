@@ -139,8 +139,7 @@ create table if not exists public.promo_new_cards (
   evidence jsonb not null default '{}'::jsonb,
   failure_reasons jsonb not null default '[]'::jsonb,
   unique (version_id, card_id),
-  unique (version_id, page_number, sequence_number),
-  unique (product_group_id, class_id)
+  unique (version_id, page_number, sequence_number)
 );
 
 create table if not exists public.promo_new_audit_log (
@@ -156,6 +155,7 @@ create table if not exists public.promo_new_audit_log (
 
 create index if not exists promo_new_cards_version_class_idx on public.promo_new_cards(version_id, class_id);
 create index if not exists promo_new_cards_sku_idx on public.promo_new_cards(sku_id);
+create index if not exists promo_new_cards_group_class_idx on public.promo_new_cards(product_group_id, class_id);
 create index if not exists promo_new_groups_version_idx on public.promo_new_product_groups(version_id);
 create index if not exists promo_new_tiers_family_class_idx on public.promo_new_promotion_tiers(family_id, class_id, min_quantity);
 create index if not exists promo_new_audit_entity_idx on public.promo_new_audit_log(entity_type, entity_id, created_at desc);
@@ -359,7 +359,7 @@ begin
   where v.id = p_version_id and v.status in ('draft','ready') for update;
   if v_month_id is null then raise exception 'publish_version_not_found'; end if;
   if exists (select 1 from public.promo_new_cards where version_id = p_version_id and (status <> 'ready' or effective_price is null)) then raise exception 'publish_cards_not_ready'; end if;
-  if exists (select 1 from public.promo_new_product_groups where version_id = p_version_id and (status <> 'ready' or promotion_family_id is null)) then raise exception 'publish_groups_not_ready'; end if;
+  if exists (select 1 from public.promo_new_product_groups where version_id = p_version_id and status <> 'ready') then raise exception 'publish_groups_not_ready'; end if;
   if exists (
     select 1 from public.promo_new_cards c
     where c.version_id = p_version_id and not exists (
@@ -445,9 +445,9 @@ as $$
     'productGroups',coalesce((select jsonb_agg(jsonb_build_object(
       'id',g.external_id,'monthKey',chosen.month_key,'skuId',s.external_id,
       'cardIds',(select coalesce(jsonb_agg(c.card_id order by c.class_id),'[]'::jsonb) from public.promo_new_cards c where c.product_group_id=g.id),
-      'classIds',(select coalesce(jsonb_agg(c.class_id order by c.class_id),'[]'::jsonb) from public.promo_new_cards c where c.product_group_id=g.id),
+      'classIds',(select coalesce(jsonb_agg(distinct c.class_id order by c.class_id),'[]'::jsonb) from public.promo_new_cards c where c.product_group_id=g.id),
       'promotionFamilyId',f.external_id,'status',g.status,'failureReasons',g.failure_reasons
-    ) order by s.canonical_name) from public.promo_new_product_groups g join public.promo_new_skus s on s.id=g.sku_id join public.promo_new_promotion_families f on f.id=g.promotion_family_id where g.version_id=chosen.version_id),'[]'::jsonb),
+    ) order by s.canonical_name) from public.promo_new_product_groups g join public.promo_new_skus s on s.id=g.sku_id left join public.promo_new_promotion_families f on f.id=g.promotion_family_id where g.version_id=chosen.version_id),'[]'::jsonb),
     'cards',coalesce((select jsonb_agg(jsonb_build_object(
       'id',c.card_id,'monthKey',chosen.month_key,'page',c.page_number,'sequence',c.sequence_number,'classId',c.class_id,
       'imageUrl',c.image_path,'skuId',s.external_id,'productGroupId',g.external_id,'promotionFamilyId',f.external_id,

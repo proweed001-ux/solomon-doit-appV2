@@ -27,6 +27,67 @@ export function normalizeManualProductKey(value: string): string {
   return clean(value).toLowerCase().normalize('NFKC').replace(/[^a-z0-9ก-๙]+/gu, '');
 }
 
+function tokens(value: string): Set<string> {
+  return new Set(clean(value).toLowerCase().normalize('NFKC').split(/[^a-z0-9ก-๙]+/gu).filter(token => token.length >= 2));
+}
+
+function dice(left: string, right: string): number {
+  const bigrams = (value: string) => {
+    const normalized = normalizeManualProductKey(value);
+    const result = new Map<string, number>();
+    for (let index = 0; index < normalized.length - 1; index += 1) {
+      const key = normalized.slice(index, index + 2);
+      result.set(key, (result.get(key) || 0) + 1);
+    }
+    return result;
+  };
+  const a = bigrams(left);
+  const b = bigrams(right);
+  let overlap = 0;
+  a.forEach((count, key) => { overlap += Math.min(count, b.get(key) || 0); });
+  const total = [...a.values()].reduce((sum, count) => sum + count, 0)
+    + [...b.values()].reduce((sum, count) => sum + count, 0);
+  return total ? (2 * overlap) / total : 0;
+}
+
+export interface SimilarMasterMatch {
+  sku: Sku;
+  score: number;
+}
+
+export function findSimilarProductMasters(input: ManualProductInput, skus: Sku[]): SimilarMasterMatch[] {
+  const query = [
+    input.canonicalName,
+    input.brand,
+    input.productType,
+    input.variant,
+    input.sizeValue || '',
+    input.sizeUnit,
+    input.salesUnit,
+    input.packQuantity,
+  ].join(' ');
+  const queryTokens = tokens(query);
+  return skus.flatMap(sku => {
+    const candidate = [
+      sku.canonicalName,
+      sku.identity.brand,
+      sku.identity.productType,
+      sku.identity.variant || '',
+      sku.identity.sizeValue || '',
+      sku.identity.sizeUnit,
+      sku.identity.salesUnit,
+      sku.identity.packQuantity,
+      ...sku.evidence,
+    ].join(' ');
+    const candidateTokens = tokens(candidate);
+    const intersection = [...queryTokens].filter(token => candidateTokens.has(token)).length;
+    const union = new Set([...queryTokens, ...candidateTokens]).size;
+    const tokenScore = union ? intersection / union : 0;
+    const score = Math.max(dice(input.canonicalName, sku.canonicalName), dice(query, candidate), tokenScore);
+    return score >= 0.58 ? [{ sku, score }] : [];
+  }).sort((left, right) => right.score - left.score || left.sku.canonicalName.localeCompare(right.sku.canonicalName, 'th')).slice(0, 5);
+}
+
 export function validateManualProductInput(input: ManualProductInput): string[] {
   const errors: string[] = [];
   if (clean(input.canonicalName).length < 3) errors.push('กรอกชื่อกลุ่มสินค้าอย่างน้อย 3 ตัวอักษร');

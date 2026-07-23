@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createManualSku, emptyManualPrice, ensureSkuInDataset } from '../../src/promo-new/domain/manual-product';
+import { createManualSku, emptyManualPrice, ensureSkuInDataset, findSimilarProductMasters } from '../../src/promo-new/domain/manual-product';
 import { createDemoDataset } from '../../src/promo-new/shared/demo-data';
 
 const input = {
@@ -40,4 +40,18 @@ test('adding a manual SKU to a dataset never invents a price', () => {
   assert.equal(next.skus.length, 1);
   assert.equal(next.prices.length, 1);
   assert.equal(next.prices[0].effectivePrice, null);
+});
+
+test('near-duplicate Product Master is warned even when normalized names are not exact', () => {
+  const existing = createManualSku({
+    ...input,
+    canonicalName: 'แพนทีนแชมพู 500มล',
+  }, 'MASTER-00000000-0000-5000-8000-000000000001');
+  const matches = findSimilarProductMasters({
+    ...input,
+    canonicalName: 'แพนทีน แชมพู ขนาด 500 มล.',
+  }, [existing]);
+
+  assert.equal(matches[0]?.sku.id, existing.id);
+  assert.ok(matches[0].score >= 0.58);
 });

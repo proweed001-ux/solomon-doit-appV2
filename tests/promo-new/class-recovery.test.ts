@@ -24,7 +24,7 @@ function card(page: number, sequence: number, classId: string | null, pageClassT
   };
 }
 
-test('จัดกลุ่มจากแคชแก้ HFS-WH เป็น HFSM และย้าย visual signature ไป Card ID ใหม่', () => {
+test('จัดกลุ่มจากแคชแก้ HFS-WH เป็น HFSM โดย Stable Card ID และ visual signature ไม่เปลี่ยน', () => {
   const cards = [
     card(1, 1, 'HFSS', 'สำหรับร้าน HFS-S'),
     card(2, 1, null, 'สำหรับร้าน HFS-WH'),
@@ -36,10 +36,9 @@ test('จัดกลุ่มจากแคชแก้ HFS-WH เป็น HF
   const result = recoverCachedCardClasses(cards, signatures);
   assert.equal(cards[1].classId, 'HFSM');
   assert.equal(cards[2].classId, 'HFSM');
-  assert.match(cards[1].cardId, /-HFSM-/u);
+  assert.equal(cards[1].cardId, oldId);
   assert.equal(cards[1].failureReasons.includes('class_missing'), false);
-  assert.equal(signatures[cards[1].cardId], 'aabbcc');
-  assert.equal(signatures[oldId], undefined);
+  assert.equal(signatures[oldId], 'aabbcc');
   assert.equal(result.changedCards, 2);
   assert.equal(result.recoveredPages, 2);
 });
