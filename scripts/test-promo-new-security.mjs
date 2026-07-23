@@ -17,7 +17,8 @@ const required = [
   'src/promo-new/import/card-title-ocr.ts', 'src/promo-new/import/grid-detector.ts', 'src/promo-new/import/ocr-items.ts',
   'src/promo-new/import/workbook-parser.ts', 'src/promo-new/import/workbook-safety.ts',
   'src/promo-new/admin/grouping-client.ts', 'src/promo-new/admin/grouping-worker.ts', 'src/promo-new/admin/grouping-transport.ts',
-  'src/promo-new/admin/test-cache.ts', 'src/promo-new/admin/cached-run.ts', 'src/promo-new/domain/auto-match.ts',
+  'src/promo-new/admin/test-cache.ts', 'src/promo-new/admin/cached-run.ts', 'src/promo-new/admin/manual-workbench.tsx',
+  'src/promo-new/admin/grouping-snapshot-save.tsx', 'src/promo-new/domain/manual-snapshot.ts', 'src/promo-new/domain/auto-match.ts',
   'src/promo-new/domain/master-match-audit.ts', 'src/promo-new/domain/master-text-matcher.ts',
   'src/promo-new/domain/visual-product-signatures.ts', 'src/promo-new/domain/visual-product-clusters.ts',
   'vite.promo-new.config.ts', 'scripts/prepare-sheetjs-lock.mjs',
@@ -43,6 +44,10 @@ const legacyAuth = read('api/promo-legacy-auth.js');
 check(legacyAuth.includes('MAX_LOGIN_BODY_BYTES = 4_096'), 'upload_key_body_limit_missing');
 check(legacyAuth.includes('MAX_UPLOAD_KEY_LENGTH = 200'), 'upload_key_length_limit_missing');
 check(!/detail:\s*message/.test(legacyAuth), 'auth_internal_detail_exposed');
+check(legacyAuth.includes('group?.confirmed !== true'), 'group_snapshot_confirmation_guard_missing');
+check(legacyAuth.includes('group.cardIds'), 'stable_card_id_snapshot_missing');
+check(legacyAuth.includes("action === 'load-grouping-snapshot'"), 'group_snapshot_load_route_missing');
+check(legacyAuth.includes('sameIdentity'), 'structured_master_duplicate_guard_missing');
 
 const sharedApi = read('src/promo-new/shared/api.ts');
 check(sharedApi.includes('const LEGACY_WRITES_ENABLED = false'), 'legacy_writes_must_remain_disabled');
@@ -146,6 +151,15 @@ check(adminSource.includes('ราคากลางต่อชิ้น'), 'ma
 check(adminSource.includes('setCentralPrice(group.price, amount)'), 'manual_price_apply_missing');
 check(adminSource.includes('applyPromotionFamily(priced.group, priced.cards, family)'), 'manual_promotion_apply_missing');
 check(adminSource.includes('assertReadyForPublish'), 'admin_preview_validation_missing');
+check(adminSource.includes('applyPromotionFamilyToCard'), 'per_card_promotion_apply_missing');
+check(adminSource.includes('<ManualGroupingWorkbench'), 'manual_workbench_not_directly_wired');
+check(adminSource.includes('<GroupingSnapshotSave'), 'grouping_snapshot_save_not_directly_wired');
+check(adminSource.includes('visualSignatures: undefined'), 'fresh_visual_signatures_not_directly_wired');
+const manualWorkbench = read('src/promo-new/admin/manual-workbench.tsx');
+check(!manualWorkbench.includes('localStorage'), 'group_locks_must_not_be_browser_only');
+check(manualWorkbench.includes('loadPromoGroupingSnapshot'), 'saved_grouping_hydration_missing');
+check(manualWorkbench.includes('manualConfirmed: true'), 'persisted_group_confirmation_missing');
+check(manualWorkbench.includes('window.confirm'), 'manual_bulk_action_confirmation_missing');
 
 const frontend = read('src/promo-new/frontend/main.tsx');
 check(frontend.includes("card.status === 'ready'"), 'frontend_ready_only_filter_missing');
@@ -165,10 +179,10 @@ const rollback = read('supabase/rollback/20260716083231_promo_system_rebuild.sql
 check(rollback.includes('drop table if exists public.promo_new_cards;'), 'rollback_cards_missing');
 
 const promoVite = read('vite.promo-new.config.ts');
-const buildFlavor = 'THREE-ANCHOR-GRID-CARD-TITLE-CACHE-V6-MANUAL-CONTROLS';
-check(promoVite.includes(`PROMO_BUILD_FLAVOR = '${buildFlavor}'`), 'three_anchor_grid_build_flavor_missing');
-check(promoVite.includes('fresh_run_must_build_visual_signatures'), 'admin_empty_visual_signature_patch_missing');
-check(promoVite.includes('cache_visual_rebuild_label'), 'admin_cache_rebuild_message_patch_missing');
+const buildFlavor = 'DIRECT-MANUAL-SNAPSHOT-PER-CARD-V8';
+check(promoVite.includes(`PROMO_BUILD_FLAVOR = '${buildFlavor}'`), 'direct_manual_build_flavor_missing');
+check(!promoVite.includes('manual-workbench.tsx'), 'build_time_workbench_rewrite_reintroduced');
+check(!promoVite.includes('replaceRequired'), 'build_time_admin_source_rewrite_reintroduced');
 check(promoVite.includes('VERCEL_GIT_COMMIT_SHA'), 'deployment_build_id_sha_missing');
 const vercel = JSON.parse(read('vercel.json'));
 const packageJson = JSON.parse(read('package.json'));
@@ -184,7 +198,7 @@ check(packageJson.dependencies?.xlsx === 'https://cdn.sheetjs.com/xlsx-0.20.3/xl
 const builtPromoJsFiles = walk('dist/assets/promo-new').filter(file => file.endsWith('.js'));
 const builtPromoJs = builtPromoJsFiles.map(file => read(file)).join('\n');
 const buildCommit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
-check(builtPromoJs.includes(`PROMO-${buildCommit}-${buildFlavor}`), 'deployed_build_id_does_not_match_three_anchor_commit');
+check(builtPromoJs.includes(`PROMO-${buildCommit}-${buildFlavor}`), 'deployed_build_id_does_not_match_direct_manual_commit');
 check(!builtPromoJs.includes('FINAL-UPLOAD-AUDIT-20260719-0031'), 'stale_build_id_reached_deployed_bundle');
 for (const file of builtPromoJsFiles) {
   const size = fs.statSync(path.join(root, file)).size;
@@ -197,4 +211,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: three-anchor Structural Grid requires one complete outer card panel, exactly one lower-left reference panel and exactly one lower-right red promotion panel before card OCR; per-card title OCR remains single-pass, visual-first and Product Master guards remain active, price and Promotion Family remain manual, and read-only deployment protections remain intact.');
+console.log('Promo new security/static checks passed: Structural Grid and single-pass title OCR guards remain active; manual grouping uses stable card IDs, persisted confirmations and reloadable snapshots; per-card Promotion Family and manual prices remain explicit; read-only deployment protections remain intact.');
