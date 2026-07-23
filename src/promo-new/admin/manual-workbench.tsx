@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Lock, Plus, Search, Trash2, Undo2, Unlock, X } from 'lucide-react';
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 import type { PromoDataset, ProductGroup, Sku } from '../domain/types';
 import { assignCardsManually, unassignCardsManually } from '../domain/manual-grouping';
+import { hydrateManualGroupingSnapshot } from '../domain/manual-snapshot';
 import {
   createManualSku,
   ensureSkuInDataset,
   type ManualProductInput,
 } from '../domain/manual-product';
-import { createPromoMasterProduct, fetchActivePromoMasterSkus } from '../shared/master-api';
+import { createPromoMasterProduct, fetchActivePromoMasterSkus, loadPromoGroupingSnapshot } from '../shared/master-api';
 import './manual-workbench.css';
 
 interface ManualGroupingWorkbenchProps {
@@ -26,7 +27,6 @@ interface ManualGroupingWorkbenchProps {
 interface Snapshot {
   dataset: PromoDataset;
   quarantine: ImportedCardCandidate[];
-  lockedGroupIds: string[];
 }
 
 interface CardView {
@@ -104,12 +104,11 @@ export function ManualGroupingWorkbench({
   onError,
   onDirty,
 }: ManualGroupingWorkbenchProps) {
-  const storageKey = `promo-manual-group-locks:${dataset.version.monthKey}`;
+  const hydrationKeyRef = useRef('');
   const [masterSkus, setMasterSkus] = useState<Sku[]>([]);
   const [targetValue, setTargetValue] = useState('');
   const [targetLocked, setTargetLocked] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [confirmedLocks, setConfirmedLocks] = useState<Set<string>>(() => new Set());
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [searchText, setSearchText] = useState('');
   const [classFilter, setClassFilter] = useState('all');
@@ -118,15 +117,6 @@ export function ManualGroupingWorkbench({
   const [createBusy, setCreateBusy] = useState(false);
   const [form, setForm] = useState<ManualProductInput>(emptyForm());
   const [aliasText, setAliasText] = useState('');
-
-  useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      setConfirmedLocks(new Set(Array.isArray(stored) ? stored.map(String) : []));
-    } catch {
-      setConfirmedLocks(new Set());
-    }
-  }, [storageKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,13 +130,8 @@ export function ManualGroupingWorkbench({
     return () => { cancelled = true; };
   }, [adminKey, dataset.version.monthKey]);
 
-  const persistLocks = (next: Set<string>) => {
-    setConfirmedLocks(next);
-    try { localStorage.setItem(storageKey, JSON.stringify([...next])); } catch { /* storage is optional */ }
-  };
-
   const pushHistory = () => {
-    const snapshot: Snapshot = { dataset, quarantine, lockedGroupIds: [...confirmedLocks] };
+    const snapshot: Snapshot = { dataset, quarantine };
     setHistory(current => [...current.slice(-19), snapshot]);
   };
 
@@ -154,6 +139,37 @@ export function ManualGroupingWorkbench({
     () => uniqueSkus([...masterSkus, ...dataset.skus]),
     [masterSkus, dataset.skus],
   );
+  const confirmedLocks = useMemo(
+    () => new Set(dataset.productGroups.filter(group => group.manualConfirmed === true).map(group => group.id)),
+    [dataset.productGroups],
+  );
+
+  useEffect(() => {
+    if (!adminKey || !allMasterSkus.length) return;
+    const allCardIds = [
+      ...dataset.cards.map(card => card.id),
+      ...quarantine.map(card => card.cardId),
+    ].sort();
+    if (!allCardIds.length) return;
+    const hydrationKey = `${dataset.version.monthKey}:${allCardIds.join('|')}`;
+    if (hydrationKeyRef.current === hydrationKey) return;
+    hydrationKeyRef.current = hydrationKey;
+    let cancelled = false;
+    loadPromoGroupingSnapshot(dataset.version.monthKey, adminKey)
+      .then(snapshot => {
+        if (cancelled || !snapshot?.groups.length) return;
+        const hydrated = hydrateManualGroupingSnapshot(dataset, quarantine, snapshot, allMasterSkus);
+        onDatasetChange(hydrated.dataset);
+        onQuarantineChange(hydrated.quarantine);
+        onMessage(`โหลดการจัดกลุ่มที่บันทึกไว้แล้ว ${hydrated.dataset.cards.length} การ์ด · ${hydrated.dataset.productGroups.length} กลุ่ม`);
+        onError('');
+      })
+      .catch(error => {
+        if (!cancelled) onError(`โหลดการจัดกลุ่มเดิมไม่สำเร็จ: ${String((error as Error)?.message || error)}`);
+      });
+    return () => { cancelled = true; };
+  }, [adminKey, allMasterSkus, dataset.version.monthKey, dataset.cards, quarantine]);
+
   const groupsById = useMemo(() => new Map(dataset.productGroups.map(group => [group.id, group])), [dataset.productGroups]);
   const skusById = useMemo(() => new Map(allMasterSkus.map(sku => [sku.id, sku])), [allMasterSkus]);
   const target = targetParts(targetValue);
@@ -236,7 +252,7 @@ export function ManualGroupingWorkbench({
     if (!targetValue) return;
     setTargetLocked(true);
     setSelectedIds([]);
-    setViewMode('suggested');
+    setViewMode('all');
     onError('');
   };
 
@@ -249,6 +265,7 @@ export function ManualGroupingWorkbench({
   const assignSelected = () => {
     if (!targetLocked || !targetSku || !selectedIds.length) return;
     if (targetConfirmed) return onError('กลุ่มนี้ยืนยันแล้ว ต้องปลดล็อกก่อนเพิ่มการ์ด');
+    if (!window.confirm(`เพิ่ม/ย้ายการ์ดที่เลือก ${selectedIds.length} ใบ เข้า “${targetSku.canonicalName}” ใช่หรือไม่`)) return;
     try {
       pushHistory();
       let working = dataset;
@@ -278,6 +295,7 @@ export function ManualGroupingWorkbench({
     if (!assignedIds.length) return onError('เลือกการ์ดที่อยู่ในกลุ่มก่อนนำออก');
     const lockedSource = assignedIds.map(id => dataset.cards.find(card => card.id === id)).find(card => card?.productGroupId && confirmedLocks.has(card.productGroupId));
     if (lockedSource) return onError('มีการ์ดจากกลุ่มที่ยืนยันแล้ว กรุณาปลดล็อกกลุ่มนั้นก่อน');
+    if (!window.confirm(`นำการ์ดที่เลือก ${assignedIds.length} ใบออกจากกลุ่มและกลับไปรอจัดใช่หรือไม่`)) return;
     try {
       pushHistory();
       const result = unassignCardsManually(dataset, quarantine, assignedIds);
@@ -310,10 +328,13 @@ export function ManualGroupingWorkbench({
   const confirmTargetGroup = () => {
     if (!targetGroup) return onError('ต้องมีการ์ดในกลุ่มก่อนยืนยัน');
     pushHistory();
-    onDatasetChange(cleanDuplicateClassFlags(targetGroup.id));
-    const next = new Set(confirmedLocks);
-    next.add(targetGroup.id);
-    persistLocks(next);
+    const cleaned = cleanDuplicateClassFlags(targetGroup.id);
+    onDatasetChange({
+      ...cleaned,
+      productGroups: cleaned.productGroups.map(group => group.id === targetGroup.id
+        ? { ...group, manualConfirmed: true }
+        : group),
+    });
     setSelectedIds([]);
     onDirty();
     onMessage(`ยืนยันและล็อกกลุ่ม ${targetGroup.sku.canonicalName} แล้ว (${targetGroup.cardIds.length} การ์ด)`);
@@ -323,9 +344,12 @@ export function ManualGroupingWorkbench({
   const unlockTargetGroup = () => {
     if (!targetGroup) return;
     pushHistory();
-    const next = new Set(confirmedLocks);
-    next.delete(targetGroup.id);
-    persistLocks(next);
+    onDatasetChange({
+      ...dataset,
+      productGroups: dataset.productGroups.map(group => group.id === targetGroup.id
+        ? { ...group, manualConfirmed: false }
+        : group),
+    });
     onDirty();
     onMessage(`ปลดล็อกกลุ่ม ${targetGroup.sku.canonicalName} แล้ว`);
   };
@@ -335,7 +359,6 @@ export function ManualGroupingWorkbench({
     if (!previous) return;
     onDatasetChange(previous.dataset);
     onQuarantineChange(previous.quarantine);
-    persistLocks(new Set(previous.lockedGroupIds));
     setHistory(current => current.slice(0, -1));
     setSelectedIds([]);
     setTargetLocked(false);
@@ -404,7 +427,14 @@ export function ManualGroupingWorkbench({
 
     <div className="target-picker">
       <label className="field">กลุ่มสินค้าปลายทาง
-        <select disabled={targetLocked} value={targetValue} onChange={event => setTargetValue(event.target.value)}>
+        <select disabled={targetLocked} value={targetValue} onChange={event => {
+          const value = event.target.value;
+          setTargetValue(value);
+          setTargetLocked(Boolean(value));
+          setSelectedIds([]);
+          setViewMode(value ? 'all' : 'unassigned');
+          onError('');
+        }}>
           <option value="">เลือกกลุ่มสินค้า</option>
           <optgroup label="กลุ่มที่มีการ์ดในเดือนนี้">
             {dataset.productGroups.slice().sort((a, b) => a.sku.canonicalName.localeCompare(b.sku.canonicalName, 'th')).map(group =>
