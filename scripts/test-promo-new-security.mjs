@@ -47,6 +47,8 @@ check(legacyAuth.includes('MAX_UPLOAD_KEY_LENGTH = 200'), 'upload_key_length_lim
 check(!/detail:\s*message/.test(legacyAuth), 'auth_internal_detail_exposed');
 check(legacyAuth.includes('validateGroupingSnapshotShape(input)'), 'group_snapshot_shape_guard_missing');
 check(legacyAuth.includes("testSupabase('/rest/v1/rpc/save_promo_grouping_snapshot_v2'"), 'test_snapshot_rpc_missing');
+check(legacyAuth.includes('testSupabase(`/rest/v1/promo_product_master?status=eq.active'), 'test_master_read_missing');
+check(legacyAuth.includes("testSupabase('/rest/v1/rpc/create_promo_master_product'"), 'test_master_write_missing');
 check(legacyAuth.includes("action === 'load-source-dataset'"), 'source_dataset_load_route_missing');
 check(legacyAuth.includes("action === 'load-grouping-snapshot'"), 'group_snapshot_load_route_missing');
 check(legacyAuth.includes("action === 'unlock-grouping-group'"), 'central_group_unlock_route_missing');
