@@ -13,8 +13,18 @@
     "preview": "vite preview --host=0.0.0.0 --port=3000",
     "clean": "rimraf dist",
     "smoke": "node scripts/smoke-check.mjs",
-    "verify": "npm run smoke",
+    "verify": "npm run smoke && npm run test:pro-scope && npm run test:pro-regression && npm run test:pro-lazy && npm run test:local-xlsx && npm run test:pro-architecture && npm run test:pro-modules && npm run test:pro-browser",
     "verify:react": "npm run build && npm run smoke",
+    "test:pro-scope": "node scripts/test-pro-change-scope.mjs",
+    "test:pro-architecture": "node scripts/test-pro-architecture.mjs",
+    "test:pro-modules": "node scripts/test-pro-module-syntax.mjs",
+    "test:pro-browser": "playwright test --config=playwright.pro.config.mjs",
+    "test:pro-lazy": "node scripts/test-pro-telesale-pagination.mjs",
+    "test:pro-regression": "node scripts/test-pro-regression.mjs",
+    "test:fuel-warning": "node scripts/test-fuel-warning.mjs",
+    "test:local-xlsx": "node scripts/test-local-xlsx.mjs",
+    "test:admin-storage": "node scripts/test-admin-storage-guards.mjs",
+    "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\"",
     "build:promo-new": "vite build --config vite.promo-new.config.ts",
     "typecheck:promo-new": "tsc --noEmit",
     "test:promo-new": "node --import tsx --test tests/promo-new/*.test.ts",
@@ -22,28 +32,24 @@
     "inspect:promo-grid": "node --import tsx scripts/inspect-promo-grid.ts",
     "inspect:promo-real-files": "node --import tsx scripts/inspect-promo-real-files.ts",
     "test:promo-new-security": "node scripts/test-promo-new-security.mjs",
-    "verify:promo-new": "npm run typecheck:promo-new && npm run test:promo-new && npm run audit:promo-new && npm run build:promo-new && npm run test:promo-new-security",
-    "test:pro-lazy": "node scripts/test-pro-telesale-pagination.mjs",
-    "test:fuel-warning": "node scripts/test-fuel-warning.mjs",
-    "test:local-xlsx": "node scripts/test-local-xlsx.mjs",
-    "test:admin-storage": "node scripts/test-admin-storage-guards.mjs",
-    "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\""
+    "verify:promo-new": "npm run typecheck:promo-new && npm run test:promo-new && npm run audit:promo-new && npm run build:promo-new && npm run test:promo-new-security"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.4",
-    "jszip": "^3.10.1",
-    "lucide-react": "^0.546.0",
-    "pdfjs-dist": "6.1.200",
+    "vite": "^6.4.3",
+    "typescript": "~5.8.2",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "tesseract.js": "7.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.4.3",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "lucide-react": "^0.546.0",
+    "jszip": "^3.10.1",
+    "pdfjs-dist": "6.1.200",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "@playwright/test": "^1.61.1"
   }
 }

@@ -7,21 +7,27 @@
 ```text
 main = เวอร์ชันใช้งานจริง
 Pro Stable = 1028 Native
-สถานะทดสอบจริง = ผ่าน production mobile QA
+Production commit = 8b982911f7b13e9c9231d8a12c78709f6a674324
+PR #64 = merged
+Active architecture = single entry / single state / single render
 ```
 
 ห้ามใช้ `main` เป็นที่ทดลองฟีเจอร์หรือรีแฟกเตอร์ใหญ่
 
-## Stable 1028 Native baseline
+## Stable 1028 Single Source baseline
 
 ```text
-ใช้เป็นจุด rollback หลัง Project Pro Native Core production switch ผ่านแล้ว
+dist/pro.html
+  -> dist/assets/pro/app.js
+      -> dist/assets/pro/core.js
+      -> dist/assets/pro/state.js และ owner modules
 ```
 
 ผ่านการทดสอบหลักแล้ว:
 
 - production `pro.html?t=1028` เปิดได้ปกติ
-- native core bootstrap ทำงานแทน jsdelivr/eval wrapper
+- App entry เป็น static ES module จุดเดียว
+- ไม่มี shell/string replace/dynamic core loader/override หลัง render
 - ปริ้นยอดไม่ซ้ำ
 - ระยะขอบปริ้น A4 ใช้งานได้
 - หน้า 2 ไม่ชิดขอบ
@@ -50,15 +56,18 @@ Pro Stable = 1028 Native
 - [x] รอ preview deploy ก่อนเปิดใช้จริง
 - [x] สรุป rollback plan ใน PR ทุกครั้ง
 
-## Phase 2 — Native core cleanup
+## Phase 2 — Single-source cleanup
 
-เป้าหมาย: ลด bridge ทีละจุดโดยไม่เปลี่ยน behavior
+เป้าหมาย: ย้าย bridge เข้า source owner โดยไม่เปลี่ยน behavior
 
-- [ ] ย้าย `currentState` bridge เข้า `pro-native-core.js` โดยตรง
-- [ ] ย้าย send Next navigation เข้า `pro-native-core.js` โดยตรง
-- [ ] ย้าย done/order/Telesale bridge เข้า core/source ที่ชัดเจน
-- [ ] ลดบทบาท `pro-native-core-overrides.js`
-- [ ] เก็บหน้า preview ที่ไม่จำเป็นหลังใช้งานจริงครบหลายรอบ
+- [x] State/Current State อยู่ใน `dist/assets/pro/state.js`
+- [x] Send Next อยู่ใน `dist/assets/pro/send-store.js`
+- [x] Done/Order/Telesale อยู่ใน owner module
+- [x] Print อยู่ใน `print.js` และ `print-model.js`
+- [x] ตัด Core/Override รุ่นเก่าออกจาก Active Pro path
+- [x] Merge PR #64 และใช้ Production commit `8b982911…`
+- [ ] ลบหน้า preview/test รุ่นเก่าหลังอนุมัติ cleanup แยก
+- [ ] ลบ Legacy assets หลังไม่มี reference เหลือ
 
 ## Phase 3 — Split UI gradually
 
@@ -80,14 +89,16 @@ Pro Stable = 1028 Native
 - [ ] แยก storage helpers
 - [ ] เพิ่ม sample parse check ถ้ามีไฟล์ตัวอย่างที่ปลอดภัย
 
-## Completed — Project Pro Native Core
+## Completed — Project Pro Single Source
 
 ```text
-PR #42: native core preview checkpoint
-PR #43: native UI mirror checkpoint
-PR #44: production switch candidate
-สถานะ: production ผ่านแล้ว
+PR #42–#46: historical Native Core checkpoints
+PR #64: Single Source refactor merged
+Production: 8b982911f7b13e9c9231d8a12c78709f6a674324
 ```
+
+ไฟล์ Core/Override/Print Fix รุ่นเก่าเป็น LEGACY ไม่ใช่ Active Pro source
+และห้ามแก้เพื่อแก้ปัญหาปัจจุบัน ดู `docs/PRO_LEGACY_MANIFEST.md`
 
 ## Parking lot — Future features
 

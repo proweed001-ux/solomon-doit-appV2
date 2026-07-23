@@ -1,94 +1,79 @@
-# QA Checklist
+# QA Checklist — Active Pro
 
-Checklist นี้ใช้ก่อน merge ฟีเจอร์หรือ refactor เข้า `main`
-
-## Current stable
+## Stable baseline
 
 ```text
-Pro Stable = 1028 Native
-Production URL = /pro.html?t=1028
-```
-
-ก่อนเริ่มงานต่อ ให้อ่าน:
-
-```text
-docs/HANDOFF_1028_NATIVE.md
+URL: /pro.html?t=1028
+Production commit: 8b982911f7b13e9c9231d8a12c78709f6a674324
+Entry: dist/assets/pro/app.js
+State: dist/assets/pro/state.js
 ```
 
 ## Automated checks
 
-สำหรับงาน Pro ต้องผ่าน:
-
-```bash
-npm run smoke
-```
-
-หรือรันรวม:
+หลัง `npm ci` และติดตั้ง Chromium ให้รัน:
 
 ```bash
 npm run verify
 ```
 
-ตอนนี้ `verify` เป็น smoke-only เพื่อไม่ให้ `vite build` ทับ `dist` ที่ใช้จริงโดยไม่ตั้งใจ
-
-สำหรับงานย้าย React app เท่านั้น:
-
-```bash
-npm run verify:react
-```
-
-หลัง `verify:react` ห้าม commit ผล build ใน `dist` จนกว่าจะตรวจ diff ทุกไฟล์แล้วว่าไม่ทับ Pro Stable 1028 Native
-
-## Manual quick check
-
-ตรวจ preview ก่อนเสมอ และถ้าแตะ Pro production path ให้ตรวจมือถือจริง:
+`verify` ต้องรันและผ่าน:
 
 ```text
-1. เปิดหน้าเว็บได้
-2. เปิด /pro.html?t=1028 ได้
-3. โหลด Cloud ได้
-4. เลือกวันที่ / PS / ร้านส่ง ได้
-5. ช่อง “ส่งร้านนี้” กด Enter/Next ลงแถวถัดไป
-6. ปุ่มเตรียมปริ้นยังอยู่
-7. หน้าเตรียมปริ้นเปิดได้
-8. บิลยังเป็น 12 รายการต่อบิล
-9. ยังเป็น 2 บิลต่อ A4
-10. สินค้า 0 ชิ้นไม่เข้าใบปริ้น
-11. รวม order / จัดแล้ว / Telesale ยังถูก
-12. ไม่มี error แดงบนหน้าเว็บ
+npm run smoke
+npm run test:pro-scope
+npm run test:pro-regression
+npm run test:pro-lazy
+npm run test:local-xlsx
+npm run test:pro-architecture
+npm run test:pro-modules
+npm run test:pro-browser
 ```
 
-## High-risk areas
+ห้ามใช้ build ที่เขียนทับ `dist` สำหรับงาน Pro ถ้าจำเป็นต้อง build ต้องตรวจ
+Git diff ทุกไฟล์ก่อน commit
 
-ห้าม merge ถ้ายังไม่ได้ตรวจเมื่อแตะไฟล์เหล่านี้:
+## Browser coverage
+
+- Mobile 390×844
+- Desktop 1365×768
+- single `/assets/pro/app.js` entry
+- ไม่มี request ไป shell/core/override/print-fix รุ่นเก่า
+- ไม่มี JavaScript error
+- XLSX และ XLSM อัปโหลดผ่าน `<input type="file">` จริง
+- Date/PS/filter/search
+- Enter/Next, Undo/Redo, reload state
+- Developer QR, Fuel secret, Telesale 20+1 pagination
+- Print 12/12/1 = 3 บิล, 2 A4, zero item excluded
+
+Browser fixture เป็นข้อมูลทดสอบที่สร้างใน `test-results/` เท่านั้น และ mock
+เฉพาะ GET ภายนอก จึงไม่เขียนข้อมูลจริง
+
+## Manual checks before Merge
+
+1. เปิด Preview บนมือถือจริง
+2. โหลด Cloud แบบอ่านอย่างเดียว
+3. เปิดไฟล์ DOIT ที่อนุญาตสำหรับ QA
+4. ตรวจหน้าตา/การเลื่อนด้วยนิ้วและ keyboard มือถือจริง
+5. เปิด OS Print Preview จริงบนอุปกรณ์/เครื่องพิมพ์เป้าหมาย
+6. ตรวจขอบ A4, scaling และ 2 บิลต่อกระดาษ
+7. ยืนยัน Production URL/commit ยังไม่เปลี่ยนก่อนอนุมัติ Merge
+
+Automated print overlay ผ่านไม่ได้แปลว่า OS Print Preview ผ่าน
+
+## High-risk owner files
 
 ```text
 dist/pro.html
-dist/assets/pro-core-v4.js
-dist/assets/pro-native-core.js
-dist/assets/pro-native-core-overrides.js
-dist/assets/pro-print-store-bills.js
-dist/assets/pro-print.css
-src/lib/parser.ts
-src/lib/pricing.ts
+dist/assets/pro/core.js
+dist/assets/pro/state.js
+dist/assets/pro/parser-adapter.js
+dist/assets/pro/filters.js
+dist/assets/pro/send-store.js
+dist/assets/pro/print.js
+dist/assets/pro/print-model.js
+dist/assets/pro/pro.css
 ```
 
-## Rollback plan
-
-ถ้า preview พัง:
-
-```text
-1. ไม่ merge PR
-2. ปิด PR หรือ revert commit ใน branch
-3. main ยังไม่กระทบ
-4. เปิด issue/รายการบั๊กแยก
-```
-
-ถ้า production พังหลัง merge:
-
-```text
-1. ใช้ Vercel rollback ไป deployment ก่อนหน้า
-2. หรือ revert merge commit ล่าสุด
-3. เปิด bugfix branch ใหม่
-4. รัน smoke + mobile QA ก่อน merge อีกครั้ง
-```
+ไฟล์ Core/Override/Print Fix รุ่นเก่าเป็น LEGACY และห้ามแก้แทน owner files
+ด้านบน
