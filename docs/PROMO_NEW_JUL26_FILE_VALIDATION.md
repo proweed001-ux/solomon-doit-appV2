@@ -1,6 +1,6 @@
 # Promo New — JUL26 validation status
 
-Updated: 2026-07-19 (Asia/Bangkok)
+Updated: 2026-07-23 (Asia/Bangkok)
 
 ## Important
 
@@ -13,6 +13,11 @@ The old figures such as 200 cards, 30 tests, and results from
 `scripts/inspect-promo-real-files.ts` must not be used for approval.
 That script now exits with an error to prevent accidental use.
 
+The current workbook parser now has targeted regression coverage for the real JUL26 `Header` sheet
+layout where `InitiativeID` appears beside `Description`, including HFSS, HFSM/HFS-WH collapsing and
+HFSL multi-tier rows. That coverage verifies header and tier parsing only. It is not a full workbook
+or PDF round-trip.
+
 ## Current JUL26 reference
 
 The current reference PDF discussed for the rebuild has:
@@ -23,6 +28,10 @@ The current reference PDF discussed for the rebuild has:
 
 These figures identify the file and expected card conservation only. They do not certify grouping,
 Product Master matching, Promotion Family selection, price correctness, unresolved count, or runtime.
+
+A separate synthetic staging benchmark has proven that the atomic Draft transaction can carry
+212 Cards and 42 Product Groups. It must not be treated as real-file validation. See
+`docs/PROMO_NEW_ATOMIC_REVISION_BENCHMARK.md`.
 
 ## Required validation method
 
@@ -57,6 +66,6 @@ A real-file run is not approved until the browser result records all of the foll
 
 ## Data safety
 
-The rebuild Preview is read-only. Legacy Draft and Publish calls are blocked until an atomic revision
-staging design is implemented and separately approved. This validation must not write Production
-Database or Storage and must not invoke `finalize_latest`.
+The rebuild Preview remains read-only for the ordinary Promo UI. Production Draft, Publish, Rollback,
+Card-image uploads and Production Database/Storage writes are blocked. The staging-only atomic adapter
+must not be enabled in Production and must not invoke `finalize_latest`.
