@@ -169,58 +169,33 @@ function validateGroupingInput(input) {
   if (!monthId) throw new Error('invalid_promo_month');
   if (!groups.length || groups.length > 300) throw new Error('invalid_group_count');
   let cardCount = 0;
-  const locators = new Set();
+  const cardIds = new Set();
   const validated = groups.map(group => {
     const skuId = text(group?.skuId);
     const masterMatch = skuId.match(MASTER_SKU_ID);
     if (!masterMatch) throw new Error('group_master_product_required');
-    const cards = Array.isArray(group?.cards) ? group.cards : [];
-    if (!cards.length) throw new Error('group_has_no_cards');
-    const normalizedCards = cards.map(card => {
-      const classId = toLegacyClassId(text(card?.classId));
-      const page = Number(card?.page);
-      const sequence = Number(card?.sequence);
-      if (!classId || !Number.isInteger(page) || page < 1 || !Number.isInteger(sequence) || sequence < 1) {
-        throw new Error('invalid_card_locator');
-      }
-      const key = `${classId}|${page}|${sequence}`;
-      if (locators.has(key)) throw new Error('duplicate_card_in_snapshot');
-      locators.add(key);
+    const ids = Array.isArray(group?.cardIds) ? group.cardIds.map(text).filter(Boolean) : [];
+    if (!ids.length) throw new Error('group_has_no_cards');
+    if (group?.confirmed !== true) throw new Error('group_not_confirmed');
+    for (const cardId of ids) {
+      if (cardId.length > 240 || /[\u0000-\u001f]/u.test(cardId)) throw new Error('invalid_card_id');
+      if (cardIds.has(cardId)) throw new Error('duplicate_card_in_snapshot');
+      cardIds.add(cardId);
       cardCount += 1;
-      return { classId, page, sequence };
-    });
-    return { masterProductId: masterMatch[1].toLowerCase(), cards: normalizedCards };
+    }
+    return { masterProductId: masterMatch[1].toLowerCase(), cardIds: ids, confirmed: true };
   });
   if (cardCount < 1 || cardCount > 2000) throw new Error('invalid_card_count');
   return { monthId, groups: validated, cardCount };
 }
 
-async function resolveGroupingCardIds(monthId, groups, expectedCardCount) {
-  const rows = await supabase(`/rest/v1/promo_cards?promo_month_id=eq.${encodeURIComponent(monthId)}&status=neq.inactive&select=card_id,class_id,page_no,card_no&order=class_id.asc,page_no.asc,card_no.asc&limit=2000`);
-  const cards = Array.isArray(rows) ? rows : [];
-  if (cards.length !== expectedCardCount) throw new Error(`grouping_snapshot_incomplete:${expectedCardCount}/${cards.length}`);
-  const byPage = new Map();
-  for (const card of cards) {
-    const key = `${text(card.class_id).toUpperCase()}|${Number(card.page_no)}`;
-    const list = byPage.get(key) || [];
-    list.push(card);
-    byPage.set(key, list);
-  }
-  for (const list of byPage.values()) list.sort((left, right) => Number(left.card_no) - Number(right.card_no));
-  return groups.map(group => ({
-    master_product_id: group.masterProductId,
-    card_ids: group.cards.map(locator => {
-      const list = byPage.get(`${locator.classId}|${locator.page}`) || [];
-      const row = list[locator.sequence - 1];
-      if (!row?.card_id) throw new Error(`card_locator_not_found:${locator.classId}:${locator.page}:${locator.sequence}`);
-      return text(row.card_id);
-    }),
-  }));
-}
-
 async function saveGroupingSnapshot(input, adminKey) {
   const validated = validateGroupingInput(input);
-  const groups = await resolveGroupingCardIds(validated.monthId, validated.groups, validated.cardCount);
+  const groups = validated.groups.map(group => ({
+    master_product_id: group.masterProductId,
+    card_ids: group.cardIds,
+    confirmed: group.confirmed,
+  }));
   const rows = await supabase('/rest/v1/rpc/save_manual_promo_grouping_snapshot', {
     method: 'POST',
     body: JSON.stringify({
@@ -232,6 +207,29 @@ async function saveGroupingSnapshot(input, adminKey) {
   const row = Array.isArray(rows) ? rows[0] : rows;
   if (!row || Number(row.card_count) !== validated.cardCount) throw new Error('grouping_snapshot_save_incomplete');
   return { promoMonthId: validated.monthId, groupCount: Number(row.group_count), cardCount: Number(row.card_count) };
+}
+
+async function loadGroupingSnapshot(monthKey) {
+  const monthId = toLegacyMonthId(text(monthKey));
+  if (!monthId) throw new Error('invalid_promo_month');
+  const [groups, mappings] = await Promise.all([
+    supabase(`/rest/v1/promo_product_groups?promo_month_id=eq.${encodeURIComponent(monthId)}&status=eq.manual_locked&master_product_id=not.is.null&select=group_id,master_product_id&order=canonical_name.asc&limit=300`),
+    supabase(`/rest/v1/promo_card_product_groups?promo_month_id=eq.${encodeURIComponent(monthId)}&decision=eq.MANUAL&select=group_id,card_id&order=group_id.asc,card_id.asc&limit=2000`),
+  ]);
+  if (!Array.isArray(groups) || !groups.length) return null;
+  const idsByGroup = new Map();
+  for (const row of Array.isArray(mappings) ? mappings : []) {
+    const list = idsByGroup.get(text(row.group_id)) || [];
+    list.push(text(row.card_id));
+    idsByGroup.set(text(row.group_id), list);
+  }
+  const resultGroups = groups.map(group => ({
+    skuId: `MASTER-${text(group.master_product_id)}`,
+    cardIds: idsByGroup.get(text(group.group_id)) || [],
+    confirmed: true,
+  })).filter(group => group.cardIds.length > 0);
+  const cardCount = resultGroups.reduce((sum, group) => sum + group.cardIds.length, 0);
+  return { promoMonthId: monthId, groups: resultGroups, cardCount };
 }
 
 export default async function handler(req, res) {
@@ -263,6 +261,11 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true, data: await masterData() });
     }
 
+    if (req.method === 'GET' && action === 'load-grouping-snapshot') {
+      await validateUploadKey(headerKey);
+      return json(res, 200, { ok: true, data: await loadGroupingSnapshot(req.query?.monthKey) });
+    }
+
     if (req.method === 'POST' && action === 'create-master') {
       if (requestBodySize(req) > MAX_MASTER_BODY_BYTES) return json(res, 413, { ok: false, error: 'request_body_too_large' });
       const adminKey = await validateUploadKey(headerKey);
@@ -280,7 +283,7 @@ export default async function handler(req, res) {
   } catch (error) {
     const message = String(error?.message || error || 'unknown_error');
     const authFailure = /invalid_upload_key|missing_admin_key|invalid_admin_key|supabase_401|supabase_403/.test(message);
-    const badRequest = /invalid_canonical_name|invalid_brand|invalid_product_type|invalid_sales_unit|invalid_size_value|invalid_pack_quantity|invalid_unit|invalid_normalized_key|invalid_promo_month|invalid_group_count|invalid_card_count|invalid_card_locator|duplicate_card_in_snapshot|group_master_product_required|group_has_no_cards|grouping_snapshot_incomplete|card_locator_not_found|active_master_product_not_found|card_not_found_for_month/.test(message);
+    const badRequest = /invalid_canonical_name|invalid_brand|invalid_product_type|invalid_sales_unit|invalid_size_value|invalid_pack_quantity|invalid_unit|invalid_normalized_key|invalid_promo_month|invalid_group_count|invalid_card_count|invalid_card_id|duplicate_card_in_snapshot|group_master_product_required|group_has_no_cards|group_not_confirmed|grouping_snapshot_incomplete|active_master_product_not_found|card_not_found_for_month/.test(message);
     if (authFailure) return json(res, 401, { ok: false, error: 'invalid_upload_key' });
     if (badRequest) return json(res, 400, { ok: false, error: message.replace(/^supabase_\d+:/u, '') });
     return json(res, 503, { ok: false, error: 'promo_auth_unavailable' });
