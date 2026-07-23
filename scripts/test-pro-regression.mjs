@@ -3,6 +3,13 @@ import fs from "node:fs";
 import { group, sourceRows, teleRows } from "../dist/assets/pro/filters.js";
 import { norm } from "../dist/assets/pro/parser-adapter.js";
 import {
+  BILL_ROWS,
+  BILLS_PER_A4,
+  buildBills,
+  doneSummary,
+  lineVal,
+} from "../dist/assets/pro/print-model.js";
+import {
   createSelection,
   mapVal,
   rkey,
@@ -16,10 +23,6 @@ const fixture = JSON.parse(
 );
 const appSource = fs.readFileSync("dist/assets/pro/app.js", "utf8");
 const coreSource = fs.readFileSync("dist/assets/pro/core.js", "utf8");
-const printSource = fs.readFileSync(
-  "dist/assets/pro-print-store-bills.js",
-  "utf8",
-);
 
 state.rows = fixture.rows.map((row) => ({ ...row }));
 state.key = "fixture-active";
@@ -60,6 +63,11 @@ const printLines = groups
   })
   .filter((line) => line.qty > 0);
 const printRawTotal = printLines.reduce((sum, line) => sum + line.total, 0);
+const moduleBills = buildBills();
+const modulePrintRows = moduleBills.flatMap((bill) =>
+  bill.rows.map((row) => lineVal(bill.store, row)),
+);
+const done = doneSummary();
 const telesaleRows = teleRows();
 const telesaleBills = new Set(
   telesaleRows.map((row) => [row.inv, row.store, row.tele, row.date].join("|")),
@@ -95,6 +103,16 @@ assert.equal(
 assert.ok(Math.abs(printRawTotal - fixture.expected.printRawTotal) < 1e-9);
 assert.equal(Math.floor(printRawTotal), fixture.expected.printStoreTotal);
 assert.equal(Math.ceil(printLines.length / 12), fixture.expected.printBills);
+assert.equal(BILL_ROWS, 12, "Print rows per bill changed");
+assert.equal(BILLS_PER_A4, 2, "Bills per A4 changed");
+assert.equal(moduleBills.length, fixture.expected.printBills);
+assert.equal(modulePrintRows.length, fixture.expected.printRows);
+assert.equal(
+  modulePrintRows.reduce((sum, row) => sum + row.qty, 0),
+  fixture.expected.printQty,
+  "Print model must use send quantities only",
+);
+assert.equal(done.storeTotal, fixture.expected.printStoreTotal);
 assert.equal(telesaleRows.length, fixture.expected.teleRows);
 assert.equal(telesaleBills.size, fixture.expected.teleBills);
 assert.equal(
@@ -126,17 +144,6 @@ assert.equal(sk(), "doit-core-unified-v1:fixture-active");
 assert.match(appSource, /import "\.\/core\.js";/);
 assert.doesNotMatch(appSource, /pro-native-core\.js/);
 assert.match(coreSource, /currentStateSource: "state-module"/);
-assert.match(printSource, /BILL_ROWS=12/, "Print rows per bill changed");
-assert.match(printSource, /BILLS_PER_A4=2/, "Bills per A4 changed");
-assert.match(
-  printSource,
-  /const qty=mapVal\(st\.send,g\.poolKey,store,st\.sel\)/,
-  "Print must use send only",
-);
-assert.match(
-  printSource,
-  /return rows\.filter\(r=>T\(r\.name\)&&N\(r\.qty\)>0\)/,
-  "Zero-quantity print filter changed",
-);
+assert.doesNotMatch(appSource, /pro-native-core-overrides\.js/);
 
 console.log("Pro regression modules passed:", fixture.expected);

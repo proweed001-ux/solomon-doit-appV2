@@ -1,12 +1,8 @@
-globalThis.TEAM_FN =
-  "https://saodmeoilixfdqentofp.supabase.co/functions/v1/team-photo/";
-globalThis.TEAM_PUBLIC =
-  "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/public/doit-files/team/";
-
 globalThis.DOIT_PRO_CORE_BOOT = {
-  version: "1028-single-state-stage3",
-  mode: "single-module-entry-state-owner",
+  version: "1028-owned-features-stage4",
+  mode: "single-entry-owned-features",
   productionCandidate: false,
   legacyWrapperRemoved: true,
   singleEntry: true,
+  overrideLayerRemoved: true,
 };

@@ -1,33 +1,43 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import {
+  buildTelesaleBills,
+  TELE_PAGE_SIZE,
+} from "../dist/assets/pro/telesale.js";
 
-const corePath = "dist/assets/pro/core.js";
+const corePath = "dist/assets/pro/telesale.js";
 const source = fs.readFileSync(corePath, "utf8");
 
+assert.equal(TELE_PAGE_SIZE, 20, "Telesale page size must stay at 20 bills");
 assert.match(
   source,
-  /const TELE_PAGE_SIZE = 20;/,
-  "Telesale page size must stay at 20 bills",
-);
-assert.match(
-  source,
-  /if \(!drawer\?\.classList\.contains\("on"\)\) \{[\s\S]*?return;/,
+  /if \(!drawer\?\.classList\.contains\("on"\)\) \{[\s\S]*?return page;/,
   "Closed Telesale drawer must return before bill tables are built",
 );
 assert.match(
   source,
-  /bs\.slice\(start, start \+ TELE_PAGE_SIZE\)/,
+  /bills\.slice\(start, start \+ TELE_PAGE_SIZE\)/,
   "Open Telesale drawer must render only the active page",
 );
 
-const bills = Array.from({ length: 53 }, (_, billIndex) => ({
-  lines: Array.from({ length: (billIndex % 4) + 1 }, (_, lineIndex) => {
+const rows = Array.from({ length: 53 }, (_, billIndex) =>
+  Array.from({ length: (billIndex % 4) + 1 }, (_, lineIndex) => {
     const qty = billIndex + lineIndex + 1;
     const rawAmt = qty * (12.5 + lineIndex);
     const netAmt = rawAmt - lineIndex * 0.75;
-    return { qty, rawAmt, netAmt };
+    return {
+      inv: `INV-${billIndex}`,
+      store: `Store-${billIndex}`,
+      tele: `Tele-${billIndex % 3}`,
+      date: "2026-07-20",
+      qty,
+      amt: rawAmt,
+      rawAmt,
+      netAmt,
+    };
   }),
-}));
+).flat();
+const bills = buildTelesaleBills(rows);
 
 const summarize = (list) =>
   list.reduce(
@@ -47,8 +57,8 @@ const summarize = (list) =>
 
 const before = summarize(bills);
 const pages = [];
-for (let start = 0; start < bills.length; start += 20) {
-  pages.push(bills.slice(start, start + 20));
+for (let start = 0; start < bills.length; start += TELE_PAGE_SIZE) {
+  pages.push(bills.slice(start, start + TELE_PAGE_SIZE));
 }
 const after = pages.reduce(
   (total, page) => {
@@ -64,7 +74,15 @@ const after = pages.reduce(
   { bills: 0, lines: 0, qty: 0, raw: 0, vat: 0 },
 );
 
-assert.deepEqual(after, before, "Pagination must not change Telesale totals");
+assert.deepEqual(
+  { ...after, vat: 0 },
+  { ...before, vat: 0 },
+  "Pagination must not change Telesale counts or raw totals",
+);
+assert.ok(
+  Math.abs(after.vat - before.vat) < 1e-9,
+  "Pagination must not change Telesale VAT total",
+);
 assert.deepEqual(
   pages.map((page) => page.length),
   [20, 20, 13],

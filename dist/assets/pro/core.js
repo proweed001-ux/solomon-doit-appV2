@@ -1,3 +1,11 @@
+import { bindQuantityInputs } from "./send-store.js";
+import { renderOrderMode } from "./order.js";
+import { renderDoneMode } from "./done.js";
+import {
+  buildTelesaleBills,
+  renderTelesaleDrawer,
+  TELE_PAGE_SIZE,
+} from "./telesale.js";
 import {
   $,
   $$,
@@ -48,7 +56,6 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
 (() => {
   "use strict";
 
-  const TELE_PAGE_SIZE = 20;
   function msg(s) {
     const m = $("#msg");
     if (m) m.textContent = s;
@@ -325,18 +332,15 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
   function renderMode(pool) {
     if (state.mode === "pick") {
       $("#table").innerHTML = pickTable(pool);
-      $$(".jdata").forEach((i) => {
-        i.oninput = (e) => recalcPickRow(e.target.closest("tr"));
-        i.onchange = (e) => {
+      bindQuantityInputs({
+        inputs: $$(".jdata"),
+        onInput: (input) => recalcPickRow(input.closest("tr")),
+        onCommit: (input) => {
           push();
-          ({
-            send: state.send,
-            add: state.add,
-            pull: state.pull,
-          })[e.target.dataset.map][e.target.dataset.k] = N(e.target.value);
+          state[input.dataset.map][input.dataset.k] = N(input.value);
           save();
           render();
-        };
+        },
       });
       $$("[data-insert-del]").forEach(
         (b) =>
@@ -380,39 +384,18 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
       return;
     }
     if (state.mode === "order") {
-      const p = group(
+      const grouped = group(
         state.rows.filter(
-          (r) =>
-            okDate(r) &&
-            okPs(r) &&
-            okCut(r) &&
-            okBrand(r) &&
-            okType(r) &&
-            okQ(r),
+          (row) =>
+            okDate(row) &&
+            okPs(row) &&
+            okCut(row) &&
+            okBrand(row) &&
+            okType(row) &&
+            okQ(row),
         ),
       );
-      simpleTable(
-        "รวม order PS + Telesale " + F(p.length) + " รายการ",
-        ["#", "สินค้า", "จำนวนรวม", "ยอดดิบ", "ยอดสุทธิ", "รวม VAT"],
-        p
-          .map(
-            (g, i) =>
-              "<tr><td>" +
-              (i + 1) +
-              "</td><td>" +
-              E(g.sku) +
-              "</td><td>" +
-              F(g.qty) +
-              "</td><td>" +
-              B(g.rawAmt) +
-              "</td><td>" +
-              B(g.netAmt) +
-              "</td><td>" +
-              B((N(g.netAmt) || N(g.rawAmt)) * 1.07) +
-              "</td></tr>",
-          )
-          .join(""),
-      );
+      renderOrderMode(grouped, simpleTable);
       return;
     }
     if (state.mode === "dist") {
@@ -500,39 +483,7 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
       return;
     }
     if (state.mode === "done") {
-      const out = [];
-      pool.forEach((g) => {
-        const qty = manualSent(g);
-        if (qty > 0)
-          out.push({
-            name: g.sku,
-            qty,
-            rawAmt: qty * N(g.unit),
-            netAmt: qty * N(g.netUnit),
-          });
-      });
-      simpleTable(
-        "จัดแล้ว " + F(out.length) + " รายการ",
-        ["#", "สินค้า", "จำนวนที่คีย์", "ยอดดิบ", "ยอดสุทธิ", "รวม VAT"],
-        out
-          .map(
-            (l, i) =>
-              "<tr><td>" +
-              (i + 1) +
-              "</td><td>" +
-              E(l.name) +
-              "</td><td>" +
-              F(l.qty) +
-              "</td><td>" +
-              B(l.rawAmt) +
-              "</td><td>" +
-              B(l.netAmt) +
-              "</td><td>" +
-              B((N(l.netAmt) || N(l.rawAmt)) * 1.07) +
-              "</td></tr>",
-          )
-          .join(""),
-      );
+      renderDoneMode();
       return;
     }
     const r = sourceRows().slice(0, 500);
@@ -581,112 +532,17 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
     );
   }
   function teleBills() {
-    const m = new Map();
-    teleRows().forEach((r) => {
-      const k = [r.inv, r.store, r.tele, r.date].join("|");
-      let b = m.get(k);
-      if (!b) {
-        b = {
-          inv: r.inv || "-",
-          store: r.store,
-          tele: r.tele,
-          date: r.date,
-          lines: [],
-          qty: 0,
-          amt: 0,
-        };
-        m.set(k, b);
-      }
-      b.lines.push(r);
-      b.qty += r.qty;
-      b.amt += r.amt;
-    });
-    return [...m.values()].sort(
-      (a, b) =>
-        a.date.localeCompare(b.date) || a.store.localeCompare(b.store, "th"),
-    );
+    return buildTelesaleBills(teleRows());
   }
   function renderTele() {
-    const bs = teleBills(),
-      btn = $("#teleBtn"),
-      body = $("#drawerBody"),
-      drawer = $("#teleDrawer");
-    if (btn) btn.textContent = "บิล Telesale (" + F(bs.length) + ")";
-    if (!body) return;
-    if (!drawer?.classList.contains("on")) {
-      body.innerHTML =
-        '<div class="empty">เปิดบิล Telesale เพื่อแสดงรายการแบบแบ่งหน้า</div>';
-      return;
-    }
-    if (!bs.length) {
-      body.innerHTML =
-        '<div class="empty">ไม่พบ Telesale ตามตัวเลือกที่ติ๊ก</div>';
-      return;
-    }
-    const pages = Math.max(1, Math.ceil(bs.length / TELE_PAGE_SIZE));
-    state.telePage = Math.min(Math.max(1, state.telePage), pages);
-    const start = (state.telePage - 1) * TELE_PAGE_SIZE,
-      shown = bs.slice(start, start + TELE_PAGE_SIZE),
-      cards = shown
-        .map(
-          (b) =>
-            '<div class="teleBill"><div class="teleBillHead"><b>ร้าน: ' +
-            E(b.store) +
-            "</b><br><small>บิล: " +
-            E(b.inv) +
-            " · วันที่ " +
-            E(dlabel(b.date)) +
-            " · Tele: " +
-            E(b.tele) +
-            '</small></div><table class="teleTbl"><thead><tr><th>สินค้า</th><th>จำนวน</th><th>ยอดดิบ</th><th>สุทธิ+VAT</th></tr></thead><tbody>' +
-            b.lines
-              .map(
-                (r) =>
-                  "<tr><td>" +
-                  E(r.sku) +
-                  "</td><td>" +
-                  F(r.qty) +
-                  "</td><td>" +
-                  B(r.rawAmt) +
-                  "</td><td>" +
-                  B((N(r.netAmt) || N(r.rawAmt)) * 1.07) +
-                  "</td></tr>",
-              )
-              .join("") +
-            "</tbody></table></div>",
-        )
-        .join(""),
-      pager =
-        '<div class="pagination telePager"><button class="page" data-tele-page="' +
-        Math.max(1, state.telePage - 1) +
-        '" ' +
-        (state.telePage === 1 ? "disabled" : "") +
-        '>‹</button><button class="page on">' +
-        state.telePage +
-        "/" +
-        pages +
-        '</button><button class="page" data-tele-page="' +
-        Math.min(pages, state.telePage + 1) +
-        '" ' +
-        (state.telePage === pages ? "disabled" : "") +
-        ">›</button></div>";
-    body.innerHTML =
-      '<div class="hint" style="padding:0 0 8px">แสดงบิล ' +
-      F(start + 1) +
-      "–" +
-      F(start + shown.length) +
-      " จาก " +
-      F(bs.length) +
-      " บิล</div>" +
-      cards +
-      pager;
-    $$("[data-tele-page]").forEach(
-      (b) =>
-        (b.onclick = () => {
-          state.telePage = N(b.dataset.telePage) || 1;
-          renderTele();
-        }),
-    );
+    state.telePage = renderTelesaleDrawer({
+      bills: teleBills(),
+      page: state.telePage,
+      onPage: (nextPage) => {
+        state.telePage = nextPage;
+        renderTele();
+      },
+    });
   }
   function render() {
     fixUi();
@@ -1147,33 +1003,6 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
       gear.classList.add("settingsGear");
     }
     patchBrandTitle();
-    patchTeamName();
-  }
-  function patchTeamName() {
-    try {
-      document.querySelectorAll(".devInfo b").forEach((b) => {
-        if (T(b.textContent) === "ฐากูร อุปมัย")
-          b.textContent = "นาย ฐากูร อุปมัย";
-      });
-      const img = $("#teamThakoonPro");
-      if (img) img.alt = "นาย ฐากูร อุปมัย";
-    } catch {}
-  }
-  function autoTeamPopup() {
-    let tries = 0;
-    const tick = () => {
-      tries++;
-      patchTeamName();
-      try {
-        if (typeof window.openDevTeamModal === "function") {
-          window.openDevTeamModal();
-          setTimeout(patchTeamName, 80);
-          return;
-        }
-      } catch {}
-      if (tries < 30) setTimeout(tick, 150);
-    };
-    setTimeout(tick, 350);
   }
   function bind() {
     if (state.bound) return;
@@ -1257,7 +1086,6 @@ import { publicFetch, resolveCloudPayload } from "./data-source.js";
     );
     $("#diagBtn").onclick = () =>
       alert(JSON.stringify(window.DOIT_CORE_APP.health(), null, 2));
-    autoTeamPopup();
   }
   window.DOIT_CORE_APP = {
     load: loadData,

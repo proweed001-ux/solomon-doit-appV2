@@ -16,6 +16,7 @@ export const B = (value) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+export const D = (value) => Math.floor(N(value)).toLocaleString("th-TH");
 export const E = (value) =>
   T(value).replace(
     /[&<>"']/g,

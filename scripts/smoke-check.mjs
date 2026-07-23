@@ -32,7 +32,14 @@ const required = [
   "dist/assets/pro/filters.js",
   "dist/assets/pro/utils.js",
   "dist/assets/pro/fuel-secret.js",
-  "dist/assets/pro-native-core-overrides.js",
+  "dist/assets/pro/send-store.js",
+  "dist/assets/pro/order.js",
+  "dist/assets/pro/telesale.js",
+  "dist/assets/pro/done.js",
+  "dist/assets/pro/developer-qr.js",
+  "dist/assets/pro/team.js",
+  "dist/assets/pro/results-mode.js",
+  "dist/assets/pro/print-model.js",
   "dist/assets/pro-print-store-bills.js",
   "dist/assets/pro-print-mode-fixes.js",
   "dist/assets/pro-print.css",
@@ -76,8 +83,15 @@ mustNotContain("dist/pro.html", "/assets/pro-core-v4.js");
 mustContain("dist/assets/pro/app.js", 'import "./bootstrap.js";');
 mustContain("dist/assets/pro/app.js", 'import "./core.js";');
 mustNotContain("dist/assets/pro/app.js", 'import "../pro-native-core.js";');
+mustNotContain("dist/assets/pro/app.js", "pro-native-core-overrides.js");
+mustNotContain("dist/assets/pro/app.js", "pro-team-single.js");
+mustNotContain("dist/assets/pro/app.js", "pro-results-mode.js");
 mustContain("dist/assets/pro/core.js", 'currentStateSource: "state-module"');
+mustNotContain("dist/assets/pro/core.js", "MutationObserver");
+mustNotContain("dist/assets/pro/core.js", "setInterval");
 mustContain("dist/assets/pro/state.js", '"doit-core-unified-v1:" + state.key');
+mustContain("dist/assets/pro/print-model.js", "export const BILL_ROWS = 12");
+mustContain("dist/assets/pro/print-model.js", "export const BILLS_PER_A4 = 2");
 mustContain("dist/assets/pro-print-store-bills.js", "BILLS_PER_A4=2");
 mustContain("dist/assets/pro-print-store-bills.js", "BILL_ROWS=12");
 mustContain(
