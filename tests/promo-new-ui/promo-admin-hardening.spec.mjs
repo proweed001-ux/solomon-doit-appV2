@@ -316,6 +316,16 @@ test('runtime supports add, remove, undo, bulk confirm, per-card promo, lock, sa
   expect(backend.writeCount).toBe(1);
   expect(backend.savedSnapshot.assignments).toHaveLength(4);
 
+  await page.getByRole('button', { name: 'ปลดล็อกกลุ่ม' }).click();
+  await expect(page.getByTestId(`card-promotion-${CARD_ONE}`)).toBeEnabled();
+  expect(backend.unlockWriteCount).toBe(1);
+  await page.getByRole('button', { name: 'ยืนยันกลุ่ม' }).click();
+  await expect(page.getByTestId('save-grouping-snapshot')).toBeEnabled();
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByTestId('save-grouping-snapshot').click();
+  await expect(page.getByText(/บันทึก Snapshot revision 3 แล้ว/u)).toBeVisible();
+  expect(backend.writeCount).toBe(2);
+
   await page.reload();
   await expect(page.getByText(/โหลดการจัดกลุ่มที่บันทึกไว้แล้ว 4 การ์ด/u)).toBeVisible();
   await expect(page.getByTestId(`card-promotion-${CARD_ONE}`)).toHaveValue('family:three');
@@ -325,7 +335,7 @@ test('runtime supports add, remove, undo, bulk confirm, per-card promo, lock, sa
   await expect(page.getByTestId('target-group-banner')).toContainText('กลุ่มยืนยันแล้ว');
   await page.getByRole('button', { name: 'ปลดล็อกกลุ่ม' }).click();
   await expect(page.getByTestId(`card-promotion-${CARD_ONE}`)).toBeEnabled();
-  expect(backend.unlockWriteCount).toBe(1);
+  expect(backend.unlockWriteCount).toBe(2);
 });
 
 test('dry-run mutates only memory and never calls the snapshot Write API', async ({ page }) => {
