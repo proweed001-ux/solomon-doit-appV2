@@ -1,0 +1,52 @@
+{
+  "version": "pro-regression-v1",
+  "rows": [
+    { "date": "2026-07-20", "inv": "INV-001", "type": "INVC", "ps": "AYAPS062", "store": "ร้านเอ", "tele": "", "isTele": false, "code": "SKU-001", "sku": "สินค้าเอ", "brand": "P&G", "size": "แพ็ก", "qty": 10, "unit": 10, "rawAmt": 100, "netAmt": 90 },
+    { "date": "2026-07-20", "inv": "INV-002", "type": "INVC", "ps": "AYAPS062", "store": "ร้านบี", "tele": "", "isTele": false, "code": "SKU-001", "sku": "สินค้าเอ", "brand": "P&G", "size": "แพ็ก", "qty": 5, "unit": 10, "rawAmt": 50, "netAmt": 45 },
+    { "date": "2026-07-20", "inv": "INV-003", "type": "INVC", "ps": "AYAPS062", "store": "ร้านเอ", "tele": "", "isTele": false, "code": "SKU-002", "sku": "สินค้าบี", "brand": "P&G", "size": "ขวด", "qty": 8, "unit": 20, "rawAmt": 160, "netAmt": 140 },
+    { "date": "2026-07-20", "inv": "INV-004", "type": "INVC", "ps": "AYAPS063", "store": "ร้านซี", "tele": "", "isTele": false, "code": "SKU-001", "sku": "สินค้าเอ", "brand": "P&G", "size": "แพ็ก", "qty": 7, "unit": 10, "rawAmt": 70, "netAmt": 63 },
+    { "date": "2026-07-21", "inv": "INV-005", "type": "INVC", "ps": "AYAPS062", "store": "ร้านเอ", "tele": "", "isTele": false, "code": "SKU-001", "sku": "สินค้าเอ", "brand": "P&G", "size": "แพ็ก", "qty": 4, "unit": 10, "rawAmt": 40, "netAmt": 36 },
+    { "date": "2026-07-20", "inv": "TELE-001", "type": "INVC", "ps": "AYAPS062", "store": "ร้านเทเล", "tele": "T001", "isTele": true, "code": "SKU-T01", "sku": "สินค้าเทเล", "brand": "P&G", "size": "ชิ้น", "qty": 3, "unit": 10, "rawAmt": 30, "netAmt": 27 }
+  ],
+  "selection": {
+    "dates": ["2026-07-20"],
+    "ps": ["AYAPS062"],
+    "orderStores": ["ร้านบี"],
+    "receivers": ["ร้านเอ"],
+    "brands": [],
+    "types": []
+  },
+  "search": "",
+  "manual": {
+    "send": [
+      { "store": "ร้านเอ", "poolKey": "P&G|แพ็ก|SKU-001|สินค้าเอ|INVC", "qty": 2 },
+      { "store": "ร้านเอ", "poolKey": "P&G|ขวด|SKU-002|สินค้าบี|INVC", "qty": 3 }
+    ],
+    "add": [
+      { "store": "ร้านเอ", "poolKey": "P&G|แพ็ก|SKU-001|สินค้าเอ|INVC", "qty": 4 }
+    ],
+    "pull": [
+      { "store": "ร้านเอ", "poolKey": "P&G|ขวด|SKU-002|สินค้าบี|INVC", "qty": 1 }
+    ]
+  },
+  "expected": {
+    "filteredRows": 2,
+    "pickGroups": 2,
+    "sourceQty": 18,
+    "rawAmount": 260,
+    "netAmount": 230,
+    "vatAmount": 246.1,
+    "sentQty": 5,
+    "remainingQty": 16,
+    "printRows": 2,
+    "printQty": 5,
+    "printRawTotal": 75.435,
+    "printStoreTotal": 75,
+    "printBills": 1,
+    "teleRows": 1,
+    "teleBills": 1,
+    "teleQty": 3,
+    "teleRaw": 30,
+    "teleVat": 28.89
+  }
+}
