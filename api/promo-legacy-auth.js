@@ -137,18 +137,24 @@ async function validateUploadKey(adminKey) {
   return key;
 }
 
-function applyStructuredIdentity(sku, master) {
+export function applyStructuredIdentity(sku, master) {
   if (!sku || !master) return sku;
-  const sizeValue = Number(master.size_value || 0);
+  const rawStructuredSize = text(master.size_value);
+  const structuredSize = rawStructuredSize ? Number(rawStructuredSize) : null;
+  const hasStructuredSize = Number.isFinite(structuredSize) && structuredSize > 0;
+  const fallbackSize = Number(sku.identity?.sizeValue || 0);
+  const fallbackVariant = text(sku.identity?.variant);
+  const structuredVariant = text(master.variant);
+  const canonicalFallback = text(master.canonical_name);
   return {
     ...sku,
     identity: {
       ...sku.identity,
       brand: text(master.brand) || sku.identity.brand,
       productType: text(master.product_type) || sku.identity.productType,
-      variant: text(master.variant) || null,
-      sizeValue: Number.isFinite(sizeValue) ? sizeValue : sku.identity.sizeValue,
-      sizeUnit: text(master.size_unit) || sku.identity.sizeUnit,
+      variant: structuredVariant || fallbackVariant || (!hasStructuredSize && fallbackSize <= 0 ? canonicalFallback || null : null),
+      sizeValue: hasStructuredSize ? structuredSize : fallbackSize,
+      sizeUnit: hasStructuredSize ? (text(master.size_unit) || sku.identity.sizeUnit) : sku.identity.sizeUnit,
       salesUnit: text(master.sales_unit) || text(master.unit_label) || sku.identity.salesUnit,
       packQuantity: Number.isInteger(Number(master.pack_quantity)) && Number(master.pack_quantity) > 0 ? Number(master.pack_quantity) : sku.identity.packQuantity,
     },
