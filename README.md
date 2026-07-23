@@ -7,7 +7,7 @@
 ```text
 Production: Pro Stable 1028 Native
 URL: https://solomon-doit-app-v2.vercel.app/pro.html?t=1028
-Production commit: 8b982911f7b13e9c9231d8a12c78709f6a674324
+Production commit: 24035247351ebc99ab30c38b3efc1da74e7ef23a
 PR #64: merged
 Architecture: single entry / single state / single render
 ```
@@ -108,7 +108,7 @@ tests/pro/pro-browser.spec.mjs    browser test มือถือ/Desktop/XLSX/X
 - ห้ามแก้ `main` ตรง ๆ ให้ใช้ branch/PR เสมอ
 - งานหน้า Pro ต้องแก้ในโมดูลเจ้าของภายใต้ `dist/assets/pro/`
 - งาน State แก้ `state.js`; งาน filter แก้ `filters.js`; งาน print แก้ `print.js`/`print-model.js`
-- ไฟล์ Core/Override/Print Fix รุ่นเก่าเป็น LEGACY และไม่ใช่ source ของหน้า Pro ตัวจริง
+- ไฟล์ Core/Override/Print Fix รุ่นเก่าถูกลบแล้ว; ชื่อที่ยังอยู่ในเอกสาร/Test เป็น Historical/Negative guard
 - หลีกเลี่ยงการใส่ CSS/JS ใหม่ยาว ๆ ลงใน `dist/pro.html` โดยตรง
 - หลีกเลี่ยง workflow แบบ patch ไฟล์อัตโนมัติ เพราะเสี่ยงเขียนทับงานใหม่
 - งานที่แตะ parser / pricing / print ต้องตรวจด้วยไฟล์ DOIT จริงก่อน merge
@@ -166,3 +166,11 @@ node scripts/qa-doit-file.mjs "path/to/DOIT.xlsx" --json=qa-result.json
 ## หมายเหตุ
 
 ถ้า CSV ภาษาไทยกลายเป็น `?` ตั้งแต่ต้นทาง แอปจะอ่านตัวเลขได้ แต่ข้อความไทยที่เสีย encoding ไปแล้วกู้คืนไม่ได้
+
+
+## Pro Legacy Cleanup
+
+Cleanup Base: `24035247351ebc99ab30c38b3efc1da74e7ef23a`
+
+URL checkpoint เก่าสามรายการ Redirect ไป `/pro.html?t=1028`; Active Pro,
+สูตร, State และ LocalStorage keys ไม่เปลี่ยน

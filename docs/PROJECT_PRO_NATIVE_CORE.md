@@ -7,7 +7,7 @@
 ```text
 Project Pro Native Core: historical migration complete
 Project Pro Single Source: merged in PR #64
-Production commit: 8b982911f7b13e9c9231d8a12c78709f6a674324
+Current production baseline: 24035247351ebc99ab30c38b3efc1da74e7ef23a
 Production entry: /pro.html?t=1028
 ```
 
@@ -66,3 +66,13 @@ npm run verify
 ```
 
 Rollback point ของสถาปัตยกรรมปัจจุบันคือ Production commit `8b982911…`
+
+
+## Pro Legacy Cleanup follow-up — 23 กรกฎาคม 2026
+
+Cleanup Base: `24035247351ebc99ab30c38b3efc1da74e7ef23a`
+
+Legacy assets/checkpoint 14 รายการถูกลบหลังย้าย Test/QA ออกแล้ว ชื่อที่ยัง
+ปรากฏในเอกสารและ Test เป็น Historical/Negative reference เท่านั้น
+Active source ยังคง `dist/pro.html -> dist/assets/pro/app.js` และไม่มีการ
+เปลี่ยนสูตร, State structure, LocalStorage key หรือ Print model
