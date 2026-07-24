@@ -6,9 +6,9 @@ const DB_NAME = 'solomon-promo-new-test-cache';
 const DB_VERSION = 1;
 const STORE_NAME = 'runs';
 const LATEST_KEY = 'latest';
-const SUMMARY_KEY = 'promo-new-test-cache-summary-v6';
-export const PROMO_TEST_CACHE_SCHEMA_VERSION = 6 as const;
-export const PROMO_TEST_PIPELINE_VERSION = 'density-grid-v1-card-title-single-pass-visual-first' as const;
+const SUMMARY_KEY = 'promo-new-test-cache-summary-v7';
+export const PROMO_TEST_CACHE_SCHEMA_VERSION = 7 as const;
+export const PROMO_TEST_PIPELINE_VERSION = 'density-grid-v2-class-only-manual-grouping' as const;
 
 interface StoredFile {
   name: string;
