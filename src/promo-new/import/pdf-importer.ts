@@ -70,6 +70,7 @@ export interface PdfImportResult {
 interface ImportOptions {
   monthKey: string;
   enableOcr?: boolean;
+  extractProductText?: boolean;
   onProgress?: (progress: PdfImportProgress) => void;
 }
 
@@ -300,9 +301,10 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
 
       for (const [index, bounds] of grid.regions.entries()) {
         const sequence = index + 1;
-        let productText = hasPdfText ? textIn(textItems, cardProductTitleZone(bounds)) : '';
-        let rawText = hasPdfText ? textIn(textItems, bounds) : '';
-        if (!hasPdfText && options.enableOcr) {
+        const extractProductText = options.extractProductText !== false;
+        let productText = extractProductText && hasPdfText ? textIn(textItems, cardProductTitleZone(bounds)) : '';
+        let rawText = extractProductText && hasPdfText ? textIn(textItems, bounds) : '';
+        if (extractProductText && !hasPdfText && options.enableOcr) {
           progress('ocr', pageNumber - 1 + (index + 1) / Math.max(1, grid.regions.length), `หน้า ${pageNumber}: OCR ชื่อมุมขวาบน ${index + 1}/${grid.regions.length}`);
           try {
             productText = await recognizeCardProductTitle(await ensureWorker(), canvas, bounds);
@@ -313,7 +315,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
         }
         const failureReasons = [
           ...(!classId ? ['class_missing'] : []),
-          ...(!productText ? ['product_text_missing'] : []),
+          ...(extractProductText && !productText ? ['product_text_missing'] : []),
           ...(grid.diagnostics.status !== 'ok' ? ['grid_needs_review'] : []),
         ];
         const crop = cropCanvas(canvas, bounds, Math.max(2, Math.round(bounds.width * 0.008)));
