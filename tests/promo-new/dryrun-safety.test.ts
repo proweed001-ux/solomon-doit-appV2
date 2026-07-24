@@ -32,11 +32,11 @@ test('grouping stops before visual work when Product Master is unavailable', () 
   assert.match(client, /product_master_required_before_grouping/u);
 });
 
-test('cache rejects clipped-card records and fingerprints are rebuilt only from density-grid cards', () => {
+test('cache rejects prior automatic-grouping records and preserves the manual grid-only contract', () => {
   const cache = read('src/promo-new/admin/test-cache.ts');
   const client = read('src/promo-new/admin/grouping-client.ts');
-  assert.match(cache, /PROMO_TEST_CACHE_SCHEMA_VERSION = 6/u);
-  assert.match(cache, /PROMO_TEST_PIPELINE_VERSION = 'density-grid-v1-card-title-single-pass-visual-first'/u);
+  assert.match(cache, /PROMO_TEST_CACHE_SCHEMA_VERSION = 7/u);
+  assert.match(cache, /PROMO_TEST_PIPELINE_VERSION = 'density-grid-v2-class-only-manual-grouping'/u);
   assert.match(cache, /record\.schemaVersion === PROMO_TEST_CACHE_SCHEMA_VERSION/u);
   assert.match(cache, /record\.pipelineVersion === PROMO_TEST_PIPELINE_VERSION/u);
   assert.match(client, /visualProductSignaturesComplete/u);
