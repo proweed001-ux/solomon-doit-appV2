@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AlertTriangle, CheckCircle2, Database, FileSpreadsheet, Layers3, LogOut, Save, Search, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 import type { PromoDataset, ProductGroup } from '../domain/types';
-import { autoAssignPromotionFamilies } from '../domain/auto-match';
 import { applyPromotionFamilyToCard } from '../domain/grouping';
 import { applyPriceToGroup, setCentralPrice } from '../domain/pricing';
 import { confirmSkuCandidate } from '../domain/sku-identity';
@@ -13,9 +12,6 @@ import type { WorkbookParseResult } from '../import/workbook-parser';
 import { inspectPromotionWorkbookFile, PROMOTION_WORKBOOK_ACCEPT } from '../import/workbook-file';
 import { createDemoDataset } from '../shared/demo-data';
 import { fetchPromoMasterData, loadSession, login, logout, publishVersion, saveDraft, saveSession, uploadCardImage, validateSession } from '../shared/api';
-import { enrichAdaptiveCardHeaders, selectAdaptiveHeaderOcrTargets } from './adaptive-header-ocr';
-import { prepareCachedRun } from './cached-run';
-import { runGroupingInWorker } from './grouping-client';
 import {
   clearPromoTestCache,
   formatCacheSize,
@@ -31,7 +27,6 @@ import './admin.css';
 
 type Session = NonNullable<ReturnType<typeof loadSession>>;
 type MasterData = Awaited<ReturnType<typeof fetchPromoMasterData>>;
-type GroupedResult = Awaited<ReturnType<typeof runGroupingInWorker>>;
 
 const BUILD_ID = __PROMO_BUILD_ID__;
 const PROMO_CLASSES = new Set(['HFSS', 'HFSM', 'HFSL', 'HFSXL', 'HFSWS-S', 'HFSWS-L']);
@@ -150,7 +145,7 @@ function AdminApp() {
   const [quarantine, setQuarantine] = useState<ImportedCardCandidate[]>([]);
   const [progress, setProgress] = useState<PdfImportProgress | null>(null);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('เลือก PDF และ CSV/XLSM ของเดือนเดียวกัน หรือกดตรวจแคชในเครื่อง');
+  const [message, setMessage] = useState('เลือก PDF และ CSV/XLSM ของเดือนเดียวกัน ระบบจะตัดกริดภาพและให้คุณจัดกลุ่มเองทั้งหมด');
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -206,46 +201,35 @@ function AdminApp() {
     return fetchPromoMasterData(session);
   };
 
-  const runGrouping = async (imported: PdfImportResult, parsedWorkbook: WorkbookParseResult, master: MasterData, artifactMonthKey: string, progressPrefix: string): Promise<GroupedResult> => {
-    const groupingStarted = performance.now();
-    setProgress({ phase: 'cards', page: 0.55, pageCount: 1, cards: imported.cards.length, elapsedMs: 0, message: `${progressPrefix} · กำลังเปิด Inline Worker` });
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    return runGroupingInWorker({
-      monthKey: artifactMonthKey,
-      cards: imported.cards,
-      existingSkus: master.skus,
-      storedPrices: master.prices,
-      promotionFamilies: parsedWorkbook.families,
-      visualSignatures: undefined,
-      onProgress: workerMessage => setProgress({ phase: 'cards', page: 0.72, pageCount: 1, cards: imported.cards.length, elapsedMs: performance.now() - groupingStarted, message: `${progressPrefix} · ${workerMessage}` }),
-    });
-  };
-
-  const groupArtifacts = async (
+  const startManualGrid = (
     imported: PdfImportResult,
     parsedWorkbook: WorkbookParseResult,
+    master: MasterData,
     sourcePdfName: string,
     sourceWorkbookName: string,
+    sourceLabel: string,
     extraWarnings: string[] = [],
-    sourceLabel = 'ไฟล์ใหม่',
     artifactMonthKey = monthKey,
-    masterInput: MasterData | null = null,
-    groupedInput: GroupedResult | null = null,
   ) => {
-    const master = masterInput || await loadMasterData();
-    const grouped = groupedInput || await runGrouping(imported, parsedWorkbook, master, artifactMonthKey, 'จัดกลุ่มจาก Structural Grid และชื่อสินค้า');
-    setProgress({ phase: 'cards', page: 0.92, pageCount: 1, cards: imported.cards.length, elapsedMs: 0, message: 'กำลังสร้างผลลัพธ์และ Promotion Family' });
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     const version = nextDraftVersion(artifactMonthKey, [], session?.user.id || null);
     version.status = 'need_review';
     version.source = { pdfName: sourcePdfName, workbookName: sourceWorkbookName, pdfHash: null, workbookHash: null };
+    const unassigned = imported.cards.map(card => ({
+      ...card,
+      rawText: '',
+      productText: '',
+      failureReasons: [...new Set([
+        ...card.failureReasons.filter(reason => reason !== 'product_text_missing'),
+        'manual_grouping_required',
+      ])],
+    }));
     const next: PromoDataset = {
       schema: 'promo-system-rebuild-v1',
       version,
-      skus: grouped.skus,
-      prices: grouped.prices,
-      cards: grouped.cards,
-      productGroups: grouped.groups,
+      skus: master.skus.filter(sku => sku.status === 'active'),
+      prices: [],
+      cards: [],
+      productGroups: [],
       promotionFamilies: parsedWorkbook.families,
       sourceDataset: {
         datasetId: crypto.randomUUID(),
@@ -255,15 +239,21 @@ function AdminApp() {
         persisted: false,
         savedAt: null,
       },
-      warnings: [...imported.warnings, ...parsedWorkbook.warnings, ...grouped.warnings, ...extraWarnings],
+      warnings: [...new Set([
+        ...imported.warnings,
+        ...parsedWorkbook.warnings,
+        ...extraWarnings,
+        'pipeline:grid_and_class_only',
+        'automatic_product_ocr_disabled',
+        'automatic_product_grouping_disabled',
+      ])],
     };
-    const automated = autoAssignPromotionFamilies(next);
-    const inheritedPrices = automated.dataset.productGroups.filter(group => group.price.source === 'central_override').length;
-    setDataset(automated.dataset);
-    setQuarantine(grouped.quarantineCards);
-    setPriceDrafts(Object.fromEntries(automated.dataset.productGroups.map(group => [group.id, String(group.price.effectivePrice?.amount || '')])));
+    const missingClass = unassigned.filter(card => !card.classId).length;
+    setDataset(next);
+    setQuarantine(unassigned);
+    setPriceDrafts({});
     setProgress(null);
-    setMessage(`${sourceLabel}: ${automated.dataset.cards.length}/${imported.cards.length} การ์ด · ${automated.dataset.productGroups.length} กลุ่ม · Product Master ${grouped.diagnostics.masterText || 0} · Scope ${grouped.diagnostics.structuredScope} · unresolved ${grouped.diagnostics.unresolved} · ราคาเดิม ${inheritedPrices}`);
+    setMessage(`${sourceLabel}: กริด ${unassigned.length} การ์ด · Product Master ${next.skus.length} กลุ่ม · รอคุณจัดเองทั้งหมด${missingClass ? ` · ไม่มี Class ${missingClass} ใบ` : ''}`);
   };
 
   const processFiles = async () => {
@@ -274,48 +264,45 @@ function AdminApp() {
     setSavedVersionId(null);
     try {
       const [{ importPromotionPdf }, { parsePromotionWorkbook }] = await Promise.all([import('../import/pdf-importer'), import('../import/workbook-parser')]);
-      setProgress({ phase: 'loading', page: 0.02, pageCount: 1, cards: 0, elapsedMs: 0, message: 'ตรวจ XLSM และโหลด Product Master ก่อนเปิด PDF' });
+      setProgress({ phase: 'loading', page: 0.02, pageCount: 1, cards: 0, elapsedMs: 0, message: 'ตรวจ XLSM และโหลด Product Master ก่อนตัดกริด PDF' });
       const [parsedWorkbook, master] = await Promise.all([parsePromotionWorkbook(workbook), loadMasterData()]);
       assertWorkbookReady(parsedWorkbook);
-      setProgress({ phase: 'loading', page: 0.05, pageCount: 1, cards: 0, elapsedMs: 0, message: `XLSM พร้อม ${parsedWorkbook.families.length} Family · Product Master ${master.skus.length} รายการ · เริ่มเปิด PDF` });
-      let imported = await importPromotionPdf(pdf, { monthKey, enableOcr: ocr, onProgress: setProgress });
-      let grouped = await runGrouping(imported, parsedWorkbook, master, monthKey, 'Preflight จาก OCR หน้ารอบหลัก');
-      const selection = ocr ? selectAdaptiveHeaderOcrTargets(imported.cards, grouped) : {
-        targetIds: new Set<string>(),
-        unresolvedTargets: 0,
-        candidateTargets: 0,
-        skippedByExistingKnowledge: imported.cards.length,
-        unresolvedWithoutOcrBenefit: grouped.quarantineCards.length,
-      };
-      let adaptiveAttempted = 0;
-      let adaptiveImproved = 0;
-      const adaptiveWarnings: string[] = [
-        'pipeline:text_first_product_master_before_fallback_ocr',
-        `adaptive_header_ocr_skipped_by_existing_knowledge:${selection.skippedByExistingKnowledge}`,
-        `adaptive_header_ocr_no_expected_benefit:${selection.unresolvedWithoutOcrBenefit}`,
+      setProgress({ phase: 'loading', page: 0.05, pageCount: 1, cards: 0, elapsedMs: 0, message: `XLSM พร้อม ${parsedWorkbook.families.length} Family · Product Master ${master.skus.length} รายการ · เริ่มตัดกริด PDF` });
+      const imported = await importPromotionPdf(pdf, {
+        monthKey,
+        enableOcr: ocr,
+        extractProductText: false,
+        onProgress: setProgress,
+      });
+      const cacheWarnings = [
+        'pipeline:grid_and_class_only',
+        'automatic_product_ocr_disabled',
+        'automatic_product_grouping_disabled',
       ];
-      if (ocr && selection.targetIds.size) {
-        const headerStarted = performance.now();
-        const enriched = await enrichAdaptiveCardHeaders(imported.cards, selection.targetIds, (completed, total) => {
-          setProgress({ phase: 'cards', page: 0.76 + completed / Math.max(1, total) * 0.12, pageCount: 1, cards: imported.cards.length, elapsedMs: performance.now() - headerStarted, message: `OCR เพิ่มเฉพาะ unresolved ${completed}/${total}` });
-        });
-        adaptiveAttempted = enriched.attempted;
-        adaptiveImproved = enriched.improved;
-        adaptiveWarnings.push(...enriched.warnings);
-        imported = { ...imported, cards: enriched.cards, warnings: [...new Set([...imported.warnings, ...enriched.warnings])] };
-        grouped = await runGrouping(imported, parsedWorkbook, master, monthKey, 'จัดกลุ่มซ้ำหลัง OCR เฉพาะจุด');
-      } else {
-        adaptiveWarnings.push(ocr ? 'adaptive_header_ocr_skipped:no_unresolved_targets' : 'adaptive_header_ocr_disabled');
-      }
-      const cacheWarnings: string[] = [...adaptiveWarnings];
       try {
-        const summary = await savePromoTestCache({ monthKey, ocrEnabled: ocr, pdf, workbook, imported, parsedWorkbook, visualSignatures: {} });
+        const summary = await savePromoTestCache({
+          monthKey,
+          ocrEnabled: ocr,
+          pdf,
+          workbook,
+          imported,
+          parsedWorkbook,
+          visualSignatures: {},
+        });
         setCacheSummary(summary);
         if (summary.mode === 'source_only') cacheWarnings.push('browser_cache_source_only_storage_quota');
       } catch (caught) {
         cacheWarnings.push(`browser_cache_save_failed:${errorText(caught)}`);
       }
-      await groupArtifacts(imported, parsedWorkbook, pdf.name, workbook.name, cacheWarnings, `ประมวลผล Structural Grid, OCR ชื่อรอบเดียว และ Visual-first แล้ว`, monthKey, master, grouped);
+      startManualGrid(
+        imported,
+        parsedWorkbook,
+        master,
+        pdf.name,
+        workbook.name,
+        'ตัดกริดภาพและอ่าน Class แล้ว',
+        cacheWarnings,
+      );
     } catch (caught) {
       setProgress(null);
       setError(errorText(caught));
@@ -330,7 +317,7 @@ function AdminApp() {
     setError('');
     setPreviewChecked(false);
     setSavedVersionId(null);
-    setProgress({ phase: 'loading', page: 0.05, pageCount: 1, cards: cacheSummary?.cardCount || 0, elapsedMs: 0, message: 'รับคำสั่งแล้ว · กำลังอ่าน IndexedDB หนึ่งครั้ง' });
+    setProgress({ phase: 'loading', page: 0.05, pageCount: 1, cards: cacheSummary?.cardCount || 0, elapsedMs: 0, message: 'รับคำสั่งแล้ว · กำลังอ่านกริดภาพจาก IndexedDB' });
     try {
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
       const [cached, master] = await Promise.all([loadPromoTestCache(), loadMasterData()]);
@@ -342,14 +329,22 @@ function AdminApp() {
       setWorkbook(cached.workbook);
       if (!cached.imported || !cached.parsedWorkbook) throw new Error('cache_source_only_reprocess_required');
       assertWorkbookReady(cached.parsedWorkbook);
-      const prepared = prepareCachedRun(cached.imported, cached.visualSignatures || {});
-      setProgress({ phase: 'cards', page: 0.3, pageCount: 1, cards: prepared.imported.cards.length, elapsedMs: performance.now() - started, message: `โหลดแคชแล้ว · Product Master ${master.skus.length} · แก้ Class ${prepared.changedClasses} การ์ดใน ${prepared.recoveredPages} หน้า` });
-      await groupArtifacts(prepared.imported, cached.parsedWorkbook, cached.pdf.name, cached.workbook.name, ['grouping_rerun_from_browser_cache', ...cached.warnings, ...prepared.warnings], `จัดกลุ่มใหม่จากแคช · ใช้ข้อความและ Product Master · แก้ Class ${prepared.changedClasses} การ์ด`, cached.monthKey, master);
+      setProgress({ phase: 'cards', page: 0.8, pageCount: 1, cards: cached.imported.cards.length, elapsedMs: performance.now() - started, message: `โหลดกริดแล้ว · Product Master ${master.skus.length} · เตรียมให้จัดเองทั้งหมด` });
+      startManualGrid(
+        cached.imported,
+        cached.parsedWorkbook,
+        master,
+        cached.pdf.name,
+        cached.workbook.name,
+        'โหลดกริดจากแคชแล้ว',
+        ['manual_grid_loaded_from_browser_cache', ...cached.warnings],
+        cached.monthKey,
+      );
     } catch (caught) {
       setProgress(null);
       const code = errorText(caught);
       if (code === 'cache_not_found_on_this_browser') setError('ไม่พบแคชในเบราว์เซอร์นี้ ต้องประมวลผลไฟล์ใหม่หนึ่งครั้ง');
-      else if (code === 'cache_source_only_reprocess_required') setError('แคชเก็บเฉพาะไฟล์ต้นฉบับ ไม่มีผล OCR สำหรับจัดกลุ่ม ต้องประมวลผลไฟล์ใหม่');
+      else if (code === 'cache_source_only_reprocess_required') setError('แคชเก็บเฉพาะไฟล์ต้นฉบับ ไม่มีผลกริด ต้องประมวลผลไฟล์ใหม่');
       else setError(code);
     } finally {
       setBusy(false);
@@ -532,8 +527,8 @@ function AdminApp() {
           <label className="field file-drop"><span><FileSpreadsheet size={16} /> เลือก CSV/XLSX/XLSM</span><input type="file" accept={PROMOTION_WORKBOOK_ACCEPT} onChange={selectWorkbook} /><small>{workbook ? `${workbook.name} · ${inspectPromotionWorkbookFile(workbook).label}` : 'รองรับ .csv, .xlsx, .xlsm และ .xls'}</small></label>
         </div>
         <div className="run-row">
-          <label className="field" style={{ flexDirection: 'row', alignItems: 'center' }}><input style={{ width: 18, height: 18 }} type="checkbox" checked={ocr} onChange={event => setOcr(event.target.checked)} /> ตรวจกรอบการ์ดจากกรอบนอก + ช่องอ้างอิงซ้ายล่าง + ช่องโปรโมชั่นสีแดง แล้ว OCR ชื่อมุมขวาบนครั้งเดียว</label>
-          <button className="btn primary" disabled={busy || !pdf || !workbook || demo || !session} title={demo ? 'โหมดสาธิตไม่รับไฟล์' : !session ? 'เข้าสู่ระบบก่อน' : !pdf || !workbook ? 'เลือก PDF และ CSV/XLSM ให้ครบ' : busy ? 'กำลังประมวลผล' : ''} onClick={processFiles}>{busy ? 'กำลังประมวลผล...' : 'ประมวลผลไฟล์และบันทึกแคช'}</button>
+          <label className="field" style={{ flexDirection: 'row', alignItems: 'center' }}><input style={{ width: 18, height: 18 }} type="checkbox" checked={ocr} onChange={event => setOcr(event.target.checked)} /> ตัดกริดการ์ดจากกรอบนอก + ช่องอ้างอิงซ้ายล่าง + ช่องโปรโมชั่นสีแดง และอ่าน Class ของหน้าเท่านั้น</label>
+          <button className="btn primary" disabled={busy || !pdf || !workbook || demo || !session} title={demo ? 'โหมดสาธิตไม่รับไฟล์' : !session ? 'เข้าสู่ระบบก่อน' : !pdf || !workbook ? 'เลือก PDF และ CSV/XLSM ให้ครบ' : busy ? 'กำลังประมวลผล' : ''} onClick={processFiles}>{busy ? 'กำลังตัดกริด...' : 'ตัดกริดภาพและเตรียมจัดกลุ่ม'}</button>
         </div>
         <div style={{ marginTop: 12, padding: 12, border: '1px solid #dbe4ef', borderRadius: 12, background: '#f8fafc' }}>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -581,7 +576,7 @@ function AdminApp() {
           } : current)}
         />
       </>}
-      <section className="panel"><div className="section-head"><div><h2><Layers3 size={19} /> Product Group</h2><small>ใช้ชื่อมุมขวาบนจากกรอบการ์ดที่ผ่าน Structural Grid, Product Master และลายนิ้วมือรูปสินค้าเพื่อรวมข้าม Class; ราคาและ Promotion Family ให้แอดมินเลือกเอง</small></div><span className="tag">{visibleGroups.length} กลุ่ม</span></div><div className="search-row"><label style={{ position: 'relative' }}><Search size={17} style={{ position: 'absolute', left: 12, top: 14, color: '#64748b' }} /><input style={{ paddingLeft: 38 }} value={search} onChange={event => setSearch(event.target.value)} placeholder="ค้นหาชื่อสินค้า แบรนด์ SKU หรือ Class" /></label><select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">ทุกสถานะ</option><option value="ready">พร้อมใช้</option><option value="need_review">ต้องตรวจ</option><option value="blocked">Block</option></select></div>
+      <section className="panel"><div className="section-head"><div><h2><Layers3 size={19} /> Product Group</h2><small>PDF ใช้เฉพาะตัดกริดภาพและอ่าน Class; ระบบไม่อ่านชื่อสินค้าและไม่จัด Product Group อัตโนมัติ คุณต้องเลือก Product Master ปลายทางเองทุกการ์ด</small></div><span className="tag">{visibleGroups.length} กลุ่ม</span></div><div className="search-row"><label style={{ position: 'relative' }}><Search size={17} style={{ position: 'absolute', left: 12, top: 14, color: '#64748b' }} /><input style={{ paddingLeft: 38 }} value={search} onChange={event => setSearch(event.target.value)} placeholder="ค้นหาชื่อสินค้า แบรนด์ SKU หรือ Class" /></label><select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">ทุกสถานะ</option><option value="ready">พร้อมใช้</option><option value="need_review">ต้องตรวจ</option><option value="blocked">Block</option></select></div>
         <div className="group-list">{dataset ? visibleGroups.map(group => <GroupEditor
           key={group.id}
           group={group}
