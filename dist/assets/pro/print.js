@@ -221,7 +221,11 @@ function tableRowsFromDom() {
       rowElement,
       row: [...rowElement.children].map((cell) => {
         const input = cell.querySelector("input");
-        return input ? T(input.value) : T(cell.innerText || cell.textContent);
+        if (input) return T(input.value);
+        if (cell.hasAttribute("data-print-value")) {
+          return T(cell.getAttribute("data-print-value"));
+        }
+        return T(cell.innerText || cell.textContent);
       }),
     }))
     .filter(

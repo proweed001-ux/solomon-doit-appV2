@@ -8,6 +8,10 @@ export function renderOrderMode(groups, simpleTable) {
   const body = groups
     .map((group, index) => {
       const lineVat = (N(group.netAmt) || N(group.rawAmt)) * 1.07;
+      const code =
+        group.code && group.code !== group.sku
+          ? "<small>" + E(group.code) + "</small>"
+          : "";
       qty += N(F(group.qty));
       raw += N(B(group.rawAmt));
       net += N(B(group.netAmt));
@@ -15,8 +19,12 @@ export function renderOrderMode(groups, simpleTable) {
       return (
         "<tr><td>" +
         (index + 1) +
-        "</td><td>" +
+        '</td><td class="p" data-print-value="' +
         E(group.sku) +
+        '"><b>' +
+        E(group.sku) +
+        "</b>" +
+        code +
         "</td><td>" +
         F(group.qty) +
         "</td><td>" +

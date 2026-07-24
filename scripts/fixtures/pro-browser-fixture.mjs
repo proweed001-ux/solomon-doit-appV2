@@ -10,14 +10,22 @@ export const fixtureMeta = {
   teleRows: 21,
   totalRows: 47,
   normalQty: 260,
+  teleQty: 21,
+  orderQty: 281,
   rawAmount: 2951,
   netAmount: 2691,
   vatAmount: 2879.37,
+  orderRawAmount: 3602,
+  orderNetAmount: 3300,
+  orderVatAmount: 3531,
+  orderGroups: 47,
   sentRows: 25,
   sentQty: 25,
   printStoreTotal: 275,
   printBills: 3,
   a4Sheets: 2,
+  numericProductName: "DN ปรับผ้านุ่ม 3in1 100MLx60",
+  numericProductCode: "80880592",
 };
 
 export function browserFixtureRows() {
@@ -47,8 +55,14 @@ export function browserFixtureRows() {
       SO_SalespersonID: fixtureMeta.ps,
       TelesaleID: `TELE-${String(number).padStart(3, "0")}`,
       CustomerName: `ร้าน Tele ${String(number).padStart(3, "0")}`,
-      SKUCode: `TSKU-${String(number).padStart(3, "0")}`,
-      SKUDescription: `สินค้า Telesale ${String(number).padStart(3, "0")}`,
+      SKUCode:
+        number === 2
+          ? fixtureMeta.numericProductCode
+          : `TSKU-${String(number).padStart(3, "0")}`,
+      SKUDescription:
+        number === 2
+          ? fixtureMeta.numericProductName
+          : `สินค้า Telesale ${String(number).padStart(3, "0")}`,
       GroupBrand: "Fixture Tele Brand",
       TAS_SizeGroup: "Fixture Tele Size",
       ShipQtyPCS: 1,
