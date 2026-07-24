@@ -93,6 +93,37 @@
   background: #f8fafc;
 }
 
+.realBillsLoading,
+.realBillPickerLoading {
+  color: #1d4ed8;
+}
+
+.realBillPager {
+  position: sticky;
+  bottom: 8px;
+  display: grid;
+  grid-template-columns: minmax(88px, auto) 1fr minmax(88px, auto);
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: rgba(239, 246, 255, 0.96);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+}
+
+.realBillPager span {
+  min-width: 0;
+  text-align: center;
+  font-weight: 900;
+}
+
+.realBillPager button {
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+}
+
 @media (max-width: 720px) {
   .realBillHead {
     grid-template-columns: 1fr;
@@ -104,6 +135,16 @@
 
   .realBillTable {
     min-width: 560px;
+  }
+
+  .realBillPager {
+    grid-template-columns: 82px 1fr 82px;
+    gap: 5px;
+  }
+
+  .realBillPager button {
+    padding: 0 5px;
+    font-size: 12px;
   }
 }
       body {

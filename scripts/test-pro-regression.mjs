@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { performance } from "node:perf_hooks";
 import {
   group,
   okBrand,
@@ -16,6 +17,7 @@ import { renderOrderMode } from "../dist/assets/pro/order.js";
 import {
   browserFixtureRows,
   fixtureMeta,
+  largeRealBillFixtureRows,
 } from "./fixtures/pro-browser-fixture.mjs";
 import {
   BILL_ROWS,
@@ -30,10 +32,13 @@ import {
 } from "../dist/assets/pro/print.js";
 import {
   buildRealBills,
+  createRealBillSelector,
   filterRealBills,
   realBillCandidateRows,
   realBillKey,
+  realBillPageModel,
   realBillPickerOptions,
+  realBillsHtml,
   realBillStoreOptions,
   selectRealBills,
   splitRealBillsForPrint,
@@ -536,14 +541,114 @@ assert.equal(
   "Type filter must retain the full bill",
 );
 const emptyRealSelection = createSelection();
-assert.equal(selectRealBills(realRows, emptyRealSelection, "").bills.length, 0);
+let earlyBuildCalls = 0;
+assert.equal(
+  selectRealBills(
+    realRows,
+    emptyRealSelection,
+    "",
+    (rows) => {
+      earlyBuildCalls += 1;
+      return buildRealBills(rows);
+    },
+  ).bills.length,
+  0,
+);
+assert.equal(
+  earlyBuildCalls,
+  0,
+  "Selection-required state must return before building bill models",
+);
 assert.equal(
   selectRealBills(realRows, emptyRealSelection, "").requiresSelection,
   true,
 );
+assert.doesNotMatch(
+  realBillsHtml([], true),
+  /class="realBill"/,
+  "Selection-required state must not pre-render bill cards",
+);
 assert.equal(
   selectRealBills(realRows, emptyRealSelection, "ร้าน TS").bills.length,
   2,
+);
+
+const facetSelection = createSelection();
+facetSelection.billStores = ["ร้านร่วม"];
+facetSelection.brands = ["Brand Match"];
+facetSelection.types = ["TYPE-B"];
+const crossFacetBills = filterRealBills(
+  realBills,
+  facetSelection,
+  "",
+);
+assert.equal(crossFacetBills.length, 1);
+assert.equal(crossFacetBills[0].inv, "INV-SAME");
+assert.equal(
+  crossFacetBills[0].lines.length,
+  2,
+  "Brand and Type may match different source lines in the same full bill",
+);
+assert.equal(crossFacetBills[0].qty, 3);
+assert.equal(crossFacetBills[0].raw, 30);
+const brandOptions = realBillPickerOptions(
+  "brands",
+  realRows,
+  {
+    ...createSelection(),
+    billStores: ["ร้านร่วม"],
+    types: ["TYPE-B"],
+  },
+  realBills,
+);
+assert.ok(brandOptions.some((item) => item.value === "Brand Match"));
+const typeOptions = realBillPickerOptions(
+  "types",
+  realRows,
+  {
+    ...createSelection(),
+    billStores: ["ร้านร่วม"],
+    brands: ["Brand Match"],
+  },
+  realBills,
+);
+assert.ok(typeOptions.some((item) => item.value === "TYPE-B"));
+
+let selectorBuildCalls = 0;
+const cachedSelector = createRealBillSelector((rows) => {
+  selectorBuildCalls += 1;
+  return buildRealBills(rows);
+});
+const cachedSelection = {
+  ...createSelection(),
+  billStores: ["ร้านร่วม"],
+};
+const cachedFirst = cachedSelector.select(realRows, cachedSelection, "");
+const cachedSecond = cachedSelector.select(realRows, cachedSelection, "");
+assert.equal(selectorBuildCalls, 1);
+assert.equal(cachedFirst, cachedSecond, "Filtered result must be reusable");
+cachedSelection.billStores = ["ร้าน TS"];
+cachedSelector.select(realRows, cachedSelection, "");
+cachedSelection.brands = ["Brand Search"];
+cachedSelector.select(realRows, cachedSelection, "");
+cachedSelection.types = ["TYPE-B"];
+cachedSelector.select(realRows, cachedSelection, "");
+cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
+assert.equal(
+  selectorBuildCalls,
+  1,
+  "Store, Brand, Type and Search must reuse the candidate bill model",
+);
+cachedSelection.dates = ["2026-07-03"];
+cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
+cachedSelection.ps = ["PS001"];
+cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
+cachedSelection.orderStores = ["ร้านอื่น"];
+cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
+assert.equal(
+  selectorBuildCalls,
+  4,
+  "Dates, PS and orderStores must invalidate the candidate model",
 );
 
 const longBill = buildRealBills(
@@ -567,6 +672,64 @@ assert.equal(
 assert.match(realPrintHtml, /ต่อใบถัดไป \(1\/2\)/);
 assert.match(realPrintHtml, /data-real-part="2\/2"/);
 assert.doesNotMatch(realPrintHtml, /data-edit-key|PRINT_EDIT_KEY/);
+
+const largeRealRows = largeRealBillFixtureRows().map(norm);
+let largeBuildCalls = 0;
+const largeSelector = createRealBillSelector((rows) => {
+  largeBuildCalls += 1;
+  return buildRealBills(rows);
+});
+const largeSelection = createSelection();
+const noSelectionStart = performance.now();
+const noSelectionLarge = largeSelector.select(
+  largeRealRows,
+  largeSelection,
+  "",
+);
+const noSelectionElapsed = performance.now() - noSelectionStart;
+assert.equal(noSelectionLarge.requiresSelection, true);
+assert.equal(largeBuildCalls, 0);
+assert.ok(
+  noSelectionElapsed < 100,
+  `Selection-required large fixture took ${noSelectionElapsed.toFixed(2)} ms`,
+);
+largeSelection.billStores = [
+  ...new Set(largeRealRows.map((row) => row.store)),
+];
+const selectedLargeStart = performance.now();
+const selectedLarge = largeSelector.select(
+  largeRealRows,
+  largeSelection,
+  "",
+);
+const selectedLargeElapsed = performance.now() - selectedLargeStart;
+assert.equal(selectedLarge.bills.length, fixtureMeta.largeBills);
+assert.equal(largeBuildCalls, 1);
+assert.ok(
+  selectedLargeElapsed < 1500,
+  `Large candidate model took ${selectedLargeElapsed.toFixed(2)} ms`,
+);
+const largePage = realBillPageModel(selectedLarge.bills, 1);
+assert.equal(largePage.visibleBills.length, 12);
+assert.equal(
+  largePage.visibleRows,
+  12 * fixtureMeta.largeLinesPerBill,
+);
+largeSelection.brands = ["PERF-BRAND-1"];
+largeSelector.select(largeRealRows, largeSelection, "");
+largeSelection.types = ["PERF-TYPE-2"];
+largeSelector.select(largeRealRows, largeSelection, "");
+largeSelector.select(largeRealRows, largeSelection, "PERF-SKU");
+assert.equal(largeBuildCalls, 1);
+const largePerformance = {
+  rows: largeRealRows.length,
+  bills: selectedLarge.bills.length,
+  noSelectionMs: Number(noSelectionElapsed.toFixed(3)),
+  candidateMs: Number(selectedLargeElapsed.toFixed(3)),
+  renderedBills: largePage.visibleBills.length,
+  renderedRows: largePage.visibleRows,
+  builds: largeBuildCalls,
+};
 
 assert.deepEqual(mergeSelection({ receivers: ["ร้านเดิม"] }), {
   dates: [],
@@ -614,5 +777,18 @@ assert.doesNotMatch(coreSource, /ใบส่งร้านจริง/);
 assert.match(coreSource, /ship: "บิลจริง"/);
 assert.match(coreSource, /state\.sel = createSelection\(\)/);
 assert.doesNotMatch(coreSource, /state\.sel = \{\s*dates:/);
+assert.match(
+  coreSource,
+  /state\.mode === "ship" \? currentRealBillResult\(\)\.bills : undefined/,
+  "Real Bill print must receive every filtered bill, not the visible page",
+);
+assert.doesNotMatch(
+  coreSource,
+  /setTimeout\(/,
+  "Real Bill performance must not be hidden behind setTimeout",
+);
 
-console.log("Pro regression modules passed:", fixture.expected);
+console.log("Pro regression modules passed:", {
+  ...fixture.expected,
+  realBillPerformance: largePerformance,
+});

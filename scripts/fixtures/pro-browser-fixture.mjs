@@ -33,6 +33,11 @@ export const fixtureMeta = {
   realTsSecondInvoice: "INV-T-SECOND",
   realTsTele: "TELE-GROUP",
   telesaleBills: 20,
+  largeRows: 3000,
+  largeTeleRows: 1500,
+  largeBills: 600,
+  largeStores: 60,
+  largeLinesPerBill: 5,
 };
 
 export function browserFixtureRows() {
@@ -100,6 +105,28 @@ export function browserFixtureRows() {
   return [...normal, ...telesale];
 }
 
+export function largeRealBillFixtureRows() {
+  return Array.from({ length: fixtureMeta.largeRows }, (_, index) => {
+    const bill = Math.floor(index / fixtureMeta.largeLinesPerBill);
+    const isTele = bill % 2 === 1;
+    return {
+      InvoiceDate: `2026-07-${String((bill % 10) + 1).padStart(2, "0")}`,
+      InvoiceNo: `PERF-INV-${String(bill).padStart(4, "0")}`,
+      SOTypeID: `PERF-TYPE-${index % 15}`,
+      SO_SalespersonID: `PERF-PS-${bill % 8}`,
+      TelesaleID: isTele ? `PERF-TELE-${bill % 16}` : "",
+      CustomerName: `ร้าน Performance ${String(bill % fixtureMeta.largeStores).padStart(2, "0")}`,
+      SKUCode: `PERF-SKU-${String(index).padStart(5, "0")}`,
+      SKUDescription: `สินค้า Performance ${String(index).padStart(5, "0")}`,
+      GroupBrand: `PERF-BRAND-${index % 20}`,
+      TAS_SizeGroup: "Fixture Performance Size",
+      ShipQtyPCS: 1,
+      LineAmtBeforeDisc: 10 + (index % 7),
+      InvoiceAmt: 9 + (index % 5),
+    };
+  });
+}
+
 export function createBrowserFixtureFiles(outputDir) {
   fs.mkdirSync(outputDir, { recursive: true });
   const worksheet = XLSX.utils.json_to_sheet(browserFixtureRows());
@@ -108,8 +135,16 @@ export function createBrowserFixtureFiles(outputDir) {
   const files = {
     xlsx: path.join(outputDir, "pro-browser-fixture.xlsx"),
     xlsm: path.join(outputDir, "pro-browser-fixture.xlsm"),
+    largeXlsx: path.join(outputDir, "pro-browser-performance-fixture.xlsx"),
   };
   XLSX.writeFile(workbook, files.xlsx, { bookType: "xlsx" });
   XLSX.writeFile(workbook, files.xlsm, { bookType: "xlsm" });
+  const largeWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    largeWorkbook,
+    XLSX.utils.json_to_sheet(largeRealBillFixtureRows()),
+    "DOIT",
+  );
+  XLSX.writeFile(largeWorkbook, files.largeXlsx, { bookType: "xlsx" });
   return files;
 }

@@ -50,14 +50,30 @@ import {
   distPool,
 } from "./filters.js";
 import {
+  createRealBillSelector,
+  REAL_BILL_PAGE_SIZE,
   realBillPickerOptions,
   renderRealBills,
-  selectRealBills,
 } from "./real-bills.js";
 import { publicFetch, resolveCloudPayload } from "./data-source.js";
 import { preparePrint } from "./print.js";
 (() => {
   "use strict";
+  const realBillSelector = createRealBillSelector();
+  let realBillPage = 1;
+  let realBillResultKey = "";
+  let realBillRenderToken = 0;
+  let realBillRenderStats = {
+    totalBills: 0,
+    renderedBills: 0,
+    renderedRows: 0,
+  };
+  let realBillPickerSession = null;
+  let realBillPickerToken = 0;
+  const realBillUiMetrics = {
+    pickerOptionsCalls: 0,
+    pickerListRenders: 0,
+  };
 
   function msg(s) {
     const m = $("#msg");
@@ -98,19 +114,50 @@ import { preparePrint } from "./print.js";
       ? "billStores"
       : requestedKind;
   }
+  function keepSelectedPickerOptions(kind, pickerItems) {
+    const optionsByValue = new Map(
+      pickerItems.map((item) => [T(item.value), item]),
+    );
+    const selectedValues = uniq([
+      ...(state.sel[kind] || []),
+      ...(state.pickKind === kind ? state.tmp : []),
+    ]);
+    selectedValues.forEach((value) => {
+      if (optionsByValue.has(value)) return;
+      optionsByValue.set(value, {
+        value,
+        label:
+          (kind === "dates" ? dlabel(value) : value) +
+          " · เลือกอยู่ — ไม่มีในชุดปัจจุบัน",
+      });
+    });
+    return [...optionsByValue.values()];
+  }
   function pickerOptions(kind) {
+    let pickerItems;
     if (
       state.mode === "ship" &&
       ["dates", "ps", "orderStores", "billStores", "brands", "types"].includes(
         kind,
       )
     ) {
-      return realBillPickerOptions(kind, state.rows, state.sel);
+      const candidateBills = ["billStores", "brands", "types"].includes(kind)
+        ? realBillSelector.candidateBills(state.rows, state.sel)
+        : undefined;
+      realBillUiMetrics.pickerOptionsCalls += 1;
+      pickerItems = realBillPickerOptions(
+        kind,
+        state.rows,
+        state.sel,
+        candidateBills,
+      );
+    } else {
+      pickerItems = options(kind).map((value) => ({
+        value,
+        label: kind === "dates" ? dlabel(value) : value,
+      }));
     }
-    return options(kind).map((value) => ({
-      value,
-      label: kind === "dates" ? dlabel(value) : value,
-    }));
+    return keepSelectedPickerOptions(kind, pickerItems);
   }
   function undo() {
     if (!state.hist.length) return msg("ไม่มีรายการ Undo");
@@ -169,14 +216,35 @@ import { preparePrint } from "./print.js";
     state.tmp = [...(state.sel[k] || [])];
     $("#pickTitle").textContent =
       k === "orderStores" ? "ติ๊กเพื่อเอาร้านบิลจริงออก" : lab(k);
-    drawPick();
     $("#pickShade").classList.add("on");
+    if (state.mode !== "ship") {
+      realBillPickerSession = null;
+      drawPick();
+      return;
+    }
+    const token = ++realBillPickerToken;
+    realBillPickerSession = { kind: k, options: null };
+    $("#pickList").innerHTML =
+      '<div class="empty realBillPickerLoading">กำลังเตรียมตัวเลือก…</div>';
+    requestAnimationFrame(() => {
+      if (
+        token !== realBillPickerToken ||
+        !realBillPickerSession ||
+        realBillPickerSession.kind !== k
+      ) {
+        return;
+      }
+      realBillPickerSession.options = pickerOptions(k);
+      renderPickerList(realBillPickerSession.options, true);
+    });
   }
   function closePick() {
+    realBillPickerToken += 1;
+    realBillPickerSession = null;
     $("#pickShade").classList.remove("on");
   }
-  function drawPick() {
-    const o = pickerOptions(state.pickKind);
+  function renderPickerList(o, frozen = false) {
+    if (frozen) realBillUiMetrics.pickerListRenders += 1;
     $("#pickList").innerHTML = o.length
       ? o
           .map(
@@ -193,32 +261,57 @@ import { preparePrint } from "./print.js";
           )
           .join("")
       : '<div class="empty">ไม่มีรายการให้เลือก</div>';
-    $$(".pickItem").forEach(
+    $("#pickList")
+      .querySelectorAll(".pickItem")
+      .forEach(
       (i) =>
         (i.onclick = () => {
           const v = i.dataset.v;
           state.tmp = state.tmp.includes(v)
             ? state.tmp.filter((x) => x !== v)
             : state.tmp.concat(v);
-          drawPick();
+          if (frozen) {
+            syncPickerItems();
+          } else {
+            drawPick();
+          }
         }),
     );
+  }
+  function drawPick() {
+    renderPickerList(pickerOptions(state.pickKind));
+  }
+  function syncPickerItems() {
+    $("#pickList")
+      .querySelectorAll(".pickItem")
+      .forEach((item) => {
+        const active = state.tmp.includes(item.dataset.v);
+        item.classList.toggle("on", active);
+        const box = item.querySelector(".box");
+        if (box) box.textContent = active ? "✓" : "";
+      });
   }
   function applyPick() {
     push();
     state.sel[state.pickKind] = [...state.tmp];
     state.page = 1;
+    realBillPage = 1;
     closePick();
     render();
     msg("ใช้ตัวเลือกแล้ว");
   }
   function clearPick() {
     state.tmp = [];
-    drawPick();
+    if (realBillPickerSession) syncPickerItems();
+    else drawPick();
   }
   function allPick() {
-    state.tmp = pickerOptions(state.pickKind).map(({ value }) => value);
-    drawPick();
+    const pickerItems = realBillPickerSession?.options;
+    state.tmp = (pickerItems || pickerOptions(state.pickKind)).map(
+      ({ value }) => value,
+    );
+    if (realBillPickerSession) syncPickerItems();
+    else drawPick();
   }
   function manualSent(g) {
     return sumMap(state.send, g.poolKey);
@@ -379,10 +472,58 @@ import { preparePrint } from "./print.js";
     if (pageControls) pageControls.hidden = active;
   }
   function currentRealBillResult() {
-    return selectRealBills(state.rows, state.sel, state.q);
+    return realBillSelector.select(state.rows, state.sel, state.q);
+  }
+  function renderRealBillResult(result) {
+    if (result.resultKey !== realBillResultKey) {
+      realBillResultKey = result.resultKey;
+      realBillPage = 1;
+    }
+    $("#tableCount").textContent = result.requiresSelection
+      ? "บิลจริง · เลือกร้านหรือค้นหาเพื่อแสดงข้อมูล"
+      : "บิลจริง " + F(result.bills.length) + " บิล";
+    const model = renderRealBills($("#realBills"), result, {
+      page: realBillPage,
+      pageSize: REAL_BILL_PAGE_SIZE,
+      onPage: (nextPage) => {
+        realBillPage = nextPage;
+        renderRealBillResult(result);
+      },
+    });
+    realBillRenderStats = {
+      totalBills: model?.totalBills || 0,
+      renderedBills: model?.visibleBills.length || 0,
+      renderedRows: model?.visibleRows || 0,
+    };
+  }
+  function renderRealBillMode() {
+    showRealBillSurface(true);
+    const requiresSelection =
+      !state.sel.billStores.length && !T(state.q);
+    if (requiresSelection) {
+      realBillRenderToken += 1;
+      renderRealBillResult(currentRealBillResult());
+      return;
+    }
+    if (realBillSelector.hasCandidate(state.rows, state.sel)) {
+      realBillRenderToken += 1;
+      renderRealBillResult(currentRealBillResult());
+      return;
+    }
+    const token = ++realBillRenderToken;
+    $("#tableCount").textContent = "บิลจริง · กำลังเตรียมข้อมูล";
+    $("#realBills").innerHTML =
+      '<div class="empty realBillsEmpty realBillsLoading">กำลังเตรียมบิลจริง…</div>';
+    requestAnimationFrame(() => {
+      if (token !== realBillRenderToken || state.mode !== "ship") return;
+      renderRealBillResult(currentRealBillResult());
+    });
   }
   function renderMode(pool) {
-    if (state.mode !== "ship") showRealBillSurface(false);
+    if (state.mode !== "ship") {
+      realBillRenderToken += 1;
+      showRealBillSurface(false);
+    }
     if (state.mode === "pick") {
       $("#table").innerHTML = pickTable(pool);
       bindQuantityInputs({
@@ -407,12 +548,7 @@ import { preparePrint } from "./print.js";
       return;
     }
     if (state.mode === "ship") {
-      const result = currentRealBillResult();
-      showRealBillSurface(true);
-      $("#tableCount").textContent = result.requiresSelection
-        ? "บิลจริง · เลือกร้านหรือค้นหาเพื่อแสดงข้อมูล"
-        : "บิลจริง " + F(result.bills.length) + " บิล";
-      renderRealBills($("#realBills"), result);
+      renderRealBillMode();
       return;
     }
     if (state.mode === "order") {
@@ -608,6 +744,9 @@ import { preparePrint } from "./print.js";
   }
   function loadData(p, m = {}) {
     state.rows = arr(p).map(norm);
+    realBillSelector.invalidate();
+    realBillPage = 1;
+    realBillResultKey = "";
     state.key = m.id || p?.version_id || m.file_name || "active";
     state.send = {};
     state.add = {};
@@ -831,6 +970,7 @@ import { preparePrint } from "./print.js";
       push();
       state.q = $("#q").value;
       state.page = 1;
+      realBillPage = 1;
       render();
     };
     $("#clearFilter").onclick = () => {
@@ -838,6 +978,7 @@ import { preparePrint } from "./print.js";
       state.sel = createSelection();
       state.q = "";
       state.page = 1;
+      realBillPage = 1;
       render();
       msg("ล้างตัวกรองแล้ว");
     };
@@ -893,6 +1034,7 @@ import { preparePrint } from "./print.js";
           state.mode =
             ["pick", "dist", "ship", "done", "raw", "order"][i] || "pick";
           state.page = 1;
+          if (state.mode === "ship") realBillPage = 1;
           render();
           msg("เปลี่ยนโหมด: " + T(t.textContent));
         }),
@@ -901,10 +1043,11 @@ import { preparePrint } from "./print.js";
   }
   function health() {
     const telesale = teleRows();
+    const realBillResult = currentRealBillResult();
     return {
       rows: state.rows.length,
       pickRows: sourceRows().length,
-      realBills: currentRealBillResult().bills.length,
+      realBills: realBillResult.bills.length,
       distRows: sourceRows({ ignoreDate: true }).length,
       teleRows: state.rows.filter((row) => row.isTele).length,
       teleBills: teleBills().length,
@@ -919,6 +1062,13 @@ import { preparePrint } from "./print.js";
       telePageSize: TELE_PAGE_SIZE,
       receivers: state.sel.receivers,
       billStores: state.sel.billStores,
+      realBillPerformance: {
+        ...realBillSelector.stats(),
+        ...realBillUiMetrics,
+        ...realBillRenderStats,
+        page: realBillPage,
+        pageSize: REAL_BILL_PAGE_SIZE,
+      },
       manualKeys: Object.keys(state.send).length,
       inserted: state.ins.length,
       mode: state.mode,

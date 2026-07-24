@@ -2,6 +2,7 @@ import { B, E, F, N, SEP, T, dlabel, uniq } from "./utils.js";
 
 export const REAL_BILL_SOURCE_PS = "PS";
 export const REAL_BILL_SOURCE_TS = "TS";
+export const REAL_BILL_PAGE_SIZE = 12;
 
 function selected(values, value) {
   return !values.length || values.includes(value);
@@ -132,15 +133,149 @@ export function filterRealBills(bills, selection, query) {
   );
 }
 
-export function selectRealBills(rows, selection, query) {
+function requiresRealBillSelection(selection, query) {
+  return !(selection?.billStores || []).length && !T(query);
+}
+
+function candidateSignature(selection) {
+  const sel = selection || {};
+  return JSON.stringify([
+    sel.dates || [],
+    sel.ps || [],
+    sel.orderStores || [],
+  ]);
+}
+
+function filterSignature(selection, query) {
+  const sel = selection || {};
+  return JSON.stringify([
+    sel.billStores || [],
+    sel.brands || [],
+    sel.types || [],
+    T(query).toLowerCase(),
+  ]);
+}
+
+export function selectRealBills(
+  rows,
+  selection,
+  query,
+  buildBills = buildRealBills,
+) {
+  if (requiresRealBillSelection(selection, query)) {
+    return {
+      candidateRows: [],
+      allBills: [],
+      bills: [],
+      requiresSelection: true,
+      resultKey: "selection-required",
+    };
+  }
   const candidateRows = realBillCandidateRows(rows, selection);
-  const allBills = buildRealBills(candidateRows);
+  const allBills = buildBills(candidateRows);
   return {
     candidateRows,
     allBills,
     bills: filterRealBills(allBills, selection, query),
-    requiresSelection:
-      !(selection?.billStores || []).length && !T(query),
+    requiresSelection: false,
+    resultKey:
+      candidateSignature(selection) + "|" + filterSignature(selection, query),
+  };
+}
+
+export function createRealBillSelector(buildBills = buildRealBills) {
+  let rowsReference = null;
+  let cachedCandidateSignature = "";
+  let cachedCandidateRows = [];
+  let cachedCandidateBills = [];
+  let candidateVersion = 0;
+  let cachedFilterSignature = "";
+  let cachedResult = null;
+  const counters = {
+    selectCalls: 0,
+    candidateBuilds: 0,
+    candidateCacheHits: 0,
+    filteredBuilds: 0,
+    filteredCacheHits: 0,
+    optionModelRequests: 0,
+  };
+
+  function hasCandidate(rows, selection) {
+    return (
+      rowsReference === rows &&
+      cachedCandidateSignature === candidateSignature(selection)
+    );
+  }
+
+  function ensureCandidate(rows, selection) {
+    counters.optionModelRequests += 1;
+    if (hasCandidate(rows, selection)) {
+      counters.candidateCacheHits += 1;
+      return cachedCandidateBills;
+    }
+    rowsReference = rows;
+    cachedCandidateSignature = candidateSignature(selection);
+    cachedCandidateRows = realBillCandidateRows(rows, selection);
+    cachedCandidateBills = buildBills(cachedCandidateRows);
+    candidateVersion += 1;
+    counters.candidateBuilds += 1;
+    cachedFilterSignature = "";
+    cachedResult = null;
+    return cachedCandidateBills;
+  }
+
+  function select(rows, selection, query) {
+    counters.selectCalls += 1;
+    if (requiresRealBillSelection(selection, query)) {
+      return {
+        candidateRows: [],
+        allBills: [],
+        bills: [],
+        requiresSelection: true,
+        resultKey: "selection-required",
+      };
+    }
+    const allBills = ensureCandidate(rows, selection);
+    const nextFilterSignature = filterSignature(selection, query);
+    if (
+      cachedResult &&
+      cachedFilterSignature === nextFilterSignature
+    ) {
+      counters.filteredCacheHits += 1;
+      return cachedResult;
+    }
+    counters.filteredBuilds += 1;
+    cachedFilterSignature = nextFilterSignature;
+    cachedResult = {
+      candidateRows: cachedCandidateRows,
+      allBills,
+      bills: filterRealBills(allBills, selection, query),
+      requiresSelection: false,
+      resultKey: candidateVersion + "|" + nextFilterSignature,
+    };
+    return cachedResult;
+  }
+
+  function invalidate() {
+    rowsReference = null;
+    cachedCandidateSignature = "";
+    cachedCandidateRows = [];
+    cachedCandidateBills = [];
+    cachedFilterSignature = "";
+    cachedResult = null;
+    candidateVersion += 1;
+  }
+
+  function stats() {
+    return { ...counters };
+  }
+
+  return {
+    candidateBills: ensureCandidate,
+    hasCandidate,
+    invalidate,
+    select,
+    stats,
   };
 }
 
@@ -154,21 +289,13 @@ function sortOptions(values) {
   );
 }
 
-export function realBillStoreOptions(rows, selection) {
-  const sel = selection || {};
-  const qualifyingRows = realBillCandidateRows(rows, sel).filter(
-    (row) =>
-      selected(sel.brands || [], row.brand) &&
-      selected(sel.types || [], row.type),
-  );
+function realBillStoreOptionsFromBills(bills) {
   const sources = new Map();
-  qualifyingRows.forEach((row) => {
-    const store = T(row.store);
+  (bills || []).forEach((bill) => {
+    const store = T(bill.store);
     if (!store) return;
     if (!sources.has(store)) sources.set(store, new Set());
-    sources
-      .get(store)
-      .add(row.isTele ? REAL_BILL_SOURCE_TS : REAL_BILL_SOURCE_PS);
+    sources.get(store).add(bill.sourceType);
   });
   return sortOptions(
     [...sources.entries()].map(([store, kinds]) => {
@@ -183,7 +310,13 @@ export function realBillStoreOptions(rows, selection) {
   );
 }
 
-function rowsForOption(rows, selection, kind) {
+export function realBillStoreOptions(rows, selection) {
+  return realBillStoreOptionsFromBills(
+    buildRealBills(realBillCandidateRows(rows, selection)),
+  );
+}
+
+function rowsForCandidateOption(rows, selection, kind) {
   const sel = selection || {};
   return (rows || []).filter((row) => {
     if (kind !== "dates" && !selected(sel.dates || [], row.date)) return false;
@@ -194,17 +327,30 @@ function rowsForOption(rows, selection, kind) {
     ) {
       return false;
     }
-    if (kind !== "brands" && !selected(sel.brands || [], row.brand)) {
-      return false;
-    }
-    if (kind !== "types" && !selected(sel.types || [], row.type)) return false;
     return true;
   });
 }
 
-export function realBillPickerOptions(kind, rows, selection) {
-  if (kind === "billStores") return realBillStoreOptions(rows, selection);
-  const optionRows = rowsForOption(rows, selection, kind);
+function billsForFacetOptions(bills, selection, kind) {
+  const sel = selection || {};
+  return (bills || []).filter(
+    (bill) =>
+      (!(sel.billStores || []).length ||
+        sel.billStores.includes(bill.store)) &&
+      (kind !== "brands" ||
+        billHasFacet(bill, sel.types || [], "type")) &&
+      (kind !== "types" ||
+        billHasFacet(bill, sel.brands || [], "brand")),
+  );
+}
+
+export function realBillPickerOptions(
+  kind,
+  rows,
+  selection,
+  candidateBills,
+) {
+  const optionRows = rowsForCandidateOption(rows, selection, kind);
   if (kind === "dates") {
     return uniq(optionRows.map((row) => row.date))
       .sort()
@@ -216,11 +362,29 @@ export function realBillPickerOptions(kind, rows, selection) {
   if (kind === "orderStores") {
     return sortOptions(uniq(optionRows.map((row) => row.store)).map(option));
   }
+  const bills = Array.isArray(candidateBills)
+    ? candidateBills
+    : buildRealBills(realBillCandidateRows(rows, selection));
+  if (kind === "billStores") {
+    return realBillStoreOptionsFromBills(bills);
+  }
   if (kind === "brands") {
-    return sortOptions(uniq(optionRows.map((row) => row.brand)).map(option));
+    return sortOptions(
+      uniq(
+        billsForFacetOptions(bills, selection, kind).flatMap((bill) =>
+          bill.lines.map((line) => line.brand),
+        ),
+      ).map(option),
+    );
   }
   if (kind === "types") {
-    return sortOptions(uniq(optionRows.map((row) => row.type)).map(option));
+    return sortOptions(
+      uniq(
+        billsForFacetOptions(bills, selection, kind).flatMap((bill) =>
+          bill.lines.map((line) => line.type),
+        ),
+      ).map(option),
+    );
   }
   return [];
 }
@@ -260,13 +424,54 @@ function billLinesHtml(bill) {
     .join("");
 }
 
-export function realBillsHtml(bills, requiresSelection = false) {
-  if (requiresSelection) {
-    return '<div class="empty realBillsEmpty">เลือกร้านหรือพิมพ์ชื่อร้าน เพื่อดูบิลจริง</div>';
-  }
-  if (!bills.length) {
-    return '<div class="empty realBillsEmpty">ไม่พบบิลจริงตามตัวเลือกหรือคำค้นหา</div>';
-  }
+export function realBillPageModel(
+  bills,
+  page = 1,
+  pageSize = REAL_BILL_PAGE_SIZE,
+) {
+  const size = Math.max(1, N(pageSize) || REAL_BILL_PAGE_SIZE);
+  const totalBills = (bills || []).length;
+  const totalPages = Math.max(1, Math.ceil(totalBills / size));
+  const currentPage = Math.min(Math.max(1, N(page) || 1), totalPages);
+  const visibleBills = (bills || []).slice(
+    (currentPage - 1) * size,
+    currentPage * size,
+  );
+  return {
+    currentPage,
+    pageSize: size,
+    totalBills,
+    totalPages,
+    visibleBills,
+    visibleRows: visibleBills.reduce(
+      (sum, bill) => sum + bill.lines.length,
+      0,
+    ),
+  };
+}
+
+function realBillPagerHtml(model) {
+  if (model.totalPages <= 1) return "";
+  return (
+    '<nav class="realBillPager" aria-label="หน้าบิลจริง"><button type="button" data-real-page="' +
+    (model.currentPage - 1) +
+    '"' +
+    (model.currentPage <= 1 ? " disabled" : "") +
+    ">ก่อนหน้า</button><span>หน้า " +
+    F(model.currentPage) +
+    "/" +
+    F(model.totalPages) +
+    " · " +
+    F(model.totalBills) +
+    ' บิล</span><button type="button" data-real-page="' +
+    (model.currentPage + 1) +
+    '"' +
+    (model.currentPage >= model.totalPages ? " disabled" : "") +
+    ">ถัดไป</button></nav>"
+  );
+}
+
+function realBillCardsHtml(bills) {
   return bills
     .map(
       (bill) =>
@@ -300,10 +505,51 @@ export function realBillsHtml(bills, requiresSelection = false) {
     .join("");
 }
 
-export function renderRealBills(container, result) {
-  if (!container) return;
-  container.innerHTML = realBillsHtml(
-    result?.bills || [],
-    Boolean(result?.requiresSelection),
+export function realBillsHtml(
+  bills,
+  requiresSelection = false,
+  page = 1,
+  pageSize = REAL_BILL_PAGE_SIZE,
+) {
+  if (requiresSelection) {
+    return '<div class="empty realBillsEmpty">เลือกร้านหรือพิมพ์ชื่อร้าน เพื่อดูบิลจริง</div>';
+  }
+  if (!bills.length) {
+    return '<div class="empty realBillsEmpty">ไม่พบบิลจริงตามตัวเลือกหรือคำค้นหา</div>';
+  }
+  const model = realBillPageModel(bills, page, pageSize);
+  return (
+    realBillCardsHtml(model.visibleBills) +
+    realBillPagerHtml(model)
   );
+}
+
+export function renderRealBills(
+  container,
+  result,
+  {
+    page = 1,
+    pageSize = REAL_BILL_PAGE_SIZE,
+    onPage = null,
+  } = {},
+) {
+  if (!container) return null;
+  const bills = result?.bills || [];
+  const model = realBillPageModel(bills, page, pageSize);
+  container.innerHTML = realBillsHtml(
+    bills,
+    Boolean(result?.requiresSelection),
+    model.currentPage,
+    model.pageSize,
+  );
+  container.dataset.totalBills = String(model.totalBills);
+  container.dataset.renderedBills = String(model.visibleBills.length);
+  container.dataset.renderedRows = String(model.visibleRows);
+  container.querySelectorAll("[data-real-page]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (button.disabled || !onPage) return;
+      onPage(N(button.dataset.realPage) || 1);
+    });
+  });
+  return model;
 }

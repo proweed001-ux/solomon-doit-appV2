@@ -81,14 +81,21 @@ async function preparePage(page) {
   return { errors, requests };
 }
 
-async function uploadFixture(page, file) {
+async function uploadFixture(
+  page,
+  file,
+  {
+    rows = fixtureMeta.totalRows,
+    teleRows = fixtureMeta.teleRows,
+  } = {},
+) {
   await page.locator("#file").setInputFiles(file);
   await expect(page.locator("#fileLabel")).toHaveText(path.basename(file));
   await expect(page.locator("#msg")).toContainText(
-    `โหลดสำเร็จ ${fixtureMeta.totalRows.toLocaleString("th-TH")} แถว`,
+    `โหลดสำเร็จ ${rows.toLocaleString("th-TH")} แถว`,
   );
   await expect(page.locator("#msg")).toContainText(
-    `Tele ${fixtureMeta.teleRows.toLocaleString("th-TH")} แถว`,
+    `Tele ${teleRows.toLocaleString("th-TH")} แถว`,
   );
 }
 
@@ -325,24 +332,16 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
       )
       .toBe(2);
 
-    await expect(
-      page.locator(
-        `.realBill[data-real-store="${fixtureMeta.realPsTsStore}"]`,
-      ),
-    ).toHaveCount(15);
-    await expect(
-      page.locator(`.realBill[data-real-store="${fixtureMeta.realTsStore}"]`),
-    ).toHaveCount(2);
+    await expect(page.locator("#realBills")).toHaveAttribute(
+      "data-total-bills",
+      "17",
+    );
+    await expect(page.locator("#realBills .realBill")).toHaveCount(12);
+    await expect(page.locator(".realBillPager")).toContainText("17 บิล");
     const psSharedInvoice = page.locator(
       `.realBill[data-real-source="PS"][data-real-store="${fixtureMeta.realPsTsStore}"][data-real-inv="${fixtureMeta.realBulkInvoice}"]`,
     );
-    const tsSharedInvoice = page.locator(
-      `.realBill[data-real-source="TS"][data-real-store="${fixtureMeta.realPsTsStore}"][data-real-inv="${fixtureMeta.realBulkInvoice}"]`,
-    );
     await expect(psSharedInvoice).toHaveCount(1);
-    await expect(tsSharedInvoice).toHaveCount(1);
-    await expect(tsSharedInvoice).toContainText("Telesale (TS)");
-    await expect(tsSharedInvoice).toContainText("TELE-PS-TS");
     await expect(psSharedInvoice).toContainText("15/07/2026");
     await expect(psSharedInvoice.locator("tbody tr:not(.realBillTotal)")).toHaveCount(
       13,
@@ -353,6 +352,17 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
         .first()
         .evaluate((element) => getComputedStyle(element).overflowX),
     ).toBe("auto");
+    await page.locator('[data-real-page="2"]').click();
+    await expect(page.locator("#realBills .realBill")).toHaveCount(5);
+    await expect(
+      page.locator(`.realBill[data-real-store="${fixtureMeta.realTsStore}"]`),
+    ).toHaveCount(2);
+    const tsSharedInvoice = page.locator(
+      `.realBill[data-real-source="TS"][data-real-store="${fixtureMeta.realPsTsStore}"][data-real-inv="${fixtureMeta.realBulkInvoice}"]`,
+    );
+    await expect(tsSharedInvoice).toHaveCount(1);
+    await expect(tsSharedInvoice).toContainText("Telesale (TS)");
+    await expect(tsSharedInvoice).toContainText("TELE-PS-TS");
 
     await page.locator('[data-pick="receivers"]').click();
     await page.locator("#pickClear").click();
@@ -437,6 +447,24 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     expect(selectedState.sel.billStores).toEqual([]);
 
     await realBillTab.click();
+    await chooseOnly(page, "brands", "Fixture Tele Brand");
+    await page.locator(".tabs .tab").first().click();
+    await page.locator('[data-pick="brands"]').click();
+    const hiddenFilterOption = page.locator(
+      '.pickItem[data-v="Fixture Tele Brand"]',
+    );
+    await expect(hiddenFilterOption).toContainText(
+      "เลือกอยู่ — ไม่มีในชุดปัจจุบัน",
+    );
+    await hiddenFilterOption.click();
+    await page.locator("#pickOk").click();
+    selectedState = await page.evaluate(() =>
+      window.DOIT_CORE_APP.currentState(),
+    );
+    expect(selectedState.sel.brands).toEqual([]);
+    expect(selectedState.sel.receivers).toEqual([fixtureMeta.receiver]);
+
+    await realBillTab.click();
     await page.locator('[data-pick="receivers"]').click();
     await page.locator(
       `.pickItem[data-v="${fixtureMeta.realTsStore}"]`,
@@ -451,6 +479,127 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
       )
       .toBe(0);
   }
+  expect(runtime.errors).toEqual([]);
+});
+
+test("keeps large real-bill tabs, pickers and pagination responsive", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.largeXlsx, {
+    rows: fixtureMeta.largeRows,
+    teleRows: fixtureMeta.largeTeleRows,
+  });
+
+  const tabStart = Date.now();
+  await page.locator(".tabs .tab").nth(2).click();
+  await expect(page.locator("#modeHeading")).toHaveText("บิลจริง");
+  await expect(page.locator("#realBills")).toContainText(
+    "เลือกร้านหรือพิมพ์ชื่อร้าน เพื่อดูบิลจริง",
+  );
+  expect(Date.now() - tabStart).toBeLessThan(500);
+  let metrics = await page.evaluate(
+    () => window.DOIT_CORE_APP.health().realBillPerformance,
+  );
+  expect(metrics.candidateBuilds).toBe(0);
+  expect(metrics.renderedBills).toBe(0);
+
+  const popupStart = Date.now();
+  await page.locator('[data-pick="receivers"]').click();
+  await expect(page.locator("#pickShade")).toHaveClass(/on/);
+  await expect(page.locator("#pickList .pickItem")).toHaveCount(
+    fixtureMeta.largeStores,
+  );
+  expect(Date.now() - popupStart).toBeLessThan(1500);
+  metrics = await page.evaluate(
+    () => window.DOIT_CORE_APP.health().realBillPerformance,
+  );
+  const pickerOptionsCalls = metrics.pickerOptionsCalls;
+  const pickerListRenders = metrics.pickerListRenders;
+  expect(pickerOptionsCalls).toBe(1);
+  expect(pickerListRenders).toBe(1);
+  expect(metrics.candidateBuilds).toBe(1);
+
+  const toggleResult = await page.evaluate(() => {
+    const list = document.querySelector("#pickList");
+    const item = list.querySelectorAll(".pickItem")[20];
+    list.scrollTop = 180;
+    const scrollTop = list.scrollTop;
+    const started = performance.now();
+    item.click();
+    return {
+      elapsed: performance.now() - started,
+      sameNode: item === list.querySelectorAll(".pickItem")[20],
+      scrollTop,
+      nextScrollTop: list.scrollTop,
+    };
+  });
+  expect(toggleResult.elapsed).toBeLessThan(100);
+  expect(toggleResult.sameNode).toBe(true);
+  expect(toggleResult.nextScrollTop).toBe(toggleResult.scrollTop);
+  metrics = await page.evaluate(
+    () => window.DOIT_CORE_APP.health().realBillPerformance,
+  );
+  expect(metrics.pickerOptionsCalls).toBe(pickerOptionsCalls);
+  expect(metrics.pickerListRenders).toBe(pickerListRenders);
+
+  await page.locator("#pickAll").click();
+  await expect(page.locator("#pickList .pickItem.on")).toHaveCount(
+    fixtureMeta.largeStores,
+  );
+  metrics = await page.evaluate(
+    () => window.DOIT_CORE_APP.health().realBillPerformance,
+  );
+  expect(metrics.pickerOptionsCalls).toBe(pickerOptionsCalls);
+  expect(metrics.pickerListRenders).toBe(pickerListRenders);
+
+  const applyStart = Date.now();
+  await page.locator("#pickOk").click();
+  await expect(page.locator("#tableCount")).toContainText(
+    `${fixtureMeta.largeBills} บิล`,
+  );
+  await expect(page.locator("#realBills .realBill")).toHaveCount(12);
+  expect(Date.now() - applyStart).toBeLessThan(1500);
+  await expect(page.locator("#realBills")).toHaveAttribute(
+    "data-total-bills",
+    String(fixtureMeta.largeBills),
+  );
+  await expect(page.locator(".realBillPager")).toContainText(
+    `${fixtureMeta.largeBills} บิล`,
+  );
+  metrics = await page.evaluate(
+    () => window.DOIT_CORE_APP.health().realBillPerformance,
+  );
+  expect(metrics.candidateBuilds).toBe(1);
+  expect(metrics.totalBills).toBe(fixtureMeta.largeBills);
+  expect(metrics.renderedBills).toBe(12);
+  expect(metrics.renderedRows).toBe(
+    12 * fixtureMeta.largeLinesPerBill,
+  );
+
+  await page.locator('[data-real-page="2"]').click();
+  await expect(page.locator(".realBillPager")).toContainText("หน้า 2/");
+  await expect(page.locator("#realBills .realBill")).toHaveCount(12);
+
+  await chooseOnly(page, "brands", "PERF-BRAND-0");
+  await chooseOnly(page, "types", "PERF-TYPE-4");
+  await expect(page.locator("#realBills .realBill").first()).toBeVisible();
+  await expect(
+    page
+      .locator("#realBills .realBill")
+      .first()
+      .locator("tbody tr:not(.realBillTotal)"),
+  ).toHaveCount(fixtureMeta.largeLinesPerBill);
+  metrics = await page.evaluate(
+    () => window.DOIT_CORE_APP.health().realBillPerformance,
+  );
+  expect(metrics.candidateBuilds).toBe(1);
+
+  expect(
+    runtime.requests
+      .map(requestBasename)
+      .filter((name) => forbiddenRequestNames.includes(name)),
+  ).toEqual([]);
   expect(runtime.errors).toEqual([]);
 });
 
