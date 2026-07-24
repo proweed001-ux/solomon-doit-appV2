@@ -709,6 +709,15 @@ assert.ok(
   selectedLargeElapsed < 1500,
   `Large candidate model took ${selectedLargeElapsed.toFixed(2)} ms`,
 );
+assert.ok(
+  realBillPickerOptions(
+    "brands",
+    largeRealRows,
+    largeSelection,
+    selectedLarge.allBills,
+  ).some((item) => item.value === "PERF-BRAND-0"),
+  "Brand options must remain available with every bill store selected",
+);
 const largePage = realBillPageModel(selectedLarge.bills, 1);
 assert.equal(largePage.visibleBills.length, 12);
 assert.equal(

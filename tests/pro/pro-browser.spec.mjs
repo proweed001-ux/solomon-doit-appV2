@@ -104,7 +104,11 @@ async function chooseOnly(page, kind, label) {
     kind === "dates" ? label.split("-").reverse().join("/") : label;
   await page.locator(`[data-pick="${kind}"]`).click();
   await expect(page.locator("#pickShade")).toHaveClass(/on/);
-  await page.locator(".pickItem", { hasText: visibleLabel }).click();
+  const item =
+    kind === "dates"
+      ? page.locator(".pickItem", { hasText: visibleLabel })
+      : page.locator(`.pickItem[data-v="${label}"]`);
+  await item.click();
   await page.locator("#pickOk").click();
   await expect(page.locator(`[data-pick="${kind}"]`)).toContainText(visibleLabel);
 }
@@ -338,14 +342,6 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     );
     await expect(page.locator("#realBills .realBill")).toHaveCount(12);
     await expect(page.locator(".realBillPager")).toContainText("17 บิล");
-    const psSharedInvoice = page.locator(
-      `.realBill[data-real-source="PS"][data-real-store="${fixtureMeta.realPsTsStore}"][data-real-inv="${fixtureMeta.realBulkInvoice}"]`,
-    );
-    await expect(psSharedInvoice).toHaveCount(1);
-    await expect(psSharedInvoice).toContainText("15/07/2026");
-    await expect(psSharedInvoice.locator("tbody tr:not(.realBillTotal)")).toHaveCount(
-      13,
-    );
     expect(
       await page
         .locator(".realBillTableWrap")
@@ -354,6 +350,14 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     ).toBe("auto");
     await page.locator('[data-real-page="2"]').click();
     await expect(page.locator("#realBills .realBill")).toHaveCount(5);
+    const psSharedInvoice = page.locator(
+      `.realBill[data-real-source="PS"][data-real-store="${fixtureMeta.realPsTsStore}"][data-real-inv="${fixtureMeta.realBulkInvoice}"]`,
+    );
+    await expect(psSharedInvoice).toHaveCount(1);
+    await expect(psSharedInvoice).toContainText("15/07/2026");
+    await expect(psSharedInvoice.locator("tbody tr:not(.realBillTotal)")).toHaveCount(
+      13,
+    );
     await expect(
       page.locator(`.realBill[data-real-store="${fixtureMeta.realTsStore}"]`),
     ).toHaveCount(2);
@@ -581,8 +585,14 @@ test("keeps large real-bill tabs, pickers and pagination responsive", async ({
   await expect(page.locator(".realBillPager")).toContainText("หน้า 2/");
   await expect(page.locator("#realBills .realBill")).toHaveCount(12);
 
+  await page.locator('[data-pick="receivers"]').click();
+  await page.locator("#pickClear").click();
+  await page.locator("#pickOk").click();
   await chooseOnly(page, "brands", "PERF-BRAND-0");
   await chooseOnly(page, "types", "PERF-TYPE-4");
+  await page.locator('[data-pick="receivers"]').click();
+  await page.locator("#pickAll").click();
+  await page.locator("#pickOk").click();
   await expect(page.locator("#realBills .realBill").first()).toBeVisible();
   await expect(
     page
