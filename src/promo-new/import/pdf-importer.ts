@@ -4,6 +4,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { cropCanvas, detectCardGrid, type GridDiagnostics, type Rect } from './grid-detector';
 import {
   classifyClassText,
+  classifyPageClassText,
   normalizeClassId,
   resolvePageClassSequence,
   type PageClassObservation,
@@ -14,7 +15,7 @@ import { cardProductTitleZone, configureCardTitleOcr, recognizeCardProductTitle 
 import type { PositionedText } from './ocr-items';
 import { assertProductMasterReady } from '../shared/runtime-readiness';
 
-export { classifyClassText, normalizeClassId, resolvePageClassSequence } from './class-id';
+export { classifyClassText, classifyPageClassText, normalizeClassId, resolvePageClassSequence } from './class-id';
 export { makeCardId } from './card-id';
 export { collectOcrItems } from './ocr-items';
 export type { PositionedText } from './ocr-items';
@@ -88,6 +89,10 @@ function pageHeaderZone(width: number, height: number): Rect {
   return { x: 0, y: 0, width: width * 0.48, height: height * 0.2 };
 }
 
+function pageTopBandZone(width: number, height: number): Rect {
+  return { x: 0, y: 0, width, height: height * 0.28 };
+}
+
 async function pdfTextItems(page: any, viewport: any): Promise<PositionedText[]> {
   const content = await page.getTextContent();
   return (content.items || []).flatMap((item: any) => {
@@ -135,10 +140,13 @@ function scaledHeaderVariant(canvas: HTMLCanvasElement, rect: Rect, mode: 'color
 function preparedHeaderCanvases(canvas: HTMLCanvasElement): HTMLCanvasElement[] {
   const tokenRect = { x: canvas.width * 0.085, y: canvas.height * 0.055, width: canvas.width * 0.31, height: canvas.height * 0.13 };
   const broadRect = { x: canvas.width * 0.025, y: canvas.height * 0.015, width: canvas.width * 0.44, height: canvas.height * 0.18 };
+  const rightRect = { x: canvas.width * 0.4, y: canvas.height * 0.015, width: canvas.width * 0.58, height: canvas.height * 0.2 };
   return [
     scaledHeaderVariant(canvas, tokenRect, 'color'),
     scaledHeaderVariant(canvas, tokenRect, 'threshold'),
     scaledHeaderVariant(canvas, broadRect, 'threshold'),
+    scaledHeaderVariant(canvas, rightRect, 'color'),
+    scaledHeaderVariant(canvas, rightRect, 'threshold'),
   ];
 }
 
@@ -257,20 +265,31 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       const textMethod: 'pdf_text' | 'page_ocr' | 'none' = hasPdfText ? 'pdf_text' : options.enableOcr ? 'page_ocr' : 'none';
       const headerTexts: string[] = [];
       const pageTextHeader = textIn(textItems, pageHeaderZone(canvas.width, canvas.height));
+      const pageTextTopBand = textIn(textItems, pageTopBandZone(canvas.width, canvas.height));
       if (pageTextHeader) headerTexts.push(pageTextHeader);
-      let classEvidence = classifyClassText(headerTexts);
+      if (pageTextTopBand && pageTextTopBand !== pageTextHeader) headerTexts.push(pageTextTopBand);
+      const pageTextValues = textItems.map(item => item.text).filter(Boolean);
+      const headerEvidence = classifyClassText(headerTexts);
+      let classEvidence = classifyPageClassText(headerTexts, [
+        ...pageTextValues,
+        pageTextValues.join(' '),
+      ]);
+      if (!headerEvidence.classId && classEvidence.classId) warnings.push(`page:${pageNumber}:class_page_text_fallback:${classEvidence.classId}`);
       if (grid.regions.length && options.enableOcr && (!classEvidence.classId || classEvidence.confidence < 0.9)) {
         progress('ocr', pageNumber, `หน้า ${pageNumber}: จำแนก Class จากหัวซ้ายบน`);
         try {
           headerTexts.push(...await headerClassOcr(await ensureWorker(), canvas));
-          classEvidence = classifyClassText(headerTexts);
+          classEvidence = classifyPageClassText(headerTexts, [
+            ...pageTextValues,
+            pageTextValues.join(' '),
+          ]);
         } catch {
           warnings.push(`page:${pageNumber}:class_header_ocr_failed`);
         }
       }
 
       const classId = classEvidence.classId;
-      const headerText = clean(headerTexts.join(' | '));
+      const headerText = clean([...headerTexts, classEvidence.classId ? `CLASS:${classEvidence.classId}` : ''].filter(Boolean).join(' | '));
       pageClassObservations.push({ page: pageNumber, texts: headerTexts, headerColor: headerColorEvidence(canvas), hasCards: grid.regions.length > 0 });
       if (grid.diagnostics.status !== 'ok') warnings.push(...grid.diagnostics.reasons.map(reason => `page:${pageNumber}:${reason}`));
 
