@@ -38,6 +38,7 @@ function billLine(row, sourceIndex) {
     sourceIndex,
     code: T(row.code),
     sku: T(row.sku),
+    ps: T(row.ps),
     brand: T(row.brand),
     type: T(row.type),
     qty,
@@ -156,6 +157,71 @@ function filterSignature(selection, query) {
   ]);
 }
 
+function rowsContentSignature(rows) {
+  let hash = 2166136261;
+  (rows || []).forEach((row) => {
+    [
+      row.isTele ? "1" : "0",
+      row.tele,
+      row.store,
+      row.inv,
+      row.date,
+      row.ps,
+      row.code,
+      row.sku,
+      row.brand,
+      row.type,
+      row.qty,
+      row.rawAmt,
+      row.netAmt,
+    ].forEach((value) => {
+      const text = T(value);
+      for (let index = 0; index < text.length; index += 1) {
+        hash ^= text.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+      }
+      hash ^= 31;
+      hash = Math.imul(hash, 16777619);
+    });
+  });
+  return (rows || []).length + ":" + (hash >>> 0).toString(36);
+}
+
+function rowsDataSignature(rows, rowsVersion) {
+  return rowsVersion === undefined
+    ? rowsContentSignature(rows)
+    : T(rowsVersion) + ":" + (rows || []).length;
+}
+
+function selectionIgnoring(selection, kind) {
+  const sel = selection || {};
+  return {
+    ...sel,
+    dates: [...(sel.dates || [])],
+    ps: [...(sel.ps || [])],
+    orderStores: [...(sel.orderStores || [])],
+    billStores: [...(sel.billStores || [])],
+    brands: [...(sel.brands || [])],
+    types: [...(sel.types || [])],
+    [kind]: [],
+  };
+}
+
+function optionSignature(kind, selection, query, dataSignature) {
+  const sel = selectionIgnoring(selection, kind);
+  return JSON.stringify([
+    dataSignature,
+    kind,
+    sel.dates,
+    sel.ps,
+    sel.orderStores,
+    sel.billStores,
+    sel.brands,
+    sel.types,
+    T(query).toLowerCase(),
+  ]);
+}
+
 export function selectRealBills(
   rows,
   selection,
@@ -185,12 +251,14 @@ export function selectRealBills(
 
 export function createRealBillSelector(buildBills = buildRealBills) {
   let rowsReference = null;
+  let cachedRowsDataSignature = "";
   let cachedCandidateSignature = "";
   let cachedCandidateRows = [];
   let cachedCandidateBills = [];
   let candidateVersion = 0;
   let cachedFilterSignature = "";
   let cachedResult = null;
+  const optionCache = new Map();
   const counters = {
     selectCalls: 0,
     candidateBuilds: 0,
@@ -198,22 +266,28 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     filteredBuilds: 0,
     filteredCacheHits: 0,
     optionModelRequests: 0,
+    optionCandidateBuilds: 0,
+    pickerOptionsBuilds: 0,
+    pickerOptionsCacheHits: 0,
   };
 
-  function hasCandidate(rows, selection) {
+  function hasCandidate(rows, selection, rowsVersion) {
     return (
       rowsReference === rows &&
+      cachedRowsDataSignature === rowsDataSignature(rows, rowsVersion) &&
       cachedCandidateSignature === candidateSignature(selection)
     );
   }
 
-  function ensureCandidate(rows, selection) {
+  function ensureCandidate(rows, selection, rowsVersion) {
     counters.optionModelRequests += 1;
-    if (hasCandidate(rows, selection)) {
+    const nextRowsDataSignature = rowsDataSignature(rows, rowsVersion);
+    if (hasCandidate(rows, selection, rowsVersion)) {
       counters.candidateCacheHits += 1;
       return cachedCandidateBills;
     }
     rowsReference = rows;
+    cachedRowsDataSignature = nextRowsDataSignature;
     cachedCandidateSignature = candidateSignature(selection);
     cachedCandidateRows = realBillCandidateRows(rows, selection);
     cachedCandidateBills = buildBills(cachedCandidateRows);
@@ -221,10 +295,11 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     counters.candidateBuilds += 1;
     cachedFilterSignature = "";
     cachedResult = null;
+    optionCache.clear();
     return cachedCandidateBills;
   }
 
-  function select(rows, selection, query) {
+  function select(rows, selection, query, rowsVersion) {
     counters.selectCalls += 1;
     if (requiresRealBillSelection(selection, query)) {
       return {
@@ -232,10 +307,14 @@ export function createRealBillSelector(buildBills = buildRealBills) {
         allBills: [],
         bills: [],
         requiresSelection: true,
-        resultKey: "selection-required",
+        resultKey:
+          "selection-required|" +
+          rowsDataSignature(rows, rowsVersion) +
+          "|" +
+          candidateSignature(selection),
       };
     }
-    const allBills = ensureCandidate(rows, selection);
+    const allBills = ensureCandidate(rows, selection, rowsVersion);
     const nextFilterSignature = filterSignature(selection, query);
     if (
       cachedResult &&
@@ -256,13 +335,51 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     return cachedResult;
   }
 
+  function pickerOptions(kind, rows, selection, query, rowsVersion) {
+    const dataSignature = rowsDataSignature(rows, rowsVersion);
+    const key = optionSignature(kind, selection, query, dataSignature);
+    if (optionCache.has(key)) {
+      counters.pickerOptionsCacheHits += 1;
+      return optionCache.get(key);
+    }
+    const optionSelection = selectionIgnoring(selection, kind);
+    let optionBills;
+    if (["dates", "ps", "orderStores"].includes(kind)) {
+      counters.optionCandidateBuilds += 1;
+      optionBills = buildBills(
+        realBillCandidateRows(rows, optionSelection),
+      );
+    } else {
+      optionBills = ensureCandidate(rows, optionSelection, rowsVersion);
+    }
+    counters.pickerOptionsBuilds += 1;
+    const result = realBillPickerOptions(
+      kind,
+      rows,
+      selection,
+      optionBills,
+      query,
+    );
+    if (optionCache.size >= 24) optionCache.clear();
+    optionCache.set(key, result);
+    return result;
+  }
+
+  function refreshFilters() {
+    cachedFilterSignature = "";
+    cachedResult = null;
+    optionCache.clear();
+  }
+
   function invalidate() {
     rowsReference = null;
+    cachedRowsDataSignature = "";
     cachedCandidateSignature = "";
     cachedCandidateRows = [];
     cachedCandidateBills = [];
     cachedFilterSignature = "";
     cachedResult = null;
+    optionCache.clear();
     candidateVersion += 1;
   }
 
@@ -274,6 +391,8 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     candidateBills: ensureCandidate,
     hasCandidate,
     invalidate,
+    pickerOptions,
+    refreshFilters,
     select,
     stats,
   };
@@ -316,31 +435,20 @@ export function realBillStoreOptions(rows, selection) {
   );
 }
 
-function rowsForCandidateOption(rows, selection, kind) {
-  const sel = selection || {};
-  return (rows || []).filter((row) => {
-    if (kind !== "dates" && !selected(sel.dates || [], row.date)) return false;
-    if (kind !== "ps" && !selected(sel.ps || [], row.ps)) return false;
-    if (
-      kind !== "orderStores" &&
-      (sel.orderStores || []).includes(row.store)
-    ) {
-      return false;
-    }
-    return true;
-  });
-}
-
-function billsForFacetOptions(bills, selection, kind) {
+function billsForFacetOptions(bills, selection, kind, query) {
   const sel = selection || {};
   return (bills || []).filter(
     (bill) =>
-      (!(sel.billStores || []).length ||
+      (kind === "billStores" ||
+        !(sel.billStores || []).length ||
         sel.billStores.includes(bill.store)) &&
-      (kind !== "brands" ||
+      (kind === "brands" ||
+        !(sel.brands || []).length ||
+        billHasFacet(bill, sel.brands || [], "brand")) &&
+      (kind === "types" ||
+        !(sel.types || []).length ||
         billHasFacet(bill, sel.types || [], "type")) &&
-      (kind !== "types" ||
-        billHasFacet(bill, sel.brands || [], "brand")),
+      billContains(bill, T(query).toLowerCase()),
   );
 }
 
@@ -349,29 +457,44 @@ export function realBillPickerOptions(
   rows,
   selection,
   candidateBills,
+  query = "",
 ) {
-  const optionRows = rowsForCandidateOption(rows, selection, kind);
+  const optionSelection = selectionIgnoring(selection, kind);
+  const bills = Array.isArray(candidateBills)
+    ? candidateBills
+    : buildRealBills(realBillCandidateRows(rows, optionSelection));
+  const matchedBills = billsForFacetOptions(
+    bills,
+    selection,
+    kind,
+    query,
+  );
   if (kind === "dates") {
-    return uniq(optionRows.map((row) => row.date))
+    return uniq(matchedBills.map((bill) => bill.date))
       .sort()
       .map((value) => option(value, dlabel(value)));
   }
   if (kind === "ps") {
-    return sortOptions(uniq(optionRows.map((row) => row.ps)).map(option));
+    return sortOptions(
+      uniq(
+        matchedBills.flatMap((bill) =>
+          bill.lines.map((line) => line.ps),
+        ),
+      ).map(option),
+    );
   }
   if (kind === "orderStores") {
-    return sortOptions(uniq(optionRows.map((row) => row.store)).map(option));
+    return sortOptions(
+      uniq(matchedBills.map((bill) => bill.store)).map(option),
+    );
   }
-  const bills = Array.isArray(candidateBills)
-    ? candidateBills
-    : buildRealBills(realBillCandidateRows(rows, selection));
   if (kind === "billStores") {
-    return realBillStoreOptionsFromBills(bills);
+    return realBillStoreOptionsFromBills(matchedBills);
   }
   if (kind === "brands") {
     return sortOptions(
       uniq(
-        billsForFacetOptions(bills, selection, kind).flatMap((bill) =>
+        matchedBills.flatMap((bill) =>
           bill.lines.map((line) => line.brand),
         ),
       ).map(option),
@@ -380,7 +503,7 @@ export function realBillPickerOptions(
   if (kind === "types") {
     return sortOptions(
       uniq(
-        billsForFacetOptions(bills, selection, kind).flatMap((bill) =>
+        matchedBills.flatMap((bill) =>
           bill.lines.map((line) => line.type),
         ),
       ).map(option),
@@ -490,7 +613,7 @@ function realBillCardsHtml(bills) {
         "</span><small>บิล: " +
         E(bill.displayInv) +
         " · วันที่ " +
-        E(dlabel(bill.date)) +
+        E(bill.date ? dlabel(bill.date) : "-") +
         (bill.tele ? " · Tele: " + E(bill.tele) : "") +
         '</small></div><div class="realBillTableWrap"><table class="realBillTable"><thead><tr><th>สินค้า</th><th>จำนวน</th><th>ยอดดิบ</th><th>สุทธิ+VAT</th></tr></thead><tbody>' +
         billLinesHtml(bill) +
