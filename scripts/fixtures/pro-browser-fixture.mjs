@@ -38,6 +38,10 @@ export const fixtureMeta = {
   largeBills: 600,
   largeStores: 60,
   largeLinesPerBill: 5,
+  hugeRows: 6000,
+  hugeTeleRows: 3000,
+  hugeBills: 1200,
+  hugeStores: 120,
 };
 
 export function browserFixtureRows() {
@@ -105,8 +109,12 @@ export function browserFixtureRows() {
   return [...normal, ...telesale];
 }
 
-export function largeRealBillFixtureRows() {
-  return Array.from({ length: fixtureMeta.largeRows }, (_, index) => {
+export function largeRealBillFixtureRows({
+  rows = fixtureMeta.largeRows,
+  stores = fixtureMeta.largeStores,
+} = {}) {
+  const storeDigits = Math.max(2, String(Math.max(0, stores - 1)).length);
+  return Array.from({ length: rows }, (_, index) => {
     const bill = Math.floor(index / fixtureMeta.largeLinesPerBill);
     const isTele = bill % 2 === 1;
     return {
@@ -115,7 +123,7 @@ export function largeRealBillFixtureRows() {
       SOTypeID: `PERF-TYPE-${index % 15}`,
       SO_SalespersonID: `PERF-PS-${bill % 8}`,
       TelesaleID: isTele ? `PERF-TELE-${bill % 16}` : "",
-      CustomerName: `ร้าน Performance ${String(bill % fixtureMeta.largeStores).padStart(2, "0")}`,
+      CustomerName: `ร้าน Performance ${String(bill % stores).padStart(storeDigits, "0")}`,
       SKUCode: `PERF-SKU-${String(index).padStart(5, "0")}`,
       SKUDescription: `สินค้า Performance ${String(index).padStart(5, "0")}`,
       GroupBrand: `PERF-BRAND-${index % 20}`,
@@ -136,6 +144,10 @@ export function createBrowserFixtureFiles(outputDir) {
     xlsx: path.join(outputDir, "pro-browser-fixture.xlsx"),
     xlsm: path.join(outputDir, "pro-browser-fixture.xlsm"),
     largeXlsx: path.join(outputDir, "pro-browser-performance-fixture.xlsx"),
+    hugeXlsx: path.join(
+      outputDir,
+      "pro-browser-performance-6000-fixture.xlsx",
+    ),
   };
   XLSX.writeFile(workbook, files.xlsx, { bookType: "xlsx" });
   XLSX.writeFile(workbook, files.xlsm, { bookType: "xlsm" });
@@ -146,5 +158,17 @@ export function createBrowserFixtureFiles(outputDir) {
     "DOIT",
   );
   XLSX.writeFile(largeWorkbook, files.largeXlsx, { bookType: "xlsx" });
+  const hugeWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    hugeWorkbook,
+    XLSX.utils.json_to_sheet(
+      largeRealBillFixtureRows({
+        rows: fixtureMeta.hugeRows,
+        stores: fixtureMeta.hugeStores,
+      }),
+    ),
+    "DOIT",
+  );
+  XLSX.writeFile(hugeWorkbook, files.hugeXlsx, { bookType: "xlsx" });
   return files;
 }
