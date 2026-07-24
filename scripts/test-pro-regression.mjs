@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { performance } from "node:perf_hooks";
 import {
   group,
   okBrand,
@@ -16,6 +17,7 @@ import { renderOrderMode } from "../dist/assets/pro/order.js";
 import {
   browserFixtureRows,
   fixtureMeta,
+  largeRealBillFixtureRows,
 } from "./fixtures/pro-browser-fixture.mjs";
 import {
   BILL_ROWS,
@@ -24,12 +26,33 @@ import {
   doneSummary,
   lineVal,
 } from "../dist/assets/pro/print-model.js";
-import { billPagesHtml } from "../dist/assets/pro/print.js";
+import {
+  billPagesHtml,
+  realBillPagesHtml,
+} from "../dist/assets/pro/print.js";
+import {
+  buildRealBills,
+  createRealBillSelector,
+  filterRealBills,
+  realBillCandidateRows,
+  realBillKey,
+  realBillPageModel,
+  realBillPickerOptions,
+  realBillsHtml,
+  realBillStoreOptions,
+  selectRealBills,
+  splitRealBillsForPrint,
+} from "../dist/assets/pro/real-bills.js";
 import {
   createSelection,
+  loadState,
   mapVal,
+  mergeSelection,
   rkey,
+  restore,
+  save,
   sk,
+  snap,
   state,
   sumMap,
 } from "../dist/assets/pro/state.js";
@@ -39,6 +62,7 @@ const fixture = JSON.parse(
 );
 const appSource = fs.readFileSync("dist/assets/pro/app.js", "utf8");
 const coreSource = fs.readFileSync("dist/assets/pro/core.js", "utf8");
+const proHtmlSource = fs.readFileSync("dist/pro.html", "utf8");
 
 state.rows = fixture.rows.map((row) => ({ ...row }));
 state.key = "fixture-active";
@@ -252,10 +276,10 @@ assert.equal(filteredOrderRows().length, fixtureMeta.totalRows);
 state.sel.ps = [fixtureMeta.ps];
 assert.equal(filteredOrderRows().length, fixtureMeta.totalRows);
 state.sel.orderStores = [fixtureMeta.receiver];
-assert.equal(filteredOrderRows().length, fixtureMeta.teleRows);
+assert.equal(filteredOrderRows().length, fixtureMeta.teleRows - 1);
 assert.equal(
   filteredOrderRows().filter((row) => row.isTele).length,
-  fixtureMeta.teleRows,
+  fixtureMeta.teleRows - 1,
 );
 state.sel.orderStores = [];
 state.sel.brands = ["Fixture Tele Brand"];
@@ -311,4 +335,719 @@ assert.ok(
   ) < 1e-9,
 );
 
-console.log("Pro regression modules passed:", fixture.expected);
+const realRows = [
+  {
+    isTele: false,
+    tele: "",
+    store: "ร้านร่วม",
+    inv: "INV-SAME",
+    date: "2026-07-01",
+    ps: "PS001",
+    code: "DUP-001",
+    sku: "สินค้าซ้ำต้นฉบับ",
+    brand: "Brand Match",
+    type: "TYPE-A",
+    qty: 1,
+    rawAmt: 10,
+    netAmt: 9,
+  },
+  {
+    isTele: false,
+    tele: "",
+    store: "ร้านร่วม",
+    inv: "INV-SAME",
+    date: "2026-07-01",
+    ps: "PS001",
+    code: "DUP-001",
+    sku: "สินค้าซ้ำต้นฉบับ",
+    brand: "Brand Other",
+    type: "TYPE-B",
+    qty: 2,
+    rawAmt: 20,
+    netAmt: 18,
+  },
+  {
+    isTele: false,
+    tele: "",
+    store: "ร้านร่วม",
+    inv: "INV-PS-SECOND",
+    date: "2026-07-02",
+    ps: "PS001",
+    code: "PS-SECOND",
+    sku: "บิล PS ใบที่สอง",
+    brand: "Brand Match",
+    type: "TYPE-A",
+    qty: 3,
+    rawAmt: 30,
+    netAmt: 27,
+  },
+  {
+    isTele: true,
+    tele: "TELE-SAME",
+    store: "ร้านร่วม",
+    inv: "INV-SAME",
+    date: "2026-07-01",
+    ps: "PS001",
+    code: "TS-SAME",
+    sku: "บิล TS เลขเดียวกับ PS",
+    brand: "Brand Tele",
+    type: "TYPE-TS",
+    qty: 4,
+    rawAmt: 40,
+    netAmt: 36,
+  },
+  {
+    isTele: true,
+    tele: "TELE-B",
+    store: "ร้าน TS",
+    inv: "INV-TS-ONE",
+    date: "2026-07-03",
+    ps: "PS001",
+    code: "TS-SEARCH",
+    sku: "สินค้าที่ใช้ค้นหา",
+    brand: "Brand Search",
+    type: "TYPE-SEARCH",
+    qty: 5,
+    rawAmt: 50,
+    netAmt: 45,
+  },
+  {
+    isTele: true,
+    tele: "TELE-B",
+    store: "ร้าน TS",
+    inv: "INV-TS-ONE",
+    date: "2026-07-03",
+    ps: "PS001",
+    code: "TS-FULL",
+    sku: "รายการอื่นในบิลเดียวกัน",
+    brand: "Brand Other",
+    type: "TYPE-B",
+    qty: 6,
+    rawAmt: 60,
+    netAmt: 54,
+  },
+  {
+    isTele: true,
+    tele: "TELE-B",
+    store: "ร้าน TS",
+    inv: "INV-TS-TWO",
+    date: "2026-07-04",
+    ps: "PS001",
+    code: "TS-TWO",
+    sku: "บิล TS ใบที่สอง",
+    brand: "Brand Tele",
+    type: "TYPE-TS",
+    qty: 7,
+    rawAmt: 70,
+    netAmt: 63,
+  },
+  {
+    isTele: false,
+    tele: "",
+    store: "ร้านไม่มีเลขบิล",
+    inv: "",
+    date: "2026-07-05",
+    ps: "PS001",
+    code: "NO-INV",
+    sku: "สินค้าไม่มีเลขบิล",
+    brand: "Brand Blank",
+    type: "TYPE-BLANK",
+    qty: 8,
+    rawAmt: 80,
+    netAmt: 72,
+  },
+];
+const realSelection = createSelection();
+const candidateRealRows = realBillCandidateRows(realRows, realSelection);
+const realBills = buildRealBills(candidateRealRows);
+assert.equal(realBills.length, 6, "Real bills must stay separated by bill key");
+assert.equal(
+  new Set(realBills.map((bill) => bill.key)).size,
+  realBills.length,
+);
+const psSame = realBills.find(
+  (bill) => bill.sourceType === "PS" && bill.inv === "INV-SAME",
+);
+const tsSame = realBills.find(
+  (bill) => bill.sourceType === "TS" && bill.inv === "INV-SAME",
+);
+assert.ok(psSame && tsSame, "PS and TS with the same invoice must both exist");
+assert.notEqual(psSame.key, tsSame.key);
+assert.equal(psSame.lines.length, 2, "Duplicate source lines must not be grouped");
+assert.deepEqual(
+  psSame.lines.map((line) => line.sourceIndex),
+  [0, 1],
+  "Source line order must be preserved",
+);
+assert.equal(psSame.qty, 3);
+assert.equal(psSame.raw, 30);
+assert.equal(psSame.vat, 28.89);
+assert.equal(
+  realBillKey(realRows[0]).split("\u001f").length,
+  5,
+  "Bill key must contain source, store, invoice, date and tele",
+);
+const noInvoice = realBills.find((bill) => bill.store === "ร้านไม่มีเลขบิล");
+assert.equal(noInvoice.displayInv, "-");
+assert.equal(noInvoice.inv, "");
+
+const storeOptions = realBillStoreOptions(realRows, realSelection);
+assert.deepEqual(
+  storeOptions.find((item) => item.value === "ร้านร่วม"),
+  { value: "ร้านร่วม", label: "ร้านร่วม (PS+TS)" },
+);
+assert.deepEqual(
+  storeOptions.find((item) => item.value === "ร้าน TS"),
+  { value: "ร้าน TS", label: "ร้าน TS (TS)" },
+);
+assert.ok(
+  storeOptions.every(
+    (item) => !item.value.includes("(TS)") && !item.value.includes("(PS+TS)"),
+  ),
+);
+assert.deepEqual(
+  realBillPickerOptions("billStores", realRows, realSelection),
+  storeOptions,
+);
+const invoiceSearchSelection = createSelection();
+const invoiceSearchBills = buildRealBills(realRows);
+assert.deepEqual(
+  realBillPickerOptions(
+    "billStores",
+    realRows,
+    invoiceSearchSelection,
+    invoiceSearchBills,
+    " INV-TS-ONE ",
+  ).map((item) => item.value),
+  ["ร้าน TS"],
+  "Store options must follow trimmed invoice search",
+);
+assert.deepEqual(
+  realBillPickerOptions(
+    "dates",
+    realRows,
+    invoiceSearchSelection,
+    invoiceSearchBills,
+    "INV-TS-ONE",
+  ).map((item) => item.value),
+  ["2026-07-03"],
+);
+assert.deepEqual(
+  realBillPickerOptions(
+    "ps",
+    realRows,
+    invoiceSearchSelection,
+    invoiceSearchBills,
+    "INV-TS-ONE",
+  ).map((item) => item.value),
+  ["PS001"],
+);
+assert.deepEqual(
+  realBillPickerOptions(
+    "orderStores",
+    realRows,
+    invoiceSearchSelection,
+    invoiceSearchBills,
+    "INV-TS-ONE",
+  ).map((item) => item.value),
+  ["ร้าน TS"],
+);
+assert.deepEqual(
+  new Set(
+    realBillPickerOptions(
+      "brands",
+      realRows,
+      invoiceSearchSelection,
+      invoiceSearchBills,
+      "inv-ts-one",
+    ).map((item) => item.value),
+  ),
+  new Set(["Brand Search", "Brand Other"]),
+  "Brand options must follow case-insensitive invoice search",
+);
+assert.deepEqual(
+  new Set(
+    realBillPickerOptions(
+      "types",
+      realRows,
+      invoiceSearchSelection,
+      invoiceSearchBills,
+      "ร้าน TS",
+    ).map((item) => item.value),
+  ),
+  new Set(["TYPE-SEARCH", "TYPE-B", "TYPE-TS"]),
+  "Type options must follow Thai store search",
+);
+
+realSelection.billStores = ["ร้านร่วม"];
+assert.equal(filterRealBills(realBills, realSelection, "").length, 3);
+realSelection.billStores = ["ร้านร่วม", "ร้าน TS"];
+assert.equal(filterRealBills(realBills, realSelection, "").length, 5);
+realSelection.billStores = [];
+const searchedRealBills = filterRealBills(realBills, realSelection, "TS-SEARCH");
+assert.equal(searchedRealBills.length, 1);
+assert.equal(
+  searchedRealBills[0].lines.length,
+  2,
+  "Search must keep every source line in the matching bill",
+);
+realSelection.billStores = ["ร้านร่วม"];
+realSelection.brands = ["Brand Match"];
+const brandMatched = filterRealBills(realBills, realSelection, "");
+assert.equal(brandMatched.length, 2);
+assert.equal(
+  brandMatched.find((bill) => bill.inv === "INV-SAME").lines.length,
+  2,
+  "Brand filter must retain the full bill",
+);
+realSelection.brands = [];
+realSelection.types = ["TYPE-A"];
+assert.equal(
+  filterRealBills(realBills, realSelection, "").find(
+    (bill) => bill.inv === "INV-SAME",
+  ).lines.length,
+  2,
+  "Type filter must retain the full bill",
+);
+const emptyRealSelection = createSelection();
+let earlyBuildCalls = 0;
+assert.equal(
+  selectRealBills(
+    realRows,
+    emptyRealSelection,
+    "",
+    (rows) => {
+      earlyBuildCalls += 1;
+      return buildRealBills(rows);
+    },
+  ).bills.length,
+  0,
+);
+assert.equal(
+  earlyBuildCalls,
+  0,
+  "Selection-required state must return before building bill models",
+);
+assert.equal(
+  selectRealBills(realRows, emptyRealSelection, "").requiresSelection,
+  true,
+);
+assert.doesNotMatch(
+  realBillsHtml([], true),
+  /class="realBill"/,
+  "Selection-required state must not pre-render bill cards",
+);
+assert.equal(
+  selectRealBills(realRows, emptyRealSelection, "ร้าน TS").bills.length,
+  2,
+);
+
+const facetSelection = createSelection();
+facetSelection.billStores = ["ร้านร่วม"];
+facetSelection.brands = ["Brand Match"];
+facetSelection.types = ["TYPE-B"];
+const crossFacetBills = filterRealBills(
+  realBills,
+  facetSelection,
+  "",
+);
+assert.equal(crossFacetBills.length, 1);
+assert.equal(crossFacetBills[0].inv, "INV-SAME");
+assert.equal(
+  crossFacetBills[0].lines.length,
+  2,
+  "Brand and Type may match different source lines in the same full bill",
+);
+assert.equal(crossFacetBills[0].qty, 3);
+assert.equal(crossFacetBills[0].raw, 30);
+const brandOptions = realBillPickerOptions(
+  "brands",
+  realRows,
+  {
+    ...createSelection(),
+    billStores: ["ร้านร่วม"],
+    types: ["TYPE-B"],
+  },
+  realBills,
+);
+assert.ok(brandOptions.some((item) => item.value === "Brand Match"));
+const typeOptions = realBillPickerOptions(
+  "types",
+  realRows,
+  {
+    ...createSelection(),
+    billStores: ["ร้านร่วม"],
+    brands: ["Brand Match"],
+  },
+  realBills,
+);
+assert.ok(typeOptions.some((item) => item.value === "TYPE-B"));
+
+let selectorBuildCalls = 0;
+const cachedSelector = createRealBillSelector((rows) => {
+  selectorBuildCalls += 1;
+  return buildRealBills(rows);
+});
+const cachedSelection = {
+  ...createSelection(),
+  billStores: ["ร้านร่วม"],
+};
+const cachedFirst = cachedSelector.select(realRows, cachedSelection, "");
+const cachedSecond = cachedSelector.select(realRows, cachedSelection, "");
+assert.equal(selectorBuildCalls, 1);
+assert.equal(cachedFirst, cachedSecond, "Filtered result must be reusable");
+cachedSelection.billStores = ["ร้าน TS"];
+cachedSelector.select(realRows, cachedSelection, "");
+cachedSelection.brands = ["Brand Search"];
+cachedSelector.select(realRows, cachedSelection, "");
+cachedSelection.types = ["TYPE-B"];
+cachedSelector.select(realRows, cachedSelection, "");
+cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
+assert.equal(
+  selectorBuildCalls,
+  1,
+  "Store, Brand, Type and Search must reuse the candidate bill model",
+);
+cachedSelection.dates = ["2026-07-03"];
+cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
+cachedSelection.ps = ["PS001"];
+cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
+cachedSelection.orderStores = ["ร้านอื่น"];
+cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
+assert.equal(
+  selectorBuildCalls,
+  4,
+  "Dates, PS and orderStores must invalidate the candidate model",
+);
+
+let mutableBuildCalls = 0;
+const mutableSelector = createRealBillSelector((rows) => {
+  mutableBuildCalls += 1;
+  return buildRealBills(rows);
+});
+const mutableRows = [realRows[0]];
+const mutableSelection = {
+  ...createSelection(),
+  billStores: ["ร้านร่วม"],
+};
+mutableSelector.select(mutableRows, mutableSelection, "");
+mutableRows.push({
+  ...realRows[4],
+  store: "ร้านเพิ่มแบบ in-place",
+  inv: "INV-IN-PLACE",
+});
+mutableSelection.billStores.push("ร้านเพิ่มแบบ in-place");
+assert.equal(
+  mutableSelector.select(mutableRows, mutableSelection, "").bills.length,
+  2,
+  "In-place rows and selection-array changes must not return stale bills",
+);
+assert.equal(mutableBuildCalls, 2);
+const replacementRows = mutableRows.map((row) => ({ ...row }));
+mutableSelector.select(replacementRows, mutableSelection, "");
+assert.equal(
+  mutableBuildCalls,
+  3,
+  "Replacing the rows array must invalidate the candidate model",
+);
+replacementRows[0] = { ...replacementRows[0], inv: "INV-VERSION-CHANGED" };
+mutableSelector.select(replacementRows, mutableSelection, "", 2);
+assert.equal(
+  mutableBuildCalls,
+  4,
+  "A new rows version must invalidate same-length in-place data changes",
+);
+
+let optionBuildCalls = 0;
+const optionSelector = createRealBillSelector((rows) => {
+  optionBuildCalls += 1;
+  return buildRealBills(rows);
+});
+const optionSelection = createSelection();
+assert.deepEqual(
+  optionSelector
+    .pickerOptions(
+      "brands",
+      realRows,
+      optionSelection,
+      "INV-TS-ONE",
+      1,
+    )
+    .map((item) => item.value)
+    .sort(),
+  ["Brand Other", "Brand Search"].sort(),
+);
+const optionStats = optionSelector.stats();
+optionSelector.pickerOptions(
+  "brands",
+  realRows,
+  optionSelection,
+  "INV-TS-ONE",
+  1,
+);
+assert.equal(optionSelector.stats().pickerOptionsBuilds, optionStats.pickerOptionsBuilds);
+assert.equal(optionSelector.stats().pickerOptionsCacheHits, 1);
+optionSelector.pickerOptions(
+  "brands",
+  realRows,
+  optionSelection,
+  "INV-SAME",
+  1,
+);
+assert.equal(
+  optionSelector.stats().pickerOptionsBuilds,
+  optionStats.pickerOptionsBuilds + 1,
+  "Search changes must invalidate filtered picker options",
+);
+
+const longBill = buildRealBills(
+  Array.from({ length: 13 }, (_, index) => ({
+    ...realRows[0],
+    code: "LONG-" + (index + 1),
+    sku: "รายการยาว " + (index + 1),
+  })),
+)[0];
+const realParts = splitRealBillsForPrint([longBill, tsSame], BILL_ROWS);
+assert.deepEqual(realParts.map((part) => part.lines.length), [12, 1, 1]);
+assert.deepEqual(realParts.map((part) => part.partNo), [1, 2, 1]);
+assert.equal(realParts[0].isLastPart, false);
+assert.equal(realParts[1].isLastPart, true);
+const realPrintHtml = realBillPagesHtml([longBill, tsSame]);
+assert.equal((realPrintHtml.match(/class="a4Sheet"/g) || []).length, 2);
+assert.equal(
+  (realPrintHtml.match(/class="receiptPage realBillReceipt"/g) || []).length,
+  3,
+);
+assert.match(realPrintHtml, /ต่อใบถัดไป \(1\/2\)/);
+assert.match(realPrintHtml, /data-real-part="2\/2"/);
+assert.doesNotMatch(realPrintHtml, /data-edit-key|PRINT_EDIT_KEY/);
+
+const blankDateBill = buildRealBills([
+  { ...realRows[7], date: "" },
+])[0];
+assert.match(
+  realBillsHtml([blankDateBill]),
+  /วันที่ -/,
+  "A blank Real Bill date must not be presented as 'ทั้งหมด'",
+);
+const specialBill = buildRealBills([
+  {
+    ...realRows[0],
+    store: "ร้าน <A&B>",
+    inv: 'INV/"พิเศษ"',
+    code: "MiXeD-001",
+    sku: "สินค้า & พิเศษ",
+  },
+])[0];
+assert.equal(
+  filterRealBills([specialBill], createSelection(), " mixed-001 ").length,
+  1,
+);
+assert.match(realBillsHtml([specialBill]), /ร้าน &lt;A&amp;B&gt;/);
+const sameInvoiceDifferentPs = buildRealBills([
+  { ...realRows[0], ps: "PS-A" },
+  { ...realRows[0], ps: "PS-B", code: "PS-B-LINE" },
+]);
+assert.equal(
+  sameInvoiceDifferentPs.length,
+  1,
+  "Current Bill Key intentionally does not split the same PS bill by PS",
+);
+assert.equal(sameInvoiceDifferentPs[0].lines.length, 2);
+assert.equal(
+  buildRealBills([
+    { ...realRows[3], tele: "TELE-A" },
+    { ...realRows[3], tele: "TELE-B" },
+  ]).length,
+  2,
+  "Different Tele IDs must remain separate bills",
+);
+
+const largeRealRows = largeRealBillFixtureRows().map(norm);
+let largeBuildCalls = 0;
+const largeSelector = createRealBillSelector((rows) => {
+  largeBuildCalls += 1;
+  return buildRealBills(rows);
+});
+const largeSelection = createSelection();
+const noSelectionStart = performance.now();
+const noSelectionLarge = largeSelector.select(
+  largeRealRows,
+  largeSelection,
+  "",
+  1,
+);
+const noSelectionElapsed = performance.now() - noSelectionStart;
+assert.equal(noSelectionLarge.requiresSelection, true);
+assert.equal(largeBuildCalls, 0);
+assert.ok(
+  noSelectionElapsed < 100,
+  `Selection-required large fixture took ${noSelectionElapsed.toFixed(2)} ms`,
+);
+largeSelection.billStores = [
+  ...new Set(largeRealRows.map((row) => row.store)),
+];
+const selectedLargeStart = performance.now();
+const selectedLarge = largeSelector.select(
+  largeRealRows,
+  largeSelection,
+  "",
+  1,
+);
+const selectedLargeElapsed = performance.now() - selectedLargeStart;
+assert.equal(selectedLarge.bills.length, fixtureMeta.largeBills);
+assert.equal(largeBuildCalls, 1);
+assert.ok(
+  selectedLargeElapsed < 1500,
+  `Large candidate model took ${selectedLargeElapsed.toFixed(2)} ms`,
+);
+assert.ok(
+  realBillPickerOptions(
+    "brands",
+    largeRealRows,
+    largeSelection,
+    selectedLarge.allBills,
+  ).some((item) => item.value === "PERF-BRAND-0"),
+  "Brand options must remain available with every bill store selected",
+);
+const largePage = realBillPageModel(selectedLarge.bills, 1);
+assert.equal(largePage.visibleBills.length, 12);
+assert.equal(
+  largePage.visibleRows,
+  12 * fixtureMeta.largeLinesPerBill,
+);
+const clampedPage = realBillPageModel(selectedLarge.bills.slice(0, 13), 99);
+assert.equal(clampedPage.currentPage, 2);
+assert.equal(clampedPage.visibleBills.length, 1);
+largeSelection.brands = ["PERF-BRAND-1"];
+largeSelector.select(largeRealRows, largeSelection, "", 1);
+largeSelection.types = ["PERF-TYPE-2"];
+largeSelector.select(largeRealRows, largeSelection, "", 1);
+largeSelector.select(largeRealRows, largeSelection, "PERF-SKU", 1);
+assert.equal(largeBuildCalls, 1);
+const hugeRealRows = largeRealBillFixtureRows({
+  rows: fixtureMeta.hugeRows,
+  stores: fixtureMeta.hugeStores,
+}).map(norm);
+let hugeBuildCalls = 0;
+const hugeSelector = createRealBillSelector((rows) => {
+  hugeBuildCalls += 1;
+  return buildRealBills(rows);
+});
+const hugeSelection = createSelection();
+const hugePromptStart = performance.now();
+hugeSelector.select(hugeRealRows, hugeSelection, "", 1);
+const hugePromptMs = performance.now() - hugePromptStart;
+hugeSelection.billStores = [
+  ...new Set(hugeRealRows.map((row) => row.store)),
+];
+const hugeCandidateStart = performance.now();
+const hugeResult = hugeSelector.select(
+  hugeRealRows,
+  hugeSelection,
+  "",
+  1,
+);
+const hugeCandidateMs = performance.now() - hugeCandidateStart;
+assert.equal(hugeResult.bills.length, fixtureMeta.hugeBills);
+assert.equal(hugeBuildCalls, 1);
+assert.equal(realBillPageModel(hugeResult.bills, 999).visibleBills.length, 12);
+assert.ok(hugePromptMs < 100);
+assert.ok(
+  hugeCandidateMs < 2000,
+  `6,000-row candidate model took ${hugeCandidateMs.toFixed(2)} ms`,
+);
+const largePerformance = {
+  rows: largeRealRows.length,
+  bills: selectedLarge.bills.length,
+  noSelectionMs: Number(noSelectionElapsed.toFixed(3)),
+  candidateMs: Number(selectedLargeElapsed.toFixed(3)),
+  renderedBills: largePage.visibleBills.length,
+  renderedRows: largePage.visibleRows,
+  builds: largeBuildCalls,
+  hugeRows: hugeRealRows.length,
+  hugeBills: hugeResult.bills.length,
+  hugePromptMs: Number(hugePromptMs.toFixed(3)),
+  hugeCandidateMs: Number(hugeCandidateMs.toFixed(3)),
+  hugeBuilds: hugeBuildCalls,
+};
+
+assert.deepEqual(mergeSelection({ receivers: ["ร้านเดิม"] }), {
+  dates: [],
+  ps: [],
+  orderStores: [],
+  receivers: ["ร้านเดิม"],
+  billStores: [],
+  brands: [],
+  types: [],
+});
+const memory = new Map();
+globalThis.localStorage = {
+  getItem: (key) => memory.get(key) ?? null,
+  setItem: (key, value) => memory.set(key, String(value)),
+  removeItem: (key) => memory.delete(key),
+  clear: () => memory.clear(),
+};
+state.key = "legacy-state";
+assert.equal(
+  restore(
+    JSON.stringify({
+      sel: { receivers: ["ร้านเดิม"], dates: ["2026-07-01"] },
+      mode: "pick",
+    }),
+  ),
+  true,
+);
+assert.deepEqual(state.sel.billStores, []);
+assert.deepEqual(state.sel.receivers, ["ร้านเดิม"]);
+state.sel.billStores = ["ร้าน TS"];
+const billStoreSnapshot = snap();
+state.sel.billStores = [];
+restore(billStoreSnapshot);
+assert.deepEqual(state.sel.billStores, ["ร้าน TS"], "Undo/redo snapshots must retain billStores");
+save();
+state.sel = createSelection();
+loadState();
+assert.deepEqual(state.sel.billStores, ["ร้าน TS"], "Autosave/reload must retain billStores");
+assert.equal(sk(), "doit-core-unified-v1:legacy-state");
+delete globalThis.localStorage;
+
+assert.match(proHtmlSource, /<button class="tab">บิลจริง<\/button/);
+assert.doesNotMatch(proHtmlSource, /ใบส่งร้านจริง/);
+assert.doesNotMatch(coreSource, /ใบส่งร้านจริง/);
+assert.match(coreSource, /ship: "บิลจริง"/);
+assert.match(coreSource, /state\.sel = createSelection\(\)/);
+assert.doesNotMatch(coreSource, /state\.sel = \{\s*dates:/);
+assert.match(
+  coreSource,
+  /state\.mode === "ship" \? currentRealBillResult\(\)\.bills : undefined/,
+  "Real Bill print must receive every filtered bill, not the visible page",
+);
+assert.doesNotMatch(
+  coreSource,
+  /setTimeout\(/,
+  "Real Bill performance must not be hidden behind setTimeout",
+);
+const coreRenderSource = coreSource.match(
+  /function render\(startedAt[\s\S]*?\n  \}\n  function loadData/,
+)?.[0] || "";
+assert.doesNotMatch(
+  coreRenderSource,
+  /pickPool\(\)/,
+  "Full render must use the summary cache instead of rebuilding pickPool",
+);
+assert.match(
+  coreRenderSource,
+  /if \(\$\("#teleDrawer"\)\?\.classList\.contains\("on"\)\) renderTele\(\)/,
+  "Closed Telesale drawer must not be rendered during every full render",
+);
+assert.equal(
+  (coreRenderSource.match(/\.reduce\(/g) || []).length,
+  0,
+  "Full render must not repeat summary reductions",
+);
+
+console.log("Pro regression modules passed:", {
+  ...fixture.expected,
+  realBillPerformance: largePerformance,
+});

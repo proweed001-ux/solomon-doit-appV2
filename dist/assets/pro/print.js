@@ -7,8 +7,22 @@ import {
   lineVal,
   saveLineEdit,
 } from "./print-model.js";
+import { splitRealBillsForPrint } from "./real-bills.js";
 import { state } from "./state.js";
-import { $, $$, B, D, E, F, N, T, parseIso, prevDay, thaiDate } from "./utils.js";
+import {
+  $,
+  $$,
+  B,
+  D,
+  E,
+  F,
+  N,
+  T,
+  dlabel,
+  parseIso,
+  prevDay,
+  thaiDate,
+} from "./utils.js";
 
 function saleDate() {
   let date = parseIso(state.sel.dates[0]);
@@ -145,6 +159,110 @@ export function billPagesHtml(bills) {
         "</div>",
     )
     .join("");
+}
+
+function realBillReceiptHtml(part) {
+  const heads = ["รหัส", "รายการสินค้า", "จำนวน", "ยอดดิบ", "สุทธิ+VAT"];
+  const meta = [
+    ["ประเภท", part.sourceLabel],
+    ["ร้าน", part.store || "-"],
+    ["เลขบิล", part.displayInv],
+    ["วันที่", dlabel(part.date)],
+    ...(part.tele ? [["Tele ID", part.tele]] : []),
+  ]
+    .map(
+      ([key, value]) =>
+        '<div><b>' +
+        E(key) +
+        ':</b> <span>' +
+        E(value) +
+        "</span></div>",
+    )
+    .join("");
+  const body = part.lines
+    .map(
+      (line, index) =>
+        '<tr data-real-line><td class="c">' +
+        (part.startNo + index) +
+        "</td><td>" +
+        E(line.code || "-") +
+        '</td><td class="itemName">' +
+        E(line.sku) +
+        '</td><td class="r">' +
+        F(line.shownQty) +
+        '</td><td class="r">' +
+        B(line.shownRaw) +
+        '</td><td class="r">' +
+        B(line.shownVat) +
+        "</td></tr>",
+    )
+    .join("");
+  const total = part.isLastPart
+    ? '<tr class="totalRow realBillPrintTotal"><td colspan="3" class="r">รวมทั้งหมด</td><td class="r">' +
+      F(part.qty) +
+      '</td><td class="r">' +
+      B(part.raw) +
+      '</td><td class="r">' +
+      B(part.vat) +
+      "</td></tr>"
+    : '<tr class="totalRow"><td colspan="6" class="r">ต่อใบถัดไป (' +
+      part.partNo +
+      "/" +
+      part.partCount +
+      ")</td></tr>";
+  return (
+    '<section class="receiptPage realBillReceipt" data-real-key="' +
+    E(part.key) +
+    '" data-real-part="' +
+    part.partNo +
+    "/" +
+    part.partCount +
+    '"><div class="receiptTop"><div class="titleWrap"><h1 class="receiptTitle">บิลจริง</h1></div><div class="docBox"><div><b>เลขบิล:</b> ' +
+    E(part.displayInv) +
+    "</div><div><b>ส่วน:</b> " +
+    part.partNo +
+    "/" +
+    part.partCount +
+    '</div></div></div><div class="metaGrid compactMeta">' +
+    meta +
+    '</div><table class="receiptTable"><thead><tr><th style="width:24px">#</th>' +
+    heads.map((head) => "<th>" + E(head) + "</th>").join("") +
+    "</tr></thead><tbody>" +
+    body +
+    blankRows(part.lines.length) +
+    total +
+    '</tbody></table><div class="noteBox" contenteditable="true">หมายเหตุ: </div><div class="signGrid"><div class="signBox" contenteditable="true">ผู้ส่งสินค้า / ผู้จัดทำ</div><div class="signBox" contenteditable="true">ผู้รับสินค้า</div></div></section>'
+  );
+}
+
+export function realBillPagesHtml(bills) {
+  const parts = splitRealBillsForPrint(bills, BILL_ROWS);
+  const pages = [];
+  for (let index = 0; index < parts.length; index += BILLS_PER_A4) {
+    pages.push(parts.slice(index, index + BILLS_PER_A4));
+  }
+  return pages
+    .map(
+      (page) =>
+        '<div class="a4Sheet">' +
+        page.map(realBillReceiptHtml).join("") +
+        Array.from(
+          { length: BILLS_PER_A4 - page.length },
+          () => '<section class="receiptPage emptyBill"></section>',
+        ).join("") +
+        "</div>",
+    )
+    .join("");
+}
+
+function openRealBills(bills) {
+  const overlay = document.createElement("div");
+  overlay.className = "printOverlay printMobileSafeA4 realBillPrint";
+  overlay.innerHTML =
+    printBar("ตรวจ/แก้ไขก่อนปริ้น — บิลจริง") +
+    realBillPagesHtml(bills);
+  document.body.appendChild(overlay);
+  bindOverlay(overlay);
 }
 
 function decodeKey(value) {
@@ -315,7 +433,7 @@ function openGenericPrint(title, heads, rows, options = {}) {
   bindOverlay(overlay);
 }
 
-export function preparePrint({ mode, title }) {
+export function preparePrint({ mode, title, realBills = [] }) {
   if (mode === "pick") {
     const bills = buildBills();
     if (!bills.length) {
@@ -325,6 +443,14 @@ export function preparePrint({ mode, title }) {
     openStoreBills(bills);
     return;
   }
+  if (mode === "ship") {
+    if (!realBills.length) {
+      alert("ไม่มีบิลจริงสำหรับเตรียมปริ้น");
+      return;
+    }
+    openRealBills(realBills);
+    return;
+  }
   let heads = tableHeadsFromDom();
   let rows = tableRowsFromDom();
   if (!rows.length) {
@@ -332,7 +458,7 @@ export function preparePrint({ mode, title }) {
     return;
   }
   let total = null;
-  let finalTitle = mode === "ship" ? "ใบส่งสินค้า / ใบเสร็จรับเงิน" : title;
+  let finalTitle = title;
   let printClass = "";
   if (mode === "order") {
     const order = orderPrintShape(heads, rows);

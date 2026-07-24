@@ -19,6 +19,7 @@ import {
   dlabel,
 } from "./utils.js";
 import {
+  createSelection,
   state,
   snap,
   push,
@@ -44,15 +45,58 @@ import {
   teleRows,
   options,
   group,
-  insertedGroups,
   pickPool,
   distPool,
-  shipPool,
 } from "./filters.js";
+import {
+  createRealBillSelector,
+  REAL_BILL_PAGE_SIZE,
+  renderRealBills,
+} from "./real-bills.js";
 import { publicFetch, resolveCloudPayload } from "./data-source.js";
 import { preparePrint } from "./print.js";
 (() => {
   "use strict";
+  const realBillSelector = createRealBillSelector();
+  let rowsVersion = 0;
+  let realBillPage = 1;
+  let realBillResultKey = "";
+  let realBillRenderToken = 0;
+  let realBillRenderStats = {
+    totalBills: 0,
+    renderedBills: 0,
+    renderedRows: 0,
+  };
+  let realBillPickerSession = null;
+  let realBillPickerToken = 0;
+  const realBillUiMetrics = {
+    pickerOptionsCalls: 0,
+    pickerListRenders: 0,
+  };
+  const corePerformance = {
+    fullRenderCalls: 0,
+    pickPoolCalls: 0,
+    groupCalls: 0,
+    summaryBuilds: 0,
+    manualSentCalls: 0,
+    telesaleModelBuilds: 0,
+    telesaleDrawerRenders: 0,
+    telesaleButtonUpdates: 0,
+    realBillPageRenders: 0,
+    lastFullRenderMs: 0,
+  };
+  const summaryCache = {
+    poolSignature: "",
+    pool: [],
+    totalsSignature: "",
+    totals: null,
+  };
+  const telesaleCache = {
+    signature: "",
+    bills: [],
+  };
+  let fullRenderSequence = 0;
+  let activeFullRender = null;
 
   function msg(s) {
     const m = $("#msg");
@@ -69,6 +113,7 @@ import { preparePrint } from "./print.js";
         ps: "PS",
         orderStores: "ตัดร้านบิลจริง",
         receivers: "ส่งให้ร้าน",
+        billStores: "เลือกร้านบิลจริง",
         brands: "แบรนด์",
         types: "ประเภทสินค้า",
       }[k] || k
@@ -79,7 +124,7 @@ import { preparePrint } from "./print.js";
       {
         pick: "ถอดของ Pro",
         dist: "กระจายสินค้า",
-        ship: "ใบส่งร้านจริง",
+        ship: "บิลจริง",
         done: "จัดแล้ว",
         raw: "รายการดิบ",
         remain: "สรุปของเหลือ",
@@ -87,17 +132,75 @@ import { preparePrint } from "./print.js";
       }[state.mode] || "รายการ"
     );
   }
+  function activePickerKind(requestedKind) {
+    return requestedKind === "receivers" && state.mode === "ship"
+      ? "billStores"
+      : requestedKind;
+  }
+  function keepSelectedPickerOptions(kind, pickerItems) {
+    const optionsByValue = new Map(
+      pickerItems.map((item) => [
+        T(item.value),
+        { ...item, available: true },
+      ]),
+    );
+    const selectedValues = uniq([
+      ...(state.sel[kind] || []),
+      ...(state.pickKind === kind ? state.tmp : []),
+    ]);
+    selectedValues.forEach((value) => {
+      if (optionsByValue.has(value)) return;
+      optionsByValue.set(value, {
+        value,
+        available: false,
+        label:
+          (kind === "dates" ? dlabel(value) : value) +
+          " · เลือกอยู่ — ไม่มีในชุดปัจจุบัน",
+      });
+    });
+    return [...optionsByValue.values()];
+  }
+  function pickerOptions(kind) {
+    let pickerItems;
+    if (
+      state.mode === "ship" &&
+      ["dates", "ps", "orderStores", "billStores", "brands", "types"].includes(
+        kind,
+      )
+    ) {
+      realBillUiMetrics.pickerOptionsCalls += 1;
+      pickerItems = realBillSelector.pickerOptions(
+        kind,
+        state.rows,
+        state.sel,
+        state.q,
+        rowsVersion,
+      );
+    } else {
+      pickerItems = options(kind).map((value) => ({
+        value,
+        label: kind === "dates" ? dlabel(value) : value,
+      }));
+    }
+    return keepSelectedPickerOptions(kind, pickerItems);
+  }
   function undo() {
     if (!state.hist.length) return msg("ไม่มีรายการ Undo");
+    closePick();
     state.redoStack.push(snap());
     restore(state.hist.pop());
+    realBillSelector.refreshFilters();
+    realBillPage = 1;
     render();
     msg("Undo แล้ว");
   }
   function redo() {
     if (!state.redoStack.length) return msg("ไม่มีรายการ Redo");
+    closePick();
     state.hist.push(snap());
     restore(state.redoStack.pop());
+    realBillSelector.refreshFilters();
+    realBillPage = 1;
     render();
     msg("Redo แล้ว");
   }
@@ -109,7 +212,13 @@ import { preparePrint } from "./print.js";
       return "ตัดร้านบิลจริง: ตัด " + F(a.length) + " ร้าน";
     }
     if (!a.length)
-      return lab(k) + ": " + (k === "receivers" ? "ยังไม่เลือก" : "ทั้งหมด");
+      return (
+        lab(k) +
+        ": " +
+        (k === "receivers" || k === "billStores"
+          ? "ยังไม่เลือก"
+          : "ทั้งหมด")
+      );
     if (a.length === 1)
       return lab(k) + ": " + (k === "dates" ? dlabel(a[0]) : a[0]);
     return lab(k) + ": เลือก " + F(a.length) + " รายการ";
@@ -121,66 +230,208 @@ import { preparePrint } from "./print.js";
         if (e) e.textContent = txt(k);
       },
     );
+    const activeStoreKind = activePickerKind("receivers");
+    const storeLabel = lab(activeStoreKind);
+    const label = $("#sendLabelText");
+    if (label) label.textContent = storeLabel + ":";
     const s = $("#sendText");
-    if (s) s.textContent = txt("receivers").replace("ส่งให้ร้าน: ", "");
+    if (s) {
+      s.textContent = txt(activeStoreKind).replace(storeLabel + ": ", "");
+    }
+    const heading = $("#modeHeading");
+    if (heading) heading.textContent = modeName();
   }
-  function openPick(k) {
+  function openPick(requestedKind) {
+    const k = activePickerKind(requestedKind);
     state.pickKind = k;
     state.tmp = [...(state.sel[k] || [])];
     $("#pickTitle").textContent =
       k === "orderStores" ? "ติ๊กเพื่อเอาร้านบิลจริงออก" : lab(k);
-    drawPick();
     $("#pickShade").classList.add("on");
+    if (state.mode !== "ship") {
+      realBillPickerSession = null;
+      drawPick();
+      return;
+    }
+    const token = ++realBillPickerToken;
+    realBillPickerSession = { kind: k, options: null, token };
+    $("#pickList").innerHTML =
+      '<div class="empty realBillPickerLoading">กำลังเตรียมตัวเลือก…</div>';
+    setPickerPending(true);
+    requestAnimationFrame(() => {
+      if (
+        token !== realBillPickerToken ||
+        !realBillPickerSession ||
+        realBillPickerSession.kind !== k
+      ) {
+        return;
+      }
+      const options = pickerOptions(k);
+      if (
+        token !== realBillPickerToken ||
+        !realBillPickerSession ||
+        realBillPickerSession.kind !== k
+      ) {
+        return;
+      }
+      realBillPickerSession.options = options;
+      renderPickerList(options, true);
+      setPickerPending(false);
+    });
+  }
+  function setPickerPending(pending) {
+    const ok = $("#pickOk");
+    const all = $("#pickAll");
+    if (ok) ok.disabled = pending;
+    if (all) all.disabled = pending;
   }
   function closePick() {
+    realBillPickerToken += 1;
+    realBillPickerSession = null;
+    setPickerPending(false);
     $("#pickShade").classList.remove("on");
   }
-  function drawPick() {
-    const o = options(state.pickKind);
+  function renderPickerList(o, frozen = false) {
+    if (frozen) realBillUiMetrics.pickerListRenders += 1;
     $("#pickList").innerHTML = o.length
       ? o
           .map(
-            (x) =>
+            ({ value, label, available }) =>
               '<div class="pickItem ' +
-              (state.tmp.includes(x) ? "on" : "") +
+              (state.tmp.includes(value) ? "on" : "") +
+              (available === false ? " unavailable" : "") +
               '" data-v="' +
-              E(x) +
+              E(value) +
+              '" data-available="' +
+              (available === false ? "0" : "1") +
               '"><span class="box">' +
-              (state.tmp.includes(x) ? "✓" : "") +
+              (state.tmp.includes(value) ? "✓" : "") +
               "</span><span>" +
-              (state.pickKind === "dates" ? E(dlabel(x)) : E(x)) +
+              E(label) +
               "</span></div>",
           )
           .join("")
       : '<div class="empty">ไม่มีรายการให้เลือก</div>';
-    $$(".pickItem").forEach(
+    $("#pickList")
+      .querySelectorAll(".pickItem")
+      .forEach(
       (i) =>
         (i.onclick = () => {
           const v = i.dataset.v;
           state.tmp = state.tmp.includes(v)
             ? state.tmp.filter((x) => x !== v)
             : state.tmp.concat(v);
-          drawPick();
+          if (frozen) {
+            syncPickerItems();
+          } else {
+            drawPick();
+          }
         }),
     );
   }
+  function drawPick() {
+    renderPickerList(pickerOptions(state.pickKind));
+  }
+  function syncPickerItems() {
+    $("#pickList")
+      .querySelectorAll(".pickItem")
+      .forEach((item) => {
+        const active = state.tmp.includes(item.dataset.v);
+        item.classList.toggle("on", active);
+        const box = item.querySelector(".box");
+        if (box) box.textContent = active ? "✓" : "";
+      });
+  }
   function applyPick() {
+    if (state.mode === "ship" && !realBillPickerSession?.options) {
+      return msg("กำลังเตรียมตัวเลือก กรุณารอสักครู่");
+    }
     push();
     state.sel[state.pickKind] = [...state.tmp];
     state.page = 1;
+    realBillPage = 1;
+    realBillSelector.refreshFilters();
     closePick();
     render();
     msg("ใช้ตัวเลือกแล้ว");
   }
   function clearPick() {
     state.tmp = [];
-    drawPick();
+    if (realBillPickerSession) syncPickerItems();
+    else drawPick();
   }
   function allPick() {
-    state.tmp = options(state.pickKind);
-    drawPick();
+    const pickerItems = realBillPickerSession?.options;
+    if (realBillPickerSession && !pickerItems) {
+      return msg("กำลังเตรียมตัวเลือก กรุณารอสักครู่");
+    }
+    state.tmp = (pickerItems || pickerOptions(state.pickKind))
+      .filter(({ available }) => available !== false)
+      .map(({ value }) => value);
+    if (realBillPickerSession) syncPickerItems();
+    else drawPick();
+  }
+  function summaryPoolSignature() {
+    return JSON.stringify([
+      rowsVersion,
+      state.sel.dates,
+      state.sel.ps,
+      state.sel.orderStores,
+      state.sel.brands,
+      state.sel.types,
+      T(state.q).toLowerCase(),
+      state.ins,
+    ]);
+  }
+  function summaryTotalsSignature(poolSignature) {
+    return JSON.stringify([
+      poolSignature,
+      state.send,
+      state.add,
+      state.pull,
+    ]);
+  }
+  function invalidateSummary() {
+    summaryCache.poolSignature = "";
+    summaryCache.pool = [];
+    summaryCache.totalsSignature = "";
+    summaryCache.totals = null;
+  }
+  function currentSummary() {
+    const poolSignature = summaryPoolSignature();
+    if (summaryCache.poolSignature !== poolSignature) {
+      corePerformance.pickPoolCalls += 1;
+      corePerformance.groupCalls += 1;
+      summaryCache.pool = pickPool();
+      summaryCache.poolSignature = poolSignature;
+      summaryCache.totalsSignature = "";
+    }
+    const totalsSignature = summaryTotalsSignature(poolSignature);
+    if (
+      summaryCache.totalsSignature !== totalsSignature ||
+      !summaryCache.totals
+    ) {
+      const totals = { total: 0, sent: 0, remain: 0, raw: 0, net: 0 };
+      summaryCache.pool.forEach((item) => {
+        const sent = manualSent(item);
+        totals.total += N(item.qty);
+        totals.sent += sent;
+        totals.remain +=
+          N(item.qty) -
+          sent +
+          sumMap(state.add, item.poolKey) -
+          sumMap(state.pull, item.poolKey);
+        totals.raw += N(item.rawAmt);
+        totals.net += N(item.netAmt);
+      });
+      summaryCache.totals = totals;
+      summaryCache.totalsSignature = totalsSignature;
+      corePerformance.summaryBuilds += 1;
+    }
+    return { pool: summaryCache.pool, ...summaryCache.totals };
   }
   function manualSent(g) {
+    corePerformance.manualSentCalls += 1;
     return sumMap(state.send, g.poolKey);
   }
   function remain(g) {
@@ -315,6 +566,7 @@ import { preparePrint } from "./print.js";
     return h + "</tbody>";
   }
   function simpleTable(title, heads, body) {
+    showRealBillSurface(false);
     $("#tableCount").textContent = title;
     $("#table").innerHTML =
       "<thead><tr>" +
@@ -327,7 +579,90 @@ import { preparePrint } from "./print.js";
       "</tbody>";
     $("#pager").innerHTML = "";
   }
-  function renderMode(pool) {
+  function showRealBillSurface(active) {
+    const table = $("#table");
+    const tableWrap = table?.closest(".tableWrap");
+    const realBills = $("#realBills");
+    const pageControls = $("#pager");
+    if (table) table.hidden = active;
+    if (tableWrap) tableWrap.hidden = active;
+    if (realBills) realBills.hidden = !active;
+    if (pageControls) pageControls.hidden = active;
+  }
+  function currentRealBillResult() {
+    return realBillSelector.select(
+      state.rows,
+      state.sel,
+      state.q,
+      rowsVersion,
+    );
+  }
+  function markFullRenderReady(renderId) {
+    if (!renderId || activeFullRender?.id !== renderId) return;
+    corePerformance.lastFullRenderMs =
+      performance.now() - activeFullRender.startedAt;
+    activeFullRender = null;
+  }
+  function renderRealBillResult(result, renderId = 0) {
+    if (result.resultKey !== realBillResultKey) {
+      realBillResultKey = result.resultKey;
+      realBillPage = 1;
+    }
+    $("#tableCount").textContent = result.requiresSelection
+      ? "บิลจริง · เลือกร้านหรือค้นหาเพื่อแสดงข้อมูล"
+      : "บิลจริง " + F(result.bills.length) + " บิล";
+    const model = renderRealBills($("#realBills"), result, {
+      page: realBillPage,
+      pageSize: REAL_BILL_PAGE_SIZE,
+      onPage: (nextPage) => {
+        realBillPage = nextPage;
+        corePerformance.realBillPageRenders += 1;
+        renderRealBillResult(result);
+      },
+    });
+    realBillPage = model?.currentPage || 1;
+    realBillRenderStats = {
+      totalBills: model?.totalBills || 0,
+      renderedBills: model?.visibleBills.length || 0,
+      renderedRows: model?.visibleRows || 0,
+    };
+    markFullRenderReady(renderId);
+  }
+  function renderRealBillMode(renderId) {
+    showRealBillSurface(true);
+    const requiresSelection =
+      !state.sel.billStores.length && !T(state.q);
+    if (requiresSelection) {
+      realBillRenderToken += 1;
+      renderRealBillResult(currentRealBillResult());
+      return false;
+    }
+    if (
+      realBillSelector.hasCandidate(
+        state.rows,
+        state.sel,
+        rowsVersion,
+      )
+    ) {
+      realBillRenderToken += 1;
+      renderRealBillResult(currentRealBillResult());
+      return false;
+    }
+    const token = ++realBillRenderToken;
+    $("#tableCount").textContent = "บิลจริง · กำลังเตรียมข้อมูล";
+    $("#realBills").innerHTML =
+      '<div class="empty realBillsEmpty realBillsLoading">กำลังเตรียมบิลจริง…</div>';
+    requestAnimationFrame(() => {
+      if (token !== realBillRenderToken || state.mode !== "ship") return;
+      renderRealBillResult(currentRealBillResult(), renderId);
+    });
+    return true;
+  }
+  function renderMode(pool, renderId) {
+    if (state.mode !== "ship") {
+      realBillRenderToken += 1;
+      showRealBillSurface(false);
+    }
     if (state.mode === "pick") {
       $("#table").innerHTML = pickTable(pool);
       bindQuantityInputs({
@@ -352,36 +687,10 @@ import { preparePrint } from "./print.js";
       return;
     }
     if (state.mode === "ship") {
-      const p = shipPool();
-      simpleTable(
-        "ใบส่งร้านจริง " +
-          (rec() || "ยังไม่เลือก") +
-          " · จากไฟล์ DOIT " +
-          F(p.length) +
-          " รายการ",
-        ["#", "สินค้า", "จำนวน", "ยอดดิบ", "ยอดสุทธิ", "รวม VAT"],
-        p
-          .map(
-            (g, i) =>
-              "<tr><td>" +
-              (i + 1) +
-              "</td><td>" +
-              E(g.sku) +
-              "</td><td>" +
-              F(g.qty) +
-              "</td><td>" +
-              B(g.rawAmt) +
-              "</td><td>" +
-              B(g.netAmt) +
-              "</td><td>" +
-              B((N(g.netAmt) || N(g.rawAmt)) * 1.07) +
-              "</td></tr>",
-          )
-          .join(""),
-      );
-      return;
+      return renderRealBillMode(renderId);
     }
     if (state.mode === "order") {
+      corePerformance.groupCalls += 1;
       const grouped = group(
         state.rows.filter(
           (row) =>
@@ -397,6 +706,7 @@ import { preparePrint } from "./print.js";
       return;
     }
     if (state.mode === "dist") {
+      corePerformance.groupCalls += 1;
       const p = distPool();
       simpleTable(
         "กระจายสินค้า จากไฟล์ DOIT รวมทุกวัน · " + F(p.length) + " รายการ",
@@ -529,10 +839,36 @@ import { preparePrint } from "./print.js";
         }),
     );
   }
+  function telesaleSignature() {
+    return JSON.stringify([
+      rowsVersion,
+      state.sel.dates,
+      state.sel.ps,
+    ]);
+  }
+  function invalidateTelesale() {
+    telesaleCache.signature = "";
+    telesaleCache.bills = [];
+  }
   function teleBills() {
-    return buildTelesaleBills(teleRows());
+    const signature = telesaleSignature();
+    if (telesaleCache.signature !== signature) {
+      telesaleCache.bills = buildTelesaleBills(teleRows());
+      telesaleCache.signature = signature;
+      corePerformance.telesaleModelBuilds += 1;
+    }
+    return telesaleCache.bills;
+  }
+  function updateTelesaleButton() {
+    const button = $("#teleBtn");
+    if (button) {
+      button.textContent =
+        "บิล Telesale (" + F(teleBills().length) + ")";
+    }
+    corePerformance.telesaleButtonUpdates += 1;
   }
   function renderTele() {
+    corePerformance.telesaleDrawerRenders += 1;
     state.telePage = renderTelesaleDrawer({
       bills: teleBills(),
       page: state.telePage,
@@ -542,15 +878,19 @@ import { preparePrint } from "./print.js";
       },
     });
   }
-  function render() {
+  function render(startedAt = performance.now()) {
+    const renderId = ++fullRenderSequence;
+    corePerformance.fullRenderCalls += 1;
+    activeFullRender = { id: renderId, startedAt };
     fixUi();
     updText();
-    const pool = pickPool(),
-      tot = pool.reduce((s, g) => s + g.qty, 0),
-      sent = pool.reduce((s, g) => s + manualSent(g), 0),
-      rem = pool.reduce((s, g) => s + remain(g), 0),
-      raw = pool.reduce((s, g) => s + N(g.rawAmt), 0),
-      net = pool.reduce((s, g) => s + N(g.netAmt), 0);
+    const summary = currentSummary(),
+      pool = summary.pool,
+      tot = summary.total,
+      sent = summary.sent,
+      rem = summary.remain,
+      raw = summary.raw,
+      net = summary.net;
     $("#amount").textContent =
       "฿ " +
       (raw ? B(raw) : "—") +
@@ -568,25 +908,27 @@ import { preparePrint } from "./print.js";
         ["pick", "dist", "ship", "done", "raw", "order"][i] === state.mode,
       ),
     );
-    renderMode(pool);
-    renderTele();
+    const renderPending = Boolean(renderMode(pool, renderId));
+    updateTelesaleButton();
+    if ($("#teleDrawer")?.classList.contains("on")) renderTele();
     save();
+    if (!renderPending) markFullRenderReady(renderId);
   }
   function loadData(p, m = {}) {
+    closePick();
     state.rows = arr(p).map(norm);
+    rowsVersion += 1;
+    realBillSelector.invalidate();
+    invalidateSummary();
+    invalidateTelesale();
+    realBillPage = 1;
+    realBillResultKey = "";
     state.key = m.id || p?.version_id || m.file_name || "active";
     state.send = {};
     state.add = {};
     state.pull = {};
     state.ins = [];
-    state.sel = {
-      dates: [],
-      ps: [],
-      orderStores: [],
-      receivers: [],
-      brands: [],
-      types: [],
-    };
+    state.sel = createSelection();
     state.q = "";
     state.page = 1;
     state.mode = "pick";
@@ -801,23 +1143,22 @@ import { preparePrint } from "./print.js";
     $("#cloudCheckBtn").onclick = check;
     $("#cloudLoadBtn").onclick = loadCloud;
     $("#searchBtn").onclick = () => {
+      closePick();
       push();
       state.q = $("#q").value;
       state.page = 1;
+      realBillPage = 1;
+      realBillSelector.refreshFilters();
       render();
     };
     $("#clearFilter").onclick = () => {
+      closePick();
       push();
-      state.sel = {
-        dates: [],
-        ps: [],
-        orderStores: [],
-        receivers: [],
-        brands: [],
-        types: [],
-      };
+      state.sel = createSelection();
       state.q = "";
       state.page = 1;
+      realBillPage = 1;
+      realBillSelector.refreshFilters();
       render();
       msg("ล้างตัวกรองแล้ว");
     };
@@ -839,7 +1180,12 @@ import { preparePrint } from "./print.js";
     };
     $("#insertBtn").onclick = addInsert;
     $("#prepPrint").onclick = () =>
-      preparePrint({ mode: state.mode, title: modeName() });
+      preparePrint({
+        mode: state.mode,
+        title: modeName(),
+        realBills:
+          state.mode === "ship" ? currentRealBillResult().bills : undefined,
+      });
     $("#exportCsv").onclick = exportCsv;
     const cs = $("#copySummary");
     if (cs) cs.onclick = copySummary;
@@ -864,11 +1210,14 @@ import { preparePrint } from "./print.js";
     $$(".tab").forEach(
       (t, i) =>
         (t.onclick = () => {
+          const startedAt = performance.now();
+          closePick();
           push();
           state.mode =
             ["pick", "dist", "ship", "done", "raw", "order"][i] || "pick";
           state.page = 1;
-          render();
+          if (state.mode === "ship") realBillPage = 1;
+          render(startedAt);
           msg("เปลี่ยนโหมด: " + T(t.textContent));
         }),
     );
@@ -878,11 +1227,14 @@ import { preparePrint } from "./print.js";
     const telesale = teleRows();
     return {
       rows: state.rows.length,
-      pickRows: sourceRows().length,
-      shipRows: shipPool().length,
+      pickRows: summaryCache.pool.reduce(
+        (sum, item) => sum + (item.rows?.length || 0),
+        0,
+      ),
+      realBills: realBillRenderStats.totalBills,
       distRows: sourceRows({ ignoreDate: true }).length,
-      teleRows: state.rows.filter((row) => row.isTele).length,
-      teleBills: teleBills().length,
+      teleRows: telesale.length,
+      teleBills: telesaleCache.bills.length,
       teleQty: telesale.reduce((sum, row) => sum + N(row.qty), 0),
       teleRaw: telesale.reduce((sum, row) => sum + N(row.rawAmt), 0),
       teleVat: telesale.reduce(
@@ -893,6 +1245,16 @@ import { preparePrint } from "./print.js";
       telePage: state.telePage,
       telePageSize: TELE_PAGE_SIZE,
       receivers: state.sel.receivers,
+      billStores: state.sel.billStores,
+      realBillPerformance: {
+        ...realBillSelector.stats(),
+        ...realBillUiMetrics,
+        ...realBillRenderStats,
+        ...corePerformance,
+        rowsVersion,
+        page: realBillPage,
+        pageSize: REAL_BILL_PAGE_SIZE,
+      },
       manualKeys: Object.keys(state.send).length,
       inserted: state.ins.length,
       mode: state.mode,
