@@ -58,7 +58,7 @@ const OCR_ALIASES: Record<PromoClassId, string[]> = {
   HFSM: ['HFSM', 'HFSWH', 'HFSH', 'HFSN', 'HFSIV', 'HFSRN', 'HFSW'],
   HFSL: ['HFSL', 'HFSI', 'HFS1'],
   HFSXL: ['HFSXL', 'HFSX1', 'HFSXI'],
-  'HFSWS-S': ['HFSWSS', 'HFSWS5', 'HFSW5S', 'HFSWHSS', 'HFSWSSS'],
+  'HFSWS-S': ['HFSWSS', 'HFSWS5', 'HFSW5S', 'HFSWHSS', 'HFSWSSS', 'HFSW55', 'HFSVVS5', 'HFSVVSS', 'HFSWSS5'],
   'HFSWS-L': ['HFSWSL', 'HFSWS1', 'HFSWSI', 'HFSWHSL'],
 };
 
@@ -160,11 +160,23 @@ export function classifyClassText(values: unknown | unknown[]): ClassTextEvidenc
 
   const ranked = PROMO_CLASS_IDS
     .map(classId => ({ classId, score: scores[classId] }))
-    .sort((left, right) => right.score - left.score || PROMO_CLASS_IDS.indexOf(left.classId) - PROMO_CLASS_IDS.indexOf(right.classId));
+    .sort((left, right) => (
+      right.score - left.score
+      || CANONICAL_COMPACT[right.classId].length - CANONICAL_COMPACT[left.classId].length
+      || PROMO_CLASS_IDS.indexOf(left.classId) - PROMO_CLASS_IDS.indexOf(right.classId)
+    ));
   const best = ranked[0];
   const second = ranked[1];
   const margin = best.score - second.score;
-  const accepted = best.score >= 0.72 && (best.score >= 0.9 || margin >= 0.12);
+  const compoundSpecificity = best.score >= 0.9
+    && best.classId.startsWith('HFSWS-')
+    && !second.classId.startsWith('HFSWS-');
+  const accepted = best.score >= 0.72 && (
+    second.score === 0
+    || margin >= 0.12
+    || (best.score >= 0.9 && second.score < 0.9)
+    || compoundSpecificity
+  );
   return {
     classId: accepted ? best.classId : null,
     confidence: Number((accepted ? Math.min(1, best.score * 0.82 + Math.max(0, margin) * 0.35) : best.score).toFixed(3)),
