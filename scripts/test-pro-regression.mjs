@@ -231,6 +231,21 @@ assert.match(
   /TSKU-001/,
   "Combined Order must visibly render Telesale SKU code TSKU-001",
 );
+assert.match(
+  renderedOrderBody,
+  /data-print-value="สินค้า Telesale 001"/,
+  "Combined Order product cell must expose the product name for printing",
+);
+assert.match(
+  renderedOrderBody,
+  new RegExp(`data-print-value="${fixtureMeta.numericProductName}"`),
+  "Combined Order print value must preserve numbers inside the product name",
+);
+assert.match(
+  renderedOrderBody,
+  new RegExp(`<small>${fixtureMeta.numericProductCode}</small>`),
+  "Combined Order screen must keep the separate numeric product code visible",
+);
 
 state.sel.dates = [fixtureMeta.date];
 assert.equal(filteredOrderRows().length, fixtureMeta.totalRows);

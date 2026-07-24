@@ -138,6 +138,39 @@ async function expectCombinedOrder(page) {
   );
 }
 
+async function expectOrderPrintNamesOnly(page) {
+  const telesaleCell = page.locator(
+    '#table td[data-print-value="สินค้า Telesale 001"]',
+  );
+  await expect(telesaleCell).toHaveCount(1);
+  await expect(telesaleCell).toContainText("สินค้า Telesale 001");
+  await expect(telesaleCell).toContainText("TSKU-001");
+  await expect(telesaleCell).toHaveAttribute(
+    "data-print-value",
+    "สินค้า Telesale 001",
+  );
+
+  const numericNameCell = page.locator(
+    `#table td[data-print-value="${fixtureMeta.numericProductName}"]`,
+  );
+  await expect(numericNameCell).toHaveCount(1);
+  await expect(numericNameCell).toContainText(fixtureMeta.numericProductName);
+  await expect(numericNameCell).toContainText(fixtureMeta.numericProductCode);
+
+  await page.locator("#prepPrint").click();
+  const overlay = page.locator(".printOverlay.orderPrint");
+  await expect(overlay).toBeVisible();
+  await expect(overlay).toContainText("สินค้า Telesale 001");
+  await expect(overlay).not.toContainText("TSKU-001");
+  await expect(overlay).toContainText(fixtureMeta.numericProductName);
+  await expect(overlay).not.toContainText(fixtureMeta.numericProductCode);
+
+  await overlay.locator("[data-print-close]").click();
+  await expect(overlay).toHaveCount(0);
+  await expect(page.locator("#table")).toContainText("TSKU-001");
+  await expect(page.locator("#table")).toContainText(fixtureMeta.numericProductCode);
+}
+
 function requestBasename(url) {
   try {
     return new URL(url).pathname.split("/").pop();
@@ -186,6 +219,7 @@ test("combines PS and Telesale in the real Combined Order tab for XLSX and XLSM"
     await uploadFixture(page, file);
     await openOrderMode(page);
     await expectCombinedOrder(page);
+    await expectOrderPrintNamesOnly(page);
 
     await chooseOnly(page, "dates", fixtureMeta.date);
     await expectCombinedOrder(page);
@@ -320,6 +354,8 @@ test("keeps the active Pro flow, state, mobile layout and print contract", async
     fixtureMeta.printBills,
   );
   await expect(overlay.locator("tr[data-line]")).toHaveCount(fixtureMeta.sentRows);
+  await expect(overlay.locator(".receiptTable thead")).toContainText("รหัส");
+  await expect(overlay.locator("tr[data-line]").first()).toContainText("SKU-001");
   await expect(overlay).not.toContainText("สินค้า Fixture 026");
   const printShape = await overlay.evaluate((element) => {
     const pages = [...element.querySelectorAll(".receiptPage:not(.emptyBill)")];

@@ -19,7 +19,9 @@ export function renderOrderMode(groups, simpleTable) {
       return (
         "<tr><td>" +
         (index + 1) +
-        '</td><td class="p"><b>' +
+        '</td><td class="p" data-print-value="' +
+        E(group.sku) +
+        '"><b>' +
         E(group.sku) +
         "</b>" +
         code +
