@@ -276,7 +276,7 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       ]);
       if (!headerEvidence.classId && classEvidence.classId) warnings.push(`page:${pageNumber}:class_page_text_fallback:${classEvidence.classId}`);
       if (grid.regions.length && options.enableOcr && (!classEvidence.classId || classEvidence.confidence < 0.9)) {
-        progress('ocr', pageNumber, `หน้า ${pageNumber}: จำแนก Class จากหัวซ้ายบน`);
+        progress('ocr', pageNumber, `หน้า ${pageNumber}: จำแนก Class จากหัวเอกสาร`);
         try {
           headerTexts.push(...await headerClassOcr(await ensureWorker(), canvas));
           classEvidence = classifyPageClassText(headerTexts, [
@@ -290,7 +290,12 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
 
       const classId = classEvidence.classId;
       const headerText = clean([...headerTexts, classEvidence.classId ? `CLASS:${classEvidence.classId}` : ''].filter(Boolean).join(' | '));
-      pageClassObservations.push({ page: pageNumber, texts: headerTexts, headerColor: headerColorEvidence(canvas), hasCards: grid.regions.length > 0 });
+      pageClassObservations.push({
+        page: pageNumber,
+        texts: classEvidence.classId ? [...headerTexts, `CLASS:${classEvidence.classId}`] : headerTexts,
+        headerColor: headerColorEvidence(canvas),
+        hasCards: grid.regions.length > 0,
+      });
       if (grid.diagnostics.status !== 'ok') warnings.push(...grid.diagnostics.reasons.map(reason => `page:${pageNumber}:${reason}`));
 
       for (const [index, bounds] of grid.regions.entries()) {
