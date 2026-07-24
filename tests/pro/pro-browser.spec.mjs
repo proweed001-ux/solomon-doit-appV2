@@ -354,7 +354,10 @@ test("keeps the active Pro flow, state, mobile layout and print contract", async
     fixtureMeta.printBills,
   );
   await expect(overlay.locator("tr[data-line]")).toHaveCount(fixtureMeta.sentRows);
-  await expect(overlay.locator(".receiptTable thead")).toContainText("รหัส");
+  await expect(overlay.locator(".receiptTable thead")).toHaveCount(
+    fixtureMeta.printBills,
+  );
+  await expect(overlay.locator(".receiptTable thead").first()).toContainText("รหัส");
   await expect(overlay.locator("tr[data-line]").first()).toContainText("SKU-001");
   await expect(overlay).not.toContainText("สินค้า Fixture 026");
   const printShape = await overlay.evaluate((element) => {
