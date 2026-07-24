@@ -61,6 +61,25 @@ test('WS-S และ WS-L ไม่ถูกยุบเป็น M แม้ OC
   assert.equal(normalizeClassId('HFS-WS-1'), 'HFSWS-L');
 });
 
+test('WS-S ที่เฉพาะกว่าชนะเมื่อหน้าเดียวมีข้อความ HFS-S ปะปน', () => {
+  const evidence = classifyClassText([
+    'ข้อความอ้างอิงสำหรับร้าน HFS-S',
+    'หัวหน้าปัจจุบัน HFS-WS-S',
+  ]);
+  assert.equal(evidence.classId, 'HFSWS-S');
+});
+
+test('WS-S และ WS-L ที่ชัดเท่ากันต้องไม่เดาเลือกข้างใดข้างหนึ่ง', () => {
+  const evidence = classifyClassText(['HFS-WS-S', 'HFS-WS-L']);
+  assert.equal(evidence.classId, null);
+});
+
+test('อ่าน OCR เพี้ยนของ WS-S ที่ W กลายเป็น VV และ S กลายเป็น 5', () => {
+  for (const value of ['HFS-VVS-S', 'HFS-VVS-5', 'HFS-W5-5']) {
+    assert.equal(normalizeClassId(value), 'HFSWS-S', value);
+  }
+});
+
 test('ข้อความที่ไม่มีหลักฐาน Class ไม่ถูกเดาเป็น S หรือ M', () => {
   assert.equal(normalizeClassId('PROMOTION JULY 2026 PAGE 4'), null);
   assert.equal(normalizeClassId('HEAD AND SHOULDERS SHAMPOO 140 ML'), null);
