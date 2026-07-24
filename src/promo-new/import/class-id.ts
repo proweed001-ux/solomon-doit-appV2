@@ -102,7 +102,7 @@ function extractTokens(rawText: string): string[] {
   }
 
   if (/^(?:HFS)?(?:S|M|L|XL|WSS|WSL|WH|H|N|IV)$/u.test(compact)) tokens.add(compact.startsWith('HFS') ? compact : `HFS${compact}`);
-  const contextual = normalized.match(/(?:CLASS|กลุ่ม|ระดับ|ร้าน)\s*[:=-]?\s*(?:HFS\s*[-_/]?\s*)?(S|M|L|XL|WS[- ]?S|WS[- ]?L|WH|H|N|IV)\b/u)?.[1];
+  const contextual = normalized.match(/(?:CLASS|คลาส|กลุ่ม|ระดับ|ขนาด|ประเภท|ร้าน(?:ค้า)?(?:ขนาด)?)\s*[:=-]?\s*(?:HFS\s*[-_/]?\s*)?(S|M|L|XL|WS[- ]?S|WS[- ]?L|WH|H|N|IV)\b/u)?.[1];
   if (contextual) tokens.add(`HFS${compactClass(contextual)}`);
   return [...tokens];
 }
@@ -173,6 +173,15 @@ export function classifyClassText(values: unknown | unknown[]): ClassTextEvidenc
     scores,
     rawText,
   };
+}
+
+export function classifyPageClassText(headerValues: unknown[], pageValues: unknown[]): ClassTextEvidence {
+  const header = classifyClassText(headerValues);
+  if (header.classId && header.confidence >= 0.9) return header;
+  const fallback = classifyClassText([...headerValues, ...pageValues]);
+  if (!fallback.classId) return header;
+  if (!header.classId || fallback.confidence >= header.confidence) return fallback;
+  return header;
 }
 
 export function normalizeClassId(value: string): string | null {
