@@ -102,6 +102,42 @@ async function chooseOnly(page, kind, label) {
   await expect(page.locator(`[data-pick="${kind}"]`)).toContainText(visibleLabel);
 }
 
+async function openOrderMode(page) {
+  await page.locator(".orderTab").click();
+  await expect(page.locator("#tableCount")).toContainText(
+    "รวม order PS + Telesale",
+  );
+}
+
+async function expectCombinedOrder(page) {
+  await expect(page.locator("#tableCount")).toContainText(
+    `${fixtureMeta.orderGroups.toLocaleString("th-TH")} รายการ`,
+  );
+  await expect(page.locator("#table tbody tr:not(.nativeOrderTotal)")).toHaveCount(
+    fixtureMeta.orderGroups,
+  );
+  await expect(page.locator("#table")).toContainText("TSKU-001");
+  const total = page.locator("#table .nativeOrderTotal");
+  await expect(total).toContainText(
+    fixtureMeta.orderQty.toLocaleString("th-TH"),
+  );
+  await expect(total).toContainText(
+    fixtureMeta.orderRawAmount.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+    }),
+  );
+  await expect(total).toContainText(
+    fixtureMeta.orderNetAmount.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+    }),
+  );
+  await expect(total).toContainText(
+    fixtureMeta.orderVatAmount.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+    }),
+  );
+}
+
 function requestBasename(url) {
   try {
     return new URL(url).pathname.split("/").pop();
@@ -139,6 +175,49 @@ test("uploads real XLSX and XLSM fixtures through the file input", async ({
   expect(runtime.requests.some((url) => /cdn\.jsdelivr|unpkg\.com/i.test(url))).toBe(
     false,
   );
+  expect(runtime.errors).toEqual([]);
+});
+
+test("combines PS and Telesale in the real Combined Order tab for XLSX and XLSM", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  for (const file of [fixtureFiles.xlsx, fixtureFiles.xlsm]) {
+    await uploadFixture(page, file);
+    await openOrderMode(page);
+    await expectCombinedOrder(page);
+
+    await chooseOnly(page, "dates", fixtureMeta.date);
+    await expectCombinedOrder(page);
+    await chooseOnly(page, "ps", fixtureMeta.ps);
+    await expectCombinedOrder(page);
+
+    await chooseOnly(page, "orderStores", fixtureMeta.receiver);
+    await expect(page.locator("#tableCount")).toContainText(
+      `${fixtureMeta.teleRows.toLocaleString("th-TH")} รายการ`,
+    );
+    await expect(page.locator("#table")).toContainText("TSKU-001");
+
+    await page.locator("#clearFilter").click();
+    await openOrderMode(page);
+    await chooseOnly(page, "brands", "Fixture Brand");
+    await expect(page.locator("#tableCount")).toContainText(
+      `${fixtureMeta.normalRows.toLocaleString("th-TH")} รายการ`,
+    );
+    await expect(page.locator("#table")).not.toContainText("สินค้า Telesale 001");
+
+    await page.locator("#clearFilter").click();
+    await openOrderMode(page);
+    await chooseOnly(page, "types", "INVC");
+    await expectCombinedOrder(page);
+
+    await page.locator("#q").fill("TSKU-001");
+    await page.locator("#searchBtn").click();
+    await expect(page.locator("#tableCount")).toContainText("1 รายการ");
+    await expect(page.locator("#table")).toContainText("TSKU-001");
+
+    await page.locator("#clearFilter").click();
+  }
   expect(runtime.errors).toEqual([]);
 });
 

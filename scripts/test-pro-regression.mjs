@@ -1,7 +1,22 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { group, sourceRows, teleRows } from "../dist/assets/pro/filters.js";
+import {
+  group,
+  okBrand,
+  okCut,
+  okDate,
+  okPs,
+  okQ,
+  okType,
+  sourceRows,
+  teleRows,
+} from "../dist/assets/pro/filters.js";
 import { norm } from "../dist/assets/pro/parser-adapter.js";
+import { renderOrderMode } from "../dist/assets/pro/order.js";
+import {
+  browserFixtureRows,
+  fixtureMeta,
+} from "./fixtures/pro-browser-fixture.mjs";
 import {
   BILL_ROWS,
   BILLS_PER_A4,
@@ -157,5 +172,128 @@ assert.doesNotMatch(appSource, /pro-native-core\.js/);
 assert.match(coreSource, /currentStateSource: "state-module"/);
 assert.doesNotMatch(appSource, /pro-native-core-overrides\.js/);
 assert.doesNotMatch(appSource, /pro-print-(?:store-bills|mode-fixes|column-widths|a4-pro-fix)\.js/);
+
+const orderRows = browserFixtureRows().map(norm);
+const filteredOrderRows = () =>
+  state.rows.filter(
+    (row) =>
+      okDate(row) &&
+      okPs(row) &&
+      okCut(row) &&
+      okBrand(row) &&
+      okType(row) &&
+      okQ(row),
+  );
+state.rows = orderRows;
+state.sel = createSelection();
+state.q = "";
+const orderGroups = group(filteredOrderRows());
+assert.equal(state.rows.length, fixtureMeta.totalRows);
+assert.equal(
+  state.rows.filter((row) => !row.isTele).length,
+  fixtureMeta.normalRows,
+);
+assert.equal(
+  state.rows.filter((row) => row.isTele).length,
+  fixtureMeta.teleRows,
+);
+assert.equal(orderGroups.length, fixtureMeta.orderGroups);
+assert.equal(
+  orderGroups.reduce((sum, item) => sum + item.qty, 0),
+  fixtureMeta.orderQty,
+);
+assert.equal(
+  orderGroups.reduce((sum, item) => sum + item.rawAmt, 0),
+  fixtureMeta.orderRawAmount,
+);
+assert.equal(
+  orderGroups.reduce((sum, item) => sum + item.netAmt, 0),
+  fixtureMeta.orderNetAmount,
+);
+assert.ok(
+  Math.abs(
+    orderGroups.reduce(
+      (sum, item) => sum + (item.netAmt || item.rawAmt) * 1.07,
+      0,
+    ) - fixtureMeta.orderVatAmount,
+  ) < 1e-9,
+);
+assert.ok(
+  orderGroups.some((item) => item.code === "TSKU-001"),
+  "Combined Order must include Telesale SKU TSKU-001",
+);
+let renderedOrderBody = "";
+renderOrderMode(orderGroups, (_title, _heads, body) => {
+  renderedOrderBody = body;
+});
+assert.match(
+  renderedOrderBody,
+  /TSKU-001/,
+  "Combined Order must visibly render Telesale SKU code TSKU-001",
+);
+
+state.sel.dates = [fixtureMeta.date];
+assert.equal(filteredOrderRows().length, fixtureMeta.totalRows);
+state.sel.ps = [fixtureMeta.ps];
+assert.equal(filteredOrderRows().length, fixtureMeta.totalRows);
+state.sel.orderStores = [fixtureMeta.receiver];
+assert.equal(filteredOrderRows().length, fixtureMeta.teleRows);
+assert.equal(
+  filteredOrderRows().filter((row) => row.isTele).length,
+  fixtureMeta.teleRows,
+);
+state.sel.orderStores = [];
+state.sel.brands = ["Fixture Tele Brand"];
+assert.equal(filteredOrderRows().length, fixtureMeta.teleRows);
+state.sel.brands = [];
+state.sel.types = ["INVC"];
+assert.equal(filteredOrderRows().length, fixtureMeta.totalRows);
+state.q = "TSKU-001";
+assert.equal(filteredOrderRows().length, 1);
+assert.equal(filteredOrderRows()[0].isTele, true);
+
+const sharedKeyRows = [
+  norm({
+    InvoiceDate: "2026-07-16",
+    InvoiceNo: "INV-PS-SHARED",
+    SOTypeID: "INVC",
+    SO_SalespersonID: "AYAPS999",
+    CustomerName: "ร้าน PS",
+    SKUCode: "SHARED-001",
+    SKUDescription: "สินค้า Group Key ร่วม",
+    GroupBrand: "Shared Brand",
+    TAS_SizeGroup: "Shared Size",
+    ShipQtyPCS: 10,
+    LineAmtBeforeDisc: 100,
+    InvoiceAmt: 90,
+  }),
+  norm({
+    InvoiceDate: "2026-07-16",
+    InvoiceNo: "INV-TELE-SHARED",
+    SOTypeID: "INVC",
+    SO_SalespersonID: "AYAPS999",
+    TelesaleID: "TELE-SHARED",
+    CustomerName: "ร้าน Telesale",
+    SKUCode: "SHARED-001",
+    SKUDescription: "สินค้า Group Key ร่วม",
+    GroupBrand: "Shared Brand",
+    TAS_SizeGroup: "Shared Size",
+    ShipQtyPCS: 5,
+    LineAmtBeforeDisc: 60,
+    InvoiceAmt: 50,
+  }),
+];
+assert.equal(sharedKeyRows[0].isTele, false);
+assert.equal(sharedKeyRows[1].isTele, true);
+const sharedKeyGroups = group(sharedKeyRows);
+assert.equal(sharedKeyGroups.length, 1);
+assert.equal(sharedKeyGroups[0].qty, 15);
+assert.equal(sharedKeyGroups[0].rawAmt, 160);
+assert.equal(sharedKeyGroups[0].netAmt, 140);
+assert.ok(
+  Math.abs(
+    (sharedKeyGroups[0].netAmt || sharedKeyGroups[0].rawAmt) * 1.07 - 149.8,
+  ) < 1e-9,
+);
 
 console.log("Pro regression modules passed:", fixture.expected);
