@@ -58,7 +58,7 @@ export function assignClassToPage(
     const families = [...new Set(members.map(card => card.promotionFamilyId).filter((value): value is string => Boolean(value)))];
     return {
       ...group,
-      classIds: [...new Set(members.map(card => card.classId).filter(Boolean))].sort(),
+      classIds: [...new Set(members.flatMap(card => card.classId ? [card.classId] : []))].sort(),
       promotionFamilyId: families.length === 1 && members.every(card => card.promotionFamilyId) ? families[0] : null,
       status: 'need_review' as const,
       manualConfirmed: false,
