@@ -847,7 +847,7 @@ test("cancels stale real-bill picker work without applying partial options", asy
 
   await page.evaluate(() => {
     document.querySelector('[data-pick="brands"]').click();
-    document.querySelector(".tabs .tab").first().click();
+    document.querySelector(".tabs .tab").click();
   });
   await settleAnimationFrames(page);
   await expect(page.locator("#pickShade")).not.toHaveClass(/on/);
