@@ -8,6 +8,21 @@
       "source": "/admin-performance.html",
       "destination": "/admin.html",
       "permanent": false
+    },
+    {
+      "source": "/pro-native-test.html",
+      "destination": "/pro.html?t=1028",
+      "permanent": false
+    },
+    {
+      "source": "/pro-native-phase4.html",
+      "destination": "/pro.html?t=1028",
+      "permanent": false
+    },
+    {
+      "source": "/pro-native-ui.html",
+      "destination": "/pro.html?t=1028",
+      "permanent": false
     }
   ],
   "rewrites": [

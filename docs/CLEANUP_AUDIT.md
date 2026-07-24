@@ -1,80 +1,42 @@
 # Cleanup Audit
 
-This document tracks cleanup work before future feature development.
+## Pro Legacy Cleanup — 23 กรกฎาคม 2026
 
-## Current goal
+Cleanup Base / Rollback point:
+`24035247351ebc99ab30c38b3efc1da74e7ef23a`
 
-Keep the live Pro page stable while reducing risky or stale project files.
+Branch: `codex/pro-legacy-cleanup`
 
-## Stable baseline
+ขอบเขตของรอบนี้มีเพียงการย้าย Test/QA ออกจาก Pro Legacy, เพิ่ม Redirect
+สำหรับ bookmark checkpoint เก่า, ลบไฟล์เป้าหมาย 14 รายการ และเพิ่ม
+Negative guards ไม่ได้แก้ Active Pro business logic, สูตร, State, parser,
+Supabase หรือ Promo/Promotion
+
+Active Pro ยังคงเป็น:
 
 ```text
-Pro Stable = 1028 Native
-main = production baseline
+dist/pro.html
+  -> dist/assets/pro/app.js
+      -> dist/assets/pro/state.js
+      -> dist/assets/pro/print-model.js
+      -> dist/assets/pro/print.js
+      -> dist/assets/pro/pro.css
 ```
 
-Use this as the rollback point before starting new features.
+หน้า checkpoint ที่ลบ:
 
-## Cleanup status
+- `/pro-native-test.html`
+- `/pro-native-phase4.html`
+- `/pro-native-ui.html`
 
-- Landing page points to `/pro.html?t=1028`.
-- Old public V310 pages redirect to `/pro.html?t=1028`.
-- Web CI runs smoke checks for `dist/*.html`, `dist/assets/**`, `docs/**`, and script changes on push and PR.
-- Production `pro-core-v4.js` now boots native stack directly.
-- Production no longer uses the legacy jsdelivr core fetch / eval / patch wrapper path.
-- Pro print reads live state from `window.DOIT_CORE_APP.currentState()` when available, with localStorage scan only as fallback.
-- Product rows with 0 quantity remain excluded from print bills by design.
-- PR #1 `Clean runtime v310 preview` is closed and remains unmerged.
-- PR #42, PR #43, and PR #44 completed Project Pro Native Core production switch.
+ทั้งสาม URL Redirect ไป `/pro.html?t=1028` และมี Config test ป้องกัน
+Redirect loop
 
-## Stale work inventory
-
-### Closed / do not merge
-
-- PR #1 `Clean runtime v310 preview`
-  - Reason: old preview/runtime experiment before Pro 1028 Native stabilized.
-  - Risk: stale branch has many old commits and can conflict with the current live Pro page.
-  - Action: closed unmerged on 2026-06-21.
-
-### Keep
-
-- `.github/workflows/web-ci.yml`
-  - Purpose: lightweight smoke check for branch and PR guardrails.
-  - Risk: low.
-
-- `.github/workflows/build-android-apk.yml`
-  - Purpose: manual or path-based Android debug APK build.
-  - Risk: medium, but still useful for APK output.
-
-- `dist/pro-native-test.html`, `dist/pro-native-phase4.html`, `dist/pro-native-ui.html`
-  - Purpose: native migration checkpoints and rollback comparison.
-  - Risk: low if not linked as production.
-  - Action: keep temporarily until Pro Stable 1028 Native has been used in real work for several cycles.
-
-### Remove / quarantine later after repo-wide reference audit
-
-Do not delete old `dist/assets/*.js` files in bulk until a repo-wide reference audit confirms they are not referenced by any public HTML page, preview page, Android wrapper, or docs.
-
-Known old V310 public pages have been redirected instead of deleted so old links do not open stale UI.
-
-The following icon repair workflows are one-off maintenance workflows and should not stay in the active workflow set:
+งานนี้ไม่แตะ Workflow ซ่อม Icon ต่อไปนี้:
 
 - `.github/workflows/apply-icon-from-b64.yml`
 - `.github/workflows/rebuild-icons-from-drawable.yml`
 - `.github/workflows/fix-valid-icon-build.yml`
 
-Reasons:
-
-- They use `contents: write`.
-- They can commit back to the repository from GitHub Actions.
-- Some of them remove workflow files during the job.
-- They are not needed for normal web Pro usage.
-- Keeping them increases confusion when maintaining the repo.
-
-## Cleanup rule
-
-Do not delete app source, Pro print files, parser logic, Android source, or the current stable Pro 1028 Native files during cleanup unless there is a separate feature branch and explicit QA.
-
-## Verification after cleanup
-
-Run smoke check and verify the live Pro page still loads.
+Reference audit และ Git blob SHA ก่อนลบอยู่ใน
+`docs/PRO_LEGACY_MANIFEST.md`

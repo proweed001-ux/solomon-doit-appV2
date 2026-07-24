@@ -134,3 +134,12 @@ node scripts/test-pro-regression.mjs: pass
 ```
 
 The regression fixture locks filtering, grouping, sent/remaining quantities, raw/net/VAT totals, Telesale totals, send-only print quantity, zero-quantity exclusion, 12 rows per bill, and two bills per A4.
+
+
+## หมายเหตุหลัง Cleanup
+
+รายการ Network และ runtime chain ด้านบนเป็นหลักฐาน **ก่อน Single Source**
+ไม่ใช่ Active runtime ปัจจุบัน Cleanup Base คือ
+`24035247351ebc99ab30c38b3efc1da74e7ef23a`; Active Pro ปัจจุบันเริ่มที่
+`dist/pro.html -> dist/assets/pro/app.js` และ Legacy 14 รายการถูกลบใน
+Cleanup PR หลังย้าย Test/QA และเพิ่ม Redirect แล้ว
