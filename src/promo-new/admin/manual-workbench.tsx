@@ -3,6 +3,8 @@ import { CheckCircle2, Lock, Plus, Search, Trash2, Undo2, Unlock, X } from 'luci
 import type { ImportedCardCandidate } from '../import/pdf-importer';
 import type { PromoDataset, ProductGroup, Sku } from '../domain/types';
 import { assignCardsManually, unassignCardsManually } from '../domain/manual-grouping';
+import { assignClassToPage } from '../domain/manual-class';
+import type { PromoClassId } from '../import/class-id';
 import { hydrateManualGroupingSnapshot } from '../domain/manual-snapshot';
 import {
   createManualSku,
@@ -126,6 +128,8 @@ export function ManualGroupingWorkbench({
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [searchText, setSearchText] = useState('');
   const [classFilter, setClassFilter] = useState('all');
+  const [classPage, setClassPage] = useState('');
+  const [classOverride, setClassOverride] = useState('');
   const [viewMode, setViewMode] = useState<'suggested' | 'unassigned' | 'all' | 'target'>('unassigned');
   const [showCreate, setShowCreate] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
@@ -227,6 +231,8 @@ export function ManualGroupingWorkbench({
     return [...unresolved, ...assigned].sort((left, right) => left.page - right.page || left.sequence - right.sequence);
   }, [dataset.cards, quarantine, groupsById]);
 
+  const availablePages = useMemo(() => [...new Set(cardViews.map(card => card.page))].sort((left, right) => left - right), [cardViews]);
+
   const visibleCards = useMemo(() => cardViews.filter(card => {
     if (classFilter !== 'all' && card.classId !== classFilter) return false;
     const query = clean(searchText).toLowerCase();
@@ -266,6 +272,25 @@ export function ManualGroupingWorkbench({
       selectableCards.forEach(card => allVisibleSelected ? next.delete(card.id) : next.add(card.id));
       return [...next];
     });
+  };
+
+  const applyPageClass = () => {
+    if (readOnly) return onError('โหมดอ่านอย่างเดียวไม่สามารถแก้ Class ได้');
+    const page = Number(classPage);
+    if (!Number.isInteger(page) || !classOverride) return onError('เลือกหน้าและ Class ก่อน');
+    try {
+      pushHistory();
+      const result = assignClassToPage(dataset, quarantine, page, classOverride as PromoClassId);
+      onDatasetChange(result.dataset);
+      onQuarantineChange(result.quarantine);
+      setClassFilter(classOverride);
+      setSelectedIds([]);
+      onDirty();
+      onMessage(`แก้หน้า ${page} เป็น ${classOverride} แล้ว ${result.changedCards} การ์ด`);
+      onError('');
+    } catch (error) {
+      onError(String((error as Error)?.message || error));
+    }
   };
 
   const lockTarget = () => {
@@ -572,6 +597,25 @@ export function ManualGroupingWorkbench({
       </div>
       <label className="manual-search"><Search size={16} /><input value={searchText} onChange={event => setSearchText(event.target.value)} placeholder="ค้นหาชื่อ OCR แบรนด์ หน้า หรือกลุ่ม" /></label>
       <select value={classFilter} onChange={event => setClassFilter(event.target.value)}><option value="all">ทุก Class</option>{CLASS_IDS.map(classId => <option key={classId}>{classId}</option>)}</select>
+    </div>
+
+    <div className="selection-bar page-class-bar">
+      <b>แก้ Class ทั้งหน้า</b>
+      <select data-testid="page-class-page" value={classPage} onChange={event => setClassPage(event.target.value)}>
+        <option value="">เลือกหน้า</option>
+        {availablePages.map(page => <option key={page} value={page}>หน้า {page}</option>)}
+      </select>
+      <select data-testid="page-class-value" value={classOverride} onChange={event => setClassOverride(event.target.value)}>
+        <option value="">เลือก Class</option>
+        {CLASS_IDS.map(classId => <option key={classId}>{classId}</option>)}
+      </select>
+      <button
+        data-testid="apply-page-class"
+        className="btn soft"
+        disabled={readOnly || !classPage || !classOverride}
+        title={readOnly ? 'โหมดอ่านอย่างเดียว' : !classPage || !classOverride ? 'เลือกหน้าและ Class ก่อน' : ''}
+        onClick={applyPageClass}
+      >ใช้กับการ์ดทั้งหน้า</button>
     </div>
 
     <div className="selection-bar">
