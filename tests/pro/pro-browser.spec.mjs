@@ -507,6 +507,8 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     expect(selectedState.sel.receivers).toEqual([fixtureMeta.receiver]);
 
     await realBillTab.click();
+    await page.locator("#q").fill("");
+    await page.locator("#searchBtn").click();
     await page.locator('[data-pick="receivers"]').click();
     await page.locator(
       `.pickItem[data-v="${fixtureMeta.realTsStore}"]`,
@@ -616,6 +618,10 @@ test("keeps large real-bill tabs, pickers and pagination responsive", async ({
   expect(metrics.candidateBuilds).toBe(1);
   expect(metrics.pickerOptionsBuilds).toBe(pickerOptionsBuilds);
   expect(metrics.pickerOptionsCacheHits).toBeGreaterThanOrEqual(1);
+  const cachedPickerOptionsCalls = metrics.pickerOptionsCalls;
+  const cachedPickerListRenders = metrics.pickerListRenders;
+  expect(cachedPickerOptionsCalls).toBe(pickerOptionsCalls + 1);
+  expect(cachedPickerListRenders).toBe(pickerListRenders + 1);
   const selectAllElapsed = await page.evaluate(() => {
     const started = performance.now();
     document.querySelector("#pickAll").click();
@@ -628,8 +634,8 @@ test("keeps large real-bill tabs, pickers and pagination responsive", async ({
   metrics = await page.evaluate(
     () => window.DOIT_CORE_APP.health().realBillPerformance,
   );
-  expect(metrics.pickerOptionsCalls).toBe(pickerOptionsCalls);
-  expect(metrics.pickerListRenders).toBe(pickerListRenders);
+  expect(metrics.pickerOptionsCalls).toBe(cachedPickerOptionsCalls);
+  expect(metrics.pickerListRenders).toBe(cachedPickerListRenders);
 
   const applyStart = Date.now();
   await page.locator("#pickOk").click();
@@ -793,25 +799,23 @@ test("cancels stale real-bill picker work without applying partial options", asy
 
   const loadingState = await page.evaluate(() => {
     document.querySelector('[data-pick="receivers"]').click();
-    return {
+    const pending = {
       okDisabled: document.querySelector("#pickOk").disabled,
       allDisabled: document.querySelector("#pickAll").disabled,
     };
+    document.querySelector("#pickAll").click();
+    document.querySelector("#pickOk").click();
+    const billStores = [
+      ...window.DOIT_CORE_APP.currentState().sel.billStores,
+    ];
+    document.querySelector("#pickClose").click();
+    return { ...pending, billStores };
   });
   expect(loadingState).toEqual({
     okDisabled: true,
     allDisabled: true,
+    billStores: [],
   });
-  await page.evaluate(() => {
-    document.querySelector("#pickAll").click();
-    document.querySelector("#pickOk").click();
-  });
-  expect(
-    await page.evaluate(
-      () => window.DOIT_CORE_APP.currentState().sel.billStores,
-    ),
-  ).toEqual([]);
-  await page.locator("#pickClose").click();
   await settleAnimationFrames(page);
   let metrics = await page.evaluate(
     () => window.DOIT_CORE_APP.health().realBillPerformance,
