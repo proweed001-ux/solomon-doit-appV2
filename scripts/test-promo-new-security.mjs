@@ -126,8 +126,8 @@ check(client.includes('storedPrices: []'), 'stored_price_must_not_enter_worker')
 check(client.includes('promotionFamilies: []'), 'promotion_family_must_not_enter_worker');
 check(client.includes('visualSignatures,'), 'visual_signature_transport_missing');
 check(client.includes('โดยไม่ส่งรูป ราคา หรือโปรโมชั่น'), 'visual_transport_boundary_message_missing');
-check(cache.includes('PROMO_TEST_CACHE_SCHEMA_VERSION = 6'), 'structural_grid_cache_schema_v6_missing');
-check(cache.includes("PROMO_TEST_PIPELINE_VERSION = 'density-grid-v1-card-title-single-pass-visual-first'"), 'structural_grid_cache_pipeline_missing');
+check(cache.includes('PROMO_TEST_CACHE_SCHEMA_VERSION = 7'), 'manual_grid_cache_schema_v7_missing');
+check(cache.includes("PROMO_TEST_PIPELINE_VERSION = 'density-grid-v2-class-only-manual-grouping'"), 'manual_grid_cache_pipeline_missing');
 check(cache.includes('record.schemaVersion === PROMO_TEST_CACHE_SCHEMA_VERSION'), 'cache_schema_rejection_missing');
 check(cache.includes('record.pipelineVersion === PROMO_TEST_PIPELINE_VERSION'), 'cache_pipeline_rejection_missing');
 check(cachedRun.includes('cache:visual_fingerprints_missing_rebuild_required'), 'cached_fingerprint_rebuild_marker_missing');
@@ -169,7 +169,10 @@ check(adminSource.includes('assertReadyForPublish'), 'admin_preview_validation_m
 check(adminSource.includes('applyPromotionFamilyToCard'), 'per_card_promotion_apply_missing');
 check(adminSource.includes('<ManualGroupingWorkbench'), 'manual_workbench_not_directly_wired');
 check(adminSource.includes('<GroupingSnapshotSave'), 'grouping_snapshot_save_not_directly_wired');
-check(adminSource.includes('visualSignatures: undefined'), 'fresh_visual_signatures_not_directly_wired');
+check(adminSource.includes('extractProductText: false'), 'manual_grid_must_disable_product_text_extraction');
+check(adminSource.includes("'automatic_product_grouping_disabled'"), 'manual_grid_pipeline_marker_missing');
+check(!adminSource.includes('runGroupingInWorker'), 'automatic_grouping_reintroduced_in_admin');
+check(/cards:\s*\[\],\s*productGroups:\s*\[\]/u.test(adminSource), 'manual_grid_must_start_unassigned');
 const manualWorkbench = read('src/promo-new/admin/manual-workbench.tsx');
 check(!manualWorkbench.includes('localStorage'), 'group_locks_must_not_be_browser_only');
 check(manualWorkbench.includes('loadPromoGroupingSnapshot'), 'saved_grouping_hydration_missing');
@@ -247,4 +250,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: Structural Grid and single-pass title OCR guards remain active; manual grouping uses stable card IDs, persisted confirmations and reloadable snapshots; per-card Promotion Family and manual prices remain explicit; read-only deployment protections remain intact.');
+console.log('Promo new security/static checks passed: Structural Grid and page Class detection feed a fully manual Product Group workflow; product-title OCR and automatic grouping are disabled in the admin pipeline; stable card IDs, persisted confirmations, per-card Promotion Family, manual prices and read-only deployment protections remain intact.');
