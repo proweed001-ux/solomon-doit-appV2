@@ -5,9 +5,21 @@ export const createSelection = () => ({
   ps: [],
   orderStores: [],
   receivers: [],
+  billStores: [],
   brands: [],
   types: [],
 });
+
+export function mergeSelection(saved) {
+  const defaults = createSelection();
+  const source = saved && typeof saved === "object" ? saved : {};
+  return Object.fromEntries(
+    Object.keys(defaults).map((key) => [
+      key,
+      Array.isArray(source[key]) ? [...source[key]] : defaults[key],
+    ]),
+  );
+}
 
 export const state = {
   rows: [],
@@ -57,7 +69,7 @@ export function push() {
 export function restore(snapshot) {
   try {
     const saved = JSON.parse(snapshot);
-    state.sel = saved.sel || state.sel;
+    state.sel = mergeSelection(saved.sel);
     state.q = saved.q || "";
     state.send = saved.send || {};
     state.add = saved.add || {};
@@ -99,7 +111,7 @@ export function save() {
 export function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(sk()) || "{}");
-    state.sel = saved.sel || state.sel;
+    state.sel = mergeSelection(saved.sel);
     state.q = saved.q || "";
     state.send = saved.send || {};
     state.add = saved.add || {};

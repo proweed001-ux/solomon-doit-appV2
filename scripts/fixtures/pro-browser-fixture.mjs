@@ -26,6 +26,13 @@ export const fixtureMeta = {
   a4Sheets: 2,
   numericProductName: "DN ปรับผ้านุ่ม 3in1 100MLx60",
   numericProductCode: "80880592",
+  realPsTsStore: "ร้านทดสอบ A",
+  realTsStore: "ร้าน Telesale รวม",
+  realBulkInvoice: "INV-N-BULK",
+  realTsInvoice: "INV-T-GROUP",
+  realTsSecondInvoice: "INV-T-SECOND",
+  realTsTele: "TELE-GROUP",
+  telesaleBills: 20,
 };
 
 export function browserFixtureRows() {
@@ -33,7 +40,10 @@ export function browserFixtureRows() {
     const number = index + 1;
     return {
       InvoiceDate: fixtureMeta.date,
-      InvoiceNo: `INV-N-${String(number).padStart(3, "0")}`,
+      InvoiceNo:
+        number <= 13
+          ? fixtureMeta.realBulkInvoice
+          : `INV-N-${String(number).padStart(3, "0")}`,
       SOTypeID: "INVC",
       SO_SalespersonID: fixtureMeta.ps,
       CustomerName: fixtureMeta.receiver,
@@ -50,11 +60,28 @@ export function browserFixtureRows() {
     const number = index + 1;
     return {
       InvoiceDate: fixtureMeta.date,
-      InvoiceNo: `INV-T-${String(number).padStart(3, "0")}`,
+      InvoiceNo:
+        number <= 2
+          ? fixtureMeta.realTsInvoice
+          : number === 3
+            ? fixtureMeta.realTsSecondInvoice
+            : number === 4
+              ? fixtureMeta.realBulkInvoice
+              : `INV-T-${String(number).padStart(3, "0")}`,
       SOTypeID: "INVC",
       SO_SalespersonID: fixtureMeta.ps,
-      TelesaleID: `TELE-${String(number).padStart(3, "0")}`,
-      CustomerName: `ร้าน Tele ${String(number).padStart(3, "0")}`,
+      TelesaleID:
+        number <= 3
+          ? fixtureMeta.realTsTele
+          : number === 4
+            ? "TELE-PS-TS"
+            : `TELE-${String(number).padStart(3, "0")}`,
+      CustomerName:
+        number <= 3
+          ? fixtureMeta.realTsStore
+          : number === 4
+            ? fixtureMeta.realPsTsStore
+            : `ร้าน Tele ${String(number).padStart(3, "0")}`,
       SKUCode:
         number === 2
           ? fixtureMeta.numericProductCode

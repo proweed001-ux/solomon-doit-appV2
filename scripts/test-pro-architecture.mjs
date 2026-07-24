@@ -80,6 +80,7 @@ assert.deepEqual(
   "dist/assets/pro/state.js",
   "dist/assets/pro/parser-adapter.js",
   "dist/assets/pro/filters.js",
+  "dist/assets/pro/real-bills.js",
   "dist/assets/pro/print.js",
   "dist/assets/pro/print-model.js",
 ].forEach((file) => assert.ok(activeProModules.includes(file), `${file} is not active`));

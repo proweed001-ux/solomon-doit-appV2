@@ -19,6 +19,7 @@ import {
   dlabel,
 } from "./utils.js";
 import {
+  createSelection,
   state,
   snap,
   push,
@@ -47,8 +48,12 @@ import {
   insertedGroups,
   pickPool,
   distPool,
-  shipPool,
 } from "./filters.js";
+import {
+  realBillPickerOptions,
+  renderRealBills,
+  selectRealBills,
+} from "./real-bills.js";
 import { publicFetch, resolveCloudPayload } from "./data-source.js";
 import { preparePrint } from "./print.js";
 (() => {
@@ -69,6 +74,7 @@ import { preparePrint } from "./print.js";
         ps: "PS",
         orderStores: "ตัดร้านบิลจริง",
         receivers: "ส่งให้ร้าน",
+        billStores: "เลือกร้านบิลจริง",
         brands: "แบรนด์",
         types: "ประเภทสินค้า",
       }[k] || k
@@ -79,13 +85,32 @@ import { preparePrint } from "./print.js";
       {
         pick: "ถอดของ Pro",
         dist: "กระจายสินค้า",
-        ship: "ใบส่งร้านจริง",
+        ship: "บิลจริง",
         done: "จัดแล้ว",
         raw: "รายการดิบ",
         remain: "สรุปของเหลือ",
         order: "รวม order",
       }[state.mode] || "รายการ"
     );
+  }
+  function activePickerKind(requestedKind) {
+    return requestedKind === "receivers" && state.mode === "ship"
+      ? "billStores"
+      : requestedKind;
+  }
+  function pickerOptions(kind) {
+    if (
+      state.mode === "ship" &&
+      ["dates", "ps", "orderStores", "billStores", "brands", "types"].includes(
+        kind,
+      )
+    ) {
+      return realBillPickerOptions(kind, state.rows, state.sel);
+    }
+    return options(kind).map((value) => ({
+      value,
+      label: kind === "dates" ? dlabel(value) : value,
+    }));
   }
   function undo() {
     if (!state.hist.length) return msg("ไม่มีรายการ Undo");
@@ -109,7 +134,13 @@ import { preparePrint } from "./print.js";
       return "ตัดร้านบิลจริง: ตัด " + F(a.length) + " ร้าน";
     }
     if (!a.length)
-      return lab(k) + ": " + (k === "receivers" ? "ยังไม่เลือก" : "ทั้งหมด");
+      return (
+        lab(k) +
+        ": " +
+        (k === "receivers" || k === "billStores"
+          ? "ยังไม่เลือก"
+          : "ทั้งหมด")
+      );
     if (a.length === 1)
       return lab(k) + ": " + (k === "dates" ? dlabel(a[0]) : a[0]);
     return lab(k) + ": เลือก " + F(a.length) + " รายการ";
@@ -121,10 +152,19 @@ import { preparePrint } from "./print.js";
         if (e) e.textContent = txt(k);
       },
     );
+    const activeStoreKind = activePickerKind("receivers");
+    const storeLabel = lab(activeStoreKind);
+    const label = $("#sendLabelText");
+    if (label) label.textContent = storeLabel + ":";
     const s = $("#sendText");
-    if (s) s.textContent = txt("receivers").replace("ส่งให้ร้าน: ", "");
+    if (s) {
+      s.textContent = txt(activeStoreKind).replace(storeLabel + ": ", "");
+    }
+    const heading = $("#modeHeading");
+    if (heading) heading.textContent = modeName();
   }
-  function openPick(k) {
+  function openPick(requestedKind) {
+    const k = activePickerKind(requestedKind);
     state.pickKind = k;
     state.tmp = [...(state.sel[k] || [])];
     $("#pickTitle").textContent =
@@ -136,19 +176,19 @@ import { preparePrint } from "./print.js";
     $("#pickShade").classList.remove("on");
   }
   function drawPick() {
-    const o = options(state.pickKind);
+    const o = pickerOptions(state.pickKind);
     $("#pickList").innerHTML = o.length
       ? o
           .map(
-            (x) =>
+            ({ value, label }) =>
               '<div class="pickItem ' +
-              (state.tmp.includes(x) ? "on" : "") +
+              (state.tmp.includes(value) ? "on" : "") +
               '" data-v="' +
-              E(x) +
+              E(value) +
               '"><span class="box">' +
-              (state.tmp.includes(x) ? "✓" : "") +
+              (state.tmp.includes(value) ? "✓" : "") +
               "</span><span>" +
-              (state.pickKind === "dates" ? E(dlabel(x)) : E(x)) +
+              E(label) +
               "</span></div>",
           )
           .join("")
@@ -177,7 +217,7 @@ import { preparePrint } from "./print.js";
     drawPick();
   }
   function allPick() {
-    state.tmp = options(state.pickKind);
+    state.tmp = pickerOptions(state.pickKind).map(({ value }) => value);
     drawPick();
   }
   function manualSent(g) {
@@ -315,6 +355,7 @@ import { preparePrint } from "./print.js";
     return h + "</tbody>";
   }
   function simpleTable(title, heads, body) {
+    showRealBillSurface(false);
     $("#tableCount").textContent = title;
     $("#table").innerHTML =
       "<thead><tr>" +
@@ -327,7 +368,21 @@ import { preparePrint } from "./print.js";
       "</tbody>";
     $("#pager").innerHTML = "";
   }
+  function showRealBillSurface(active) {
+    const table = $("#table");
+    const tableWrap = table?.closest(".tableWrap");
+    const realBills = $("#realBills");
+    const pageControls = $("#pager");
+    if (table) table.hidden = active;
+    if (tableWrap) tableWrap.hidden = active;
+    if (realBills) realBills.hidden = !active;
+    if (pageControls) pageControls.hidden = active;
+  }
+  function currentRealBillResult() {
+    return selectRealBills(state.rows, state.sel, state.q);
+  }
   function renderMode(pool) {
+    if (state.mode !== "ship") showRealBillSurface(false);
     if (state.mode === "pick") {
       $("#table").innerHTML = pickTable(pool);
       bindQuantityInputs({
@@ -352,33 +407,12 @@ import { preparePrint } from "./print.js";
       return;
     }
     if (state.mode === "ship") {
-      const p = shipPool();
-      simpleTable(
-        "ใบส่งร้านจริง " +
-          (rec() || "ยังไม่เลือก") +
-          " · จากไฟล์ DOIT " +
-          F(p.length) +
-          " รายการ",
-        ["#", "สินค้า", "จำนวน", "ยอดดิบ", "ยอดสุทธิ", "รวม VAT"],
-        p
-          .map(
-            (g, i) =>
-              "<tr><td>" +
-              (i + 1) +
-              "</td><td>" +
-              E(g.sku) +
-              "</td><td>" +
-              F(g.qty) +
-              "</td><td>" +
-              B(g.rawAmt) +
-              "</td><td>" +
-              B(g.netAmt) +
-              "</td><td>" +
-              B((N(g.netAmt) || N(g.rawAmt)) * 1.07) +
-              "</td></tr>",
-          )
-          .join(""),
-      );
+      const result = currentRealBillResult();
+      showRealBillSurface(true);
+      $("#tableCount").textContent = result.requiresSelection
+        ? "บิลจริง · เลือกร้านหรือค้นหาเพื่อแสดงข้อมูล"
+        : "บิลจริง " + F(result.bills.length) + " บิล";
+      renderRealBills($("#realBills"), result);
       return;
     }
     if (state.mode === "order") {
@@ -579,14 +613,7 @@ import { preparePrint } from "./print.js";
     state.add = {};
     state.pull = {};
     state.ins = [];
-    state.sel = {
-      dates: [],
-      ps: [],
-      orderStores: [],
-      receivers: [],
-      brands: [],
-      types: [],
-    };
+    state.sel = createSelection();
     state.q = "";
     state.page = 1;
     state.mode = "pick";
@@ -808,14 +835,7 @@ import { preparePrint } from "./print.js";
     };
     $("#clearFilter").onclick = () => {
       push();
-      state.sel = {
-        dates: [],
-        ps: [],
-        orderStores: [],
-        receivers: [],
-        brands: [],
-        types: [],
-      };
+      state.sel = createSelection();
       state.q = "";
       state.page = 1;
       render();
@@ -839,7 +859,12 @@ import { preparePrint } from "./print.js";
     };
     $("#insertBtn").onclick = addInsert;
     $("#prepPrint").onclick = () =>
-      preparePrint({ mode: state.mode, title: modeName() });
+      preparePrint({
+        mode: state.mode,
+        title: modeName(),
+        realBills:
+          state.mode === "ship" ? currentRealBillResult().bills : undefined,
+      });
     $("#exportCsv").onclick = exportCsv;
     const cs = $("#copySummary");
     if (cs) cs.onclick = copySummary;
@@ -879,7 +904,7 @@ import { preparePrint } from "./print.js";
     return {
       rows: state.rows.length,
       pickRows: sourceRows().length,
-      shipRows: shipPool().length,
+      realBills: currentRealBillResult().bills.length,
       distRows: sourceRows({ ignoreDate: true }).length,
       teleRows: state.rows.filter((row) => row.isTele).length,
       teleBills: teleBills().length,
@@ -893,6 +918,7 @@ import { preparePrint } from "./print.js";
       telePage: state.telePage,
       telePageSize: TELE_PAGE_SIZE,
       receivers: state.sel.receivers,
+      billStores: state.sel.billStores,
       manualKeys: Object.keys(state.send).length,
       inserted: state.ins.length,
       mode: state.mode,

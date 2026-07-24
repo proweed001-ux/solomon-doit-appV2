@@ -228,7 +228,7 @@ test("combines PS and Telesale in the real Combined Order tab for XLSX and XLSM"
 
     await chooseOnly(page, "orderStores", fixtureMeta.receiver);
     await expect(page.locator("#tableCount")).toContainText(
-      `${fixtureMeta.teleRows.toLocaleString("th-TH")} รายการ`,
+      `${(fixtureMeta.teleRows - 1).toLocaleString("th-TH")} รายการ`,
     );
     await expect(page.locator("#table")).toContainText("TSKU-001");
 
@@ -251,6 +251,205 @@ test("combines PS and Telesale in the real Combined Order tab for XLSX and XLSM"
     await expect(page.locator("#table")).toContainText("TSKU-001");
 
     await page.locator("#clearFilter").click();
+  }
+  expect(runtime.errors).toEqual([]);
+});
+
+test("shows and prints real PS and Telesale bills without changing send-to-store state", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  for (const file of [fixtureFiles.xlsx, fixtureFiles.xlsm]) {
+    await uploadFixture(page, file);
+    await chooseOnly(page, "dates", fixtureMeta.date);
+    await chooseOnly(page, "ps", fixtureMeta.ps);
+    await chooseOnly(page, "receivers", fixtureMeta.receiver);
+
+    const realBillTab = page.locator(".tabs .tab").nth(2);
+    await expect(realBillTab).toHaveText("บิลจริง");
+    await realBillTab.click();
+    await expect(page.locator("#modeHeading")).toHaveText("บิลจริง");
+    await expect(page.locator("#sendLabelText")).toHaveText("เลือกร้านบิลจริง:");
+    await expect(page.locator("body")).not.toContainText("ใบส่งร้านจริง");
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.DOIT_CORE_APP.currentState().mode),
+      )
+      .toBe("ship");
+    await expect(page.locator("#realBills")).toContainText(
+      "เลือกร้านหรือพิมพ์ชื่อร้าน เพื่อดูบิลจริง",
+    );
+    await expect(page.locator("#table")).toBeHidden();
+
+    await page.locator('[data-pick="receivers"]').click();
+    const psTsOption = page.locator(
+      `.pickItem[data-v="${fixtureMeta.realPsTsStore}"]`,
+    );
+    const tsOption = page.locator(
+      `.pickItem[data-v="${fixtureMeta.realTsStore}"]`,
+    );
+    await expect(psTsOption).toContainText(
+      `${fixtureMeta.realPsTsStore} (PS+TS)`,
+    );
+    await expect(tsOption).toContainText(`${fixtureMeta.realTsStore} (TS)`);
+    await psTsOption.click();
+    await tsOption.click();
+    await page.locator("#pickOk").click();
+
+    let selectedState = await page.evaluate(() =>
+      window.DOIT_CORE_APP.currentState(),
+    );
+    expect(selectedState.sel.receivers).toEqual([fixtureMeta.receiver]);
+    expect(selectedState.sel.billStores).toEqual([
+      fixtureMeta.realPsTsStore,
+      fixtureMeta.realTsStore,
+    ]);
+    expect(
+      selectedState.sel.billStores.some((store) => /\((?:TS|PS\+TS)\)/.test(store)),
+    ).toBe(false);
+
+    await page.locator("#undo").click();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => window.DOIT_CORE_APP.currentState().sel.billStores.length,
+        ),
+      )
+      .toBe(0);
+    await page.locator("#redo").click();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => window.DOIT_CORE_APP.currentState().sel.billStores.length,
+        ),
+      )
+      .toBe(2);
+
+    await expect(
+      page.locator(
+        `.realBill[data-real-store="${fixtureMeta.realPsTsStore}"]`,
+      ),
+    ).toHaveCount(15);
+    await expect(
+      page.locator(`.realBill[data-real-store="${fixtureMeta.realTsStore}"]`),
+    ).toHaveCount(2);
+    const psSharedInvoice = page.locator(
+      `.realBill[data-real-source="PS"][data-real-store="${fixtureMeta.realPsTsStore}"][data-real-inv="${fixtureMeta.realBulkInvoice}"]`,
+    );
+    const tsSharedInvoice = page.locator(
+      `.realBill[data-real-source="TS"][data-real-store="${fixtureMeta.realPsTsStore}"][data-real-inv="${fixtureMeta.realBulkInvoice}"]`,
+    );
+    await expect(psSharedInvoice).toHaveCount(1);
+    await expect(tsSharedInvoice).toHaveCount(1);
+    await expect(tsSharedInvoice).toContainText("Telesale (TS)");
+    await expect(tsSharedInvoice).toContainText("TELE-PS-TS");
+    await expect(psSharedInvoice).toContainText("15/07/2026");
+    await expect(psSharedInvoice.locator("tbody tr:not(.realBillTotal)")).toHaveCount(
+      13,
+    );
+    expect(
+      await page
+        .locator(".realBillTableWrap")
+        .first()
+        .evaluate((element) => getComputedStyle(element).overflowX),
+    ).toBe("auto");
+
+    await page.locator('[data-pick="receivers"]').click();
+    await page.locator("#pickClear").click();
+    await page.locator("#pickOk").click();
+    await page.locator("#q").fill(fixtureMeta.realTsStore);
+    await page.locator("#searchBtn").click();
+    await expect(page.locator("#realBills .realBill")).toHaveCount(2);
+    const searchedTsBill = page.locator(
+      `.realBill[data-real-inv="${fixtureMeta.realTsInvoice}"]`,
+    );
+    await expect(searchedTsBill.locator("tbody tr:not(.realBillTotal)")).toHaveCount(
+      2,
+    );
+    await expect(searchedTsBill.locator(".realBillTotal")).toContainText("2");
+    await expect(searchedTsBill.locator(".realBillTotal")).toContainText("43.00");
+    await expect(searchedTsBill.locator(".realBillTotal")).toContainText("41.73");
+
+    const printEditBefore = await page.evaluate(() =>
+      localStorage.getItem("doit-pro-print-price-edits-v1"),
+    );
+    await page.locator("#prepPrint").click();
+    let overlay = page.locator(".printOverlay.realBillPrint");
+    await expect(overlay).toBeVisible();
+    await expect(overlay.locator(".printBar")).toContainText(
+      "ตรวจ/แก้ไขก่อนปริ้น — บิลจริง",
+    );
+    await expect(overlay.locator(".a4Sheet")).toHaveCount(1);
+    await expect(overlay.locator(".realBillReceipt")).toHaveCount(2);
+    await expect(overlay).toContainText(fixtureMeta.realTsInvoice);
+    await expect(overlay).toContainText("15/07/2026");
+    await expect(overlay).toContainText("Telesale (TS)");
+    await expect(overlay).toContainText(fixtureMeta.realTsTele);
+    await expect(overlay.locator("[data-edit-key]")).toHaveCount(0);
+    expect(
+      await page.evaluate(() =>
+        localStorage.getItem("doit-pro-print-price-edits-v1"),
+      ),
+    ).toBe(printEditBefore);
+    await overlay.locator("[data-print-close]").click();
+
+    await page.locator("#q").fill(fixtureMeta.realBulkInvoice);
+    await page.locator("#searchBtn").click();
+    await expect(page.locator("#realBills .realBill")).toHaveCount(2);
+    await page.locator("#prepPrint").click();
+    overlay = page.locator(".printOverlay.realBillPrint");
+    await expect(overlay.locator(".a4Sheet")).toHaveCount(2);
+    await expect(overlay.locator(".realBillReceipt")).toHaveCount(3);
+    await expect(overlay.locator(".realBillReceipt").nth(0).locator("[data-real-line]")).toHaveCount(
+      12,
+    );
+    await expect(overlay.locator(".realBillReceipt").nth(1).locator("[data-real-line]")).toHaveCount(
+      1,
+    );
+    await expect(overlay.locator(".realBillReceipt").nth(2).locator("[data-real-line]")).toHaveCount(
+      1,
+    );
+    await expect(overlay.locator('[data-real-part="1/2"]')).toContainText(
+      "ต่อใบถัดไป",
+    );
+    await expect(overlay.locator('[data-real-part="2/2"]')).toContainText(
+      "1,391.00",
+    );
+    await expect(overlay.locator(".realBillPrintTotal").first()).toContainText(
+      /\d+\.\d{2}/,
+    );
+    expect(
+      await page.evaluate(() =>
+        localStorage.getItem("doit-pro-print-price-edits-v1"),
+      ),
+    ).toBe(printEditBefore);
+    await overlay.locator("[data-print-close]").click();
+
+    await page.locator(".tabs .tab").first().click();
+    await expect(page.locator("#sendLabelText")).toHaveText("ส่งให้ร้าน:");
+    await expect(page.locator('[data-pick="receivers"]')).toContainText(
+      fixtureMeta.receiver,
+    );
+    selectedState = await page.evaluate(() =>
+      window.DOIT_CORE_APP.currentState(),
+    );
+    expect(selectedState.sel.receivers).toEqual([fixtureMeta.receiver]);
+    expect(selectedState.sel.billStores).toEqual([]);
+
+    await realBillTab.click();
+    await page.locator('[data-pick="receivers"]').click();
+    await page.locator(
+      `.pickItem[data-v="${fixtureMeta.realTsStore}"]`,
+    ).click();
+    await page.locator("#pickOk").click();
+    await page.locator("#clearFilter").click();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => window.DOIT_CORE_APP.currentState().sel.billStores.length,
+        ),
+      )
+      .toBe(0);
   }
   expect(runtime.errors).toEqual([]);
 });
@@ -339,11 +538,8 @@ test("keeps the active Pro flow, state, mobile layout and print contract", async
 
   await page.locator("#teleBtn").click();
   await expect(page.locator("#teleDrawer")).toHaveClass(/on/);
-  await expect(page.locator(".teleBill")).toHaveCount(20);
-  await expect(page.locator(".telePager .page.on")).toHaveText("1/2");
-  await page.locator('[data-tele-page="2"]').click();
-  await expect(page.locator(".teleBill")).toHaveCount(1);
-  await expect(page.locator(".telePager .page.on")).toHaveText("2/2");
+  await expect(page.locator(".teleBill")).toHaveCount(fixtureMeta.telesaleBills);
+  await expect(page.locator(".telePager .page.on")).toHaveText("1/1");
   await page.locator("#closeDrawer").click();
 
   await page.locator("#prepPrint").click();
