@@ -12,6 +12,7 @@ const dataset = (): PromoDataset => ({
     monthKey: 'PROMO-2026-07',
     revision: 1,
     status: 'need_review',
+    previousVersionId: null,
     source: { pdfName: 'test.pdf', workbookName: 'test.xlsm', pdfHash: null, workbookHash: null },
     createdAt: '2026-07-24T00:00:00.000Z',
     createdBy: null,
