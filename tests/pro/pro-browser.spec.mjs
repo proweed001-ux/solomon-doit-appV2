@@ -307,6 +307,9 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
       ["types", "INVC"],
     ]) {
       await page.locator(`[data-pick="${kind}"]`).click();
+      await expect(
+        page.locator("#pickList .pickItem", { hasText: expectedText }).first(),
+      ).toBeVisible();
       const visibleTexts = await page
         .locator("#pickList .pickItem")
         .allTextContents();
