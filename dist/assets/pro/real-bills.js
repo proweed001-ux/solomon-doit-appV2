@@ -32,8 +32,11 @@ export function realBillKey(row) {
 
 function billLine(row, sourceIndex) {
   const qty = N(row.qty);
-  const raw = N(B(row.rawAmt));
-  const vat = N(B((N(row.netAmt) || N(row.rawAmt)) * 1.07));
+  const raw = roundDisplayedNumber(row.rawAmt, 2);
+  const vat = roundDisplayedNumber(
+    (N(row.netAmt) || N(row.rawAmt)) * 1.07,
+    2,
+  );
   return {
     sourceIndex,
     code: T(row.code),
@@ -44,10 +47,21 @@ function billLine(row, sourceIndex) {
     qty,
     rawAmt: N(row.rawAmt),
     netAmt: N(row.netAmt),
-    shownQty: N(F(qty)),
+    shownQty: roundDisplayedNumber(qty, 3),
     shownRaw: raw,
     shownVat: vat,
   };
+}
+
+export function roundDisplayedNumber(value, digits = 2) {
+  const number = N(value);
+  const places = Math.max(0, Math.min(6, N(digits)));
+  const factor = 10 ** places;
+  const magnitude = Math.abs(number);
+  const rounded = Math.round(
+    (magnitude + Number.EPSILON * Math.max(1, magnitude)) * factor,
+  );
+  return (number < 0 ? -rounded : rounded) / factor;
 }
 
 function compareBills(left, right) {
@@ -88,6 +102,11 @@ export function buildRealBills(rows) {
         qty: 0,
         raw: 0,
         vat: 0,
+        searchParts: new Set([
+          T(row.store),
+          T(row.inv),
+          sourceType === REAL_BILL_SOURCE_TS ? T(row.tele) : "",
+        ]),
       };
       bills.set(key, bill);
     }
@@ -96,28 +115,81 @@ export function buildRealBills(rows) {
     bill.qty += line.shownQty;
     bill.raw += line.shownRaw;
     bill.vat += line.shownVat;
+    bill.searchParts.add(line.code);
+    bill.searchParts.add(line.sku);
   });
-  return [...bills.values()].sort(compareBills);
+  return [...bills.values()]
+    .map((bill) => {
+      bill.searchText = [...bill.searchParts].join(" ").toLowerCase();
+      delete bill.searchParts;
+      return bill;
+    })
+    .sort(compareBills);
 }
 
 function billContains(bill, query) {
   if (!query) return true;
+  if (bill.searchText) return bill.searchText.includes(query);
   return [
     bill.store,
     bill.inv,
     bill.tele,
-    ...bill.lines.flatMap((line) => [line.code, line.sku]),
-  ]
-    .join(" ")
-    .toLowerCase()
-    .includes(query);
+    ...(bill.lines || []).flatMap((line) => [line.code, line.sku]),
+  ].join(" ").toLowerCase().includes(query);
 }
 
 function billHasFacet(bill, values, field) {
   return (
     !values.length ||
-    bill.lines.some((line) => values.includes(line[field]))
+    billFacetValues(bill, field).some((value) => values.includes(value))
   );
+}
+
+function billFacetValues(bill, field) {
+  const indexed = bill[field + "Values"];
+  if (indexed) return indexed instanceof Set ? [...indexed] : indexed;
+  if (field === "ps" && bill.ps) return [bill.ps];
+  return uniq((bill.lines || []).map((line) => line[field]));
+}
+
+export function buildRealBillFacetIndex(rows) {
+  const bills = new Map();
+  (rows || []).forEach((row) => {
+    const key = realBillKey(row);
+    let bill = bills.get(key);
+    if (!bill) {
+      const sourceType = row.isTele
+        ? REAL_BILL_SOURCE_TS
+        : REAL_BILL_SOURCE_PS;
+      bill = {
+        key,
+        sourceType,
+        store: T(row.store),
+        inv: T(row.inv),
+        date: T(row.date),
+        tele: sourceType === REAL_BILL_SOURCE_TS ? T(row.tele) : "",
+        psValues: new Set(),
+        brandValues: new Set(),
+        typeValues: new Set(),
+        searchParts: new Set([
+          T(row.store),
+          T(row.inv),
+          sourceType === REAL_BILL_SOURCE_TS ? T(row.tele) : "",
+        ]),
+      };
+      bills.set(key, bill);
+    }
+    bill.psValues.add(T(row.ps));
+    bill.brandValues.add(T(row.brand));
+    bill.typeValues.add(T(row.type));
+    bill.searchParts.add(T(row.code));
+    bill.searchParts.add(T(row.sku));
+  });
+  return [...bills.values()].map((bill) => {
+    bill.searchText = [...bill.searchParts].join(" ").toLowerCase();
+    delete bill.searchParts;
+    return bill;
+  });
 }
 
 export function filterRealBills(bills, selection, query) {
@@ -259,6 +331,7 @@ export function createRealBillSelector(buildBills = buildRealBills) {
   let cachedFilterSignature = "";
   let cachedResult = null;
   const optionCache = new Map();
+  const facetIndexCache = new Map();
   const counters = {
     selectCalls: 0,
     candidateBuilds: 0,
@@ -269,6 +342,10 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     optionCandidateBuilds: 0,
     pickerOptionsBuilds: 0,
     pickerOptionsCacheHits: 0,
+    facetIndexBuilds: 0,
+    facetIndexCacheHits: 0,
+    facetRowsScanned: 0,
+    moneyFormatCalls: 0,
   };
 
   function hasCandidate(rows, selection, rowsVersion) {
@@ -295,8 +372,25 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     counters.candidateBuilds += 1;
     cachedFilterSignature = "";
     cachedResult = null;
-    optionCache.clear();
     return cachedCandidateBills;
+  }
+
+  function ensureFacetIndex(rows, selection, rowsVersion) {
+    const dataSignature = rowsDataSignature(rows, rowsVersion);
+    const key = dataSignature + "|" + candidateSignature(selection);
+    if (facetIndexCache.has(key)) {
+      counters.facetIndexCacheHits += 1;
+      return facetIndexCache.get(key);
+    }
+    const candidateRows = realBillCandidateRows(rows, selection);
+    counters.facetRowsScanned += (rows || []).length;
+    const facets = buildRealBillFacetIndex(candidateRows);
+    counters.facetIndexBuilds += 1;
+    if (facetIndexCache.size >= 12) {
+      facetIndexCache.delete(facetIndexCache.keys().next().value);
+    }
+    facetIndexCache.set(key, facets);
+    return facets;
   }
 
   function select(rows, selection, query, rowsVersion) {
@@ -343,15 +437,12 @@ export function createRealBillSelector(buildBills = buildRealBills) {
       return optionCache.get(key);
     }
     const optionSelection = selectionIgnoring(selection, kind);
-    let optionBills;
-    if (["dates", "ps", "orderStores"].includes(kind)) {
-      counters.optionCandidateBuilds += 1;
-      optionBills = buildBills(
-        realBillCandidateRows(rows, optionSelection),
-      );
-    } else {
-      optionBills = ensureCandidate(rows, optionSelection, rowsVersion);
-    }
+    counters.optionCandidateBuilds += 1;
+    const optionBills = ensureFacetIndex(
+      rows,
+      optionSelection,
+      rowsVersion,
+    );
     counters.pickerOptionsBuilds += 1;
     const result = realBillPickerOptions(
       kind,
@@ -360,7 +451,9 @@ export function createRealBillSelector(buildBills = buildRealBills) {
       optionBills,
       query,
     );
-    if (optionCache.size >= 24) optionCache.clear();
+    if (optionCache.size >= 48) {
+      optionCache.delete(optionCache.keys().next().value);
+    }
     optionCache.set(key, result);
     return result;
   }
@@ -368,7 +461,6 @@ export function createRealBillSelector(buildBills = buildRealBills) {
   function refreshFilters() {
     cachedFilterSignature = "";
     cachedResult = null;
-    optionCache.clear();
   }
 
   function invalidate() {
@@ -380,6 +472,7 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     cachedFilterSignature = "";
     cachedResult = null;
     optionCache.clear();
+    facetIndexCache.clear();
     candidateVersion += 1;
   }
 
@@ -478,14 +571,16 @@ export function realBillPickerOptions(
     return sortOptions(
       uniq(
         matchedBills.flatMap((bill) =>
-          bill.lines.map((line) => line.ps),
+          billFacetValues(bill, "ps"),
         ),
-      ).map(option),
+      ).map((value) => option(value)),
     );
   }
   if (kind === "orderStores") {
     return sortOptions(
-      uniq(matchedBills.map((bill) => bill.store)).map(option),
+      uniq(matchedBills.map((bill) => bill.store)).map((value) =>
+        option(value),
+      ),
     );
   }
   if (kind === "billStores") {
@@ -495,18 +590,18 @@ export function realBillPickerOptions(
     return sortOptions(
       uniq(
         matchedBills.flatMap((bill) =>
-          bill.lines.map((line) => line.brand),
+          billFacetValues(bill, "brand"),
         ),
-      ).map(option),
+      ).map((value) => option(value)),
     );
   }
   if (kind === "types") {
     return sortOptions(
       uniq(
         matchedBills.flatMap((bill) =>
-          bill.lines.map((line) => line.type),
+          billFacetValues(bill, "type"),
         ),
-      ).map(option),
+      ).map((value) => option(value)),
     );
   }
   return [];

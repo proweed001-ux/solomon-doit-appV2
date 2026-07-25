@@ -32,6 +32,7 @@ import {
 } from "../dist/assets/pro/print.js";
 import {
   buildRealBills,
+  buildRealBillFacetIndex,
   createRealBillSelector,
   filterRealBills,
   realBillCandidateRows,
@@ -40,6 +41,7 @@ import {
   realBillPickerOptions,
   realBillsHtml,
   realBillStoreOptions,
+  roundDisplayedNumber,
   selectRealBills,
   splitRealBillsForPrint,
 } from "../dist/assets/pro/real-bills.js";
@@ -62,6 +64,10 @@ const fixture = JSON.parse(
 );
 const appSource = fs.readFileSync("dist/assets/pro/app.js", "utf8");
 const coreSource = fs.readFileSync("dist/assets/pro/core.js", "utf8");
+const realBillSource = fs.readFileSync(
+  "dist/assets/pro/real-bills.js",
+  "utf8",
+);
 const proHtmlSource = fs.readFileSync("dist/pro.html", "utf8");
 
 state.rows = fixture.rows.map((row) => ({ ...row }));
@@ -509,6 +515,31 @@ assert.deepEqual(
   realBillPickerOptions("billStores", realRows, realSelection),
   storeOptions,
 );
+for (const [kind, expected] of [
+  ["ps", "PS001"],
+  ["orderStores", "ร้าน TS"],
+  ["brands", "Brand Match"],
+  ["types", "TYPE-A"],
+]) {
+  const options = realBillPickerOptions(
+    kind,
+    realRows,
+    createSelection(),
+  );
+  const found = options.find((item) => item.value === expected);
+  assert.deepEqual(
+    found,
+    { value: expected, label: expected },
+    `${kind} must preserve both the source value and visible label`,
+  );
+  assert.ok(
+    options.every(
+      (item, index) =>
+        item.label !== String(index) || item.value === String(index),
+    ),
+    `${kind} labels must never become Array.map indexes`,
+  );
+}
 const invoiceSearchSelection = createSelection();
 const invoiceSearchBills = buildRealBills(realRows);
 assert.deepEqual(
@@ -778,6 +809,11 @@ assert.deepEqual(
   ["Brand Other", "Brand Search"].sort(),
 );
 const optionStats = optionSelector.stats();
+assert.equal(
+  optionBuildCalls,
+  0,
+  "Picker options must use the lightweight facet index, not full bills",
+);
 optionSelector.pickerOptions(
   "brands",
   realRows,
@@ -799,6 +835,33 @@ assert.equal(
   optionStats.pickerOptionsBuilds + 1,
   "Search changes must invalidate filtered picker options",
 );
+assert.equal(optionSelector.stats().moneyFormatCalls, 0);
+
+for (const value of [
+  0,
+  1,
+  -1,
+  1.005,
+  -1.005,
+  2.675,
+  -2.675,
+  10.0049,
+  10.005,
+  10.0051,
+  1234.56789,
+  -1234.56789,
+]) {
+  assert.equal(
+    roundDisplayedNumber(value, 2),
+    Number(
+      Number(value).toLocaleString("th-TH", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).replaceAll(",", ""),
+    ),
+    `Numeric rounding changed at ${value}`,
+  );
+}
 
 const longBill = buildRealBills(
   Array.from({ length: 13 }, (_, index) => ({
@@ -972,6 +1035,116 @@ const largePerformance = {
   hugeBuilds: hugeBuildCalls,
 };
 
+function productionScaleRealRows() {
+  const rowCount = 93_328;
+  const storeCount = 7_106;
+  const teleBills = 1_397;
+  return Array.from({ length: rowCount }, (_, index) => {
+    const isTele = index < teleBills;
+    const storeNo = index % storeCount;
+    const billNo = isTele ? index : Math.floor(index / 7);
+    return {
+      isTele,
+      tele: isTele ? `TELE-${String(index).padStart(4, "0")}` : "",
+      store: `ร้าน Scale ${String(storeNo).padStart(4, "0")}`,
+      inv: `${isTele ? "TS" : "PS"}-INV-${String(billNo).padStart(6, "0")}`,
+      date: `2026-07-${String((index % 28) + 1).padStart(2, "0")}`,
+      ps: `PS-${String(index % 28).padStart(2, "0")}`,
+      code: `SCALE-${index}`,
+      sku: `สินค้า Scale ${index}`,
+      brand: `BRAND-${index % 16}`,
+      type: `TYPE-${index % 9}`,
+      qty: (index % 5) + 1,
+      rawAmt: 10.005 + (index % 23),
+      netAmt: 9.005 + (index % 19),
+    };
+  });
+}
+
+const productionRows = productionScaleRealRows();
+let productionFullBuilds = 0;
+const productionSelector = createRealBillSelector((rows) => {
+  productionFullBuilds += 1;
+  return buildRealBills(rows);
+});
+const productionSelection = createSelection();
+const productionNoSelectionStart = performance.now();
+const productionPrompt = productionSelector.select(
+  productionRows,
+  productionSelection,
+  "",
+  1,
+);
+const productionNoSelectionMs =
+  performance.now() - productionNoSelectionStart;
+assert.equal(productionPrompt.requiresSelection, true);
+assert.equal(productionFullBuilds, 0);
+const productionPsStart = performance.now();
+const productionPsOptions = productionSelector.pickerOptions(
+  "ps",
+  productionRows,
+  productionSelection,
+  "",
+  1,
+);
+const productionPsMs = performance.now() - productionPsStart;
+const productionStoreStart = performance.now();
+const productionStoreOptions = productionSelector.pickerOptions(
+  "billStores",
+  productionRows,
+  productionSelection,
+  "",
+  1,
+);
+const productionStoreMs = performance.now() - productionStoreStart;
+assert.equal(productionPsOptions.length, 28);
+assert.equal(productionStoreOptions.length, 7_106);
+assert.equal(
+  productionFullBuilds,
+  0,
+  "Production-scale facets must not build full bill lines",
+);
+assert.equal(productionSelector.stats().facetIndexBuilds, 1);
+assert.equal(productionSelector.stats().moneyFormatCalls, 0);
+productionSelection.billStores = [productionStoreOptions[0].value];
+const productionApplyStart = performance.now();
+const productionResult = productionSelector.select(
+  productionRows,
+  productionSelection,
+  "",
+  1,
+);
+const productionApplyMs = performance.now() - productionApplyStart;
+assert.ok(productionResult.bills.length > 0);
+assert.equal(productionFullBuilds, 1);
+productionSelection.brands = ["BRAND-1"];
+productionSelector.select(productionRows, productionSelection, "", 1);
+productionSelection.types = ["TYPE-2"];
+productionSelector.select(productionRows, productionSelection, "", 1);
+productionSelector.select(productionRows, productionSelection, "สินค้า scale", 1);
+assert.equal(
+  productionFullBuilds,
+  1,
+  "Bill store, Brand, Type and Search must reuse the full candidate once built",
+);
+assert.ok(
+  buildRealBillFacetIndex(productionRows).every(
+    (bill) => !("lines" in bill) && !("shownRaw" in bill),
+  ),
+  "Lightweight facets must not allocate full lines or formatted totals",
+);
+const productionPerformance = {
+  rows: productionRows.length,
+  stores: productionStoreOptions.length,
+  ps: productionPsOptions.length,
+  noSelectionMs: Number(productionNoSelectionMs.toFixed(3)),
+  psPopupMs: Number(productionPsMs.toFixed(3)),
+  storePopupMs: Number(productionStoreMs.toFixed(3)),
+  applyMs: Number(productionApplyMs.toFixed(3)),
+  fullBuilds: productionFullBuilds,
+  ...productionSelector.stats(),
+};
+
 assert.deepEqual(mergeSelection({ receivers: ["ร้านเดิม"] }), {
   dates: [],
   ps: [],
@@ -1028,6 +1201,13 @@ assert.doesNotMatch(
   /setTimeout\(/,
   "Real Bill performance must not be hidden behind setTimeout",
 );
+const billLineSource =
+  realBillSource.match(/function billLine[\s\S]*?\n\}/)?.[0] || "";
+assert.doesNotMatch(
+  billLineSource,
+  /\b(?:B|F)\(|toLocaleString\(/,
+  "Real Bill model must not format money or quantity per source row",
+);
 const coreRenderSource = coreSource.match(
   /function render\(startedAt[\s\S]*?\n  \}\n  function loadData/,
 )?.[0] || "";
@@ -1050,4 +1230,5 @@ assert.equal(
 console.log("Pro regression modules passed:", {
   ...fixture.expected,
   realBillPerformance: largePerformance,
+  productionScalePerformance: productionPerformance,
 });
