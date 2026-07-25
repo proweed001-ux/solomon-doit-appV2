@@ -1221,6 +1221,16 @@ assert.match(
   /if \(\$\("#teleDrawer"\)\?\.classList\.contains\("on"\)\) renderTele\(\)/,
   "Closed Telesale drawer must not be rendered during every full render",
 );
+assert.match(
+  coreSource,
+  /state\.mode !== "ship" && summaryCache\.poolKind !== "full"/,
+  "Returning from a lightweight ship summary must rebuild the full pick pool",
+);
+assert.match(
+  coreSource,
+  /summaryCache\.poolKind = "ship"/,
+  "Ship summaries must identify their lightweight pool shape",
+);
 assert.equal(
   (coreRenderSource.match(/\.reduce\(/g) || []).length,
   0,
