@@ -300,6 +300,24 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
       "เลือกร้านหรือพิมพ์ชื่อร้าน เพื่อดูบิลจริง",
     );
     await expect(page.locator("#table")).toBeHidden();
+    for (const [kind, expectedText] of [
+      ["ps", fixtureMeta.ps],
+      ["orderStores", fixtureMeta.receiver],
+      ["brands", "Fixture Brand"],
+      ["types", "INVC"],
+    ]) {
+      await page.locator(`[data-pick="${kind}"]`).click();
+      const visibleTexts = await page
+        .locator("#pickList .pickItem")
+        .allTextContents();
+      expect(visibleTexts.some((text) => text.includes(expectedText))).toBe(
+        true,
+      );
+      expect(
+        visibleTexts.every((text, index) => text.trim() !== String(index)),
+      ).toBe(true);
+      await page.locator("#pickClose").click();
+    }
 
     await page.locator('[data-pick="receivers"]').click();
     const psTsOption = page.locator(
@@ -455,6 +473,20 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     await expect(overlay.locator(".realBillPrintTotal").first()).toContainText(
       /\d+\.\d{2}/,
     );
+    await page.emulateMedia({ media: "print" });
+    await expect(overlay).toBeVisible();
+    await expect(overlay.locator(".realBillReceipt")).toHaveCount(3);
+    await expect(overlay.locator(".realBillReceipt").first()).toBeVisible();
+    await expect(
+      overlay.locator(".realBillReceipt").first().locator("[data-real-line]"),
+    ).toHaveCount(12);
+    await expect(
+      overlay.locator(".realBillReceipt").nth(1).locator("[data-real-line]"),
+    ).toHaveCount(1);
+    await expect(overlay.locator('[data-real-part="2/2"]')).toContainText(
+      "1,391.00",
+    );
+    await page.emulateMedia({ media: "screen" });
     expect(
       await page.evaluate(() =>
         localStorage.getItem("doit-pro-print-price-edits-v1"),
@@ -579,7 +611,9 @@ test("keeps large real-bill tabs, pickers and pagination responsive", async ({
   expect(pickerOptionsCalls).toBe(1);
   expect(pickerListRenders).toBe(1);
   expect(pickerOptionsBuilds).toBe(1);
-  expect(metrics.candidateBuilds).toBe(1);
+  expect(metrics.candidateBuilds).toBe(0);
+  expect(metrics.facetIndexBuilds).toBe(1);
+  expect(metrics.moneyFormatCalls).toBe(0);
 
   const toggleResult = await page.evaluate(() => {
     const list = document.querySelector("#pickList");
@@ -615,7 +649,7 @@ test("keeps large real-bill tabs, pickers and pagination responsive", async ({
   metrics = await page.evaluate(
     () => window.DOIT_CORE_APP.health().realBillPerformance,
   );
-  expect(metrics.candidateBuilds).toBe(1);
+  expect(metrics.candidateBuilds).toBe(0);
   expect(metrics.pickerOptionsBuilds).toBe(pickerOptionsBuilds);
   expect(metrics.pickerOptionsCacheHits).toBeGreaterThanOrEqual(1);
   const cachedPickerOptionsCalls = metrics.pickerOptionsCalls;
@@ -745,7 +779,7 @@ test("keeps large real-bill tabs, pickers and pagination responsive", async ({
     () => window.DOIT_CORE_APP.health().realBillPerformance,
   );
   expect(metrics.telesaleModelBuilds).toBe(
-    beforeDrawer.telesaleModelBuilds,
+    beforeDrawer.telesaleModelBuilds + 1,
   );
   expect(metrics.telesaleDrawerRenders).toBe(
     beforeDrawer.telesaleDrawerRenders + 1,
@@ -755,7 +789,7 @@ test("keeps large real-bill tabs, pickers and pagination responsive", async ({
     () => window.DOIT_CORE_APP.health().realBillPerformance,
   );
   expect(metrics.telesaleModelBuilds).toBe(
-    beforeDrawer.telesaleModelBuilds,
+    beforeDrawer.telesaleModelBuilds + 1,
   );
   expect(metrics.telesaleDrawerRenders).toBe(
     beforeDrawer.telesaleDrawerRenders + 2,
@@ -784,6 +818,106 @@ test("keeps large real-bill tabs, pickers and pagination responsive", async ({
       .map(requestBasename)
       .filter((name) => forbiddenRequestNames.includes(name)),
   ).toEqual([]);
+  expect(runtime.errors).toEqual([]);
+});
+
+test("bounds the production-scale store picker and keeps whole-set actions", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  const storeCount = 7_106;
+  await page.evaluate((count) => {
+    const rows = Array.from({ length: count }, (_, index) => ({
+      InvoiceDate: "2026-07-25",
+      InvoiceNo: `SCALE-INV-${String(index).padStart(5, "0")}`,
+      SOTypeID: "INVC",
+      SO_SalespersonID: `PS-${String(index % 28).padStart(2, "0")}`,
+      TelesaleID:
+        index < 1_397 ? `TELE-${String(index).padStart(4, "0")}` : "",
+      CustomerName: `ร้าน Scale ${String(index).padStart(4, "0")}`,
+      SKUCode: `SCALE-${index}`,
+      SKUDescription: `สินค้า Scale ${index}`,
+      GroupBrand: `BRAND-${index % 16}`,
+      TAS_SizeGroup: `TYPE-${index % 9}`,
+      ShipQtyPCS: 1,
+      LineAmtBeforeDisc: 10.005,
+      InvoiceAmt: 9.005,
+    }));
+    window.DOIT_CORE_APP.load(rows, {
+      file_name: "synthetic-production-scale.xlsx",
+      id: "synthetic-production-scale",
+    });
+  }, storeCount);
+  await expect(page.locator("#msg")).toContainText("โหลดสำเร็จ 7,106 แถว");
+  await page.locator(".tabs .tab").nth(2).click();
+  const beforePopup = await page.evaluate(
+    () => window.DOIT_CORE_APP.health().realBillPerformance,
+  );
+  await page.locator('[data-pick="receivers"]').click();
+  await expect(page.locator("#pickList .pickItem")).toHaveCount(120);
+  await expect(page.locator(".realBillPickerPager")).toContainText(
+    "7,106 รายการ",
+  );
+  const firstPageValue = await page
+    .locator("#pickList .pickItem")
+    .first()
+    .getAttribute("data-v");
+  await page.locator('[data-picker-page="2"]').click();
+  await expect(page.locator("#pickList .pickItem")).toHaveCount(120);
+  expect(
+    await page.locator("#pickList .pickItem").first().getAttribute("data-v"),
+  ).not.toBe(firstPageValue);
+  const toggle = await page.evaluate(() => {
+    const list = document.querySelector("#pickList");
+    const item = list.querySelector(".pickItem");
+    const started = performance.now();
+    item.click();
+    return {
+      elapsed: performance.now() - started,
+      sameNode: item === list.querySelector(".pickItem"),
+      visibleItems: list.querySelectorAll(".pickItem").length,
+    };
+  });
+  expect(toggle.elapsed).toBeLessThan(100);
+  expect(toggle.sameNode).toBe(true);
+  expect(toggle.visibleItems).toBe(120);
+  await page.locator("#pickOk").click();
+  expect(
+    await page.evaluate(
+      () => window.DOIT_CORE_APP.currentState().sel.billStores.length,
+    ),
+  ).toBe(1);
+
+  await page.locator('[data-pick="receivers"]').click();
+  await page.locator("#pickAll").click();
+  await page.locator("#pickOk").click();
+  await expect(page.locator("#realBills .realBill")).toHaveCount(12);
+  expect(
+    await page.evaluate(
+      () => window.DOIT_CORE_APP.currentState().sel.billStores.length,
+    ),
+  ).toBe(storeCount);
+  let metrics = await page.evaluate(
+    () => window.DOIT_CORE_APP.health().realBillPerformance,
+  );
+  expect(metrics.pickerDomMax).toBeLessThanOrEqual(120);
+  expect(metrics.candidateBuilds).toBe(1);
+  expect(metrics.moneyFormatCalls).toBe(0);
+  expect(metrics.facetIndexBuilds).toBe(1);
+  expect(metrics.pickerToggleDomScans).toBeLessThan(storeCount);
+  expect(metrics.pickPoolCalls).toBe(beforePopup.pickPoolCalls);
+  expect(metrics.groupCalls).toBe(beforePopup.groupCalls);
+
+  await page.locator('[data-pick="receivers"]').click();
+  await page.locator("#pickClear").click();
+  await page.locator("#pickOk").click();
+  await expect(page.locator("#realBills")).toContainText(
+    "เลือกร้านหรือพิมพ์ชื่อร้าน เพื่อดูบิลจริง",
+  );
+  metrics = await page.evaluate(
+    () => window.DOIT_CORE_APP.health().realBillPerformance,
+  );
+  expect(metrics.pickerDomMax).toBeLessThanOrEqual(120);
   expect(runtime.errors).toEqual([]);
 });
 

@@ -258,6 +258,7 @@ export function realBillPagesHtml(bills) {
 function openRealBills(bills) {
   const overlay = document.createElement("div");
   overlay.className = "printOverlay printMobileSafeA4 realBillPrint";
+  overlay.style.setProperty("display", "block", "important");
   overlay.innerHTML =
     printBar("ตรวจ/แก้ไขก่อนปริ้น — บิลจริง") +
     realBillPagesHtml(bills);
