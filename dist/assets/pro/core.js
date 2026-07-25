@@ -45,6 +45,7 @@ import {
   teleRows,
   options,
   group,
+  pkey,
   pickPool,
   distPool,
 } from "./filters.js";
@@ -72,6 +73,9 @@ import { preparePrint } from "./print.js";
   const realBillUiMetrics = {
     pickerOptionsCalls: 0,
     pickerListRenders: 0,
+    pickerDomMax: 0,
+    pickerDelegatedBindings: 0,
+    pickerToggleDomScans: 0,
   };
   const corePerformance = {
     fullRenderCalls: 0,
@@ -80,6 +84,8 @@ import { preparePrint } from "./print.js";
     summaryBuilds: 0,
     manualSentCalls: 0,
     telesaleModelBuilds: 0,
+    telesaleCountBuilds: 0,
+    shipSummaryRowsScanned: 0,
     telesaleDrawerRenders: 0,
     telesaleButtonUpdates: 0,
     realBillPageRenders: 0,
@@ -94,7 +100,10 @@ import { preparePrint } from "./print.js";
   const telesaleCache = {
     signature: "",
     bills: [],
+    countSignature: "",
+    count: 0,
   };
+  const REAL_BILL_PICKER_WINDOW = 120;
   let fullRenderSequence = 0;
   let activeFullRender = null;
 
@@ -158,7 +167,11 @@ import { preparePrint } from "./print.js";
           " · เลือกอยู่ — ไม่มีในชุดปัจจุบัน",
       });
     });
-    return [...optionsByValue.values()];
+    return [...optionsByValue.values()].sort(
+      (left, right) =>
+        Number(right.available === false) -
+        Number(left.available === false),
+    );
   }
   function pickerOptions(kind) {
     let pickerItems;
@@ -254,7 +267,7 @@ import { preparePrint } from "./print.js";
       return;
     }
     const token = ++realBillPickerToken;
-    realBillPickerSession = { kind: k, options: null, token };
+    realBillPickerSession = { kind: k, options: null, token, page: 1 };
     $("#pickList").innerHTML =
       '<div class="empty realBillPickerLoading">กำลังเตรียมตัวเลือก…</div>';
     setPickerPending(true);
@@ -293,8 +306,39 @@ import { preparePrint } from "./print.js";
   }
   function renderPickerList(o, frozen = false) {
     if (frozen) realBillUiMetrics.pickerListRenders += 1;
-    $("#pickList").innerHTML = o.length
-      ? o
+    const list = $("#pickList");
+    let shown = o;
+    let pagerHtml = "";
+    if (frozen) {
+      const pages = Math.max(1, Math.ceil(o.length / REAL_BILL_PICKER_WINDOW));
+      realBillPickerSession.page = Math.min(
+        Math.max(1, realBillPickerSession.page || 1),
+        pages,
+      );
+      const page = realBillPickerSession.page;
+      shown = o.slice(
+        (page - 1) * REAL_BILL_PICKER_WINDOW,
+        page * REAL_BILL_PICKER_WINDOW,
+      );
+      pagerHtml =
+        '<div class="realBillPickerPager"><button type="button" data-picker-page="' +
+        Math.max(1, page - 1) +
+        '" ' +
+        (page === 1 ? "disabled" : "") +
+        '>‹</button><span>หน้า ' +
+        F(page) +
+        "/" +
+        F(pages) +
+        " · " +
+        F(o.length) +
+        ' รายการ</span><button type="button" data-picker-page="' +
+        Math.min(pages, page + 1) +
+        '" ' +
+        (page === pages ? "disabled" : "") +
+        ">›</button></div>";
+    }
+    list.innerHTML = o.length
+      ? shown
           .map(
             ({ value, label, available }) =>
               '<div class="pickItem ' +
@@ -310,31 +354,39 @@ import { preparePrint } from "./print.js";
               E(label) +
               "</span></div>",
           )
-          .join("")
+          .join("") + pagerHtml
       : '<div class="empty">ไม่มีรายการให้เลือก</div>';
-    $("#pickList")
-      .querySelectorAll(".pickItem")
-      .forEach(
-      (i) =>
-        (i.onclick = () => {
-          const v = i.dataset.v;
-          state.tmp = state.tmp.includes(v)
-            ? state.tmp.filter((x) => x !== v)
-            : state.tmp.concat(v);
-          if (frozen) {
-            syncPickerItems();
-          } else {
-            drawPick();
-          }
-        }),
+    realBillUiMetrics.pickerDomMax = Math.max(
+      realBillUiMetrics.pickerDomMax,
+      list.querySelectorAll(".pickItem").length,
     );
+    list.onclick = (event) => {
+      const pageButton = event.target.closest("[data-picker-page]");
+      if (pageButton && realBillPickerSession) {
+        realBillPickerSession.page = N(pageButton.dataset.pickerPage) || 1;
+        renderPickerList(realBillPickerSession.options, true);
+        return;
+      }
+      const item = event.target.closest(".pickItem");
+      if (!item || !list.contains(item)) return;
+      const value = item.dataset.v;
+      state.tmp = state.tmp.includes(value)
+        ? state.tmp.filter((entry) => entry !== value)
+        : state.tmp.concat(value);
+      if (frozen) syncPickerItems(item);
+      else drawPick();
+    };
+    realBillUiMetrics.pickerDelegatedBindings += 1;
   }
   function drawPick() {
     renderPickerList(pickerOptions(state.pickKind));
   }
-  function syncPickerItems() {
-    $("#pickList")
-      .querySelectorAll(".pickItem")
+  function syncPickerItems(target) {
+    const items = target
+      ? [target]
+      : [...$("#pickList").querySelectorAll(".pickItem")];
+    realBillUiMetrics.pickerToggleDomScans += items.length;
+    items
       .forEach((item) => {
         const active = state.tmp.includes(item.dataset.v);
         item.classList.toggle("on", active);
@@ -400,9 +452,47 @@ import { preparePrint } from "./print.js";
   function currentSummary() {
     const poolSignature = summaryPoolSignature();
     if (summaryCache.poolSignature !== poolSignature) {
-      corePerformance.pickPoolCalls += 1;
-      corePerformance.groupCalls += 1;
-      summaryCache.pool = pickPool();
+      if (state.mode === "ship") {
+        const groups = new Map();
+        state.rows.forEach((row) => {
+          corePerformance.shipSummaryRowsScanned += 1;
+          if (
+            row.isTele ||
+            !okDate(row) ||
+            !okPs(row) ||
+            !okCut(row) ||
+            !okBrand(row) ||
+            !okType(row) ||
+            !okQ(row)
+          ) {
+            return;
+          }
+          const key = pkey(row);
+          const item = groups.get(key) || {
+            poolKey: key,
+            qty: 0,
+            rawAmt: 0,
+            netAmt: 0,
+          };
+          item.qty += N(row.qty);
+          item.rawAmt += N(row.rawAmt);
+          item.netAmt += N(row.netAmt);
+          groups.set(key, item);
+        });
+        (state.ins || []).forEach((item) => {
+          groups.set(T(item.id), {
+            poolKey: T(item.id),
+            qty: N(item.qty),
+            rawAmt: N(item.qty) * N(item.unit),
+            netAmt: N(item.qty) * N(item.unit),
+          });
+        });
+        summaryCache.pool = [...groups.values()];
+      } else {
+        corePerformance.pickPoolCalls += 1;
+        corePerformance.groupCalls += 1;
+        summaryCache.pool = pickPool();
+      }
       summaryCache.poolSignature = poolSignature;
       summaryCache.totalsSignature = "";
     }
@@ -849,6 +939,22 @@ import { preparePrint } from "./print.js";
   function invalidateTelesale() {
     telesaleCache.signature = "";
     telesaleCache.bills = [];
+    telesaleCache.countSignature = "";
+    telesaleCache.count = 0;
+  }
+  function teleBillCount() {
+    const signature = telesaleSignature();
+    if (telesaleCache.countSignature !== signature) {
+      const keys = new Set();
+      state.rows.forEach((row) => {
+        if (!row.isTele || !okDate(row) || !okPs(row)) return;
+        keys.add([row.inv, row.store, row.tele, row.date].join("|"));
+      });
+      telesaleCache.count = keys.size;
+      telesaleCache.countSignature = signature;
+      corePerformance.telesaleCountBuilds += 1;
+    }
+    return telesaleCache.count;
   }
   function teleBills() {
     const signature = telesaleSignature();
@@ -863,7 +969,7 @@ import { preparePrint } from "./print.js";
     const button = $("#teleBtn");
     if (button) {
       button.textContent =
-        "บิล Telesale (" + F(teleBills().length) + ")";
+        "บิล Telesale (" + F(teleBillCount()) + ")";
     }
     corePerformance.telesaleButtonUpdates += 1;
   }
@@ -1059,7 +1165,7 @@ import { preparePrint } from "./print.js";
         "\n" +
         txt("receivers") +
         "\nTele bills " +
-        teleBills().length,
+        teleBillCount(),
     );
     msg("Copy สรุปแล้ว");
   }
@@ -1234,7 +1340,7 @@ import { preparePrint } from "./print.js";
       realBills: realBillRenderStats.totalBills,
       distRows: sourceRows({ ignoreDate: true }).length,
       teleRows: telesale.length,
-      teleBills: telesaleCache.bills.length,
+      teleBills: teleBillCount(),
       teleQty: telesale.reduce((sum, row) => sum + N(row.qty), 0),
       teleRaw: telesale.reduce((sum, row) => sum + N(row.rawAmt), 0),
       teleVat: telesale.reduce(

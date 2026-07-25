@@ -689,6 +689,26 @@
         padding: 8px;
         overflow: auto;
       }
+      .realBillPickerPager {
+        position: sticky;
+        bottom: 0;
+        display: grid;
+        grid-template-columns: 44px 1fr 44px;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        background: #fff;
+        border-top: 1px solid #e5e7eb;
+        text-align: center;
+        font-weight: 900;
+      }
+      .realBillPickerPager button {
+        min-height: 38px;
+        border: 1px solid #d1d5db;
+        border-radius: 9px;
+        background: #fff;
+        font-weight: 950;
+      }
       .pickItem {
         display: flex;
         gap: 10px;
