@@ -183,6 +183,7 @@ function recalculateReceipt(page, persist = false) {
 function openStoreBills(bills) {
   const overlay = document.createElement("div");
   overlay.className = "printOverlay printMobileSafeA4";
+  overlay.style.setProperty("display", "block", "important");
   overlay.innerHTML =
     printBar("ตรวจ/แก้ไขก่อนปริ้น — A4 มือถือ กันเครื่องปริ้นกินขอบ") + billPagesHtml(bills);
   document.body.appendChild(overlay);
