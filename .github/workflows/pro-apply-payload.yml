@@ -1,0 +1,50 @@
+name: Apply verified Pro follow-up payload
+on:
+  push:
+    branches: [codex/pro-real-bills-by-invoice]
+    paths:
+      - .github/pro-payload/**
+      - .github/workflows/pro-apply-payload.yml
+      - scripts/apply-pro-payload.mjs
+permissions:
+  contents: write
+concurrency:
+  group: pro-followup-payload
+  cancel-in-progress: false
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Reconstruct and verify payload
+        run: |
+          node scripts/apply-pro-payload.mjs
+          test "$(git hash-object dist/assets/pro/real-bills.js)" = e5e3ef730dd108ded733998d6d8429ea5f707f5e
+          test "$(git hash-object dist/assets/pro/core.js)" = 8430cbc1a354833809e6aadf244977e528e429fd
+          test "$(git hash-object scripts/test-pro-real-bill-scale.mjs)" = f7fcd60dae11ae5aa70ec2ee7bee5e9a7947e341
+          test "$(git hash-object tests/pro/pro-real-bill-scale.spec.mjs)" = 5910db07d3a93b9a257f93090fa64d7e8a563395
+          test "$(git hash-object package.json)" = ba835622056c49d93e5765bc09ad66944ab8fc62
+          node --check dist/assets/pro/real-bills.js
+          node --check dist/assets/pro/core.js
+          node --check scripts/test-pro-real-bill-scale.mjs
+          node --check tests/pro/pro-real-bill-scale.spec.mjs
+          node scripts/test-pro-real-bill-scale.mjs
+          git diff --check
+      - name: Create scoped commits
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add dist/assets/pro/real-bills.js
+          git commit -m "fix(pro): preserve real bill labels and lightweight facets"
+          git add dist/assets/pro/core.js
+          git commit -m "perf(pro): paginate real bill pickers and render lazily"
+          git add package.json scripts/test-pro-real-bill-scale.mjs tests/pro/pro-real-bill-scale.spec.mjs
+          git rm -r .github/pro-payload .github/workflows/pro-apply-payload.yml scripts/apply-pro-payload.mjs
+          git commit -m "test(pro): cover production-scale real bill filters"
+          git push origin HEAD:codex/pro-real-bills-by-invoice
