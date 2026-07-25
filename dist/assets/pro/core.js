@@ -93,6 +93,7 @@ import { preparePrint } from "./print.js";
   };
   const summaryCache = {
     poolSignature: "",
+    poolKind: "",
     pool: [],
     totalsSignature: "",
     totals: null,
@@ -445,13 +446,19 @@ import { preparePrint } from "./print.js";
   }
   function invalidateSummary() {
     summaryCache.poolSignature = "";
+    summaryCache.poolKind = "";
     summaryCache.pool = [];
     summaryCache.totalsSignature = "";
     summaryCache.totals = null;
   }
   function currentSummary() {
     const poolSignature = summaryPoolSignature();
-    if (summaryCache.poolSignature !== poolSignature) {
+    const needsFullPool =
+      state.mode !== "ship" && summaryCache.poolKind !== "full";
+    if (
+      summaryCache.poolSignature !== poolSignature ||
+      needsFullPool
+    ) {
       if (state.mode === "ship") {
         const groups = new Map();
         state.rows.forEach((row) => {
@@ -488,10 +495,12 @@ import { preparePrint } from "./print.js";
           });
         });
         summaryCache.pool = [...groups.values()];
+        summaryCache.poolKind = "ship";
       } else {
         corePerformance.pickPoolCalls += 1;
         corePerformance.groupCalls += 1;
         summaryCache.pool = pickPool();
+        summaryCache.poolKind = "full";
       }
       summaryCache.poolSignature = poolSignature;
       summaryCache.totalsSignature = "";
