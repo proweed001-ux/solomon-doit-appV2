@@ -59,11 +59,12 @@ test('runtime grouping uses only top-right name and visual fingerprints, never p
   assert.match(client, /โดยไม่ส่งรูป ราคา หรือโปรโมชั่น/u);
 });
 
-test('Admin retains manual price input and renders Promotion Family per card', () => {
+test('Admin retains manual price input and syncs one CSV Promotion Family across a Product Group', () => {
   const admin = readFileSync('src/promo-new/admin/main.tsx', 'utf8');
-  assert.match(admin, /data-testid=\{`card-promotion-\$\{card\.id\}`\}/u);
-  assert.match(admin, /<option value="">รอตรวจโปรโมชั่น<\/option>/u);
+  assert.match(admin, /data-testid=\{`group-promotion-\$\{group\.id\}`\}/u);
+  assert.match(admin, /<option value="">เลือก Promotion Family<\/option>/u);
   assert.match(admin, /ราคากลางต่อชิ้น/u);
   assert.match(admin, /setCentralPrice\(group\.price, amount\)/u);
-  assert.match(admin, /applyPromotionFamilyToCard\(group, current\.cards, cardId, family \|\| null\)/u);
+  assert.match(admin, /applyPromotionFamily\(group, current\.cards, family\)/u);
+  assert.doesNotMatch(admin, /applyPromotionFamilyToCard|card-promotion-/u);
 });
