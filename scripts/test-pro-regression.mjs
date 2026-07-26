@@ -734,8 +734,13 @@ const cachedSelection = {
 };
 const cachedFirst = cachedSelector.select(realRows, cachedSelection, "");
 const cachedSecond = cachedSelector.select(realRows, cachedSelection, "");
-assert.equal(selectorBuildCalls, 1);
+assert.equal(selectorBuildCalls, 0);
 assert.equal(cachedFirst, cachedSecond, "Filtered result must be reusable");
+const cachedFirstPage = cachedSelector.pageResult(cachedFirst, 1);
+assert.equal(selectorBuildCalls, 1);
+assert.ok(cachedFirstPage.bills.length > 0);
+assert.ok(cachedFirstPage.bills.length <= 12);
+assert.equal(cachedSelector.pageResult(cachedFirst, 1), cachedFirstPage);
 cachedSelection.billStores = ["ร้าน TS"];
 cachedSelector.select(realRows, cachedSelection, "");
 cachedSelection.brands = ["Brand Search"];
@@ -745,8 +750,8 @@ cachedSelector.select(realRows, cachedSelection, "");
 cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
 assert.equal(
   selectorBuildCalls,
-  5,
-  "Each distinct filtered result builds only its matching full bill rows",
+  1,
+  "Filtering must not build full bill rows until a page is requested",
 );
 assert.equal(
   cachedSelector.stats().candidateBuilds,
@@ -761,8 +766,8 @@ cachedSelection.orderStores = ["ร้านอื่น"];
 cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
 assert.equal(
   selectorBuildCalls,
-  8,
-  "Dates, PS and orderStores must invalidate the candidate model",
+  1,
+  "Candidate invalidation must remain lightweight until rendering",
 );
 assert.equal(cachedSelector.stats().candidateBuilds, 4);
 
@@ -788,20 +793,20 @@ assert.equal(
   2,
   "In-place rows and selection-array changes must not return stale bills",
 );
-assert.equal(mutableBuildCalls, 2);
+assert.equal(mutableBuildCalls, 0);
 const replacementRows = mutableRows.map((row) => ({ ...row }));
 mutableSelector.select(replacementRows, mutableSelection, "");
 assert.equal(
   mutableBuildCalls,
-  3,
-  "Replacing the rows array must invalidate the candidate model",
+  0,
+  "Replacing rows must not eagerly build full bills",
 );
 replacementRows[0] = { ...replacementRows[0], inv: "INV-VERSION-CHANGED" };
 mutableSelector.select(replacementRows, mutableSelection, "", 2);
 assert.equal(
   mutableBuildCalls,
-  4,
-  "A new rows version must invalidate same-length in-place data changes",
+  0,
+  "A new rows version must invalidate without eagerly building full bills",
 );
 
 let optionBuildCalls = 0;
@@ -941,6 +946,30 @@ const blocked201 = realBillPrintStats([
 assert.equal(blocked201.parts, 201);
 assert.equal(blocked201.pages, 101);
 assert.equal(blocked201.allowed, false);
+assert.equal(
+  realBillPrintStats(
+    Array.from({ length: 200 }, () => ({ lineCount: 12 })),
+  ).allowed,
+  true,
+);
+assert.equal(
+  realBillPrintStats(
+    Array.from({ length: 201 }, () => ({ lineCount: 12 })),
+  ).allowed,
+  false,
+);
+const lazyPrintSelector = createRealBillSelector();
+const lazyPrintResult = lazyPrintSelector.select(
+  realRows,
+  { ...createSelection(), billStores: ["ร้านร่วม"] },
+  "",
+  1,
+);
+const lazyPrintPayload = lazyPrintSelector.printPayload(lazyPrintResult);
+assert.equal(realBillPrintStats(lazyPrintPayload.bills).allowed, true);
+assert.equal(lazyPrintSelector.stats().fullBillPrintBuilds, 0);
+assert.ok(lazyPrintPayload.build().length > 0);
+assert.equal(lazyPrintSelector.stats().fullBillPrintBuilds, 1);
 
 const blankDateBill = buildRealBills([
   { ...realRows[7], date: "" },
@@ -1131,7 +1160,7 @@ const selectedLarge = largeSelector.select(
 );
 const selectedLargeElapsed = performance.now() - selectedLargeStart;
 assert.equal(selectedLarge.bills.length, fixtureMeta.largeBills);
-assert.equal(largeBuildCalls, 1);
+assert.equal(largeBuildCalls, 0);
 assert.ok(
   selectedLargeElapsed < 1500,
   `Large candidate model took ${selectedLargeElapsed.toFixed(2)} ms`,
@@ -1145,7 +1174,9 @@ assert.ok(
   ).some((item) => item.value === "PERF-BRAND-0"),
   "Brand options must remain available with every bill store selected",
 );
-const largePage = realBillPageModel(selectedLarge.bills, 1);
+const selectedLargePage = largeSelector.pageResult(selectedLarge, 1);
+const largePage = selectedLargePage.pageModel;
+assert.equal(largeBuildCalls, 1);
 assert.equal(largePage.visibleBills.length, 12);
 assert.equal(
   largePage.visibleRows,
@@ -1159,7 +1190,7 @@ largeSelector.select(largeRealRows, largeSelection, "", 1);
 largeSelection.types = ["PERF-TYPE-2"];
 largeSelector.select(largeRealRows, largeSelection, "", 1);
 largeSelector.select(largeRealRows, largeSelection, "PERF-SKU", 1);
-assert.equal(largeBuildCalls, 4);
+assert.equal(largeBuildCalls, 1);
 assert.equal(largeSelector.stats().candidateBuilds, 1);
 const hugeRealRows = largeRealBillFixtureRows({
   rows: fixtureMeta.hugeRows,
@@ -1186,7 +1217,7 @@ const hugeResult = hugeSelector.select(
 );
 const hugeCandidateMs = performance.now() - hugeCandidateStart;
 assert.equal(hugeResult.bills.length, fixtureMeta.hugeBills);
-assert.equal(hugeBuildCalls, 1);
+assert.equal(hugeBuildCalls, 0);
 assert.equal(realBillPageModel(hugeResult.bills, 999).visibleBills.length, 12);
 assert.ok(hugePromptMs < 100);
 assert.ok(
@@ -1277,8 +1308,19 @@ assert.equal(
   0,
   "Production-scale facets must not build full bill lines",
 );
-assert.equal(productionSelector.stats().facetIndexBuilds, 1);
+assert.equal(
+  productionSelector.stats().facetIndexBuilds,
+  2,
+  "Oversized facet indexes are recomputed instead of retained",
+);
 assert.equal(productionSelector.stats().moneyFormatCalls, 0);
+assert.ok(productionSelector.stats().optionCacheEntries <= 8);
+assert.ok(productionSelector.stats().optionCacheValues <= 20_000);
+assert.ok(productionSelector.stats().facetIndexCacheEntries <= 4);
+assert.ok(
+  productionSelector.stats().facetIndexCacheValues <= 20_000,
+  "Oversized production facet indexes must not be retained in cache",
+);
 
 let productionAllBuilds = 0;
 const productionAllSelector = createRealBillSelector((rows) => {
@@ -1299,14 +1341,38 @@ const productionAllResult = productionAllSelector.select(
 const productionAllApplyMs = performance.now() - productionAllStart;
 assert.equal(productionAllSelection.billStores.length, 7_106);
 assert.equal(productionAllResult.bills.length, productionRows.length);
-assert.equal(productionAllBuilds, 1);
+assert.equal(productionAllBuilds, 0);
 assert.equal(productionAllSelector.stats().candidateBuilds, 1);
+const productionAllPage = productionAllSelector.pageResult(
+  productionAllResult,
+  1,
+);
+assert.equal(productionAllBuilds, 1);
+assert.equal(productionAllPage.bills.length, 12);
 assert.equal(
-  productionAllSelector.stats().matchedRowsBuilt,
+  productionAllSelector.stats().matchedLightBills,
   productionRows.length,
 );
+assert.equal(productionAllSelector.stats().fullBillPageBuilds, 1);
+assert.equal(productionAllSelector.stats().fullBillPrintBuilds, 0);
+const productionPrintPayload =
+  productionAllSelector.printPayload(productionAllResult);
+const productionPrintPreflight = realBillPrintStats(
+  productionPrintPayload.bills,
+);
+assert.equal(productionPrintPreflight.allowed, false);
+assert.equal(
+  productionAllSelector.stats().fullBillPrintBuilds,
+  0,
+  "Print preflight must not build full bills when over the limit",
+);
+assert.equal(
+  productionAllSelector.stats().fullBillRowsBuilt,
+  12,
+  "Select-all must build full rows only for the visible page",
+);
 assert.ok(
-  productionAllApplyMs < 3_000 &&
+  productionAllApplyMs < 1_500 &&
     productionAllApplyMs < 5_380.166 * 0.7,
   `Select-all production apply took ${productionAllApplyMs.toFixed(2)} ms`,
 );
@@ -1321,7 +1387,7 @@ const productionResult = productionSelector.select(
 );
 const productionApplyMs = performance.now() - productionApplyStart;
 assert.ok(productionResult.bills.length > 0);
-assert.equal(productionFullBuilds, 1);
+assert.equal(productionFullBuilds, 0);
 productionSelection.brands = ["BRAND-1"];
 productionSelector.select(productionRows, productionSelection, "", 1);
 productionSelection.types = ["TYPE-2"];
@@ -1329,8 +1395,8 @@ productionSelector.select(productionRows, productionSelection, "", 1);
 productionSelector.select(productionRows, productionSelection, "สินค้า scale", 1);
 assert.equal(
   productionFullBuilds,
-  4,
-  "Each distinct filter builds only the full bills selected by the lightweight index",
+  0,
+  "Distinct filters must stay lightweight until a page is rendered",
 );
 assert.equal(
   productionSelector.stats().candidateBuilds,
@@ -1365,6 +1431,7 @@ for (let index = 0; index < 10; index += 1) {
   );
 }
 assert.ok(cacheSelector.stats().facetIndexCacheEntries <= 4);
+assert.ok(cacheSelector.stats().facetIndexCacheValues <= 20_000);
 cacheSelector.invalidate();
 assert.equal(cacheSelector.stats().optionCacheEntries, 0);
 assert.equal(cacheSelector.stats().optionCacheValues, 0);
@@ -1388,6 +1455,13 @@ const productionPerformance = {
   selectAllApplyMs: Number(productionAllApplyMs.toFixed(3)),
   selectAllBills: productionAllResult.bills.length,
   selectAllBuilds: productionAllBuilds,
+  selectAllFullRowsBuilt:
+    productionAllSelector.stats().fullBillRowsBuilt,
+  selectAllPageBuilds:
+    productionAllSelector.stats().fullBillPageBuilds,
+  selectAllPrintBuilds:
+    productionAllSelector.stats().fullBillPrintBuilds,
+  selectAllPrintParts: productionPrintPreflight.parts,
   fullBuilds: productionFullBuilds,
   ...productionSelector.stats(),
 };
@@ -1449,6 +1523,14 @@ assert.equal(state.sel.billStores.length, 7_106);
 state.redoStack.push(snap());
 trimHistory();
 assert.ok(historyStats().totalBytes <= HISTORY_MAX_BYTES);
+state.hist = ["x".repeat(HISTORY_MAX_BYTES + 1)];
+state.redoStack = [];
+trimHistory();
+assert.ok(
+  historyStats().totalBytes <= HISTORY_MAX_BYTES,
+  "A single oversized snapshot must not bypass the history hard limit",
+);
+assert.equal(state.hist.length, 0);
 
 delete globalThis.localStorage;
 
@@ -1460,16 +1542,12 @@ assert.match(coreSource, /state\.sel = createSelection\(\)/);
 assert.doesNotMatch(coreSource, /state\.sel = \{\s*dates:/);
 assert.match(
   coreSource,
-  /state\.mode === "ship" \? currentRealBillResult\(\)\.bills : undefined/,
-  "Real Bill print must receive every filtered bill, not the visible page",
+  /realBillSelector\.printPayload\(realBillResult\)/,
+  "Real Bill print must receive a lazy payload for every filtered bill",
 );
-const preparePrintSource =
-  printSource.match(
-    /export function preparePrint[\s\S]*?\n\}/,
-  )?.[0] || "";
 assert.ok(
-  preparePrintSource.indexOf("realBillPrintStats(realBills)") <
-    preparePrintSource.indexOf("openRealBills(realBills)"),
+  printSource.indexOf("realBillPrintStats(sourceBills)") <
+    printSource.indexOf("realBillPrint.build()"),
   "Real Bill print limits must be checked before building or appending print HTML",
 );
 assert.ok(
