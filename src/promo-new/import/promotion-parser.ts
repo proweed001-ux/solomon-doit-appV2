@@ -198,6 +198,12 @@ export function parsePromotionTiers(value: unknown, fallbackUnit = 'ชิ้น
 export function splitClassIds(value: unknown): string[] {
   const raw = String(value || '').toUpperCase().replace(/[,+&]/g, '/');
   const parts = raw.split('/').map(part => part.trim()).filter(Boolean);
-  const normalized = parts.map(part => normalizeClassId(part)).filter((part): part is string => Boolean(part));
+  const normalized = parts.map(part => {
+    // In the promotion workbook HFS-WH is an explicit business channel alias
+    // for M. Keep this source-specific mapping out of PDF OCR classification,
+    // where the same token can be a truncated WS-S header.
+    if (part.replace(/[^A-Z0-9]/g, '') === 'HFSWH') return 'HFSM';
+    return normalizeClassId(part);
+  }).filter((part): part is string => Boolean(part));
   return [...new Set(normalized)];
 }
