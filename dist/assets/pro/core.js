@@ -666,7 +666,12 @@ import { preparePrint } from "./print.js";
     $("#tableCount").textContent = result.requiresSelection
       ? "บิลจริง · เลือกร้านหรือค้นหาเพื่อแสดงข้อมูล"
       : "บิลจริง " + F(result.bills.length) + " บิล";
-    const model = renderRealBills($("#realBills"), result, {
+    const pageResult = realBillSelector.pageResult(
+      result,
+      realBillPage,
+      REAL_BILL_PAGE_SIZE,
+    );
+    const model = renderRealBills($("#realBills"), pageResult, {
       page: realBillPage,
       pageSize: REAL_BILL_PAGE_SIZE,
       onPage: (nextPage) => {
@@ -1260,13 +1265,18 @@ import { preparePrint } from "./print.js";
       $("#teleDrawer").classList.remove("on");
     };
     $("#insertBtn").onclick = addInsert;
-    $("#prepPrint").onclick = () =>
+    $("#prepPrint").onclick = () => {
+      const realBillResult =
+        state.mode === "ship" ? currentRealBillResult() : null;
       preparePrint({
         mode: state.mode,
         title: modeName(),
-        realBills:
-          state.mode === "ship" ? currentRealBillResult().bills : undefined,
+        realBillPrint:
+          state.mode === "ship"
+            ? realBillSelector.printPayload(realBillResult)
+            : undefined,
       });
+    };
     $("#exportCsv").onclick = exportCsv;
     const cs = $("#copySummary");
     if (cs) cs.onclick = copySummary;
