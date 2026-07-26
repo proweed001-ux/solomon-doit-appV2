@@ -162,11 +162,14 @@ check(masterMatcher.includes('byBrand: Map<string, PreparedMaster[]>'), 'product
 check(masterMatcher.includes('prepared.byBrand.get(brand)'), 'product_master_brand_index_not_used');
 
 const adminSource = read('src/promo-new/admin/main.tsx');
-check(adminSource.includes('<option value="">รอตรวจโปรโมชั่น</option>'), 'per_card_promotion_pending_option_missing');
+check(adminSource.includes('<option value="">เลือก Promotion Family</option>'), 'group_promotion_pending_option_missing');
+check(adminSource.includes('data-testid={`group-promotion-${group.id}`}'), 'group_promotion_selector_missing');
 check(adminSource.includes('ราคากลางต่อชิ้น'), 'manual_price_input_missing');
 check(adminSource.includes('setCentralPrice(group.price, amount)'), 'manual_price_apply_missing');
 check(adminSource.includes('assertReadyForPublish'), 'admin_preview_validation_missing');
-check(adminSource.includes('applyPromotionFamilyToCard'), 'per_card_promotion_apply_missing');
+check(adminSource.includes('applyPromotionFamily(group, current.cards, family)'), 'group_promotion_sync_missing');
+check(!adminSource.includes('applyPromotionFamilyToCard'), 'per_card_promotion_desync_reintroduced');
+check(!adminSource.includes('page-class-page'), 'duplicate_page_class_control_reintroduced');
 check(adminSource.includes('<ManualGroupingWorkbench'), 'manual_workbench_not_directly_wired');
 check(adminSource.includes('<GroupingSnapshotSave'), 'grouping_snapshot_save_not_directly_wired');
 check(adminSource.includes('extractProductText: false'), 'manual_grid_must_disable_product_text_extraction');
@@ -250,4 +253,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
-console.log('Promo new security/static checks passed: Structural Grid and page Class detection feed a fully manual Product Group workflow; product-title OCR and automatic grouping are disabled in the admin pipeline; stable card IDs, persisted confirmations, per-card Promotion Family, manual prices and read-only deployment protections remain intact.');
+console.log('Promo new security/static checks passed: Structural Grid and page Class detection feed a fully manual Product Group workflow; product-title OCR and automatic grouping are disabled in the admin pipeline; stable card IDs, persisted confirmations, group-level manual Promotion Family sync, per-Class tiers, manual prices and read-only deployment protections remain intact.');
