@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   PROMO_CLASS_IDS,
   classifyClassText,
@@ -46,11 +47,21 @@ test('อ่านคำเรียก Class ภาษาไทยที่ใ�
   assert.equal(normalizeClassId('ประเภท XL'), 'HFSXL');
 });
 
-test('M ที่ OCR แตกเป็น WH H N IV ยังกลับเป็น HFSM โดยไม่สร้าง Class ใหม่', () => {
-  for (const value of ['HFS-WH', 'HFS-H', 'HFS-N', 'HFS-IV', 'Class M', 'M']) {
+test('M ที่ OCR แตกเป็น H N IV RN ยังกลับเป็น HFSM โดยไม่สร้าง Class ใหม่', () => {
+  for (const value of ['HFS-H', 'HFS-N', 'HFS-IV', 'HFS-RN', 'Class M', 'M']) {
     const evidence = classifyClassText(value);
     assert.equal(evidence.classId, 'HFSM', value);
     assert.ok(evidence.confidence >= 0.72, `${value}:${evidence.confidence}`);
+  }
+});
+
+test('หัว WS ที่ถูกตัดเป็น HFS-WH หรือ HFS-W ต้องไม่ถูกฟันธงเป็น M', () => {
+  for (const value of ['HFS-WH', 'HFS-W']) {
+    const evidence = classifyClassText(value);
+    assert.equal(evidence.classId, null, value);
+    assert.equal(evidence.scores.HFSM, 0, value);
+    assert.ok(evidence.scores['HFSWS-S'] > 0, value);
+    assert.equal(evidence.scores['HFSWS-S'], evidence.scores['HFSWS-L'], value);
   }
 });
 
@@ -111,6 +122,24 @@ test('ลำดับหน้าแยกช่วง Class ได้เมื�
   ]);
   assert.equal(resolved[4].method, 'sequence');
   assert.equal(resolved[10].method, 'sequence');
+});
+
+test('ลำดับหน้าแยกหัว WS-S ที่ OCR ถูกตัดโดยไม่กลืนเข้า M', () => {
+  const observations: PageClassObservation[] = [
+    { page: 1, texts: ['HFS-XL'], headerColor: [150, 55, 145], hasCards: true },
+    { page: 2, texts: ['HFS-WH'], headerColor: [220, 20, 105], hasCards: true },
+    { page: 3, texts: ['HFS-W'], headerColor: [218, 22, 104], hasCards: true },
+    { page: 4, texts: ['HFS-WS-L'], headerColor: [25, 150, 125], hasCards: true },
+  ];
+  assert.deepEqual(resolvePageClassSequence(observations).map(item => item.classId), [
+    'HFSXL', 'HFSWS-S', 'HFSWS-S', 'HFSWS-L',
+  ]);
+});
+
+test('PDF importer ไม่เอา Class ที่เดาแล้วกลับไปยืนยันตัวเอง', () => {
+  const source = readFileSync(new URL('../../src/promo-new/import/pdf-importer.ts', import.meta.url), 'utf8');
+  assert.equal(source.includes('CLASS:${classEvidence.classId}'), false);
+  assert.match(source, /texts:\s*rawClassTexts/u);
 });
 
 test('ระบบไม่ผูก Class M กับเลขหน้า 4-6', () => {
