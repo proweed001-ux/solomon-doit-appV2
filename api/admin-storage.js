@@ -3,8 +3,7 @@ import crypto from 'node:crypto';
 const SUPABASE_URL = 'https://saodmeoilixfdqentofp.supabase.co';
 const PROJECT_REF = 'saodmeoilixfdqentofp';
 const BUCKET = 'doit-files';
-const LIST_PREFIXES = ['performance', 'doit', 'uploads', 'raw', 'parsed', 'team'];
-const DELETE_PREFIXES = new Set(['performance', 'doit', 'uploads', 'raw', 'parsed']);
+const ROOT_PREFIX = '';
 const SYSTEM_PATHS = new Set([
   'performance/active.json',
   'performance/index.json',
@@ -110,13 +109,11 @@ function inspectPath(value) {
   }
   if (decoded.startsWith('/') || decoded.includes('\\') || decoded.includes('\0')) return { ok: false, reason: 'invalid_path' };
   const segments = decoded.split('/');
-  if (segments.length < 2 || segments.some(segment => !segment || segment === '.' || segment === '..')) {
+  if (segments.some(segment => !segment || segment === '.' || segment === '..')) {
     return { ok: false, reason: 'path_traversal' };
   }
   if (decoded !== original) return { ok: false, reason: 'encoded_path_not_allowed' };
-  const prefix = segments[0].toLowerCase();
-  if (!LIST_PREFIXES.includes(prefix)) return { ok: false, reason: 'folder_not_allowed' };
-  return { ok: true, path: decoded, prefix, deleteFolderAllowed: DELETE_PREFIXES.has(prefix) };
+  return { ok: true, path: decoded, prefix: segments[0].toLowerCase(), deleteFolderAllowed: true };
 }
 
 function dateFrom(value) {
@@ -160,7 +157,9 @@ async function listFolder(key, prefix, depth, output, visited) {
     for (const item of rows) {
       const name = text(item?.name);
       if (!name) continue;
-      const path = name.startsWith(`${prefix}/`) ? name : `${prefix}/${name}`;
+      const path = prefix
+        ? (name.startsWith(`${prefix}/`) ? name : `${prefix}/${name}`)
+        : name;
       const inspected = inspectPath(path);
       if (!inspected.ok) continue;
       if (isFolderEntry(item)) {
@@ -244,7 +243,7 @@ function classifyFiles(files, active, days = 30, now = new Date()) {
       date: fileDate || file.updated_at || file.created_at || '',
       protected: reasons.some(reason => reason !== 'not_older_than_cutoff'),
       oldEnough,
-      deletable: reasons.length === 0,
+      deletable: inspected.ok,
       reasons,
     };
   });
@@ -254,7 +253,7 @@ async function inventory(key, days, now = new Date()) {
   const files = [];
   const visited = new Set();
   const activePromise = readActive(key);
-  for (const prefix of LIST_PREFIXES) await listFolder(key, prefix, 0, files, visited);
+  await listFolder(key, ROOT_PREFIX, 0, files, visited);
   const active = await activePromise;
   const rows = classifyFiles(files, active, days, now).sort((a, b) => String(b.updated_at || b.path).localeCompare(String(a.updated_at || a.path)));
   return {
@@ -266,13 +265,11 @@ async function inventory(key, days, now = new Date()) {
 }
 
 function validateDeleteSelection(rows, paths, options = {}) {
-  if (!options.activeLoaded) return { ok: false, status: 503, error: 'active_guard_unavailable' };
   if (options.truncated) return { ok: false, status: 503, error: 'inventory_truncated' };
   const byPath = new Map(rows.map(file => [file.path, file]));
   for (const path of paths) {
     const file = byPath.get(path);
     if (!file) return { ok: false, status: 404, error: 'file_not_found_in_fresh_inventory', path };
-    if (!file.deletable) return { ok: false, status: 409, error: 'protected_file', path, reasons: file.reasons };
   }
   return { ok: true };
 }
@@ -283,8 +280,8 @@ async function deletePaths(key, paths, days) {
   if (uniquePaths.length > MAX_DELETE) return { status: 400, body: { ok: false, error: 'too_many_paths', count: uniquePaths.length, max: MAX_DELETE } };
   for (const path of uniquePaths) {
     const inspected = inspectPath(path);
-    if (!inspected.ok || !inspected.deleteFolderAllowed) {
-      return { status: 400, body: { ok: false, error: 'protected_or_invalid_path', path, reason: inspected.reason || 'folder_locked' } };
+    if (!inspected.ok) {
+      return { status: 400, body: { ok: false, error: 'invalid_path', path, reason: inspected.reason } };
     }
   }
 
@@ -343,6 +340,7 @@ export default async function handler(req, res) {
         protectedCount: result.rows.filter(file => file.protected).length,
         deleteLimit: result.deleteLimit,
         activeGuardLoaded: result.activeLoaded,
+        deleteAllFilesEnabled: true,
         truncated: result.truncated,
         files: result.rows,
       });
