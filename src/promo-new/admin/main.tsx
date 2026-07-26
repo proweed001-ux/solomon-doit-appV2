@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { AlertTriangle, CheckCircle2, Database, FileSpreadsheet, Layers3, LogOut, Save, Search, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 import type { PromoDataset, ProductGroup } from '../domain/types';
 import { applyPromotionFamily } from '../domain/grouping';
+import { calculatePromotion } from '../domain/calculator';
 import { applyPriceToGroup, setCentralPrice } from '../domain/pricing';
 import { confirmSkuCandidate } from '../domain/sku-identity';
 import { assertReadyForPublishMultiCard as assertReadyForPublish } from './validation-multi-card';
@@ -90,6 +91,7 @@ function GroupEditor({ group, dataset, priceDraft, onPriceDraft, onConfirmSku, o
   const cards = dataset.cards.filter(card => group.cardIds.includes(card.id));
   const locked = Boolean(group.manualLocked || group.manualConfirmed);
   const selectedFamily = dataset.promotionFamilies.find(item => item.id === group.promotionFamilyId) || null;
+  const [previewQuantity, setPreviewQuantity] = useState(1);
   return <article className={`group-card ${group.status}`}>
     <div className="group-top">
       <div>
@@ -127,7 +129,28 @@ function GroupEditor({ group, dataset, priceDraft, onPriceDraft, onConfirmSku, o
         <div className="price-source">{selectedFamily ? `${selectedFamily.scopeText} · แถว CSV ${selectedFamily.sourceRows.join(', ')}` : 'เลือกครั้งเดียว ระบบจะใช้ Family เดียวกันทั้งกลุ่ม และแจก Tier ให้แต่ละการ์ดตาม Class ร้านค้าเดิม'}</div>
         <div className="price-row"><label className="field">ราคากลางต่อชิ้น<input type="number" min="0.01" step="0.01" inputMode="decimal" value={priceDraft} onChange={event => onPriceDraft(event.target.value)} placeholder="0.00" /></label><label className="field">แหล่งราคา<input value={group.price.source === 'central_override' ? 'คุณกรอกเอง' : 'ยังไม่มีราคา'} readOnly /></label></div>
         <div className="price-source">ราคาเดียวกันจะซิงค์ไปทุกการ์ดใน Product Group และเป็นฐานคำนวณหน้าลูกค้า</div>
-        <div className="tier-preview">{cards.map(card => <div className="tier-line" key={card.id}><b>{card.classId}</b><span>{card.promotionTiers.map(tier => tier.sourceText).join(' / ') || 'รอเลือกโปรโมชั่นของกลุ่ม'}</span></div>)}</div>
+        <label className="field">ทดลองจำนวนซื้อ
+          <input
+            data-testid={`group-calculation-quantity-${group.id}`}
+            type="number"
+            min="1"
+            step="1"
+            inputMode="numeric"
+            value={previewQuantity}
+            onChange={event => setPreviewQuantity(Math.max(1, Math.floor(Number(event.target.value) || 1)))}
+          />
+        </label>
+        <div className="tier-preview">{cards.map(card => {
+          const unitPrice = Number(card.price.effectivePrice?.amount || 0);
+          const calculation = unitPrice > 0 && card.promotionTiers.length
+            ? calculatePromotion(unitPrice, previewQuantity, card.promotionTiers)
+            : null;
+          const gift = calculation?.giftQuantity ? ` · แถม ${calculation.giftQuantity} ${calculation.giftUnit || ''}` : '';
+          return <div data-testid={`group-calculation-${card.id}`} className="tier-line" key={card.id}>
+            <b>{card.classId}</b>
+            <span>{card.promotionTiers.map(tier => tier.sourceText).join(' / ') || 'รอเลือกโปรโมชั่นของกลุ่ม'}{calculation ? ` · ซื้อ ${calculation.quantity} ยอดสุทธิ ${money(calculation.netAmount)}${gift}` : ' · รอราคาและโปรโมชั่น'}</span>
+          </div>;
+        })}</div>
         <div className="control-actions"><button className="btn success" disabled={locked || !(Number(priceDraft) > 0)} title={locked ? 'กลุ่มล็อกแล้ว ต้องปลดล็อกก่อนเปลี่ยนราคา' : !(Number(priceDraft) > 0) ? 'กรอกราคามากกว่า 0' : ''} onClick={() => onApplyPrice(Number(priceDraft))}>บันทึกราคากลาง</button></div>
       </div>
     </div>
