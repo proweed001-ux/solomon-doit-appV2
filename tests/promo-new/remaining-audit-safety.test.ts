@@ -46,10 +46,12 @@ function imported(): PdfImportResult {
 
 const signature = (title: string, product: string, quality = 0.5) => ({ title, product, quality });
 
-test('HFS-WH remains recoverable as HFSM but cannot become a strong Class anchor', () => {
+test('HFS-WH remains ambiguous for WS sequence recovery and cannot become an M anchor', () => {
   const weak = classifyClassText('HFS-WH');
-  assert.equal(weak.classId, 'HFSM');
-  assert.ok(weak.confidence < 0.78, String(weak.confidence));
+  assert.equal(weak.classId, null);
+  assert.equal(weak.scores.HFSM, 0);
+  assert.equal(weak.scores['HFSWS-S'], weak.scores['HFSWS-L']);
+  assert.ok(weak.confidence < 0.72, String(weak.confidence));
   const exact = classifyClassText('HFS-M');
   assert.equal(exact.classId, 'HFSM');
   assert.ok(exact.confidence >= 0.9, String(exact.confidence));
