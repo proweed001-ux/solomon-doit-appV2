@@ -21,6 +21,7 @@ export function realBillCandidateRows(rows, selection) {
   const dates = valueSet(sel.dates);
   const ps = valueSet(sel.ps);
   const orderStores = valueSet(sel.orderStores);
+  if (!dates.size && !ps.size && !orderStores.size) return rows || [];
   return (rows || []).filter(
     (row) =>
       selected(dates, row.date) &&
@@ -165,9 +166,14 @@ function billFacetValues(bill, field) {
   return uniq((bill.lines || []).map((line) => line[field]));
 }
 
-export function buildRealBillFacetIndex(rows) {
+function addFacetValue(values, value) {
+  const text = T(value);
+  if (!values.includes(text)) values.push(text);
+}
+
+export function buildRealBillFacetIndex(rows, sortBills = true) {
   const bills = new Map();
-  (rows || []).forEach((row) => {
+  (rows || []).forEach((row, sourceIndex) => {
     const key = realBillKey(row);
     let bill = bills.get(key);
     if (!bill) {
@@ -181,28 +187,29 @@ export function buildRealBillFacetIndex(rows) {
         inv: T(row.inv),
         date: T(row.date),
         tele: sourceType === REAL_BILL_SOURCE_TS ? T(row.tele) : "",
-        psValues: new Set(),
-        brandValues: new Set(),
-        typeValues: new Set(),
-        searchParts: new Set([
+        psValues: [],
+        brandValues: [],
+        typeValues: [],
+        rowIndexes: [],
+        lineCount: 0,
+        searchText: [
           T(row.store),
           T(row.inv),
           sourceType === REAL_BILL_SOURCE_TS ? T(row.tele) : "",
-        ]),
+        ].join(" ").toLowerCase(),
       };
       bills.set(key, bill);
     }
-    bill.psValues.add(T(row.ps));
-    bill.brandValues.add(T(row.brand));
-    bill.typeValues.add(T(row.type));
-    bill.searchParts.add(T(row.code));
-    bill.searchParts.add(T(row.sku));
+    addFacetValue(bill.psValues, row.ps);
+    addFacetValue(bill.brandValues, row.brand);
+    addFacetValue(bill.typeValues, row.type);
+    bill.rowIndexes.push(sourceIndex);
+    bill.lineCount += 1;
+    bill.searchText +=
+      " " + T(row.code).toLowerCase() + " " + T(row.sku).toLowerCase();
   });
-  return [...bills.values()].map((bill) => {
-    bill.searchText = [...bill.searchParts].join(" ").toLowerCase();
-    delete bill.searchParts;
-    return bill;
-  });
+  const result = [...bills.values()];
+  return sortBills ? result.sort(compareBills) : result;
 }
 
 export function filterRealBills(bills, selection, query) {
@@ -350,6 +357,8 @@ export function createRealBillSelector(buildBills = buildRealBills) {
   let candidateVersion = 0;
   let cachedFilterSignature = "";
   let cachedResult = null;
+  let cachedPageKey = "";
+  let cachedPageResult = null;
   const optionCache = new Map();
   const facetIndexCache = new Map();
   const counters = {
@@ -368,7 +377,11 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     candidateRowsScanned: 0,
     resultRowsScanned: 0,
     matchedRowsBuilt: 0,
+    matchedLightBills: 0,
     fullBillBuilds: 0,
+    fullBillRowsBuilt: 0,
+    fullBillPageBuilds: 0,
+    fullBillPrintBuilds: 0,
     moneyFormatCalls: 0,
   };
 
@@ -388,7 +401,8 @@ export function createRealBillSelector(buildBills = buildRealBills) {
         total +
         1 +
         ["psValues", "brandValues", "typeValues"].reduce(
-          (sum, field) => sum + (item[field]?.size || 0),
+          (sum, field) =>
+            sum + (item[field]?.size ?? item[field]?.length ?? 0),
           0,
         )
       );
@@ -415,9 +429,7 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     const entryValues = cacheValueCount(value);
     if (cache.has(key)) cache.delete(key);
     if (entryValues > maxValues) {
-      cache.clear();
-      cache.set(key, value);
-      return;
+      return false;
     }
     while (
       cache.size &&
@@ -427,6 +439,27 @@ export function createRealBillSelector(buildBills = buildRealBills) {
       cache.delete(cache.keys().next().value);
     }
     cache.set(key, value);
+    return true;
+  }
+
+  function rowsForLightBills(candidateRows, lightBills) {
+    const rows = [];
+    (lightBills || []).forEach((bill) => {
+      (bill.rowIndexes || []).forEach((index) => {
+        const row = candidateRows[index];
+        if (row) rows.push(row);
+      });
+    });
+    return rows;
+  }
+
+  function buildLightBills(candidateRows, lightBills, buildKind) {
+    const rows = rowsForLightBills(candidateRows, lightBills);
+    counters.fullBillBuilds += 1;
+    counters.fullBillRowsBuilt += rows.length;
+    if (buildKind === "page") counters.fullBillPageBuilds += 1;
+    if (buildKind === "print") counters.fullBillPrintBuilds += 1;
+    return buildBills(rows);
   }
 
   function ensureCandidateRows(rows, selection, rowsVersion) {
@@ -441,11 +474,16 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     cachedCandidateSignature = candidateSignature(selection);
     cachedCandidateRows = realBillCandidateRows(rows, selection);
     counters.candidateRowsScanned += (rows || []).length;
-    cachedCandidateFacets = buildRealBillFacetIndex(cachedCandidateRows);
+    cachedCandidateFacets = buildRealBillFacetIndex(
+      cachedCandidateRows,
+      false,
+    );
     candidateVersion += 1;
     counters.candidateBuilds += 1;
     cachedFilterSignature = "";
     cachedResult = null;
+    cachedPageKey = "";
+    cachedPageResult = null;
     return cachedCandidateRows;
   }
 
@@ -463,7 +501,7 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     }
     const candidateRows = realBillCandidateRows(rows, selection);
     counters.facetRowsScanned += (rows || []).length;
-    const facets = buildRealBillFacetIndex(candidateRows);
+    const facets = buildRealBillFacetIndex(candidateRows, false);
     counters.facetIndexBuilds += 1;
     cacheSet(
       facetIndexCache,
@@ -503,20 +541,16 @@ export function createRealBillSelector(buildBills = buildRealBills) {
       cachedCandidateFacets,
       selection,
       query,
-    );
-    const matchedKeys = new Set(matchedFacets.map((bill) => bill.key));
-    counters.resultRowsScanned += candidateRows.length;
-    const matchedRows = candidateRows.filter((row) =>
-      matchedKeys.has(realBillKey(row)),
-    );
-    counters.matchedRowsBuilt += matchedRows.length;
+    ).sort(compareBills);
+    counters.matchedLightBills += matchedFacets.length;
     counters.filteredBuilds += 1;
-    counters.fullBillBuilds += 1;
     cachedFilterSignature = nextFilterSignature;
+    cachedPageKey = "";
+    cachedPageResult = null;
     cachedResult = {
       candidateRows,
       allBills: matchedFacets,
-      bills: buildBills(matchedRows),
+      bills: matchedFacets,
       requiresSelection: false,
       resultKey: candidateVersion + "|" + nextFilterSignature,
     };
@@ -559,6 +593,8 @@ export function createRealBillSelector(buildBills = buildRealBills) {
   function refreshFilters() {
     cachedFilterSignature = "";
     cachedResult = null;
+    cachedPageKey = "";
+    cachedPageResult = null;
   }
 
   function invalidate() {
@@ -569,6 +605,8 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     cachedCandidateFacets = [];
     cachedFilterSignature = "";
     cachedResult = null;
+    cachedPageKey = "";
+    cachedPageResult = null;
     optionCache.clear();
     facetIndexCache.clear();
     candidateVersion += 1;
@@ -592,6 +630,59 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     hasCandidate,
     invalidate,
     pickerOptions,
+    pageResult(result, page = 1, pageSize = REAL_BILL_PAGE_SIZE) {
+      const lightModel = realBillPageModel(
+        result?.bills || [],
+        page,
+        pageSize,
+      );
+      const pageKey =
+        (result?.resultKey || "") +
+        "|" +
+        lightModel.currentPage +
+        "|" +
+        lightModel.pageSize;
+      if (cachedPageResult && cachedPageKey === pageKey) {
+        return cachedPageResult;
+      }
+      const fullBills = result?.requiresSelection
+        ? []
+        : buildLightBills(
+            result?.candidateRows || [],
+            lightModel.visibleBills,
+            "page",
+          );
+      counters.matchedRowsBuilt += fullBills.reduce(
+        (total, bill) => total + bill.lines.length,
+        0,
+      );
+      cachedPageKey = pageKey;
+      cachedPageResult = {
+        ...result,
+        bills: fullBills,
+        pageModel: {
+          ...lightModel,
+          visibleBills: fullBills,
+          visibleRows: fullBills.reduce(
+            (total, bill) => total + bill.lines.length,
+            0,
+          ),
+        },
+      };
+      return cachedPageResult;
+    },
+    printPayload(result) {
+      const lightBills = result?.bills || [];
+      return {
+        bills: lightBills,
+        build: () =>
+          buildLightBills(
+            result?.candidateRows || [],
+            lightBills,
+            "print",
+          ),
+      };
+    },
     refreshFilters,
     select,
     stats,
@@ -849,7 +940,8 @@ export function realBillPageModel(
     totalPages,
     visibleBills,
     visibleRows: visibleBills.reduce(
-      (sum, bill) => sum + bill.lines.length,
+      (sum, bill) =>
+        sum + (bill.lineCount ?? (bill.lines || []).length),
       0,
     ),
   };
@@ -940,13 +1032,18 @@ export function renderRealBills(
 ) {
   if (!container) return null;
   const bills = result?.bills || [];
-  const model = realBillPageModel(bills, page, pageSize);
-  container.innerHTML = realBillsHtml(
-    bills,
-    Boolean(result?.requiresSelection),
-    model.currentPage,
-    model.pageSize,
-  );
+  const model =
+    result?.pageModel || realBillPageModel(bills, page, pageSize);
+  if (result?.requiresSelection) {
+    container.innerHTML =
+      '<div class="empty realBillsEmpty">เลือกร้านหรือพิมพ์ชื่อร้าน เพื่อดูบิลจริง</div>';
+  } else if (!model.totalBills) {
+    container.innerHTML =
+      '<div class="empty realBillsEmpty">ไม่พบบิลจริงตามตัวเลือกหรือคำค้นหา</div>';
+  } else {
+    container.innerHTML =
+      realBillCardsHtml(model.visibleBills) + realBillPagerHtml(model);
+  }
   container.dataset.totalBills = String(model.totalBills);
   container.dataset.renderedBills = String(model.visibleBills.length);
   container.dataset.renderedRows = String(model.visibleRows);
