@@ -270,7 +270,7 @@ async function selectTarget(page, groupId = 'group:one') {
   await expect(page.getByTestId('target-group-banner')).toBeVisible();
 }
 
-test('runtime supports add, remove, undo, bulk confirm, per-card promo, lock, save and reload', async ({ page }) => {
+test('runtime supports add, remove, undo, bulk confirm, group promo sync, lock, save and reload', async ({ page }) => {
   const backend = await installTestBackend(page);
   await openDataset(page);
   await selectTarget(page);
@@ -296,18 +296,18 @@ test('runtime supports add, remove, undo, bulk confirm, per-card promo, lock, sa
   await page.getByTestId('confirm-bulk-move').click();
   await expect(page.getByTestId('target-group-banner')).toContainText('4 การ์ด');
 
-  await page.getByTestId(`card-promotion-${CARD_THREE}`).selectOption('family:one');
-  await page.getByTestId(`card-promotion-${CARD_FOUR}`).selectOption('family:two');
-  await expect(page.getByTestId(`card-promotion-${CARD_ONE}`)).toHaveValue('family:one');
-  await expect(page.getByTestId(`card-promotion-${CARD_TWO}`)).toHaveValue('family:two');
+  const groupPromotion = page.getByTestId('group-promotion-group:one');
+  await groupPromotion.selectOption('family:one');
+  await expect(groupPromotion).toHaveValue('family:one');
+  await expect(page.getByText(/ซิงค์ PF-ONE ให้ 4 การ์ดแล้ว/u)).toBeVisible();
 
   await page.getByRole('button', { name: 'ยืนยันกลุ่ม' }).click();
-  await expect(page.getByTestId(`card-promotion-${CARD_ONE}`)).toBeDisabled();
+  await expect(groupPromotion).toBeDisabled();
   await expect(page.getByTestId(`manual-card-${CARD_ONE}`).getByRole('checkbox')).toBeDisabled();
 
   await page.getByRole('button', { name: 'ปลดล็อกกลุ่ม' }).click();
-  await page.getByTestId(`card-promotion-${CARD_ONE}`).selectOption('family:three');
-  await expect(page.getByTestId(`card-promotion-${CARD_TWO}`)).toHaveValue('family:two');
+  await groupPromotion.selectOption('family:three');
+  await expect(groupPromotion).toHaveValue('family:three');
   await page.getByRole('button', { name: 'ยืนยันกลุ่ม' }).click();
 
   page.once('dialog', dialog => dialog.accept());
@@ -315,9 +315,10 @@ test('runtime supports add, remove, undo, bulk confirm, per-card promo, lock, sa
   await expect(page.getByText(/บันทึก Snapshot revision 1 แล้ว/u)).toBeVisible();
   expect(backend.writeCount).toBe(1);
   expect(backend.savedSnapshot.assignments).toHaveLength(4);
+  expect(backend.savedSnapshot.assignments.every(item => item.promotionFamilyId === 'family:three')).toBe(true);
 
   await page.getByRole('button', { name: 'ปลดล็อกกลุ่ม' }).click();
-  await expect(page.getByTestId(`card-promotion-${CARD_ONE}`)).toBeEnabled();
+  await expect(groupPromotion).toBeEnabled();
   expect(backend.unlockWriteCount).toBe(1);
   await page.getByRole('button', { name: 'ยืนยันกลุ่ม' }).click();
   await expect(page.getByTestId('save-grouping-snapshot')).toBeEnabled();
@@ -328,13 +329,13 @@ test('runtime supports add, remove, undo, bulk confirm, per-card promo, lock, sa
 
   await page.reload();
   await expect(page.getByTestId('target-group-select')).toBeVisible();
-  await expect(page.getByTestId(`card-promotion-${CARD_ONE}`)).toHaveValue('family:three');
-  await expect(page.getByTestId(`card-promotion-${CARD_TWO}`)).toHaveValue('family:two');
-  await expect(page.getByTestId(`card-promotion-${CARD_ONE}`)).toBeDisabled();
+  const restoredPromotion = page.getByTestId('group-promotion-group:one');
+  await expect(restoredPromotion).toHaveValue('family:three');
+  await expect(restoredPromotion).toBeDisabled();
   await selectTarget(page);
   await expect(page.getByTestId('target-group-banner')).toContainText('กลุ่มยืนยันแล้ว');
   await page.getByRole('button', { name: 'ปลดล็อกกลุ่ม' }).click();
-  await expect(page.getByTestId(`card-promotion-${CARD_ONE}`)).toBeEnabled();
+  await expect(restoredPromotion).toBeEnabled();
   expect(backend.unlockWriteCount).toBe(2);
 });
 
