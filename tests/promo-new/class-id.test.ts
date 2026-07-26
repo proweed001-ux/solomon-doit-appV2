@@ -59,8 +59,8 @@ test('หัว WS ที่ถูกตัดเป็น HFS-WH หรือ H
   for (const value of ['HFS-WH', 'HFS-W']) {
     const evidence = classifyClassText(value);
     assert.equal(evidence.classId, null, value);
-    assert.equal(evidence.scores.HFSM, 0, value);
-    assert.ok(evidence.scores['HFSWS-S'] > 0, value);
+    assert.ok(evidence.scores.HFSM > 0, value);
+    assert.equal(evidence.scores.HFSM, evidence.scores['HFSWS-S'], value);
     assert.equal(evidence.scores['HFSWS-S'], evidence.scores['HFSWS-L'], value);
   }
 });
