@@ -284,6 +284,9 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     await chooseOnly(page, "dates", fixtureMeta.date);
     await chooseOnly(page, "ps", fixtureMeta.ps);
     await chooseOnly(page, "receivers", fixtureMeta.receiver);
+    const legacyAmount = await page.locator("#amount").textContent();
+    await expect(page.locator(".summaryHead")).toBeVisible();
+    await expect(page.locator(".summary")).toBeVisible();
 
     const realBillTab = page.locator(".tabs .tab").nth(2);
     await expect(realBillTab).toHaveText("บิลจริง");
@@ -299,6 +302,9 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     await expect(page.locator("#realBills")).toContainText(
       "เลือกร้านหรือพิมพ์ชื่อร้าน เพื่อดูบิลจริง",
     );
+    await expect(page.locator(".summaryHead")).toBeHidden();
+    await expect(page.locator(".summary")).toBeHidden();
+    await expect(page.locator("#amount")).toBeHidden();
     await expect(page.locator("#table")).toBeHidden();
     for (const [kind, expectedText] of [
       ["ps", fixtureMeta.ps],
@@ -456,6 +462,8 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     await expect(page.locator("#realBills .realBill")).toHaveCount(2);
     await page.locator("#prepPrint").click();
     overlay = page.locator(".printOverlay.realBillPrint");
+    await page.evaluate(() => document.querySelector("#prepPrint").click());
+    await expect(page.locator(".printOverlay.realBillPrint")).toHaveCount(1);
     await expect(overlay.locator(".a4Sheet")).toHaveCount(2);
     await expect(overlay.locator(".realBillReceipt")).toHaveCount(3);
     await expect(overlay.locator(".realBillReceipt").nth(0).locator("[data-real-line]")).toHaveCount(
@@ -497,7 +505,12 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     ).toBe(printEditBefore);
     await overlay.locator("[data-print-close]").click();
 
+    await page.locator("#q").fill("");
+    await page.locator("#searchBtn").click();
     await page.locator(".tabs .tab").first().click();
+    await expect(page.locator(".summaryHead")).toBeVisible();
+    await expect(page.locator(".summary")).toBeVisible();
+    await expect(page.locator("#amount")).toHaveText(legacyAmount || "");
     await expect(page.locator("#sendLabelText")).toHaveText("ส่งให้ร้าน:");
     await expect(page.locator('[data-pick="receivers"]')).toContainText(
       fixtureMeta.receiver,
@@ -893,8 +906,11 @@ test("bounds the production-scale store picker and keeps whole-set actions", asy
 
   await page.locator('[data-pick="receivers"]').click();
   await page.locator("#pickAll").click();
+  const applyStart = Date.now();
   await page.locator("#pickOk").click();
   await expect(page.locator("#realBills .realBill")).toHaveCount(12);
+  const applyElapsed = Date.now() - applyStart;
+  expect(applyElapsed).toBeLessThan(1500);
   expect(
     await page.evaluate(
       () => window.DOIT_CORE_APP.currentState().sel.billStores.length,
@@ -910,6 +926,33 @@ test("bounds the production-scale store picker and keeps whole-set actions", asy
   expect(metrics.pickerToggleDomScans).toBeLessThan(storeCount);
   expect(metrics.pickPoolCalls).toBe(beforePopup.pickPoolCalls);
   expect(metrics.groupCalls).toBe(beforePopup.groupCalls);
+  const historyHealth = await page.evaluate(
+    () => window.DOIT_CORE_APP.health().history,
+  );
+  expect(historyHealth.totalBytes).toBeLessThanOrEqual(2 * 1024 * 1024);
+  expect(historyHealth.historyEntries).toBeLessThanOrEqual(80);
+
+  await page.evaluate(() => {
+    window.__realBillPrintCalls = 0;
+    window.print = () => {
+      window.__realBillPrintCalls += 1;
+    };
+  });
+  let printLimitMessage = "";
+  page.once("dialog", async (dialog) => {
+    printLimitMessage = dialog.message();
+    await dialog.accept();
+  });
+  await page.locator("#prepPrint").click();
+  expect(printLimitMessage).toContain(
+    "มีบิลสำหรับปริ้นมากเกินไป",
+  );
+  expect(printLimitMessage).toContain("200 ส่วน");
+  expect(printLimitMessage).toContain("100 หน้า A4");
+  await expect(page.locator(".printOverlay.realBillPrint")).toHaveCount(0);
+  expect(
+    await page.evaluate(() => window.__realBillPrintCalls),
+  ).toBe(0);
 
   await page.locator('[data-pick="receivers"]').click();
   await page.locator("#pickClear").click();
@@ -921,6 +964,13 @@ test("bounds the production-scale store picker and keeps whole-set actions", asy
     () => window.DOIT_CORE_APP.health().realBillPerformance,
   );
   expect(metrics.pickerDomMax).toBeLessThanOrEqual(120);
+  console.log("7,106-store Real Bill apply:", {
+    applyElapsed,
+    bills: storeCount,
+    renderedBills: metrics.renderedBills,
+    fullBillBuilds: metrics.fullBillBuilds,
+    candidateBuilds: metrics.candidateBuilds,
+  });
   expect(runtime.errors).toEqual([]);
 });
 
