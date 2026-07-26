@@ -841,16 +841,17 @@ test("bounds the production-scale store picker and keeps whole-set actions", asy
   page,
 }) => {
   const runtime = await preparePage(page);
+  const rowCount = 93_328;
   const storeCount = 7_106;
-  await page.evaluate((count) => {
-    const rows = Array.from({ length: count }, (_, index) => ({
+  await page.evaluate(({ rows: count, stores }) => {
+    const data = Array.from({ length: count }, (_, index) => ({
       InvoiceDate: "2026-07-25",
       InvoiceNo: `SCALE-INV-${String(index).padStart(5, "0")}`,
       SOTypeID: "INVC",
       SO_SalespersonID: `PS-${String(index % 28).padStart(2, "0")}`,
       TelesaleID:
         index < 1_397 ? `TELE-${String(index).padStart(4, "0")}` : "",
-      CustomerName: `ร้าน Scale ${String(index).padStart(4, "0")}`,
+      CustomerName: `ร้าน Scale ${String(index % stores).padStart(4, "0")}`,
       SKUCode: `SCALE-${index}`,
       SKUDescription: `สินค้า Scale ${index}`,
       GroupBrand: `BRAND-${index % 16}`,
@@ -859,21 +860,29 @@ test("bounds the production-scale store picker and keeps whole-set actions", asy
       LineAmtBeforeDisc: 10.005,
       InvoiceAmt: 9.005,
     }));
-    window.DOIT_CORE_APP.load(rows, {
+    window.DOIT_CORE_APP.load(data, {
       file_name: "synthetic-production-scale.xlsx",
       id: "synthetic-production-scale",
     });
-  }, storeCount);
-  await expect(page.locator("#msg")).toContainText("โหลดสำเร็จ 7,106 แถว");
+  }, { rows: rowCount, stores: storeCount });
+  await expect(page.locator("#msg")).toContainText("โหลดสำเร็จ 93,328 แถว");
+  const tabStart = Date.now();
   await page.locator(".tabs .tab").nth(2).click();
+  await expect(page.locator("#realBills")).toContainText(
+    "เลือกร้านหรือพิมพ์ชื่อร้าน เพื่อดูบิลจริง",
+  );
+  const tabElapsed = Date.now() - tabStart;
   const beforePopup = await page.evaluate(
     () => window.DOIT_CORE_APP.health().realBillPerformance,
   );
+  expect(beforePopup.fullBillBuilds).toBe(0);
+  const popupStart = Date.now();
   await page.locator('[data-pick="receivers"]').click();
   await expect(page.locator("#pickList .pickItem")).toHaveCount(120);
   await expect(page.locator(".realBillPickerPager")).toContainText(
     "7,106 รายการ",
   );
+  const coldPopupElapsed = Date.now() - popupStart;
   const firstPageValue = await page
     .locator("#pickList .pickItem")
     .first()
@@ -897,15 +906,11 @@ test("bounds the production-scale store picker and keeps whole-set actions", asy
   expect(toggle.elapsed).toBeLessThan(100);
   expect(toggle.sameNode).toBe(true);
   expect(toggle.visibleItems).toBe(120);
-  await page.locator("#pickOk").click();
-  expect(
-    await page.evaluate(
-      () => window.DOIT_CORE_APP.currentState().sel.billStores.length,
-    ),
-  ).toBe(1);
-
+  await page.locator("#pickClose").click();
   await page.locator('[data-pick="receivers"]').click();
+  const selectAllStart = Date.now();
   await page.locator("#pickAll").click();
+  const selectAllElapsed = Date.now() - selectAllStart;
   const applyStart = Date.now();
   await page.locator("#pickOk").click();
   await expect(page.locator("#realBills .realBill")).toHaveCount(12);
@@ -923,6 +928,12 @@ test("bounds the production-scale store picker and keeps whole-set actions", asy
   expect(metrics.candidateBuilds).toBe(1);
   expect(metrics.moneyFormatCalls).toBe(0);
   expect(metrics.facetIndexBuilds).toBe(1);
+  expect(metrics.matchedLightBills).toBe(rowCount);
+  expect(metrics.fullBillRowsBuilt).toBe(12);
+  expect(metrics.fullBillPageBuilds).toBe(1);
+  expect(metrics.fullBillPrintBuilds).toBe(0);
+  expect(metrics.facetIndexCacheValues).toBeLessThanOrEqual(20_000);
+  expect(metrics.optionCacheValues).toBeLessThanOrEqual(20_000);
   expect(metrics.pickerToggleDomScans).toBeLessThan(storeCount);
   expect(metrics.pickPoolCalls).toBe(beforePopup.pickPoolCalls);
   expect(metrics.groupCalls).toBe(beforePopup.groupCalls);
@@ -931,6 +942,23 @@ test("bounds the production-scale store picker and keeps whole-set actions", asy
   );
   expect(historyHealth.totalBytes).toBeLessThanOrEqual(2 * 1024 * 1024);
   expect(historyHealth.historyEntries).toBeLessThanOrEqual(80);
+
+  const beforePage = metrics;
+  const pageStart = Date.now();
+  await page.locator('[data-real-page="2"]').click();
+  await expect(page.locator(".realBillPager")).toContainText("หน้า 2/");
+  await expect(page.locator("#realBills .realBill")).toHaveCount(12);
+  const pageElapsed = Date.now() - pageStart;
+  metrics = await page.evaluate(
+    () => window.DOIT_CORE_APP.health().realBillPerformance,
+  );
+  expect(metrics.candidateBuilds).toBe(beforePage.candidateBuilds);
+  expect(metrics.fullBillPageBuilds).toBe(
+    beforePage.fullBillPageBuilds + 1,
+  );
+  expect(metrics.fullBillRowsBuilt).toBe(
+    beforePage.fullBillRowsBuilt + 12,
+  );
 
   await page.evaluate(() => {
     window.__realBillPrintCalls = 0;
@@ -943,7 +971,9 @@ test("bounds the production-scale store picker and keeps whole-set actions", asy
     printLimitMessage = dialog.message();
     await dialog.accept();
   });
+  const printStart = Date.now();
   await page.locator("#prepPrint").click();
+  const printPreflightElapsed = Date.now() - printStart;
   expect(printLimitMessage).toContain(
     "มีบิลสำหรับปริ้นมากเกินไป",
   );
@@ -953,6 +983,10 @@ test("bounds the production-scale store picker and keeps whole-set actions", asy
   expect(
     await page.evaluate(() => window.__realBillPrintCalls),
   ).toBe(0);
+  metrics = await page.evaluate(
+    () => window.DOIT_CORE_APP.health().realBillPerformance,
+  );
+  expect(metrics.fullBillPrintBuilds).toBe(0);
 
   await page.locator('[data-pick="receivers"]').click();
   await page.locator("#pickClear").click();
@@ -965,8 +999,14 @@ test("bounds the production-scale store picker and keeps whole-set actions", asy
   );
   expect(metrics.pickerDomMax).toBeLessThanOrEqual(120);
   console.log("7,106-store Real Bill apply:", {
+    rows: rowCount,
+    tabElapsed,
+    coldPopupElapsed,
+    selectAllElapsed,
     applyElapsed,
-    bills: storeCount,
+    pageElapsed,
+    printPreflightElapsed,
+    bills: rowCount,
     renderedBills: metrics.renderedBills,
     fullBillBuilds: metrics.fullBillBuilds,
     candidateBuilds: metrics.candidateBuilds,
