@@ -24,6 +24,9 @@ import {
   thaiDate,
 } from "./utils.js";
 
+export const MAX_REAL_BILL_PRINT_PARTS = 200;
+export const MAX_REAL_BILL_PRINT_PAGES = 100;
+
 function saleDate() {
   let date = parseIso(state.sel.dates[0]);
   if (!date) {
@@ -255,7 +258,29 @@ export function realBillPagesHtml(bills) {
     .join("");
 }
 
+export function realBillPrintStats(bills) {
+  const billList = bills || [];
+  let parts = 0;
+  let lines = 0;
+  billList.forEach((bill) => {
+    const lineCount = (bill.lines || []).length;
+    lines += lineCount;
+    parts += Math.max(1, Math.ceil(lineCount / BILL_ROWS));
+  });
+  const pages = Math.ceil(parts / BILLS_PER_A4);
+  return {
+    bills: billList.length,
+    parts,
+    pages,
+    lines,
+    allowed:
+      parts <= MAX_REAL_BILL_PRINT_PARTS &&
+      pages <= MAX_REAL_BILL_PRINT_PAGES,
+  };
+}
+
 function openRealBills(bills) {
+  if (document.querySelector(".printOverlay.realBillPrint")) return false;
   const overlay = document.createElement("div");
   overlay.className = "printOverlay printMobileSafeA4 realBillPrint";
   overlay.style.setProperty("display", "block", "important");
@@ -264,6 +289,7 @@ function openRealBills(bills) {
     realBillPagesHtml(bills);
   document.body.appendChild(overlay);
   bindOverlay(overlay);
+  return true;
 }
 
 function decodeKey(value) {
@@ -440,24 +466,47 @@ export function preparePrint({ mode, title, realBills = [] }) {
     const bills = buildBills();
     if (!bills.length) {
       alert("ยังไม่ได้กรอกจำนวนส่งให้ร้าน จึงไม่สามารถเตรียมปริ้นได้");
-      return;
+      return { ok: false, reason: "empty-store-bills" };
     }
     openStoreBills(bills);
-    return;
+    return { ok: true, mode };
   }
   if (mode === "ship") {
     if (!realBills.length) {
       alert("ไม่มีบิลจริงสำหรับเตรียมปริ้น");
-      return;
+      return { ok: false, reason: "empty-real-bills" };
     }
-    openRealBills(realBills);
-    return;
+    const stats = realBillPrintStats(realBills);
+    if (!stats.allowed) {
+      alert(
+        "มีบิลสำหรับปริ้นมากเกินไป กรุณาเลือกร้านหรือกรองข้อมูลให้เหลือไม่เกิน " +
+          MAX_REAL_BILL_PRINT_PARTS +
+          " ส่วน หรือ " +
+          MAX_REAL_BILL_PRINT_PAGES +
+          " หน้า A4 (ปัจจุบัน " +
+          F(stats.bills) +
+          " บิล · " +
+          F(stats.parts) +
+          " ส่วน · " +
+          F(stats.pages) +
+          " หน้า · " +
+          F(stats.lines) +
+          " รายการ)",
+      );
+      return { ok: false, reason: "real-bill-print-limit", stats };
+    }
+    const opened = openRealBills(realBills);
+    return {
+      ok: opened,
+      reason: opened ? "" : "real-bill-overlay-open",
+      stats,
+    };
   }
   let heads = tableHeadsFromDom();
   let rows = tableRowsFromDom();
   if (!rows.length) {
     alert("ไม่มีข้อมูลสำหรับปริ้นในหน้า " + title);
-    return;
+    return { ok: false, reason: "empty-table" };
   }
   let total = null;
   let finalTitle = title;
@@ -471,4 +520,5 @@ export function preparePrint({ mode, title, realBills = [] }) {
     printClass = "orderPrint";
   }
   openGenericPrint(finalTitle, heads, rows, { total, printClass });
+  return { ok: true, mode };
 }
