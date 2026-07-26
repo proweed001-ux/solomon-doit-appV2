@@ -168,6 +168,7 @@ check(adminSource.includes('ราคากลางต่อชิ้น'), 'ma
 check(adminSource.includes('setCentralPrice(group.price, amount)'), 'manual_price_apply_missing');
 check(adminSource.includes('assertReadyForPublish'), 'admin_preview_validation_missing');
 check(adminSource.includes('applyPromotionFamily(group, current.cards, family)'), 'group_promotion_sync_missing');
+check(adminSource.includes('calculatePromotion(unitPrice, previewQuantity, card.promotionTiers)'), 'group_calculator_preview_not_shared');
 check(!adminSource.includes('applyPromotionFamilyToCard'), 'per_card_promotion_desync_reintroduced');
 check(!adminSource.includes('page-class-page'), 'duplicate_page_class_control_reintroduced');
 check(adminSource.includes('<ManualGroupingWorkbench'), 'manual_workbench_not_directly_wired');
