@@ -28,12 +28,16 @@ import {
 } from "../dist/assets/pro/print-model.js";
 import {
   billPagesHtml,
+  MAX_REAL_BILL_PRINT_PAGES,
+  MAX_REAL_BILL_PRINT_PARTS,
   realBillPagesHtml,
+  realBillPrintStats,
 } from "../dist/assets/pro/print.js";
 import {
   buildRealBills,
   buildRealBillFacetIndex,
   createRealBillSelector,
+  diagnoseRealBillKeys,
   filterRealBills,
   realBillCandidateRows,
   realBillKey,
@@ -47,9 +51,12 @@ import {
 } from "../dist/assets/pro/real-bills.js";
 import {
   createSelection,
+  HISTORY_MAX_BYTES,
+  historyStats,
   loadState,
   mapVal,
   mergeSelection,
+  push,
   rkey,
   restore,
   save,
@@ -57,6 +64,7 @@ import {
   snap,
   state,
   sumMap,
+  trimHistory,
 } from "../dist/assets/pro/state.js";
 
 const fixture = JSON.parse(
@@ -68,6 +76,7 @@ const realBillSource = fs.readFileSync(
   "dist/assets/pro/real-bills.js",
   "utf8",
 );
+const printSource = fs.readFileSync("dist/assets/pro/print.js", "utf8");
 const proHtmlSource = fs.readFileSync("dist/pro.html", "utf8");
 
 state.rows = fixture.rows.map((row) => ({ ...row }));
@@ -736,8 +745,13 @@ cachedSelector.select(realRows, cachedSelection, "");
 cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
 assert.equal(
   selectorBuildCalls,
+  5,
+  "Each distinct filtered result builds only its matching full bill rows",
+);
+assert.equal(
+  cachedSelector.stats().candidateBuilds,
   1,
-  "Store, Brand, Type and Search must reuse the candidate bill model",
+  "Store, Brand, Type and Search must reuse the lightweight candidate",
 );
 cachedSelection.dates = ["2026-07-03"];
 cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
@@ -747,9 +761,10 @@ cachedSelection.orderStores = ["ร้านอื่น"];
 cachedSelector.select(realRows, cachedSelection, "TS-SEARCH");
 assert.equal(
   selectorBuildCalls,
-  4,
+  8,
   "Dates, PS and orderStores must invalidate the candidate model",
 );
+assert.equal(cachedSelector.stats().candidateBuilds, 4);
 
 let mutableBuildCalls = 0;
 const mutableSelector = createRealBillSelector((rows) => {
@@ -875,6 +890,19 @@ assert.deepEqual(realParts.map((part) => part.lines.length), [12, 1, 1]);
 assert.deepEqual(realParts.map((part) => part.partNo), [1, 2, 1]);
 assert.equal(realParts[0].isLastPart, false);
 assert.equal(realParts[1].isLastPart, true);
+const twentyFiveLineBill = buildRealBills(
+  Array.from({ length: 25 }, (_, index) => ({
+    ...realRows[0],
+    code: "LONG-25-" + (index + 1),
+    sku: "รายการ 25 แถว " + (index + 1),
+  })),
+)[0];
+assert.deepEqual(
+  splitRealBillsForPrint([twentyFiveLineBill], BILL_ROWS).map(
+    (part) => part.lines.length,
+  ),
+  [12, 12, 1],
+);
 const realPrintHtml = realBillPagesHtml([longBill, tsSame]);
 assert.equal((realPrintHtml.match(/class="a4Sheet"/g) || []).length, 2);
 assert.equal(
@@ -884,6 +912,35 @@ assert.equal(
 assert.match(realPrintHtml, /ต่อใบถัดไป \(1\/2\)/);
 assert.match(realPrintHtml, /data-real-part="2\/2"/);
 assert.doesNotMatch(realPrintHtml, /data-edit-key|PRINT_EDIT_KEY/);
+
+const printable200 = Array.from({ length: 200 }, (_, index) => ({
+  ...tsSame,
+  key: "PRINT-" + index,
+  lines: [tsSame.lines[0]],
+}));
+assert.deepEqual(realBillPrintStats([longBill, tsSame]), {
+  bills: 2,
+  parts: 3,
+  pages: 2,
+  lines: 14,
+  allowed: true,
+});
+assert.equal(realBillPrintStats(printable200).parts, MAX_REAL_BILL_PRINT_PARTS);
+assert.equal(realBillPrintStats(printable200).pages, MAX_REAL_BILL_PRINT_PAGES);
+assert.equal(realBillPrintStats(printable200).allowed, true);
+assert.equal(
+  (realBillPagesHtml(printable200).match(/class="a4Sheet"/g) || [])
+    .length,
+  100,
+  "The exact Real Bill print boundary must still render",
+);
+const blocked201 = realBillPrintStats([
+  ...printable200,
+  { ...tsSame, key: "PRINT-201", lines: [tsSame.lines[0]] },
+]);
+assert.equal(blocked201.parts, 201);
+assert.equal(blocked201.pages, 101);
+assert.equal(blocked201.allowed, false);
 
 const blankDateBill = buildRealBills([
   { ...realRows[7], date: "" },
@@ -917,6 +974,11 @@ assert.equal(
   "Current Bill Key intentionally does not split the same PS bill by PS",
 );
 assert.equal(sameInvoiceDifferentPs[0].lines.length, 2);
+assert.deepEqual(
+  [...sameInvoiceDifferentPs[0].psValues].sort(),
+  ["PS-A", "PS-B"],
+  "Full bills must retain every PS represented by the current Bill Key",
+);
 assert.equal(
   buildRealBills([
     { ...realRows[3], tele: "TELE-A" },
@@ -924,6 +986,116 @@ assert.equal(
   ]).length,
   2,
   "Different Tele IDs must remain separate bills",
+);
+
+let fuzzSeed = 0x70;
+const fuzzRandom = (limit) => {
+  fuzzSeed = (Math.imul(fuzzSeed, 1664525) + 1013904223) >>> 0;
+  return fuzzSeed % limit;
+};
+for (let caseNo = 0; caseNo < 500; caseNo += 1) {
+  const caseRows = [];
+  const sharedLines = 2 + fuzzRandom(5);
+  for (let lineNo = 0; lineNo < sharedLines; lineNo += 1) {
+    caseRows.push({
+      isTele: false,
+      tele: "",
+      store: "FUZZ-STORE-" + (caseNo % 11),
+      inv: "FUZZ-INV-" + caseNo,
+      date: "2026-07-" + String((caseNo % 28) + 1).padStart(2, "0"),
+      ps: "FUZZ-PS-" + fuzzRandom(4),
+      code: "FUZZ-CODE-" + caseNo + "-" + lineNo,
+      sku: "สินค้า Fuzz " + caseNo + " " + lineNo,
+      brand: "FUZZ-BRAND-" + fuzzRandom(4),
+      type: "FUZZ-TYPE-" + fuzzRandom(4),
+      qty: 1,
+      rawAmt: 10,
+      netAmt: 9,
+    });
+  }
+  caseRows.push({
+    ...caseRows[0],
+    isTele: true,
+    tele: "FUZZ-TELE-" + caseNo,
+    code: "FUZZ-TS-" + caseNo,
+  });
+  const lightBills = buildRealBillFacetIndex(caseRows);
+  const fullBills = buildRealBills(caseRows);
+  const fuzzSelection = {
+    ...createSelection(),
+    billStores: [caseRows[0].store],
+    brands: [caseRows[fuzzRandom(sharedLines)].brand],
+    types: [caseRows[fuzzRandom(sharedLines)].type],
+  };
+  for (const kind of [
+    "dates",
+    "ps",
+    "orderStores",
+    "billStores",
+    "brands",
+    "types",
+  ]) {
+    assert.deepEqual(
+      realBillPickerOptions(
+        kind,
+        caseRows,
+        fuzzSelection,
+        lightBills,
+        "",
+      ),
+      realBillPickerOptions(
+        kind,
+        caseRows,
+        fuzzSelection,
+        fullBills,
+        "",
+      ),
+      `Lightweight/full ${kind} options diverged in fuzz case ${caseNo}`,
+    );
+  }
+  for (const query of [
+    caseRows[0].store,
+    caseRows[0].inv,
+    caseRows[0].code,
+    caseRows[0].sku,
+    "fuzz-tele-" + caseNo,
+  ]) {
+    assert.deepEqual(
+      filterRealBills(lightBills, fuzzSelection, query).map(
+        (bill) => bill.key,
+      ),
+      filterRealBills(fullBills, fuzzSelection, query).map(
+        (bill) => bill.key,
+      ),
+      `Lightweight/full search diverged in fuzz case ${caseNo}`,
+    );
+  }
+}
+
+const keyDiagnostics = diagnoseRealBillKeys([
+  { ...realRows[0], inv: "", ps: "PS-A" },
+  { ...realRows[0], inv: "", ps: "PS-B" },
+  { ...realRows[0], inv: 12345 },
+  { ...realRows[0], store: "ร้าน|พิเศษ", inv: "INV|SPECIAL" },
+  { ...realRows[0], inv: "SHARED-SOURCE" },
+  {
+    ...realRows[0],
+    isTele: true,
+    tele: "TELE-DIAG",
+    inv: "SHARED-SOURCE",
+  },
+]);
+assert.equal(keyDiagnostics.blankInvoiceRows, 2);
+assert.equal(keyDiagnostics.blankInvoiceKeys, 1);
+assert.equal(keyDiagnostics.multiPsKeys, 1);
+assert.equal(keyDiagnostics.psTsInvoiceCollisions, 1);
+assert.equal(keyDiagnostics.numericInvoiceRows, 1);
+assert.equal(keyDiagnostics.specialDelimiterRows, 1);
+assert.ok(
+  Object.values(keyDiagnostics.examples)
+    .flat()
+    .every((value) => /^key-[a-z0-9]+$/.test(value)),
+  "Bill Key diagnostics must expose masked examples only",
 );
 
 const largeRealRows = largeRealBillFixtureRows().map(norm);
@@ -987,7 +1159,8 @@ largeSelector.select(largeRealRows, largeSelection, "", 1);
 largeSelection.types = ["PERF-TYPE-2"];
 largeSelector.select(largeRealRows, largeSelection, "", 1);
 largeSelector.select(largeRealRows, largeSelection, "PERF-SKU", 1);
-assert.equal(largeBuildCalls, 1);
+assert.equal(largeBuildCalls, 4);
+assert.equal(largeSelector.stats().candidateBuilds, 1);
 const hugeRealRows = largeRealBillFixtureRows({
   rows: fixtureMeta.hugeRows,
   stores: fixtureMeta.hugeStores,
@@ -1106,6 +1279,38 @@ assert.equal(
 );
 assert.equal(productionSelector.stats().facetIndexBuilds, 1);
 assert.equal(productionSelector.stats().moneyFormatCalls, 0);
+
+let productionAllBuilds = 0;
+const productionAllSelector = createRealBillSelector((rows) => {
+  productionAllBuilds += 1;
+  return buildRealBills(rows);
+});
+const productionAllSelection = {
+  ...createSelection(),
+  billStores: productionStoreOptions.map((item) => item.value),
+};
+const productionAllStart = performance.now();
+const productionAllResult = productionAllSelector.select(
+  productionRows,
+  productionAllSelection,
+  "",
+  1,
+);
+const productionAllApplyMs = performance.now() - productionAllStart;
+assert.equal(productionAllSelection.billStores.length, 7_106);
+assert.equal(productionAllResult.bills.length, productionRows.length);
+assert.equal(productionAllBuilds, 1);
+assert.equal(productionAllSelector.stats().candidateBuilds, 1);
+assert.equal(
+  productionAllSelector.stats().matchedRowsBuilt,
+  productionRows.length,
+);
+assert.ok(
+  productionAllApplyMs < 3_000 &&
+    productionAllApplyMs < 5_380.166 * 0.7,
+  `Select-all production apply took ${productionAllApplyMs.toFixed(2)} ms`,
+);
+
 productionSelection.billStores = [productionStoreOptions[0].value];
 const productionApplyStart = performance.now();
 const productionResult = productionSelector.select(
@@ -1124,9 +1329,48 @@ productionSelector.select(productionRows, productionSelection, "", 1);
 productionSelector.select(productionRows, productionSelection, "สินค้า scale", 1);
 assert.equal(
   productionFullBuilds,
-  1,
-  "Bill store, Brand, Type and Search must reuse the full candidate once built",
+  4,
+  "Each distinct filter builds only the full bills selected by the lightweight index",
 );
+assert.equal(
+  productionSelector.stats().candidateBuilds,
+  1,
+  "Bill store, Brand, Type and Search must reuse the lightweight candidate",
+);
+
+const cacheSelector = createRealBillSelector();
+for (let index = 0; index < 100; index += 1) {
+  cacheSelector.pickerOptions(
+    "brands",
+    realRows,
+    createSelection(),
+    "CACHE-" + index,
+    1,
+  );
+}
+assert.ok(cacheSelector.stats().optionCacheEntries <= 8);
+assert.ok(cacheSelector.stats().optionCacheValues <= 20_000);
+for (let index = 0; index < 10; index += 1) {
+  cacheSelector.pickerOptions(
+    "billStores",
+    realRows,
+    {
+      ...createSelection(),
+      dates: [
+        "2026-07-" + String(index + 1).padStart(2, "0"),
+      ],
+    },
+    "",
+    1,
+  );
+}
+assert.ok(cacheSelector.stats().facetIndexCacheEntries <= 4);
+cacheSelector.invalidate();
+assert.equal(cacheSelector.stats().optionCacheEntries, 0);
+assert.equal(cacheSelector.stats().optionCacheValues, 0);
+assert.equal(cacheSelector.stats().facetIndexCacheEntries, 0);
+assert.equal(cacheSelector.stats().facetIndexCacheValues, 0);
+
 assert.ok(
   buildRealBillFacetIndex(productionRows).every(
     (bill) => !("lines" in bill) && !("shownRaw" in bill),
@@ -1141,6 +1385,9 @@ const productionPerformance = {
   psPopupMs: Number(productionPsMs.toFixed(3)),
   storePopupMs: Number(productionStoreMs.toFixed(3)),
   applyMs: Number(productionApplyMs.toFixed(3)),
+  selectAllApplyMs: Number(productionAllApplyMs.toFixed(3)),
+  selectAllBills: productionAllResult.bills.length,
+  selectAllBuilds: productionAllBuilds,
   fullBuilds: productionFullBuilds,
   ...productionSelector.stats(),
 };
@@ -1183,6 +1430,26 @@ state.sel = createSelection();
 loadState();
 assert.deepEqual(state.sel.billStores, ["ร้าน TS"], "Autosave/reload must retain billStores");
 assert.equal(sk(), "doit-core-unified-v1:legacy-state");
+
+state.hist = [];
+state.redoStack = [];
+state.sel.billStores = productionStoreOptions.map((item) => item.value);
+for (let index = 0; index < 100; index += 1) {
+  state.q = "history-" + index;
+  push();
+}
+const boundedHistory = historyStats();
+assert.ok(boundedHistory.historyEntries <= 80);
+assert.ok(boundedHistory.totalBytes <= HISTORY_MAX_BYTES);
+assert.ok(boundedHistory.historyEntries >= 1);
+const latestHistorySnapshot = state.hist.at(-1);
+state.sel.billStores = [];
+assert.equal(restore(latestHistorySnapshot), true);
+assert.equal(state.sel.billStores.length, 7_106);
+state.redoStack.push(snap());
+trimHistory();
+assert.ok(historyStats().totalBytes <= HISTORY_MAX_BYTES);
+
 delete globalThis.localStorage;
 
 assert.match(proHtmlSource, /<button class="tab">บิลจริง<\/button/);
@@ -1196,6 +1463,21 @@ assert.match(
   /state\.mode === "ship" \? currentRealBillResult\(\)\.bills : undefined/,
   "Real Bill print must receive every filtered bill, not the visible page",
 );
+const preparePrintSource =
+  printSource.match(
+    /export function preparePrint[\s\S]*?\n\}/,
+  )?.[0] || "";
+assert.ok(
+  preparePrintSource.indexOf("realBillPrintStats(realBills)") <
+    preparePrintSource.indexOf("openRealBills(realBills)"),
+  "Real Bill print limits must be checked before building or appending print HTML",
+);
+assert.ok(
+  printSource.includes(
+    'if (document.querySelector(".printOverlay.realBillPrint")) return false',
+  ),
+  "Repeated Real Bill print actions must not append duplicate overlays",
+);
 assert.doesNotMatch(
   coreSource,
   /setTimeout\(/,
@@ -1207,6 +1489,16 @@ assert.doesNotMatch(
   billLineSource,
   /\b(?:B|F)\(|toLocaleString\(/,
   "Real Bill model must not format money or quantity per source row",
+);
+assert.doesNotMatch(
+  filterRealBills.toString(),
+  /\.includes\(/,
+  "Bill facet membership must use prebuilt Sets, not array membership per bill",
+);
+assert.doesNotMatch(
+  realBillCandidateRows.toString(),
+  /\.includes\(/,
+  "Candidate row membership must use prebuilt Sets",
 );
 const coreRenderSource = coreSource.match(
   /function render\(startedAt[\s\S]*?\n  \}\n  function loadData/,
@@ -1222,14 +1514,14 @@ assert.match(
   "Closed Telesale drawer must not be rendered during every full render",
 );
 assert.match(
-  coreSource,
-  /state\.mode !== "ship" && summaryCache\.poolKind !== "full"/,
-  "Returning from a lightweight ship summary must rebuild the full pick pool",
+  coreRenderSource,
+  /summaryHead\.hidden = shipMode/,
+  "Ship mode must hide the legacy summary heading",
 );
 assert.match(
-  coreSource,
-  /summaryCache\.poolKind = "ship"/,
-  "Ship summaries must identify their lightweight pool shape",
+  coreRenderSource,
+  /summaryCards\.hidden = shipMode/,
+  "Ship mode must hide legacy amount/done/remain cards",
 );
 assert.equal(
   (coreRenderSource.match(/\.reduce\(/g) || []).length,
