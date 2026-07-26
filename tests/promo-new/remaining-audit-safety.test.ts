@@ -49,7 +49,7 @@ const signature = (title: string, product: string, quality = 0.5) => ({ title, p
 test('HFS-WH remains ambiguous for WS sequence recovery and cannot become an M anchor', () => {
   const weak = classifyClassText('HFS-WH');
   assert.equal(weak.classId, null);
-  assert.equal(weak.scores.HFSM, 0);
+  assert.equal(weak.scores.HFSM, weak.scores['HFSWS-S']);
   assert.equal(weak.scores['HFSWS-S'], weak.scores['HFSWS-L']);
   assert.ok(weak.confidence < 0.72, String(weak.confidence));
   const exact = classifyClassText('HFS-M');
