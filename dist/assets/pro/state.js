@@ -1,5 +1,8 @@
 import { N, SEP, T } from "./utils.js";
 
+export const HISTORY_MAX_ENTRIES = 80;
+export const HISTORY_MAX_BYTES = 2 * 1024 * 1024;
+
 export const createSelection = () => ({
   dates: [],
   ps: [],
@@ -60,10 +63,52 @@ export function snap() {
   });
 }
 
+export function snapshotBytes(snapshot) {
+  return new TextEncoder().encode(String(snapshot || "")).byteLength;
+}
+
+export function historyStats() {
+  const historyBytes = state.hist.reduce(
+    (total, snapshot) => total + snapshotBytes(snapshot),
+    0,
+  );
+  const redoBytes = state.redoStack.reduce(
+    (total, snapshot) => total + snapshotBytes(snapshot),
+    0,
+  );
+  return {
+    historyEntries: state.hist.length,
+    redoEntries: state.redoStack.length,
+    historyBytes,
+    redoBytes,
+    totalBytes: historyBytes + redoBytes,
+    maxEntries: HISTORY_MAX_ENTRIES,
+    maxBytes: HISTORY_MAX_BYTES,
+  };
+}
+
+export function trimHistory() {
+  while (state.hist.length > HISTORY_MAX_ENTRIES) state.hist.shift();
+  while (state.redoStack.length > HISTORY_MAX_ENTRIES) {
+    state.redoStack.shift();
+  }
+  let stats = historyStats();
+  while (
+    stats.totalBytes > HISTORY_MAX_BYTES &&
+    state.hist.length + state.redoStack.length > 1
+  ) {
+    if (state.hist.length > 1) state.hist.shift();
+    else if (state.redoStack.length) state.redoStack.shift();
+    else state.hist.shift();
+    stats = historyStats();
+  }
+  return stats;
+}
+
 export function push() {
   state.hist.push(snap());
-  if (state.hist.length > 80) state.hist.shift();
   state.redoStack = [];
+  trimHistory();
 }
 
 export function restore(snapshot) {
