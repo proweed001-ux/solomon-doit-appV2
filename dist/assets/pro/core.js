@@ -32,6 +32,8 @@ import {
   mapVal,
   sumMap,
   currentState,
+  historyStats,
+  trimHistory,
 } from "./state.js";
 import { norm, arr, parseDoitFile } from "./parser-adapter.js";
 import {
@@ -45,7 +47,6 @@ import {
   teleRows,
   options,
   group,
-  pkey,
   pickPool,
   distPool,
 } from "./filters.js";
@@ -93,7 +94,6 @@ import { preparePrint } from "./print.js";
   };
   const summaryCache = {
     poolSignature: "",
-    poolKind: "",
     pool: [],
     totalsSignature: "",
     totals: null,
@@ -203,6 +203,7 @@ import { preparePrint } from "./print.js";
     closePick();
     state.redoStack.push(snap());
     restore(state.hist.pop());
+    trimHistory();
     realBillSelector.refreshFilters();
     realBillPage = 1;
     render();
@@ -213,6 +214,7 @@ import { preparePrint } from "./print.js";
     closePick();
     state.hist.push(snap());
     restore(state.redoStack.pop());
+    trimHistory();
     realBillSelector.refreshFilters();
     realBillPage = 1;
     render();
@@ -446,62 +448,16 @@ import { preparePrint } from "./print.js";
   }
   function invalidateSummary() {
     summaryCache.poolSignature = "";
-    summaryCache.poolKind = "";
     summaryCache.pool = [];
     summaryCache.totalsSignature = "";
     summaryCache.totals = null;
   }
   function currentSummary() {
     const poolSignature = summaryPoolSignature();
-    const needsFullPool =
-      state.mode !== "ship" && summaryCache.poolKind !== "full";
-    if (
-      summaryCache.poolSignature !== poolSignature ||
-      needsFullPool
-    ) {
-      if (state.mode === "ship") {
-        const groups = new Map();
-        state.rows.forEach((row) => {
-          corePerformance.shipSummaryRowsScanned += 1;
-          if (
-            row.isTele ||
-            !okDate(row) ||
-            !okPs(row) ||
-            !okCut(row) ||
-            !okBrand(row) ||
-            !okType(row) ||
-            !okQ(row)
-          ) {
-            return;
-          }
-          const key = pkey(row);
-          const item = groups.get(key) || {
-            poolKey: key,
-            qty: 0,
-            rawAmt: 0,
-            netAmt: 0,
-          };
-          item.qty += N(row.qty);
-          item.rawAmt += N(row.rawAmt);
-          item.netAmt += N(row.netAmt);
-          groups.set(key, item);
-        });
-        (state.ins || []).forEach((item) => {
-          groups.set(T(item.id), {
-            poolKey: T(item.id),
-            qty: N(item.qty),
-            rawAmt: N(item.qty) * N(item.unit),
-            netAmt: N(item.qty) * N(item.unit),
-          });
-        });
-        summaryCache.pool = [...groups.values()];
-        summaryCache.poolKind = "ship";
-      } else {
-        corePerformance.pickPoolCalls += 1;
-        corePerformance.groupCalls += 1;
-        summaryCache.pool = pickPool();
-        summaryCache.poolKind = "full";
-      }
+    if (summaryCache.poolSignature !== poolSignature) {
+      corePerformance.pickPoolCalls += 1;
+      corePerformance.groupCalls += 1;
+      summaryCache.pool = pickPool();
       summaryCache.poolSignature = poolSignature;
       summaryCache.totalsSignature = "";
     }
@@ -999,24 +955,34 @@ import { preparePrint } from "./print.js";
     activeFullRender = { id: renderId, startedAt };
     fixUi();
     updText();
-    const summary = currentSummary(),
-      pool = summary.pool,
-      tot = summary.total,
-      sent = summary.sent,
-      rem = summary.remain,
-      raw = summary.raw,
-      net = summary.net;
-    $("#amount").textContent =
-      "฿ " +
-      (raw ? B(raw) : "—") +
-      (net ? " / สุทธิ ฿ " + B(net) + " / รวม VAT ฿ " + B(net * 1.07) : "—");
-    $("#doneAmount").textContent = F(sent);
-    $("#remainAmount").textContent = F(rem);
-    $("#remainAmount").className = rem < 0 ? "bad" : "blue";
-    $("#donePct").textContent =
-      (tot ? Math.round((sent * 1000) / tot) / 10 : 0) + "%";
-    $("#doneBar").style.width =
-      Math.min(100, tot ? (sent * 100) / tot : 0) + "%";
+    const shipMode = state.mode === "ship";
+    const summaryHead = document.querySelector(".summaryHead");
+    const summaryCards = document.querySelector(".summary");
+    if (summaryHead) summaryHead.hidden = shipMode;
+    if (summaryCards) summaryCards.hidden = shipMode;
+    let pool = [];
+    if (!shipMode) {
+      const summary = currentSummary(),
+        tot = summary.total,
+        sent = summary.sent,
+        rem = summary.remain,
+        raw = summary.raw,
+        net = summary.net;
+      pool = summary.pool;
+      $("#amount").textContent =
+        "฿ " +
+        (raw ? B(raw) : "—") +
+        (net
+          ? " / สุทธิ ฿ " + B(net) + " / รวม VAT ฿ " + B(net * 1.07)
+          : "—");
+      $("#doneAmount").textContent = F(sent);
+      $("#remainAmount").textContent = F(rem);
+      $("#remainAmount").className = rem < 0 ? "bad" : "blue";
+      $("#donePct").textContent =
+        (tot ? Math.round((sent * 1000) / tot) / 10 : 0) + "%";
+      $("#doneBar").style.width =
+        Math.min(100, tot ? (sent * 100) / tot : 0) + "%";
+    }
     $$(".tab").forEach((t, i) =>
       t.classList.toggle(
         "on",
@@ -1370,6 +1336,7 @@ import { preparePrint } from "./print.js";
         page: realBillPage,
         pageSize: REAL_BILL_PAGE_SIZE,
       },
+      history: historyStats(),
       manualKeys: Object.keys(state.send).length,
       inserted: state.ins.length,
       mode: state.mode,
