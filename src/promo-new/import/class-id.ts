@@ -119,6 +119,7 @@ function scoreToken(token: string, scores: Record<PromoClassId, number>): { toke
   // to M before the page sequence and header colour can resolve the WS region.
   if (token === 'HFSW' || token === 'HFSWH') {
     const score = token === 'HFSWH' ? 0.68 : 0.64;
+    addScore(scores, 'HFSM', score);
     addScore(scores, 'HFSWS-S', score);
     addScore(scores, 'HFSWS-L', score);
     return { token, method: 'fuzzy' };
