@@ -55,7 +55,7 @@ const CANONICAL_COMPACT: Record<PromoClassId, string> = {
 
 const OCR_ALIASES: Record<PromoClassId, string[]> = {
   HFSS: ['HFSS', 'HFS5'],
-  HFSM: ['HFSM', 'HFSWH', 'HFSH', 'HFSN', 'HFSIV', 'HFSRN', 'HFSW'],
+  HFSM: ['HFSM', 'HFSH', 'HFSN', 'HFSIV', 'HFSRN'],
   HFSL: ['HFSL', 'HFSI', 'HFS1'],
   HFSXL: ['HFSXL', 'HFSX1', 'HFSXI'],
   'HFSWS-S': ['HFSWSS', 'HFSWS5', 'HFSW5S', 'HFSWHSS', 'HFSWSSS', 'HFSW55', 'HFSVVS5', 'HFSVVSS', 'HFSWSS5'],
@@ -114,19 +114,19 @@ function scoreToken(token: string, scores: Record<PromoClassId, number>): { toke
       return { token, method: 'exact' };
     }
   }
+  // HFS-W/HFS-WH are truncated WS headers in the real catalogue. They are
+  // deliberately ambiguous between WS-S and WS-L and must never be promoted
+  // to M before the page sequence and header colour can resolve the WS region.
+  if (token === 'HFSW' || token === 'HFSWH') {
+    const score = token === 'HFSWH' ? 0.68 : 0.64;
+    addScore(scores, 'HFSWS-S', score);
+    addScore(scores, 'HFSWS-L', score);
+    return { token, method: 'fuzzy' };
+  }
   for (const classId of PROMO_CLASS_IDS) {
     const aliasIndex = OCR_ALIASES[classId].indexOf(token);
     if (aliasIndex >= 0) {
-      const score = token === 'HFSW' ? 0.74 : token === 'HFSWH' ? 0.76 : 0.9;
-      addScore(scores, classId, score);
-      if (token === 'HFSW') {
-        addScore(scores, 'HFSWS-S', 0.5);
-        addScore(scores, 'HFSWS-L', 0.5);
-      }
-      if (token === 'HFSWH') {
-        addScore(scores, 'HFSWS-S', 0.44);
-        addScore(scores, 'HFSWS-L', 0.44);
-      }
+      addScore(scores, classId, 0.9);
       return { token, method: 'ocr_alias' };
     }
   }
