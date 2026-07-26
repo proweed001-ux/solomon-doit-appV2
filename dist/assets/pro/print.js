@@ -263,7 +263,10 @@ export function realBillPrintStats(bills) {
   let parts = 0;
   let lines = 0;
   billList.forEach((bill) => {
-    const lineCount = (bill.lines || []).length;
+    const lineCount = Math.max(
+      0,
+      N(bill.lineCount ?? (bill.lines || []).length),
+    );
     lines += lineCount;
     parts += Math.max(1, Math.ceil(lineCount / BILL_ROWS));
   });
@@ -461,7 +464,12 @@ function openGenericPrint(title, heads, rows, options = {}) {
   bindOverlay(overlay);
 }
 
-export function preparePrint({ mode, title, realBills = [] }) {
+export function preparePrint({
+  mode,
+  title,
+  realBills = [],
+  realBillPrint = null,
+}) {
   if (mode === "pick") {
     const bills = buildBills();
     if (!bills.length) {
@@ -472,11 +480,12 @@ export function preparePrint({ mode, title, realBills = [] }) {
     return { ok: true, mode };
   }
   if (mode === "ship") {
-    if (!realBills.length) {
+    const sourceBills = realBillPrint?.bills || realBills;
+    if (!sourceBills.length) {
       alert("ไม่มีบิลจริงสำหรับเตรียมปริ้น");
       return { ok: false, reason: "empty-real-bills" };
     }
-    const stats = realBillPrintStats(realBills);
+    const stats = realBillPrintStats(sourceBills);
     if (!stats.allowed) {
       alert(
         "มีบิลสำหรับปริ้นมากเกินไป กรุณาเลือกร้านหรือกรองข้อมูลให้เหลือไม่เกิน " +
@@ -495,7 +504,14 @@ export function preparePrint({ mode, title, realBills = [] }) {
       );
       return { ok: false, reason: "real-bill-print-limit", stats };
     }
-    const opened = openRealBills(realBills);
+    if (document.querySelector(".printOverlay.realBillPrint")) {
+      return { ok: false, reason: "real-bill-print-open", stats };
+    }
+    const printableBills =
+      typeof realBillPrint?.build === "function"
+        ? realBillPrint.build()
+        : realBills;
+    const opened = openRealBills(printableBills);
     return {
       ok: opened,
       reason: opened ? "" : "real-bill-overlay-open",
