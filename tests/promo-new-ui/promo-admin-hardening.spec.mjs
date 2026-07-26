@@ -300,6 +300,9 @@ test('runtime supports add, remove, undo, bulk confirm, group promo sync, lock, 
   await groupPromotion.selectOption('family:one');
   await expect(groupPromotion).toHaveValue('family:one');
   await expect(page.getByText(/ซิงค์ PF-ONE ให้ 4 การ์ดแล้ว/u)).toBeVisible();
+  await page.getByTestId('group-calculation-quantity-group:one').fill('6');
+  await expect(page.getByTestId(`group-calculation-${CARD_ONE}`)).toContainText('ซื้อ 6 ยอดสุทธิ ฿114.00');
+  await expect(page.getByTestId(`group-calculation-${CARD_THREE}`)).toContainText('ซื้อ 6 ยอดสุทธิ ฿114.00');
 
   await page.getByRole('button', { name: 'ยืนยันกลุ่ม' }).click();
   await expect(groupPromotion).toBeDisabled();
