@@ -66,5 +66,6 @@ test('Admin retains manual price input and syncs one CSV Promotion Family across
   assert.match(admin, /ราคากลางต่อชิ้น/u);
   assert.match(admin, /setCentralPrice\(group\.price, amount\)/u);
   assert.match(admin, /applyPromotionFamily\(group, current\.cards, family\)/u);
+  assert.match(admin, /calculatePromotion\(unitPrice, previewQuantity, card\.promotionTiers\)/u);
   assert.doesNotMatch(admin, /applyPromotionFamilyToCard|card-promotion-/u);
 });
