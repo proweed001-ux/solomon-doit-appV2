@@ -288,6 +288,10 @@
       .summaryHead h3 {
         margin: 0;
       }
+      .summaryHead[hidden],
+      .summary[hidden] {
+        display: none !important;
+      }
       .actions {
         display: flex;
         gap: 8px;
