@@ -93,13 +93,10 @@ export function trimHistory() {
     state.redoStack.shift();
   }
   let stats = historyStats();
-  while (
-    stats.totalBytes > HISTORY_MAX_BYTES &&
-    state.hist.length + state.redoStack.length > 1
-  ) {
-    if (state.hist.length > 1) state.hist.shift();
+  while (stats.totalBytes > HISTORY_MAX_BYTES) {
+    if (state.hist.length) state.hist.shift();
     else if (state.redoStack.length) state.redoStack.shift();
-    else state.hist.shift();
+    else break;
     stats = historyStats();
   }
   return stats;
