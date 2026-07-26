@@ -290,10 +290,16 @@ export async function importPromotionPdf(file: File, options: ImportOptions): Pr
       }
 
       const classId = classEvidence.classId;
-      const headerText = clean([...headerTexts, classEvidence.classId ? `CLASS:${classEvidence.classId}` : ''].filter(Boolean).join(' | '));
+      // Keep only raw PDF/OCR evidence here. Feeding the derived class back as
+      // CLASS:<value> turns an early OCR mistake into false exact evidence and
+      // prevents the sequence resolver from recovering WS-S.
+      const rawClassTexts = [...new Set(
+        [...headerTexts, classEvidence.rawText].map(clean).filter(Boolean),
+      )];
+      const headerText = clean(rawClassTexts.join(' | '));
       pageClassObservations.push({
         page: pageNumber,
-        texts: classEvidence.classId ? [...headerTexts, `CLASS:${classEvidence.classId}`] : headerTexts,
+        texts: rawClassTexts,
         headerColor: headerColorEvidence(canvas),
         hasCards: grid.regions.length > 0,
       });
