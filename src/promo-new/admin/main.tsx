@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AlertTriangle, CheckCircle2, Database, FileSpreadsheet, Layers3, LogOut, Save, Search, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 import type { PromoDataset, ProductGroup } from '../domain/types';
-import { applyPromotionFamilyToCard } from '../domain/grouping';
+import { applyPromotionFamily } from '../domain/grouping';
 import { applyPriceToGroup, setCentralPrice } from '../domain/pricing';
 import { confirmSkuCandidate } from '../domain/sku-identity';
 import { assertReadyForPublishMultiCard as assertReadyForPublish } from './validation-multi-card';
@@ -78,50 +78,56 @@ function LoginPage({ onLogin, onDemo, allowDemo }: { onLogin: (session: Session)
   </section></main>;
 }
 
-function GroupEditor({ group, dataset, priceDraft, onPriceDraft, onConfirmSku, onApplyPrice, onApplyCardPromotion }: {
+function GroupEditor({ group, dataset, priceDraft, onPriceDraft, onConfirmSku, onApplyPrice, onApplyGroupPromotion }: {
   group: ProductGroup;
   dataset: PromoDataset;
   priceDraft: string;
   onPriceDraft: (value: string) => void;
   onConfirmSku: () => void;
   onApplyPrice: (price: number) => void;
-  onApplyCardPromotion: (cardId: string, familyId: string) => void;
+  onApplyGroupPromotion: (familyId: string) => void;
 }) {
   const cards = dataset.cards.filter(card => group.cardIds.includes(card.id));
   const locked = Boolean(group.manualLocked || group.manualConfirmed);
+  const selectedFamily = dataset.promotionFamilies.find(item => item.id === group.promotionFamilyId) || null;
   return <article className={`group-card ${group.status}`}>
     <div className="group-top">
       <div>
         <div className="thumbs">{cards.map(card => <div className="thumb" key={card.id}>
           {card.imageUrl ? <img src={card.imageUrl} alt={card.id} loading="lazy" /> : <div className="empty">ไม่มีรูป</div>}
-          <span>{card.classId}</span>
-          <label className="field card-promotion-field">โปรโมชั่นของการ์ด
-            <select
-              data-testid={`card-promotion-${card.id}`}
-              value={card.promotionFamilyId || ''}
-              disabled={locked}
-              title={locked ? 'กลุ่มล็อกแล้ว ต้องปลดล็อกก่อนเปลี่ยนโปรโมชั่น' : ''}
-              onChange={event => onApplyCardPromotion(card.id, event.target.value)}
-            >
-              <option value="">รอตรวจโปรโมชั่น</option>
-              {dataset.promotionFamilies
-                .filter(item => Boolean(card.classId && item.tiersByClass[card.classId]))
-                .map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-            {!card.promotionFamilyId && <small className="promotion-pending">รอตรวจโปรโมชั่น</small>}
-          </label>
+          <span>{card.classId} · {card.promotionTiers.length ? `${card.promotionTiers.length} Tier` : 'รอเลือกโปร'}</span>
         </div>)}</div>
         <div className="product-name">{group.sku.canonicalName}</div>
-        <div className="tags"><span className="tag">{group.sku.code}</span><span className={`tag ${group.status === 'ready' ? 'good' : group.status === 'blocked' ? 'bad' : 'warn'}`}>{group.status}</span><span className="tag">{group.cardIds.length} การ์ด</span>{locked && <span className="tag good">ล็อกแล้ว</span>}{group.promotionFamilyId && <span className="tag good">Family เดียวกันทุกใบ</span>}{!group.promotionFamilyId && cards.some(card => card.promotionFamilyId) && <span className="tag warn">โปรโมชั่นต่างกันรายใบ</span>}{group.classIds.map(classId => <span className="tag" key={classId}>{classId}</span>)}</div>
+        <div className="tags"><span className="tag">{group.sku.code}</span><span className={`tag ${group.status === 'ready' ? 'good' : group.status === 'blocked' ? 'bad' : 'warn'}`}>{group.status}</span><span className="tag">{group.cardIds.length} การ์ด</span>{locked && <span className="tag good">ล็อกแล้ว</span>}{group.promotionFamilyId && <span className="tag good">โปรซิงค์ทั้งกลุ่ม</span>}{!group.promotionFamilyId && <span className="tag warn">ยังไม่เลือกโปรโมชั่น</span>}{group.classIds.map(classId => <span className="tag" key={classId}>{classId}</span>)}</div>
         <div className="sku-meta"><span><b>แบรนด์:</b> {group.sku.identity.brand || '-'}</span><span><b>ชนิด:</b> {group.sku.identity.productType || '-'}</span><span><b>ขนาด:</b> {group.sku.identity.sizeValue || '-'} {group.sku.identity.sizeUnit}</span><span><b>หน่วย/Pack:</b> {group.sku.identity.salesUnit} × {group.sku.identity.packQuantity}</span><span><b>Variant:</b> {group.sku.identity.variant || '-'}</span><span><b>ราคา:</b> {money(group.price.effectivePrice?.amount)}</span></div>
         {group.sku.status === 'candidate' && <button className="btn soft" style={{ marginTop: 10 }} onClick={onConfirmSku}>ยืนยันเป็น SKU ใหม่</button>}
         {group.sku.status === 'quarantine' && <div className="failure">ชื่อสินค้ายังไม่พอระบุ Product Master อย่างปลอดภัย</div>}
         {!!group.failureReasons.length && <div className="failure">{group.failureReasons.join(' · ')}</div>}
       </div>
       <div className="group-controls">
+        <label className="field">โปรโมชั่นจาก CSV/XLSM ของกลุ่ม
+          <select
+            data-testid={`group-promotion-${group.id}`}
+            value={group.promotionFamilyId || ''}
+            disabled={locked}
+            title={locked ? 'กลุ่มล็อกแล้ว ต้องปลดล็อกก่อนเปลี่ยนโปรโมชั่น' : ''}
+            onChange={event => onApplyGroupPromotion(event.target.value)}
+          >
+            <option value="">เลือก Promotion Family</option>
+            {dataset.promotionFamilies.map(item => {
+              const missingClasses = group.classIds.filter(classId => !item.tiersByClass[classId]?.length);
+              const disabled = Boolean(item.failureReasons.length || missingClasses.length);
+              const suffix = item.failureReasons.length
+                ? ' · ข้อมูล CSV ต้องตรวจ'
+                : missingClasses.length ? ` · ไม่มี ${missingClasses.join(', ')}` : '';
+              return <option key={item.id} value={item.id} disabled={disabled}>{item.familyKey} · {item.name}{suffix}</option>;
+            })}
+          </select>
+        </label>
+        <div className="price-source">{selectedFamily ? `${selectedFamily.scopeText} · แถว CSV ${selectedFamily.sourceRows.join(', ')}` : 'เลือกครั้งเดียว ระบบจะใช้ Family เดียวกันทั้งกลุ่ม และแจก Tier ให้แต่ละการ์ดตาม Class ร้านค้าเดิม'}</div>
         <div className="price-row"><label className="field">ราคากลางต่อชิ้น<input type="number" min="0.01" step="0.01" inputMode="decimal" value={priceDraft} onChange={event => onPriceDraft(event.target.value)} placeholder="0.00" /></label><label className="field">แหล่งราคา<input value={group.price.source === 'central_override' ? 'คุณกรอกเอง' : 'ยังไม่มีราคา'} readOnly /></label></div>
-        <div className="price-source">ราคาเริ่มว่างและจะเปลี่ยนเมื่อคุณกรอกเองเท่านั้น</div>
-        <div className="tier-preview">{cards.map(card => <div className="tier-line" key={card.id}><b>{card.classId}</b><span>{card.promotionTiers.map(tier => tier.sourceText).join(' / ') || 'รอตรวจโปรโมชั่น'}</span></div>)}</div>
+        <div className="price-source">ราคาเดียวกันจะซิงค์ไปทุกการ์ดใน Product Group และเป็นฐานคำนวณหน้าลูกค้า</div>
+        <div className="tier-preview">{cards.map(card => <div className="tier-line" key={card.id}><b>{card.classId}</b><span>{card.promotionTiers.map(tier => tier.sourceText).join(' / ') || 'รอเลือกโปรโมชั่นของกลุ่ม'}</span></div>)}</div>
         <div className="control-actions"><button className="btn success" disabled={locked || !(Number(priceDraft) > 0)} title={locked ? 'กลุ่มล็อกแล้ว ต้องปลดล็อกก่อนเปลี่ยนราคา' : !(Number(priceDraft) > 0) ? 'กรอกราคามากกว่า 0' : ''} onClick={() => onApplyPrice(Number(priceDraft))}>บันทึกราคากลาง</button></div>
       </div>
     </div>
@@ -423,16 +429,24 @@ function AdminApp() {
   });
 
 
-  const applyCardPromotion = (groupId: string, cardId: string, familyId: string) => setDataset(current => {
-    if (!current) return current;
+  const applyGroupPromotion = (groupId: string, familyId: string) => setDataset(current => {
+    if (!current || !familyId) return current;
     const group = current.productGroups.find(item => item.id === groupId);
-    const family = familyId ? current.promotionFamilies.find(item => item.id === familyId) : null;
-    if (!group || (familyId && !family)) return current;
+    const family = current.promotionFamilies.find(item => item.id === familyId);
+    if (!group || !family) return current;
+    const missingClasses = group.classIds.filter(classId => !family.tiersByClass[classId]?.length);
+    if (family.failureReasons.length || missingClasses.length) {
+      setError(family.failureReasons.length
+        ? `Promotion Family นี้มีข้อมูล CSV ที่ต้องตรวจ: ${family.failureReasons.join(' · ')}`
+        : `Promotion Family นี้ไม่มี Tier สำหรับ ${missingClasses.join(', ')}`);
+      return current;
+    }
     try {
-      const promoted = applyPromotionFamilyToCard(group, current.cards, cardId, family || null);
+      const promoted = applyPromotionFamily(group, current.cards, family);
       setPreviewChecked(false);
       setSavedVersionId(null);
       setError('');
+      setMessage(`ซิงค์ ${family.familyKey} ให้ ${group.cardIds.length} การ์ดแล้ว · Tier แยกตาม ${group.classIds.join(', ')}`);
       return {
         ...current,
         cards: promoted.cards,
@@ -585,7 +599,7 @@ function AdminApp() {
           onPriceDraft={value => setPriceDrafts(current => ({ ...current, [group.id]: value }))}
           onConfirmSku={() => confirmSku(group.id)}
           onApplyPrice={amount => applyGroupPrice(group.id, amount)}
-          onApplyCardPromotion={(cardId, familyId) => applyCardPromotion(group.id, cardId, familyId)}
+          onApplyGroupPromotion={familyId => applyGroupPromotion(group.id, familyId)}
         />) : <div className="empty">เลือกไฟล์แล้วกดประมวลผล หรือกดตรวจและจัดกลุ่มจากแคช</div>}</div>
       </section>
       <div className="footer-actions"><button className="btn soft" disabled={!dataset || busy || (!dryRun && !savedVersionId)} title={!dataset ? 'ยังไม่มี Dataset' : busy ? 'กำลังทำงาน' : !dryRun && !savedVersionId ? 'Draft รุ่นเดิมถูกปิดอยู่' : ''} onClick={validatePreview}><CheckCircle2 size={16} /> {previewChecked ? 'ตรวจความพร้อมผ่าน' : 'ตรวจความพร้อมจริง'}</button><button className="btn primary" disabled={!dataset || !session || demo || dryRun || busy || Boolean(savedVersionId) || dataset.version.status === 'published'} title="Legacy Draft ถูกปิดจนกว่าจะผ่าน revision staging" onClick={save}><Save size={16} /> {savedVersionId ? 'Draft บันทึกแล้ว' : 'บันทึก Draft'}</button><button className="btn dark" disabled={!publishable} title={!publishable ? 'ต้องผ่าน Preview validation และ Legacy Publish ยังถูกปิดใน rebuild' : ''} onClick={publish}>Publish เวอร์ชันนี้</button></div>
