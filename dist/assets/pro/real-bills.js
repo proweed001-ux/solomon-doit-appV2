@@ -3,18 +3,29 @@ import { B, E, F, N, SEP, T, dlabel, uniq } from "./utils.js";
 export const REAL_BILL_SOURCE_PS = "PS";
 export const REAL_BILL_SOURCE_TS = "TS";
 export const REAL_BILL_PAGE_SIZE = 12;
+const OPTION_CACHE_MAX_ENTRIES = 8;
+const OPTION_CACHE_MAX_VALUES = 20_000;
+const FACET_CACHE_MAX_ENTRIES = 4;
+const FACET_CACHE_MAX_VALUES = 20_000;
+
+function valueSet(values) {
+  return values instanceof Set ? values : new Set(values || []);
+}
 
 function selected(values, value) {
-  return !values.length || values.includes(value);
+  return !values.size || values.has(value);
 }
 
 export function realBillCandidateRows(rows, selection) {
   const sel = selection || {};
+  const dates = valueSet(sel.dates);
+  const ps = valueSet(sel.ps);
+  const orderStores = valueSet(sel.orderStores);
   return (rows || []).filter(
     (row) =>
-      selected(sel.dates || [], row.date) &&
-      selected(sel.ps || [], row.ps) &&
-      !(sel.orderStores || []).includes(row.store),
+      selected(dates, row.date) &&
+      selected(ps, row.ps) &&
+      !orderStores.has(row.store),
   );
 }
 
@@ -97,6 +108,7 @@ export function buildRealBills(rows) {
         displayInv: T(row.inv) || "-",
         date: T(row.date),
         ps: T(row.ps),
+        psValues: new Set(),
         tele: sourceType === REAL_BILL_SOURCE_TS ? T(row.tele) : "",
         lines: [],
         qty: 0,
@@ -111,6 +123,7 @@ export function buildRealBills(rows) {
       bills.set(key, bill);
     }
     const line = billLine(row, sourceIndex);
+    bill.psValues.add(line.ps);
     bill.lines.push(line);
     bill.qty += line.shownQty;
     bill.raw += line.shownRaw;
@@ -140,8 +153,8 @@ function billContains(bill, query) {
 
 function billHasFacet(bill, values, field) {
   return (
-    !values.length ||
-    billFacetValues(bill, field).some((value) => values.includes(value))
+    !values.size ||
+    billFacetValues(bill, field).some((value) => values.has(value))
   );
 }
 
@@ -194,14 +207,16 @@ export function buildRealBillFacetIndex(rows) {
 
 export function filterRealBills(bills, selection, query) {
   const sel = selection || {};
-  const stores = sel.billStores || [];
+  const stores = valueSet(sel.billStores);
+  const brands = valueSet(sel.brands);
+  const types = valueSet(sel.types);
   const q = T(query).toLowerCase();
-  if (!stores.length && !q) return [];
+  if (!stores.size && !q) return [];
   return (bills || []).filter(
     (bill) =>
-      (!stores.length || stores.includes(bill.store)) &&
-      billHasFacet(bill, sel.brands || [], "brand") &&
-      billHasFacet(bill, sel.types || [], "type") &&
+      (!stores.size || stores.has(bill.store)) &&
+      billHasFacet(bill, brands, "brand") &&
+      billHasFacet(bill, types, "type") &&
       billContains(bill, q),
   );
 }
@@ -310,11 +325,16 @@ export function selectRealBills(
     };
   }
   const candidateRows = realBillCandidateRows(rows, selection);
-  const allBills = buildBills(candidateRows);
+  const allBills = buildRealBillFacetIndex(candidateRows);
+  const matchedBills = filterRealBills(allBills, selection, query);
+  const matchedKeys = new Set(matchedBills.map((bill) => bill.key));
+  const matchedRows = candidateRows.filter((row) =>
+    matchedKeys.has(realBillKey(row)),
+  );
   return {
     candidateRows,
     allBills,
-    bills: filterRealBills(allBills, selection, query),
+    bills: buildBills(matchedRows),
     requiresSelection: false,
     resultKey:
       candidateSignature(selection) + "|" + filterSignature(selection, query),
@@ -326,7 +346,7 @@ export function createRealBillSelector(buildBills = buildRealBills) {
   let cachedRowsDataSignature = "";
   let cachedCandidateSignature = "";
   let cachedCandidateRows = [];
-  let cachedCandidateBills = [];
+  let cachedCandidateFacets = [];
   let candidateVersion = 0;
   let cachedFilterSignature = "";
   let cachedResult = null;
@@ -345,6 +365,10 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     facetIndexBuilds: 0,
     facetIndexCacheHits: 0,
     facetRowsScanned: 0,
+    candidateRowsScanned: 0,
+    resultRowsScanned: 0,
+    matchedRowsBuilt: 0,
+    fullBillBuilds: 0,
     moneyFormatCalls: 0,
   };
 
@@ -356,40 +380,98 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     );
   }
 
-  function ensureCandidate(rows, selection, rowsVersion) {
+  function cacheValueCount(value) {
+    if (!Array.isArray(value)) return 0;
+    return value.reduce((total, item) => {
+      if (!item || typeof item !== "object") return total + 1;
+      return (
+        total +
+        1 +
+        ["psValues", "brandValues", "typeValues"].reduce(
+          (sum, field) => sum + (item[field]?.size || 0),
+          0,
+        )
+      );
+    }, 0);
+  }
+
+  function cacheValues(cache) {
+    let total = 0;
+    cache.forEach((value) => {
+      total += cacheValueCount(value);
+    });
+    return total;
+  }
+
+  function cacheGet(cache, key) {
+    if (!cache.has(key)) return null;
+    const value = cache.get(key);
+    cache.delete(key);
+    cache.set(key, value);
+    return value;
+  }
+
+  function cacheSet(cache, key, value, maxEntries, maxValues) {
+    const entryValues = cacheValueCount(value);
+    if (cache.has(key)) cache.delete(key);
+    if (entryValues > maxValues) {
+      cache.clear();
+      cache.set(key, value);
+      return;
+    }
+    while (
+      cache.size &&
+      (cache.size >= maxEntries ||
+        cacheValues(cache) + entryValues > maxValues)
+    ) {
+      cache.delete(cache.keys().next().value);
+    }
+    cache.set(key, value);
+  }
+
+  function ensureCandidateRows(rows, selection, rowsVersion) {
     counters.optionModelRequests += 1;
     const nextRowsDataSignature = rowsDataSignature(rows, rowsVersion);
     if (hasCandidate(rows, selection, rowsVersion)) {
       counters.candidateCacheHits += 1;
-      return cachedCandidateBills;
+      return cachedCandidateRows;
     }
     rowsReference = rows;
     cachedRowsDataSignature = nextRowsDataSignature;
     cachedCandidateSignature = candidateSignature(selection);
     cachedCandidateRows = realBillCandidateRows(rows, selection);
-    cachedCandidateBills = buildBills(cachedCandidateRows);
+    counters.candidateRowsScanned += (rows || []).length;
+    cachedCandidateFacets = buildRealBillFacetIndex(cachedCandidateRows);
     candidateVersion += 1;
     counters.candidateBuilds += 1;
     cachedFilterSignature = "";
     cachedResult = null;
-    return cachedCandidateBills;
+    return cachedCandidateRows;
   }
 
   function ensureFacetIndex(rows, selection, rowsVersion) {
     const dataSignature = rowsDataSignature(rows, rowsVersion);
     const key = dataSignature + "|" + candidateSignature(selection);
-    if (facetIndexCache.has(key)) {
+    const cached = cacheGet(facetIndexCache, key);
+    if (cached) {
       counters.facetIndexCacheHits += 1;
-      return facetIndexCache.get(key);
+      return cached;
+    }
+    if (hasCandidate(rows, selection, rowsVersion)) {
+      counters.facetIndexCacheHits += 1;
+      return cachedCandidateFacets;
     }
     const candidateRows = realBillCandidateRows(rows, selection);
     counters.facetRowsScanned += (rows || []).length;
     const facets = buildRealBillFacetIndex(candidateRows);
     counters.facetIndexBuilds += 1;
-    if (facetIndexCache.size >= 12) {
-      facetIndexCache.delete(facetIndexCache.keys().next().value);
-    }
-    facetIndexCache.set(key, facets);
+    cacheSet(
+      facetIndexCache,
+      key,
+      facets,
+      FACET_CACHE_MAX_ENTRIES,
+      FACET_CACHE_MAX_VALUES,
+    );
     return facets;
   }
 
@@ -408,7 +490,7 @@ export function createRealBillSelector(buildBills = buildRealBills) {
           candidateSignature(selection),
       };
     }
-    const allBills = ensureCandidate(rows, selection, rowsVersion);
+    const candidateRows = ensureCandidateRows(rows, selection, rowsVersion);
     const nextFilterSignature = filterSignature(selection, query);
     if (
       cachedResult &&
@@ -417,12 +499,24 @@ export function createRealBillSelector(buildBills = buildRealBills) {
       counters.filteredCacheHits += 1;
       return cachedResult;
     }
+    const matchedFacets = filterRealBills(
+      cachedCandidateFacets,
+      selection,
+      query,
+    );
+    const matchedKeys = new Set(matchedFacets.map((bill) => bill.key));
+    counters.resultRowsScanned += candidateRows.length;
+    const matchedRows = candidateRows.filter((row) =>
+      matchedKeys.has(realBillKey(row)),
+    );
+    counters.matchedRowsBuilt += matchedRows.length;
     counters.filteredBuilds += 1;
+    counters.fullBillBuilds += 1;
     cachedFilterSignature = nextFilterSignature;
     cachedResult = {
-      candidateRows: cachedCandidateRows,
-      allBills,
-      bills: filterRealBills(allBills, selection, query),
+      candidateRows,
+      allBills: matchedFacets,
+      bills: buildBills(matchedRows),
       requiresSelection: false,
       resultKey: candidateVersion + "|" + nextFilterSignature,
     };
@@ -432,9 +526,10 @@ export function createRealBillSelector(buildBills = buildRealBills) {
   function pickerOptions(kind, rows, selection, query, rowsVersion) {
     const dataSignature = rowsDataSignature(rows, rowsVersion);
     const key = optionSignature(kind, selection, query, dataSignature);
-    if (optionCache.has(key)) {
+    const cached = cacheGet(optionCache, key);
+    if (cached) {
       counters.pickerOptionsCacheHits += 1;
-      return optionCache.get(key);
+      return cached;
     }
     const optionSelection = selectionIgnoring(selection, kind);
     counters.optionCandidateBuilds += 1;
@@ -451,10 +546,13 @@ export function createRealBillSelector(buildBills = buildRealBills) {
       optionBills,
       query,
     );
-    if (optionCache.size >= 48) {
-      optionCache.delete(optionCache.keys().next().value);
-    }
-    optionCache.set(key, result);
+    cacheSet(
+      optionCache,
+      key,
+      result,
+      OPTION_CACHE_MAX_ENTRIES,
+      OPTION_CACHE_MAX_VALUES,
+    );
     return result;
   }
 
@@ -468,7 +566,7 @@ export function createRealBillSelector(buildBills = buildRealBills) {
     cachedRowsDataSignature = "";
     cachedCandidateSignature = "";
     cachedCandidateRows = [];
-    cachedCandidateBills = [];
+    cachedCandidateFacets = [];
     cachedFilterSignature = "";
     cachedResult = null;
     optionCache.clear();
@@ -477,11 +575,20 @@ export function createRealBillSelector(buildBills = buildRealBills) {
   }
 
   function stats() {
-    return { ...counters };
+    return {
+      ...counters,
+      optionCacheEntries: optionCache.size,
+      optionCacheValues: cacheValues(optionCache),
+      facetIndexCacheEntries: facetIndexCache.size,
+      facetIndexCacheValues: cacheValues(facetIndexCache),
+    };
   }
 
   return {
-    candidateBills: ensureCandidate,
+    candidateBills(rows, selection, rowsVersion) {
+      ensureCandidateRows(rows, selection, rowsVersion);
+      return cachedCandidateFacets;
+    },
     hasCandidate,
     invalidate,
     pickerOptions,
@@ -530,17 +637,20 @@ export function realBillStoreOptions(rows, selection) {
 
 function billsForFacetOptions(bills, selection, kind, query) {
   const sel = selection || {};
+  const stores = valueSet(sel.billStores);
+  const brands = valueSet(sel.brands);
+  const types = valueSet(sel.types);
   return (bills || []).filter(
     (bill) =>
       (kind === "billStores" ||
-        !(sel.billStores || []).length ||
-        sel.billStores.includes(bill.store)) &&
+        !stores.size ||
+        stores.has(bill.store)) &&
       (kind === "brands" ||
-        !(sel.brands || []).length ||
-        billHasFacet(bill, sel.brands || [], "brand")) &&
+        !brands.size ||
+        billHasFacet(bill, brands, "brand")) &&
       (kind === "types" ||
-        !(sel.types || []).length ||
-        billHasFacet(bill, sel.types || [], "type")) &&
+        !types.size ||
+        billHasFacet(bill, types, "type")) &&
       billContains(bill, T(query).toLowerCase()),
   );
 }
@@ -605,6 +715,83 @@ export function realBillPickerOptions(
     );
   }
   return [];
+}
+
+function maskedKeyExample(key) {
+  let hash = 2166136261;
+  const text = T(key);
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return "key-" + (hash >>> 0).toString(36);
+}
+
+export function diagnoseRealBillKeys(rows) {
+  const keys = new Map();
+  const invoiceSources = new Map();
+  let blankInvoiceRows = 0;
+  let numericInvoiceRows = 0;
+  let specialDelimiterRows = 0;
+
+  (rows || []).forEach((row) => {
+    const key = realBillKey(row);
+    let entry = keys.get(key);
+    if (!entry) {
+      entry = { ps: new Set(), blankInvoice: !T(row.inv) };
+      keys.set(key, entry);
+    }
+    entry.ps.add(T(row.ps));
+    if (!T(row.inv)) blankInvoiceRows += 1;
+    if (typeof row.inv === "number") numericInvoiceRows += 1;
+    if (
+      [row.store, row.inv, row.tele].some((value) =>
+        T(value).includes(SEP) || T(value).includes("|"),
+      )
+    ) {
+      specialDelimiterRows += 1;
+    }
+    const invoiceKey = [T(row.store), T(row.inv), T(row.date)].join(SEP);
+    if (!invoiceSources.has(invoiceKey)) {
+      invoiceSources.set(invoiceKey, new Set());
+    }
+    invoiceSources
+      .get(invoiceKey)
+      .add(row.isTele ? REAL_BILL_SOURCE_TS : REAL_BILL_SOURCE_PS);
+  });
+
+  const blankInvoiceKeys = [...keys.entries()].filter(
+    ([, entry]) => entry.blankInvoice,
+  );
+  const multiPsKeys = [...keys.entries()].filter(
+    ([, entry]) => entry.ps.size > 1,
+  );
+  const psTsInvoiceCollisions = [...invoiceSources.entries()].filter(
+    ([, sources]) =>
+      sources.has(REAL_BILL_SOURCE_PS) &&
+      sources.has(REAL_BILL_SOURCE_TS),
+  );
+  return {
+    rows: (rows || []).length,
+    billKeys: keys.size,
+    blankInvoiceRows,
+    blankInvoiceKeys: blankInvoiceKeys.length,
+    multiPsKeys: multiPsKeys.length,
+    psTsInvoiceCollisions: psTsInvoiceCollisions.length,
+    numericInvoiceRows,
+    specialDelimiterRows,
+    examples: {
+      blankInvoiceKeys: blankInvoiceKeys
+        .slice(0, 3)
+        .map(([key]) => maskedKeyExample(key)),
+      multiPsKeys: multiPsKeys
+        .slice(0, 3)
+        .map(([key]) => maskedKeyExample(key)),
+      psTsInvoiceCollisions: psTsInvoiceCollisions
+        .slice(0, 3)
+        .map(([key]) => maskedKeyExample(key)),
+    },
+  };
 }
 
 export function splitRealBillsForPrint(bills, rowsPerPart = 12) {
