@@ -602,8 +602,8 @@
         }
         .winner-photo {
             z-index: 2;
-            inset: 0 0 var(--winner-caption-height);
-            height: auto;
+            inset: 0 0 auto 0;
+            height: calc(100% - var(--winner-caption-height));
             object-fit: contain;
             padding: clamp(6px, 1.2vmin, 18px);
             padding-bottom: 0;
