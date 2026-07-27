@@ -356,6 +356,12 @@ mustNotContain("dist/performance-reveal.html", "race-finished[data-rank=\"2\"] .
 mustContain("dist/performance-reveal.html", "race-avatar");
 mustContain("dist/performance-reveal.html", "race-bar-copy");
 mustContain("dist/performance-reveal.html", "race-name");
+mustContain("dist/performance-reveal.html", "race-code");
+mustContain("dist/performance-reveal.html", "winner-code");
+mustContain("dist/performance-reveal.html", 'const IMAGEKIT_PROFILE_URL = "https://ik.imagekit.io/AYAPS";');
+mustContain("dist/performance-reveal.html", "`${IMAGEKIT_PROFILE_URL}/${encodeURIComponent(code)}.webp`");
+mustContain("dist/performance-reveal.html", "code: profileKey(row, mode) || rowIdentity(row, mode)");
+mustContain("dist/performance-reveal.html", "winnerCode.textContent = code");
 mustContain("dist/performance-reveal.html", "race-started");
 mustNotContain("dist/performance-reveal.html", "race-person");
 mustContain("dist/performance-reveal.html", "ตำแหน่งคงที่ • แท่งแซงกัน • เปิดอันดับตอนจบ");
