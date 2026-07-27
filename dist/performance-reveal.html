@@ -505,6 +505,15 @@
             white-space: normal;
             overflow-wrap: anywhere;
         }
+        .race-code {
+            width: 100%;
+            color: #ffffff;
+            font-size: clamp(0.56rem, 0.9vw, 0.75rem);
+            font-weight: 800;
+            line-height: 1;
+            opacity: 0.82;
+            letter-spacing: 0.04em;
+        }
         .race-actual {
             color: #f4f4f5;
             font-size: clamp(0.72rem, 1.2vw, 0.98rem);
@@ -556,6 +565,7 @@
         .race-row.race-finished[data-final-rank="1"] .race-rank::before { content: "♛ "; }
         .race-row .race-rank,
         .race-row .race-name,
+        .race-row .race-code,
         .race-row .race-actual,
         .race-row .race-percent {
             color: #ffffff;
@@ -677,6 +687,7 @@
             overflow-wrap: anywhere;
             text-shadow: 0 3px 18px rgba(0,0,0,0.96);
         }
+        .winner-code,
         .winner-value,
         .winner-percent {
             display: inline-block;
@@ -686,10 +697,16 @@
             font-weight: 900;
             text-shadow: 0 2px 14px rgba(0,0,0,0.98);
         }
+        .winner-code {
+            color: rgba(255,255,255,0.88);
+            letter-spacing: 0.05em;
+        }
+        .winner-code:not([hidden])::after,
         .winner-percent:not([hidden])::before {
             content: " • ";
             color: rgba(255,255,255,0.72);
         }
+        .winner-code[hidden],
         .winner-percent[hidden] {
             display: none;
         }
@@ -896,6 +913,9 @@
             .race-name {
                 font-size: 0.58rem;
                 line-height: 1.12;
+            }
+            .race-code {
+                font-size: 0.52rem;
             }
             .race-actual {
                 font-size: 0.64rem;
@@ -1284,6 +1304,7 @@
         const PERFORMANCE_OBJECT_BASE = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/";
         const PERFORMANCE_HISTORY_INDEX = "performance/history-index.json";
         const PERFORMANCE_HISTORY_CACHE = "aya-performance-history-v1";
+        const IMAGEKIT_PROFILE_URL = "https://ik.imagekit.io/AYAPS";
         const RACE_DURATION_MS = 10000;
         const PERFORMANCE_PUBLIC_KEY = String.fromCharCode(115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,74,84,104,89,119,65,108,95,45,97,115,107,107,95,99,73,97,67,100,55,53,119,95,84,67,87,75,50,66,84,84);
         let performanceReady = false;
@@ -1407,7 +1428,9 @@
         }
 
         function personImageUrl(seed) {
-            return avatarDataUrl(seed);
+            const code = String(seed || "").trim();
+            if (!/^[A-Z0-9_-]+$/i.test(code)) return avatarDataUrl(seed);
+            return `${IMAGEKIT_PROFILE_URL}/${encodeURIComponent(code)}.webp`;
         }
 
         function rankByActual(rows, key, limit) {
@@ -1790,6 +1813,7 @@
                 label: snapshotLabel(snapshot),
                 rows: rows.map(row => ({
                     id: rowIdentity(row, mode),
+                    code: profileKey(row, mode) || rowIdentity(row, mode),
                     name: displayName(row, mode),
                     photoKey: profileKey(row, mode),
                     actual: raceActualValue(row, key),
@@ -1814,6 +1838,7 @@
                 const endPercent = to?.percent || 0;
                 return {
                     id,
+                    code: to?.code || from?.code || id,
                     name: to?.name || from?.name || id,
                     photoKey: to?.photoKey || from?.photoKey || id,
                     actual: startActual + (endActual - startActual) * progress,
@@ -1860,6 +1885,7 @@
                                 <div class="race-bar-copy">
                                     <span class="race-rank"></span>
                                     <span class="race-name"></span>
+                                    <span class="race-code"></span>
                                     <strong class="race-actual"></strong>
                                     <strong class="race-percent"></strong>
                                 </div>
@@ -1869,6 +1895,7 @@
                     row._raceParts = {
                         rank: row.querySelector(".race-rank"),
                         name: row.querySelector(".race-name"),
+                        code: row.querySelector(".race-code"),
                         image: row.querySelector(".race-avatar img"),
                         actual: row.querySelector(".race-actual"),
                         bar: row.querySelector(".race-bar"),
@@ -1888,6 +1915,7 @@
                 row.style.transform = `translateX(${laneIndex * 100}%)`;
                 parts.rank.textContent = String(rank);
                 parts.name.textContent = person.name;
+                parts.code.textContent = person.code || person.id || "";
                 const image = parts.image;
                 const profileSignature = person.photoKey || person.name;
                 if (row._raceProfileSignature !== profileSignature) {
@@ -1940,6 +1968,7 @@
                     <button class="winner-back" type="button" aria-label="กลับไปดูอันดับ">←</button>
                     <div class="winner-content">
                         <h2 class="winner-title"></h2>
+                        <span class="winner-code"></span>
                         <strong class="winner-value"></strong>
                         <strong class="winner-percent"></strong>
                     </div>
@@ -1992,6 +2021,10 @@
             image.alt = `ผู้ชนะอันดับ 1 ${winner.name}`;
             image.onerror = () => safeImageOnError(image, winner.name);
             overlay.querySelector(".winner-title").textContent = winner.name;
+            const winnerCode = overlay.querySelector(".winner-code");
+            const code = winner.code || winner.id || winner.photoKey || "";
+            winnerCode.hidden = !code;
+            winnerCode.textContent = code;
             overlay.querySelector(".winner-value").textContent =
                 formatRaceActual(winner.actual, container._raceMetricKey);
             const percent = overlay.querySelector(".winner-percent");
