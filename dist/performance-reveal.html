@@ -327,6 +327,171 @@
             }
         }
 
+        .race-card {
+            width: 100%;
+            max-width: 900px;
+            min-height: clamp(430px, calc(100vh - 310px), 620px);
+            height: clamp(430px, calc(100vh - 310px), 620px);
+            margin: 0 auto;
+            padding: 24px;
+            border-radius: 24px;
+            overflow: hidden;
+            position: relative;
+        }
+        .race-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            min-height: 62px;
+        }
+        .race-header h3 {
+            color: #facc15;
+            font-size: clamp(1rem, 2vw, 1.45rem);
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .race-header p {
+            margin-top: 4px;
+            color: #9ca3af;
+            font-size: 0.8rem;
+        }
+        .race-date {
+            flex: 0 0 auto;
+            padding: 7px 12px;
+            border: 1px solid rgba(250, 204, 21, 0.28);
+            border-radius: 999px;
+            background: rgba(250, 204, 21, 0.07);
+            color: #fde047;
+            font-size: 0.78rem;
+            font-weight: 800;
+        }
+        .race-track {
+            height: 350px;
+            margin-top: 16px;
+            position: relative;
+        }
+        .race-row {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 62px;
+            display: grid;
+            grid-template-columns: 42px minmax(110px, 210px) minmax(100px, 1fr) 78px;
+            align-items: center;
+            gap: 10px;
+            opacity: 0;
+            transform: translateY(310px);
+            transition: transform 0.52s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease;
+            will-change: transform;
+        }
+        .race-row.is-top-five {
+            opacity: 1;
+        }
+        .race-rank {
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: #262626;
+            color: #d4d4d8;
+            font-weight: 900;
+        }
+        .race-row[data-rank="1"] .race-rank {
+            background: linear-gradient(135deg, #fef08a, #eab308);
+            color: #050505;
+            box-shadow: 0 0 18px rgba(234, 179, 8, 0.4);
+        }
+        .race-person {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+        }
+        .race-person img {
+            width: 38px;
+            height: 38px;
+            flex: 0 0 auto;
+            border-radius: 999px;
+            border: 1px solid rgba(250, 204, 21, 0.4);
+            background: #050505;
+            object-fit: cover;
+        }
+        .race-person span {
+            min-width: 0;
+            overflow: hidden;
+            color: #f4f4f5;
+            font-size: clamp(0.78rem, 1.2vw, 1rem);
+            font-weight: 800;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .race-bar-lane {
+            height: 30px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.055);
+            position: relative;
+        }
+        .race-bar {
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #713f12, #eab308 70%, #fef08a);
+            box-shadow: 0 0 20px rgba(234,179,8,0.2);
+            transition: width 0.28s linear;
+        }
+        .race-row[data-rank="1"] .race-bar {
+            background: linear-gradient(90deg, #a16207, #facc15 70%, #fff7ae);
+            box-shadow: 0 0 24px rgba(250,204,21,0.42);
+        }
+        .race-percent {
+            color: #facc15;
+            font-size: clamp(1rem, 1.7vw, 1.28rem);
+            font-weight: 900;
+            text-align: right;
+        }
+        .race-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-height: 42px;
+            color: #71717a;
+            font-size: 0.76rem;
+        }
+        .race-replay {
+            min-height: 38px;
+            padding: 7px 12px;
+            border: 1px solid rgba(250,204,21,0.3);
+            border-radius: 10px;
+            color: #facc15;
+            font-weight: 800;
+        }
+        .race-replay:hover {
+            background: rgba(250,204,21,0.1);
+        }
+        @media (max-width: 640px) {
+            .race-card {
+                padding: 16px 12px;
+            }
+            .race-row {
+                grid-template-columns: 34px minmax(92px, 128px) minmax(70px, 1fr) 64px;
+                gap: 6px;
+            }
+            .race-person img {
+                width: 30px;
+                height: 30px;
+            }
+            .race-track {
+                height: 335px;
+            }
+        }
+
         .mode-pill {
             display: inline-flex;
             align-items: center;
@@ -395,16 +560,25 @@
                 <div class="text-center mb-4"><span class="mode-pill">PS MODE</span></div>
                 <div class="award-shell">
                     <div id="award-stage-ps" class="award-stage">
-                        <article class="award-slide overall-award active" data-award-slide data-award-title="Overall Champions">
-                            <div class="relative w-full max-w-4xl h-[400px] mx-auto flex justify-center items-end podium-wrap">
-                                <div id="podium-lock-ps" onclick="revealPodium('ps')" class="absolute inset-0 z-50 flex flex-col items-center justify-center cursor-pointer glass-panel rounded-[2rem] transition-all duration-700 hover:bg-black/90 hover:scale-[1.02] border-yellow-500/50 shadow-[0_0_50px_rgba(234,179,8,0.15)]">
+                        <article class="award-slide overall-award active" data-award-slide data-award-title="Overall Champions" data-award-key="overall">
+                            <div class="race-card glass-panel">
+                                <div class="absolute inset-0 bg-[#070707] z-30 flex flex-col items-center justify-center cursor-pointer transition-all duration-700 hover:bg-[#111]"
+                                     onclick="revealRace(this, 'ps', 'overall', 'Overall Champions', 'race-ps-overall')">
                                     <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
-                                        <svg class="w-12 h-12 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                                        <span class="text-4xl font-black text-black">TOP 5</span>
                                     </div>
-                                    <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">TAP TO REVEAL</h2>
+                                    <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">START THE RACE</h2>
                                     <p class="text-gray-400 tracking-widest text-sm uppercase">PS Overall Champions</p>
                                 </div>
-                                <div id="podium-area-ps" class="w-full h-full flex items-end justify-center gap-2 md:gap-4 hidden"></div>
+                                <div class="race-header">
+                                    <div><h3>Overall Champions</h3><p>คะแนนเฉลี่ย Index ของหมวดหลัก</p></div>
+                                    <span id="race-date-ps-overall" class="race-date">พร้อมเริ่ม</span>
+                                </div>
+                                <div id="race-ps-overall" class="race-track"></div>
+                                <div class="race-footer">
+                                    <span>TOP 5 • ข้อมูลย้อนหลังจริง • Index เทียบเป้า</span>
+                                    <button class="race-replay" type="button" onclick="startRace('ps', 'overall', 'race-ps-overall')">↻ แข่งใหม่</button>
+                                </div>
                             </div>
                         </article>
                         <div id="categories-area-ps"></div>
@@ -424,16 +598,25 @@
                 <div class="text-center mb-4"><span class="mode-pill">ADS MODE</span></div>
                 <div class="award-shell">
                     <div id="award-stage-ads" class="award-stage">
-                        <article class="award-slide overall-award active" data-award-slide data-award-title="Overall Champions">
-                            <div class="relative w-full max-w-4xl h-[400px] mx-auto flex justify-center items-end podium-wrap">
-                                <div id="podium-lock-ads" onclick="revealPodium('ads')" class="absolute inset-0 z-50 flex flex-col items-center justify-center cursor-pointer glass-panel rounded-[2rem] transition-all duration-700 hover:bg-black/90 hover:scale-[1.02] border-yellow-500/50 shadow-[0_0_50px_rgba(234,179,8,0.15)]">
+                        <article class="award-slide overall-award active" data-award-slide data-award-title="Overall Champions" data-award-key="overall">
+                            <div class="race-card glass-panel">
+                                <div class="absolute inset-0 bg-[#070707] z-30 flex flex-col items-center justify-center cursor-pointer transition-all duration-700 hover:bg-[#111]"
+                                     onclick="revealRace(this, 'ads', 'overall', 'Overall Champions', 'race-ads-overall')">
                                     <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
-                                        <svg class="w-12 h-12 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                                        <span class="text-4xl font-black text-black">TOP 5</span>
                                     </div>
-                                    <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">TAP TO REVEAL</h2>
+                                    <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">START THE RACE</h2>
                                     <p class="text-gray-400 tracking-widest text-sm uppercase">ADS Overall Champions</p>
                                 </div>
-                                <div id="podium-area-ads" class="w-full h-full flex items-end justify-center gap-2 md:gap-4 hidden"></div>
+                                <div class="race-header">
+                                    <div><h3>Overall Champions</h3><p>คะแนนเฉลี่ย Index ของหมวดหลัก</p></div>
+                                    <span id="race-date-ads-overall" class="race-date">พร้อมเริ่ม</span>
+                                </div>
+                                <div id="race-ads-overall" class="race-track"></div>
+                                <div class="race-footer">
+                                    <span>TOP 5 • ข้อมูลย้อนหลังจริง • Index เทียบเป้า</span>
+                                    <button class="race-replay" type="button" onclick="startRace('ads', 'overall', 'race-ads-overall')">↻ แข่งใหม่</button>
+                                </div>
                             </div>
                         </article>
                         <div id="categories-area-ads"></div>
@@ -454,10 +637,14 @@
     <script src="/assets/performance-cd-adapter-v1.js?v=3"></script>
     <script>
         const PERFORMANCE_DATA_URL = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/performance/current.min.json";
+        const PERFORMANCE_OBJECT_BASE = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/";
+        const PERFORMANCE_HISTORY_INDEX = "performance/history-index.json";
         const PERFORMANCE_PUBLIC_KEY = String.fromCharCode(115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,74,84,104,89,119,65,108,95,45,97,115,107,107,95,99,73,97,67,100,55,53,119,95,84,67,87,75,50,66,84,84);
         let performanceReady = false;
         let performanceLoadFailed = false;
+        let performanceTimeline = [];
         const awardIndex = { ps: 0, ads: 0 };
+        const raceRuns = new Map();
 
         let boardData = {
             ps: {
@@ -510,9 +697,29 @@
             const number = Number(String(value ?? 0).replace(/,/g, '').replace(/%/g, '').trim());
             return Number.isFinite(number) ? number : 0;
         }
-
         function metricActual(row, key) {
             return numberValue(row?.[key]?.actual);
+        }
+
+        function metricPercent(row, key) {
+            if (key === "overall") {
+                const keys = ["sales", "giv", "moq", "dc1", "dc2", "dc3"];
+                const values = keys.map(metricKey => metricPercent(row, metricKey)).filter(value => value > 0);
+                return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+            }
+
+            if (key === "cd13" && !row?.cd13) {
+                const metrics = ["dc1", "dc2", "dc3"].map(metricKey => row?.[metricKey] || {});
+                const target = metrics.reduce((sum, metric) => sum + numberValue(metric.target), 0);
+                const actual = metrics.reduce((sum, metric) => sum + numberValue(metric.actual), 0);
+                return target > 0 ? (actual / target) * 100 : 0;
+            }
+
+            const metric = row?.[key] || {};
+            const directIndex = numberValue(metric.index);
+            if (directIndex > 0) return directIndex;
+            const target = numberValue(metric.target);
+            return target > 0 ? (numberValue(metric.actual) / target) * 100 : 0;
         }
 
         function displayName(row, mode) {
@@ -577,6 +784,7 @@
             const mainPodium = [rankMap[1], rankMap[0], rankMap[2]].filter(Boolean);
             const categories = performanceCategories.map(category => ({
                 id: `${mode}-${category.suffix}`,
+                key: category.key,
                 title: category.title,
                 subtitle: category.subtitle,
                 unit: category.unit,
@@ -615,20 +823,15 @@
             period.textContent = `CHAMPIONS OF ${monthYear.toUpperCase()}`;
         }
 
-        function resetReveal(mode) {
-            const area = document.getElementById(`podium-area-${mode}`);
-            if (!area || area.dataset.rendered !== "true") return;
-            area.innerHTML = "";
-            area.dataset.rendered = "false";
-        }
-
-        async function loadPerformanceData() {
-            const status = document.getElementById("performance-data-status");
+        async function fetchPerformanceJson(path, timeoutMs = 12000) {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 12000);
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
+            const url = /^https?:\/\//i.test(path)
+                ? path
+                : `${PERFORMANCE_OBJECT_BASE}${String(path || "").replace(/^\/+/, "")}`;
 
             try {
-                const response = await fetch(PERFORMANCE_DATA_URL, {
+                const response = await fetch(url, {
                     headers: {
                         apikey: PERFORMANCE_PUBLIC_KEY,
                         authorization: `Bearer ${PERFORMANCE_PUBLIC_KEY}`
@@ -637,34 +840,93 @@
                     signal: controller.signal
                 });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
 
-                const latest = await response.json();
+        function snapshotLabel(snapshot) {
+            return String(
+                snapshot?.meta?.reportDate ||
+                snapshot?.meta?.reportKey ||
+                snapshot?.reportDate ||
+                snapshot?.reportKey ||
+                "-"
+            );
+        }
+
+        async function loadPerformanceTimeline(latest) {
+            try {
+                const index = await fetchPerformanceJson(PERFORMANCE_HISTORY_INDEX, 8000);
+                const currentLabel = snapshotLabel(latest);
+                const unique = new Map();
+
+                (Array.isArray(index) ? index : [])
+                    .filter(item => item?.path)
+                    .forEach(item => {
+                        const label = String(item.reportDate || item.reportKey || item.path);
+                        if (label === currentLabel || unique.has(label)) return;
+                        unique.set(label, item);
+                    });
+
+                const selected = [...unique.values()]
+                    .filter(item => {
+                        const label = String(item.reportDate || item.reportKey || "");
+                        return !currentLabel || !label || label < currentLabel;
+                    })
+                    .sort((a, b) => String(a.reportDate || a.reportKey || "").localeCompare(String(b.reportDate || b.reportKey || "")))
+                    .slice(-6);
+
+                const loaded = await Promise.allSettled(
+                    selected.map(item => fetchPerformanceJson(item.path, 12000))
+                );
+                const history = loaded
+                    .filter(result => result.status === "fulfilled")
+                    .map(result => result.value)
+                    .filter(snapshot => Array.isArray(snapshot?.ps) && Array.isArray(snapshot?.ads));
+
+                return [...history, latest];
+            } catch (error) {
+                console.warn("[AYA Performance History]", error);
+                return [latest];
+            }
+        }
+
+        async function loadPerformanceData() {
+            const status = document.getElementById("performance-data-status");
+
+            try {
+                const latest = await fetchPerformanceJson(PERFORMANCE_DATA_URL, 12000);
                 if (!Array.isArray(latest?.ps) || !Array.isArray(latest?.ads)) {
                     throw new Error("รูปแบบข้อมูล Performance ไม่ครบ");
                 }
 
+                performanceTimeline = await loadPerformanceTimeline(latest);
                 boardData = {
                     ps: buildModeBoard("ps", latest.ps),
                     ads: buildModeBoard("ads", latest.ads)
                 };
                 updatePerformancePeriod(latest.meta || {});
-                resetReveal("ps");
-                resetReveal("ads");
                 renderCategories("ps");
                 renderCategories("ads");
                 performanceReady = true;
                 performanceLoadFailed = false;
 
                 const reportLabel = latest?.meta?.reportDate || latest?.meta?.reportKey || "ล่าสุด";
-                status.textContent = `ข้อมูล Performance ล่าสุด • ${reportLabel}`;
-                status.className = "text-[11px] text-emerald-400/80 mt-3 tracking-wider";
+                const historyCount = Math.max(performanceTimeline.length - 1, 0);
+                status.textContent = historyCount
+                    ? `ข้อมูลล่าสุด • ${reportLabel} • การแข่งขัน ${performanceTimeline.length} ช่วงจริง`
+                    : `ข้อมูลล่าสุด • ${reportLabel} • ยังไม่มีช่วงย้อนหลังสำหรับการแซง`;
+                status.className = historyCount
+                    ? "text-[11px] text-emerald-400/80 mt-3 tracking-wider"
+                    : "text-[11px] text-amber-500/80 mt-3 tracking-wider";
             } catch (error) {
                 performanceLoadFailed = true;
-                status.textContent = `โหลดข้อมูลล่าสุดไม่สำเร็จ • กำลังใช้ข้อมูลสำรอง (${error.name === "AbortError" ? "หมดเวลา" : error.message})`;
-                status.className = "text-[11px] text-amber-500/80 mt-3 tracking-wider";
+                performanceTimeline = [];
+                status.textContent = `โหลดข้อมูลล่าสุดไม่สำเร็จ (${error.name === "AbortError" ? "หมดเวลา" : error.message})`;
+                status.className = "text-[11px] text-red-400/80 mt-3 tracking-wider";
                 console.warn("[AYA Performance]", error);
-            } finally {
-                clearTimeout(timeout);
             }
         }
 
@@ -714,218 +976,224 @@
             img.src = avatarDataUrl(seed);
         }
 
-        function animateValue(obj, start, end, duration, suffix) {
-            let startTimestamp = null;
-            const step = (timestamp) => {
-                if (!startTimestamp) startTimestamp = timestamp;
-                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-                const currentVal = Math.floor(progress * (end - start) + start);
-                obj.innerHTML = currentVal.toLocaleString('th-TH') + suffix;
-                if (progress < 1) window.requestAnimationFrame(step);
-            };
-            window.requestAnimationFrame(step);
+        function rowIdentity(row, mode) {
+            return String(
+                mode === "ps"
+                    ? (row?.ps || row?.psCode || row?.code || displayName(row, mode))
+                    : (row?.ads || row?.adsCode || row?.code || displayName(row, mode))
+            ).trim();
         }
 
-        function revealPodium(mode) {
-            const lockScreen = document.getElementById(`podium-lock-${mode}`);
-            const podiumArea = document.getElementById(`podium-area-${mode}`);
-            const data = boardData[mode].main_podium;
-            const delayByRank = { 3: 0.2, 2: 2.8, 1: 6.2 };
+        function raceFrame(snapshot, mode, key) {
+            const rows = Array.isArray(snapshot?.[mode]) ? snapshot[mode] : [];
+            return {
+                label: snapshotLabel(snapshot),
+                rows: rows.map(row => ({
+                    id: rowIdentity(row, mode),
+                    name: displayName(row, mode),
+                    photoKey: profileKey(row, mode),
+                    value: metricPercent(row, key)
+                })).filter(row => row.id)
+            };
+        }
 
+        function interpolateRaceRows(fromRows, toRows, progress) {
+            const fromMap = new Map(fromRows.map(row => [row.id, row]));
+            const toMap = new Map(toRows.map(row => [row.id, row]));
+            const ids = new Set([...fromMap.keys(), ...toMap.keys()]);
+            return [...ids].map(id => {
+                const from = fromMap.get(id);
+                const to = toMap.get(id);
+                const start = from?.value || 0;
+                const end = to?.value || 0;
+                return {
+                    id,
+                    name: to?.name || from?.name || id,
+                    photoKey: to?.photoKey || from?.photoKey || id,
+                    value: start + (end - start) * progress
+                };
+            });
+        }
+
+        function formatRacePercent(value) {
+            return `${numberValue(value).toLocaleString("th-TH", {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1
+            })}%`;
+        }
+
+        function renderRaceRows(container, rows) {
+            if (!container._raceRows) container._raceRows = new Map();
+            const sorted = [...rows].sort((a, b) => b.value - a.value);
+            const maximum = Math.max(sorted[0]?.value || 0, 1);
+
+            sorted.forEach((person, rank) => {
+                let row = container._raceRows.get(person.id);
+                if (!row) {
+                    row = document.createElement("div");
+                    row.className = "race-row";
+                    row.innerHTML = `
+                        <span class="race-rank"></span>
+                        <div class="race-person"><img alt=""><span></span></div>
+                        <div class="race-bar-lane"><div class="race-bar"></div></div>
+                        <strong class="race-percent"></strong>
+                    `;
+                    row._raceParts = {
+                        rank: row.querySelector(".race-rank"),
+                        name: row.querySelector(".race-person span"),
+                        image: row.querySelector(".race-person img"),
+                        bar: row.querySelector(".race-bar"),
+                        percent: row.querySelector(".race-percent")
+                    };
+                    container.appendChild(row);
+                    container._raceRows.set(person.id, row);
+                }
+
+                const visible = rank < 5;
+                const parts = row._raceParts;
+                row.classList.toggle("is-top-five", visible);
+                row.dataset.rank = String(rank + 1);
+                row.style.transform = `translateY(${visible ? rank * 66 : 330}px)`;
+                parts.rank.textContent = String(rank + 1);
+                parts.name.textContent = person.name;
+                const image = parts.image;
+                image.src = personImageUrl(person.photoKey || person.name);
+                image.onerror = () => safeImageOnError(image, person.name);
+                parts.bar.style.width = `${Math.max((person.value / maximum) * 100, 1.5)}%`;
+                parts.percent.textContent = formatRacePercent(person.value);
+            });
+        }
+
+        function animateRaceTransition(container, fromFrame, toFrame, duration, runKey, token) {
+            return new Promise(resolve => {
+                let startedAt = 0;
+                const step = timestamp => {
+                    if (raceRuns.get(runKey) !== token) {
+                        resolve(false);
+                        return;
+                    }
+                    if (!startedAt) startedAt = timestamp;
+                    const progress = Math.min((timestamp - startedAt) / duration, 1);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    renderRaceRows(container, interpolateRaceRows(fromFrame.rows, toFrame.rows, eased));
+                    if (progress < 1) {
+                        requestAnimationFrame(step);
+                    } else {
+                        resolve(true);
+                    }
+                };
+                requestAnimationFrame(step);
+            });
+        }
+
+        async function startRace(mode, key, containerId) {
+            if (!performanceReady || !performanceTimeline.length) return;
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const runKey = `${mode}:${key}:${containerId}`;
+            const token = (raceRuns.get(runKey) || 0) + 1;
+            raceRuns.set(runKey, token);
+            container.innerHTML = "";
+            container._raceRows = new Map();
+
+            const frames = performanceTimeline.map(snapshot => raceFrame(snapshot, mode, key));
+            const dateLabel = document.getElementById(`race-date-${mode}-${key}`);
+            let previous = { label: "เริ่มต้น", rows: [] };
+
+            for (const frame of frames) {
+                if (dateLabel) dateLabel.textContent = frame.label;
+                const completed = await animateRaceTransition(container, previous, frame, frames.length === 1 ? 2200 : 1450, runKey, token);
+                if (!completed) return;
+                previous = frame;
+                await new Promise(resolve => setTimeout(resolve, frames.length === 1 ? 0 : 320));
+                if (raceRuns.get(runKey) !== token) return;
+            }
+
+            if (dateLabel) {
+                dateLabel.textContent = frames.length > 1
+                    ? `ผลล่าสุด • ${frames.at(-1).label}`
+                    : `ข้อมูลล่าสุด • ${frames.at(-1).label}`;
+            }
+        }
+
+        function revealRace(cover, mode, key, title, containerId) {
             if (!performanceReady && !performanceLoadFailed) {
-                const waitingText = lockScreen.querySelector("p");
-                if (waitingText) waitingText.textContent = "กำลังโหลดข้อมูล Performance ล่าสุด...";
+                const status = cover.querySelector("p");
+                if (status) status.textContent = "กำลังโหลดข้อมูล Performance และประวัติ...";
                 return;
             }
-            if (lockScreen.dataset.revealing === 'true') return;
-            lockScreen.dataset.revealing = 'true';
-            lockScreen.style.pointerEvents = 'none';
-            lockScreen.classList.remove('hover:scale-[1.02]');
-            lockScreen.innerHTML = `
+            if (performanceLoadFailed || !performanceTimeline.length) {
+                const status = cover.querySelector("p");
+                if (status) status.textContent = "ไม่สามารถโหลดข้อมูลสำหรับการแข่งขันได้";
+                return;
+            }
+            if (cover.dataset.revealing === "true") return;
+
+            cover.dataset.revealing = "true";
+            cover.style.pointerEvents = "none";
+            cover.innerHTML = `
                 <div class="suspense-ring mb-7">
                     <div class="suspense-ring-inner">
-                        <span id="suspense-number-${mode}" class="suspense-number">3</span>
+                        <span class="suspense-number">3</span>
                     </div>
                 </div>
-                <h2 id="suspense-title-${mode}" class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">
-                    เตรียมเปิดผล
-                </h2>
-                <p id="suspense-status-${mode}" class="text-gray-400 tracking-widest text-xs md:text-sm uppercase">
-                    ${boardData[mode].label} OVERALL CHAMPIONS
-                </p>
-                <div class="suspense-dots">
-                    <span id="suspense-dot-1-${mode}" class="active"></span>
-                    <span id="suspense-dot-2-${mode}"></span>
-                    <span id="suspense-dot-3-${mode}"></span>
-                </div>
+                <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">เตรียมการแข่งขัน</h2>
+                <p class="text-gray-400 tracking-widest text-xs md:text-sm uppercase">${title} • TOP 5</p>
             `;
 
-            const updateCountdown = (number, activeDot, title, status) => {
-                const numberEl = document.getElementById(`suspense-number-${mode}`);
-                const titleEl = document.getElementById(`suspense-title-${mode}`);
-                const statusEl = document.getElementById(`suspense-status-${mode}`);
-                if (!numberEl) return;
-                numberEl.textContent = number;
-                numberEl.style.animation = 'none';
-                void numberEl.offsetWidth;
-                numberEl.style.animation = 'countdownPop 0.65s cubic-bezier(0.34, 1.56, 0.64, 1)';
-                titleEl.textContent = title;
-                statusEl.textContent = status;
-                for (let i = 1; i <= 3; i++) {
-                    document.getElementById(`suspense-dot-${i}-${mode}`)?.classList.toggle('active', i === activeDot);
-                }
-            };
-
-            setTimeout(() => updateCountdown('2', 2, 'อีกนิดเดียว', 'กำลังตรวจสอบคะแนนทั้งหมด'), 950);
-            setTimeout(() => updateCountdown('1', 3, 'พร้อมหรือยัง', 'อันดับที่ 3 กำลังจะปรากฏ'), 1900);
+            const number = cover.querySelector(".suspense-number");
+            setTimeout(() => { if (number) number.textContent = "2"; }, 850);
+            setTimeout(() => { if (number) number.textContent = "1"; }, 1700);
             setTimeout(() => {
-                updateCountdown('!', 3, 'เริ่มเปิดผล', 'อันดับ 3 → อันดับ 2 → CHAMPION');
-                lockScreen.style.boxShadow = '0 0 90px rgba(234,179,8,0.38)';
-            }, 2850);
-
+                if (number) number.textContent = "GO!";
+                cover.style.boxShadow = "0 0 90px rgba(234,179,8,0.4)";
+            }, 2500);
             setTimeout(() => {
-                lockScreen.style.opacity = '0';
-                lockScreen.style.transform = 'scale(1.08)';
-            }, 3550);
-
+                cover.style.opacity = "0";
+                cover.style.transform = "scale(1.06)";
+            }, 3100);
             setTimeout(() => {
-                lockScreen.style.display = 'none';
-                podiumArea.classList.remove('hidden');
-
-                if (podiumArea.dataset.rendered === 'true') return;
-                podiumArea.dataset.rendered = 'true';
-
-                data.forEach((person) => {
-                    const delay = delayByRank[person.rank] ?? 0;
-                    const rankLabel = person.rank === 1 ? '👑 CHAMPION' : `RANK ${person.rank}`;
-                    const textSize = person.rank === 1 ? 'text-2xl md:text-3xl' : 'text-lg md:text-xl';
-                    const podium = document.createElement('div');
-                    podium.className = `podium-step rank-${person.rank}`;
-                    podium.style.animation = `riseUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards ${delay}s`;
-                    podium.innerHTML = `
-                        <div class="avatar-container" style="animation: dropIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards ${delay + 0.8}s;">
-                            <img src="${personImageUrl(person.photoKey || person.name)}" class="w-full h-full object-cover" alt="" onerror="safeImageOnError(this, '${person.name.replace(/'/g, '')}')">
-                        </div>
-                        <div class="pt-10 md:pt-14 text-center w-full px-1 opacity-0" style="animation: fadeInReveal 0.5s forwards ${delay + 1.2}s;">
-                            <span class="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] bg-black/60 px-2 py-1 rounded ${person.color}">${rankLabel}</span>
-                            <h3 class="text-xs md:text-sm font-semibold mt-2 text-gray-200 truncate w-full px-1">${person.name}</h3>
-                            <p id="counter-${mode}-${person.rank}" class="${textSize} font-black ${person.color} mt-1 drop-shadow-md">0</p>
-                        </div>
-                    `;
-                    podiumArea.appendChild(podium);
-
-                    setTimeout(() => {
-                        const el = document.getElementById(`counter-${mode}-${person.rank}`);
-                        if (el) animateValue(el, 0, person.sales, 2000, ' ฿');
-                    }, (delay + 1.5) * 1000);
-                });
-            }, 4200);
-        }
-
-        function revealCategory(cover, title) {
-            if (cover.dataset.revealing === 'true') return;
-            cover.dataset.revealing = 'true';
-            cover.style.pointerEvents = 'none';
-            cover.innerHTML = `
-                <div class="category-spinner mb-5"></div>
-                <span class="text-yellow-500 font-black tracking-widest uppercase text-sm text-center px-3">
-                    กำลังเปิดผล...
-                </span>
-                <span class="text-gray-500 text-xs mt-2 text-center px-4">${title}</span>
-                <span class="text-gray-600 text-[10px] mt-3 tracking-[0.25em]">3 • 2 • 1</span>
-            `;
-
-            setTimeout(() => {
-                const label = cover.querySelector('.text-yellow-500');
-                if (label) label.textContent = 'ผู้ชนะคือ...';
-            }, 1050);
-
-            setTimeout(() => {
-                cover.style.opacity = '0';
-                cover.style.transform = 'scale(1.08)';
-            }, 1850);
-
-            setTimeout(() => {
-                cover.style.display = 'none';
-            }, 2550);
-        }
-
-        function badgeClass(rank) {
-            if (rank === 1) return 'rank-1-badge';
-            if (rank === 2) return 'rank-2-badge';
-            if (rank === 3) return 'rank-3-badge';
-            return 'rank-normal';
+                cover.style.display = "none";
+                startRace(mode, key, containerId);
+            }, 3650);
         }
 
         function renderCategories(mode) {
             const container = document.getElementById(`categories-area-${mode}`);
             const categories = boardData[mode].categories;
-            container.innerHTML = '';
+            container.innerHTML = "";
 
             categories.forEach(cat => {
-                const champ = cat.top[0];
-                if (!champ) return;
-
-                const listHTML = cat.top.map(person => {
-                    const nameStyle = person.rank === 1 ? 'text-yellow-400 font-bold' : 'text-gray-300';
-                    const valStyle = person.rank === 1 ? 'text-yellow-400 font-bold' : 'text-white font-medium';
-                    return `
-                        <li>
-                            <div class="flex items-center gap-2 overflow-hidden min-w-0">
-                                <span class="rank-badge ${badgeClass(person.rank)}">${person.rank}</span>
-                                <div class="w-9 h-9 rounded-full overflow-hidden border border-gray-600 shrink-0 bg-black">
-                                    <img src="${personImageUrl(person.photoKey || person.name)}" class="w-full h-full object-cover" alt="" onerror="safeImageOnError(this, '${person.name.replace(/'/g, '')}')">
-                                </div>
-                                <span class="truncate ${nameStyle}">${person.name}</span>
-                            </div>
-                            <span class="${valStyle} shrink-0">${person.value}</span>
-                        </li>
-                    `;
-                }).join('');
-
-                const card = document.createElement('article');
-                card.className = 'award-slide category-card glass-panel group shadow-lg';
-                card.dataset.awardSlide = '';
+                const key = cat.key || performanceCategories.find(category => cat.id.endsWith(category.suffix))?.key;
+                if (!key) return;
+                const safeTitle = cat.title.replace(/'/g, "");
+                const raceId = `race-${mode}-${key}`;
+                const card = document.createElement("article");
+                card.className = "award-slide category-card race-card glass-panel group shadow-lg";
+                card.dataset.awardSlide = "";
                 card.dataset.awardTitle = cat.title;
+                card.dataset.awardKey = key;
                 card.innerHTML = `
-                    <div class="absolute inset-0 bg-[#0a0a0a] z-30 flex flex-col items-center justify-center cursor-pointer transition-all duration-700 hover:bg-[#111]"
-                         onclick="revealCategory(this, '${cat.title.replace(/'/g, '')}')">
-                        <div class="w-14 h-14 bg-yellow-500/10 rounded-full flex items-center justify-center mb-4 border border-yellow-500/30 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(234,179,8,0.2)]">
-                            <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    <div class="absolute inset-0 bg-[#070707] z-30 flex flex-col items-center justify-center cursor-pointer transition-all duration-700 hover:bg-[#111]"
+                         onclick="revealRace(this, '${mode}', '${key}', '${safeTitle}', '${raceId}')">
+                        <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
+                            <span class="text-4xl font-black text-black">TOP 5</span>
                         </div>
-                        <span class="text-yellow-500 font-bold tracking-widest uppercase text-sm text-center px-3">TAP TO REVEAL</span>
-                        <span class="text-gray-500 text-xs mt-2 text-center px-4">${cat.title}</span>
-                        <span class="text-gray-600 text-[10px] mt-1 text-center px-4">${cat.subtitle || ''}</span>
+                        <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">START THE RACE</h2>
+                        <p class="text-gray-400 tracking-widest text-sm uppercase text-center">${cat.title}</p>
                     </div>
-
-                    <div id="slider-${cat.id}" class="flex w-full h-full overflow-x-auto snap-x snap-mandatory hide-scrollbar scroll-smooth">
-                        <div class="snap-center shrink-0 w-full h-full flex flex-col items-center justify-center p-6 relative">
-                            <h4 class="text-sm md:text-lg font-black text-yellow-500 tracking-widest uppercase mb-1 text-center">${cat.title}</h4>
-                            <p class="text-xs md:text-sm text-gray-500 mb-5 text-center">${cat.subtitle || ''}</p>
-                            <div class="w-28 h-28 md:w-40 md:h-40 rounded-full overflow-hidden border-2 border-yellow-500 mb-5 bg-black shadow-[0_0_30px_rgba(234,179,8,0.35)] shrink-0">
-                                <img src="${personImageUrl(champ.photoKey || champ.name)}" class="w-full h-full object-cover" alt="" onerror="safeImageOnError(this, '${champ.name.replace(/'/g, '')}')">
-                            </div>
-                            <p class="text-xl md:text-3xl text-white font-bold text-center w-full truncate px-4">${champ.name}</p>
-                            <p class="text-4xl md:text-6xl font-black gold-text mt-3">${champ.value} <span class="text-sm font-normal text-gray-400">${cat.unit}</span></p>
-                            <button onclick="const slider=document.getElementById('slider-${cat.id}'); slider.scrollBy({left: slider.clientWidth, behavior: 'smooth'})"
-                                    class="absolute bottom-4 right-4 text-xs md:text-sm font-bold text-yellow-500 flex items-center gap-1 animate-pulse hover:text-white bg-black/50 px-3 py-2 rounded">
-                                ดู TOP ${cat.top.length}
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                            </button>
+                    <div class="race-header">
+                        <div>
+                            <h3>${cat.title}</h3>
+                            <p>${cat.subtitle || ""} • แข่งขันด้วย % Index เทียบเป้า</p>
                         </div>
-
-                        <div class="snap-center shrink-0 w-full h-full flex flex-col p-5 relative bg-black/40">
-                            <h4 class="text-sm md:text-lg font-black text-yellow-500 tracking-widest uppercase mb-1 text-center">${cat.title}</h4>
-                            <p class="text-xs md:text-sm text-gray-500 mb-3 text-center border-b border-gray-700 pb-2">TOP ${cat.top.length} • ${cat.subtitle || cat.unit}</p>
-                            <ul class="top5-list w-full flex-grow flex flex-col justify-center">
-                                ${listHTML}
-                            </ul>
-                            <button onclick="const slider=document.getElementById('slider-${cat.id}'); slider.scrollBy({left: -slider.clientWidth, behavior: 'smooth'})"
-                                    class="absolute bottom-4 left-4 text-xs md:text-sm font-bold text-gray-400 flex items-center gap-1 hover:text-white transition-colors bg-black/50 px-3 py-2 rounded">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-                                กลับ
-                            </button>
-                        </div>
+                        <span id="race-date-${mode}-${key}" class="race-date">พร้อมเริ่ม</span>
+                    </div>
+                    <div id="${raceId}" class="race-track"></div>
+                    <div class="race-footer">
+                        <span>TOP 5 • ข้อมูลย้อนหลังจริง • แซงตามลำดับคะแนน</span>
+                        <button class="race-replay" type="button" onclick="startRace('${mode}', '${key}', '${raceId}')">↻ แข่งใหม่</button>
                     </div>
                 `;
                 container.appendChild(card);
