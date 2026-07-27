@@ -1369,7 +1369,7 @@
             { key: "dc1", suffix: "cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน" },
             { key: "dc2", suffix: "cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน" },
             { key: "dc3", suffix: "cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน" },
-            { key: "cd13", suffix: "cd123", title: "Top CD1-3", subtitle: "ร้าน", unit: "ร้าน" }
+            { key: "cd13", suffix: "cd123", title: "Top CD1+CD3", subtitle: "CD1 + CD3 (ไม่รวม CD2)", unit: "ร้าน" }
         ];
 
         function numberValue(value) {
@@ -1377,7 +1377,34 @@
             return Number.isFinite(number) ? number : 0;
         }
 
+        function combinedCd13Metric(row) {
+            const direct = row?.cd13 || {};
+            const directTarget = numberValue(direct.target);
+            const directActual = numberValue(direct.actual);
+            const directIndex = numberValue(direct.index);
+
+            if (directTarget > 0 || directActual > 0 || directIndex > 0) {
+                return {
+                    target: directTarget,
+                    actual: directActual,
+                    index: directIndex > 0
+                        ? directIndex
+                        : (directTarget > 0 ? (directActual / directTarget) * 100 : 0)
+                };
+            }
+
+            const metrics = ["dc1", "dc3"].map(metricKey => row?.[metricKey] || {});
+            const target = metrics.reduce((sum, metric) => sum + numberValue(metric.target), 0);
+            const actual = metrics.reduce((sum, metric) => sum + numberValue(metric.actual), 0);
+            return {
+                target,
+                actual,
+                index: target > 0 ? (actual / target) * 100 : 0
+            };
+        }
+
         function metricActual(row, key) {
+            if (key === "cd13") return combinedCd13Metric(row).actual;
             return numberValue(row?.[key]?.actual);
         }
 
@@ -1388,12 +1415,7 @@
                 return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
             }
 
-            if (key === "cd13" && !row?.cd13) {
-                const metrics = ["dc1", "dc2", "dc3"].map(metricKey => row?.[metricKey] || {});
-                const target = metrics.reduce((sum, metric) => sum + numberValue(metric.target), 0);
-                const actual = metrics.reduce((sum, metric) => sum + numberValue(metric.actual), 0);
-                return target > 0 ? (actual / target) * 100 : 0;
-            }
+            if (key === "cd13") return combinedCd13Metric(row).index;
 
             const metric = row?.[key] || {};
             const directIndex = numberValue(metric.index);
@@ -1796,9 +1818,6 @@
 
         function raceActualValue(row, key) {
             if (key === "overall") return metricPercent(row, key);
-            if (key === "cd13" && !row?.cd13) {
-                return ["dc1", "dc2", "dc3"].reduce((sum, metricKey) => sum + metricActual(row, metricKey), 0);
-            }
             return metricActual(row, key);
         }
 
