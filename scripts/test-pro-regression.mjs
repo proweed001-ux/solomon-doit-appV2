@@ -72,6 +72,10 @@ const fixture = JSON.parse(
 );
 const appSource = fs.readFileSync("dist/assets/pro/app.js", "utf8");
 const coreSource = fs.readFileSync("dist/assets/pro/core.js", "utf8");
+const sendStoreSource = fs.readFileSync(
+  "dist/assets/pro/send-store.js",
+  "utf8",
+);
 const realBillSource = fs.readFileSync(
   "dist/assets/pro/real-bills.js",
   "utf8",
@@ -1560,6 +1564,31 @@ assert.doesNotMatch(
   coreSource,
   /setTimeout\(/,
   "Real Bill performance must not be hidden behind setTimeout",
+);
+assert.doesNotMatch(
+  sendStoreSource,
+  /setTimeout\(/,
+  "Quantity commit and navigation must not depend on setTimeout",
+);
+assert.match(
+  sendStoreSource,
+  /export function commitPendingQuantityEdit/,
+  "State-changing commands must be able to flush the active quantity edit",
+);
+assert.match(
+  sendStoreSource,
+  /input\.onblur\s*=/,
+  "Blur must explicitly finish the quantity edit session",
+);
+assert.match(
+  coreSource,
+  /onEditStart:\s*\(\)\s*=>\s*push\(\)/,
+  "A quantity edit must snapshot history before its first state mutation",
+);
+assert.match(
+  coreSource,
+  /onInput:[\s\S]*state\[input\.dataset\.map\]\[input\.dataset\.k\]\s*=\s*N\(input\.value\)/,
+  "Input must update the authoritative quantity state",
 );
 const billLineSource =
   realBillSource.match(/function billLine[\s\S]*?\n\}/)?.[0] || "";

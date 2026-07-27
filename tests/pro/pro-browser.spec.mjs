@@ -113,6 +113,73 @@ async function chooseOnly(page, kind, label) {
   await expect(page.locator(`[data-pick="${kind}"]`)).toContainText(visibleLabel);
 }
 
+async function quantitySnapshot(page, map, index = 0) {
+  return page.evaluate(
+    async ({ mapName, inputIndex }) => {
+      const stateModule = await import("/assets/pro/state.js");
+      const inputs = [
+        ...document.querySelectorAll(
+          `#table input.jdata[data-map="${mapName}"]`,
+        ),
+      ];
+      const input = inputs[inputIndex] || null;
+      const key = input?.dataset.k || "";
+      const stored = JSON.parse(
+        localStorage.getItem(stateModule.sk()) || "{}",
+      );
+      const sendInputs = [
+        ...document.querySelectorAll(
+          '#table input.jdata[data-map="send"]',
+        ),
+      ];
+      return {
+        dom: input?.value ?? null,
+        key,
+        stateValue: key ? stateModule.state[mapName][key] ?? null : null,
+        storedValue: key ? stored[mapName]?.[key] ?? null : null,
+        receivers: [...stateModule.state.sel.receivers],
+        storedReceivers: [...(stored.sel?.receivers || [])],
+        history: stateModule.state.hist.length,
+        redo: stateModule.state.redoStack.length,
+        pending: window.DOIT_CORE_APP.health().pendingQuantityEdit,
+        activeSendIndex: sendInputs.indexOf(document.activeElement),
+        remaining: input
+          ?.closest("tr")
+          ?.querySelector(".remainCell")?.textContent,
+        doneAmount: document.querySelector("#doneAmount")?.textContent,
+        mode: stateModule.state.mode,
+        page: stateModule.state.page,
+        storageKey: stateModule.sk(),
+      };
+    },
+    { mapName: map, inputIndex: index },
+  );
+}
+
+async function quantityByKey(page, map, key) {
+  return page.evaluate(
+    async ({ mapName, stateKey }) => {
+      const stateModule = await import("/assets/pro/state.js");
+      const stored = JSON.parse(
+        localStorage.getItem(stateModule.sk()) || "{}",
+      );
+      return {
+        stateValue: stateModule.state[mapName][stateKey] ?? null,
+        storedValue: stored[mapName]?.[stateKey] ?? null,
+        receivers: [...stateModule.state.sel.receivers],
+        storedReceivers: [...(stored.sel?.receivers || [])],
+        history: stateModule.state.hist.length,
+        redo: stateModule.state.redoStack.length,
+        pending: window.DOIT_CORE_APP.health().pendingQuantityEdit,
+        mode: stateModule.state.mode,
+        page: stateModule.state.page,
+        storageKey: stateModule.sk(),
+      };
+    },
+    { mapName: map, stateKey: key },
+  );
+}
+
 async function settleAnimationFrames(page) {
   await page.evaluate(
     () =>
@@ -228,6 +295,312 @@ test("uploads real XLSX and XLSM fixtures through the file input", async ({
   expect(runtime.requests.some((url) => /cdn\.jsdelivr|unpkg\.com/i.test(url))).toBe(
     false,
   );
+  expect(runtime.errors).toEqual([]);
+});
+
+test("commits send, add and pull as one authoritative edit session", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+  await chooseOnly(page, "receivers", fixtureMeta.receiver);
+
+  const sendInputs = page.locator(
+    '#table input.jdata[data-map="send"]',
+  );
+  expect(await sendInputs.count()).toBe(fixtureMeta.normalRows);
+  const firstSend = sendInputs.nth(0);
+  const baseline = await quantitySnapshot(page, "send", 0);
+
+  await firstSend.focus();
+  await firstSend.fill("1");
+  const afterInput = await quantitySnapshot(page, "send", 0);
+  expect(afterInput.dom).toBe("1");
+  expect(afterInput.stateValue).toBe(1);
+  expect(afterInput.storedValue).toBeNull();
+  expect(afterInput.history).toBe(baseline.history + 1);
+  expect(afterInput.pending).toBe(true);
+  expect(afterInput.remaining).toBe("9");
+
+  await firstSend.press("Enter");
+  const afterEnter = await quantitySnapshot(page, "send", 0);
+  expect(afterEnter.dom).toBe("1");
+  expect(afterEnter.stateValue).toBe(1);
+  expect(afterEnter.storedValue).toBe(1);
+  expect(afterEnter.history).toBe(afterInput.history);
+  expect(afterEnter.pending).toBe(false);
+  expect(afterEnter.doneAmount).toBe("1");
+  expect(afterEnter.activeSendIndex).toBe(1);
+
+  await page.locator("#undo").click();
+  const afterUndo = await quantitySnapshot(page, "send", 0);
+  expect(afterUndo.dom).toBe("");
+  expect(afterUndo.stateValue).toBeNull();
+  expect(afterUndo.receivers).toEqual([fixtureMeta.receiver]);
+  expect(afterUndo.history).toBe(baseline.history);
+  expect(afterUndo.redo).toBe(1);
+  expect(afterUndo.doneAmount).toBe("0");
+
+  await page.locator("#redo").click();
+  const afterRedo = await quantitySnapshot(page, "send", 0);
+  expect(afterRedo.dom).toBe("1");
+  expect(afterRedo.stateValue).toBe(1);
+  expect(afterRedo.receivers).toEqual([fixtureMeta.receiver]);
+  expect(afterRedo.history).toBe(afterInput.history);
+  expect(afterRedo.redo).toBe(0);
+
+  const beforeMultiDigit = await quantitySnapshot(page, "send", 0);
+  await firstSend.focus();
+  await firstSend.fill("1");
+  await firstSend.type("2");
+  const duringMultiDigit = await quantitySnapshot(page, "send", 0);
+  expect(duringMultiDigit.dom).toBe("12");
+  expect(duringMultiDigit.stateValue).toBe(12);
+  expect(duringMultiDigit.history).toBe(beforeMultiDigit.history + 1);
+  await firstSend.press("Tab");
+  const afterMultiDigit = await quantitySnapshot(page, "send", 0);
+  expect(afterMultiDigit.storedValue).toBe(12);
+  expect(afterMultiDigit.history).toBe(duringMultiDigit.history);
+  expect(afterMultiDigit.activeSendIndex).toBe(1);
+
+  const secondSend = sendInputs.nth(1);
+  const beforeDuplicateEvents = await quantitySnapshot(page, "send", 1);
+  await secondSend.focus();
+  await secondSend.fill("3");
+  const duringDuplicateEvents = await quantitySnapshot(page, "send", 1);
+  expect(duringDuplicateEvents.history).toBe(
+    beforeDuplicateEvents.history + 1,
+  );
+  await secondSend.evaluate((input) => {
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    input.dispatchEvent(new FocusEvent("blur"));
+  });
+  const afterDuplicateEvents = await quantitySnapshot(page, "send", 1);
+  expect(afterDuplicateEvents.stateValue).toBe(3);
+  expect(afterDuplicateEvents.storedValue).toBe(3);
+  expect(afterDuplicateEvents.history).toBe(duringDuplicateEvents.history);
+  expect(afterDuplicateEvents.pending).toBe(false);
+
+  const thirdSend = sendInputs.nth(2);
+  const beforeOutsideClick = await quantitySnapshot(page, "send", 2);
+  await thirdSend.focus();
+  await thirdSend.fill("4");
+  await page.locator("#modeHeading").click();
+  const afterOutsideClick = await quantitySnapshot(page, "send", 2);
+  expect(afterOutsideClick.stateValue).toBe(4);
+  expect(afterOutsideClick.storedValue).toBe(4);
+  expect(afterOutsideClick.history).toBe(beforeOutsideClick.history + 1);
+  expect(afterOutsideClick.pending).toBe(false);
+
+  const fourthSend = sendInputs.nth(3);
+  const beforeBlur = await quantitySnapshot(page, "send", 3);
+  await fourthSend.focus();
+  await fourthSend.fill("5");
+  await fourthSend.evaluate((input) => {
+    input.dispatchEvent(new FocusEvent("blur"));
+  });
+  const afterBlur = await quantitySnapshot(page, "send", 3);
+  expect(afterBlur.stateValue).toBe(5);
+  expect(afterBlur.storedValue).toBe(5);
+  expect(afterBlur.history).toBe(beforeBlur.history + 1);
+  expect(afterBlur.pending).toBe(false);
+
+  const addInputs = page.locator('#table input.jdata[data-map="add"]');
+  const pullInputs = page.locator('#table input.jdata[data-map="pull"]');
+  expect(await addInputs.count()).toBe(fixtureMeta.normalRows);
+  expect(await pullInputs.count()).toBe(fixtureMeta.normalRows);
+  await addInputs.nth(0).focus();
+  await addInputs.nth(0).fill("2");
+  await addInputs.nth(0).press("Tab");
+  const afterAdd = await quantitySnapshot(page, "add", 0);
+  expect(afterAdd.dom).toBe("2");
+  expect(afterAdd.stateValue).toBe(2);
+  expect(afterAdd.storedValue).toBe(2);
+  expect(afterAdd.remaining).toBe("0");
+
+  await pullInputs.nth(0).focus();
+  await pullInputs.nth(0).fill("1");
+  await pullInputs.nth(0).press("Tab");
+  const afterPull = await quantitySnapshot(page, "pull", 0);
+  expect(afterPull.dom).toBe("1");
+  expect(afterPull.stateValue).toBe(1);
+  expect(afterPull.storedValue).toBe(1);
+  expect(afterPull.remaining).toBe("-1");
+
+  const beforeClear = await quantitySnapshot(page, "send", 0);
+  await firstSend.focus();
+  await firstSend.fill("");
+  await firstSend.press("Tab");
+  const afterClear = await quantitySnapshot(page, "send", 0);
+  expect(afterClear.dom).toBe("");
+  expect(afterClear.stateValue).toBe(0);
+  expect(afterClear.storedValue).toBe(0);
+  expect(afterClear.history).toBe(beforeClear.history + 1);
+  await page.locator("#undo").click();
+  await expect(firstSend).toHaveValue("12");
+  await page.locator("#redo").click();
+  await expect(firstSend).toHaveValue("");
+  await expect(page.locator('[data-pick="receivers"]')).toContainText(
+    fixtureMeta.receiver,
+  );
+
+  expect(runtime.errors).toEqual([]);
+});
+
+test("flushes a focused quantity before autosave and state-changing commands", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+  await chooseOnly(page, "receivers", fixtureMeta.receiver);
+
+  const sendInputs = page.locator(
+    '#table input.jdata[data-map="send"]',
+  );
+  expect(await sendInputs.count()).toBe(fixtureMeta.normalRows);
+  const firstSend = sendInputs.nth(0);
+  await firstSend.focus();
+  await firstSend.fill("1");
+  const focused = await quantitySnapshot(page, "send", 0);
+  expect(focused.stateValue).toBe(1);
+  expect(focused.storedValue).toBeNull();
+  expect(focused.pending).toBe(true);
+
+  await page.evaluate(() => document.querySelector("#autosaveBtn").click());
+  const afterAutosave = await quantitySnapshot(page, "send", 0);
+  expect(afterAutosave.stateValue).toBe(1);
+  expect(afterAutosave.storedValue).toBe(1);
+  expect(afterAutosave.receivers).toEqual([fixtureMeta.receiver]);
+  expect(afterAutosave.storedReceivers).toEqual([fixtureMeta.receiver]);
+  expect(afterAutosave.pending).toBe(false);
+  expect(afterAutosave.history).toBe(focused.history);
+
+  await page.evaluate(() => document.querySelector("#undo").click());
+  const afterUndo = await quantitySnapshot(page, "send", 0);
+  expect(afterUndo.dom).toBe("");
+  expect(afterUndo.stateValue).toBeNull();
+  expect(afterUndo.receivers).toEqual([fixtureMeta.receiver]);
+  expect(afterUndo.redo).toBe(1);
+
+  await page.evaluate(() => document.querySelector("#redo").click());
+  const afterRedo = await quantitySnapshot(page, "send", 0);
+  expect(afterRedo.dom).toBe("1");
+  expect(afterRedo.stateValue).toBe(1);
+  expect(afterRedo.receivers).toEqual([fixtureMeta.receiver]);
+  expect(afterRedo.redo).toBe(0);
+
+  await page.reload();
+  await expect(page.locator("#devTeamModal")).toHaveClass(/on/);
+  await page.locator("#devTeamModal .devClose").click();
+  await uploadFixture(page, fixtureFiles.xlsx);
+  const afterReload = await quantitySnapshot(page, "send", 0);
+  expect(afterReload.dom).toBe("1");
+  expect(afterReload.stateValue).toBe(1);
+  expect(afterReload.storedValue).toBe(1);
+  expect(afterReload.receivers).toEqual([fixtureMeta.receiver]);
+  expect(afterReload.storageKey).toBe(
+    "doit-core-unified-v1:pro-browser-fixture.xlsx",
+  );
+
+  const secondSend = sendInputs.nth(1);
+  await secondSend.focus();
+  await secondSend.fill("2");
+  const beforeMode = await quantitySnapshot(page, "send", 1);
+  await page.evaluate(() => {
+    const tab = [...document.querySelectorAll(".tab")].find(
+      (button) => button.textContent.trim() === "กระจายสินค้า",
+    );
+    tab.click();
+  });
+  const inMode = await quantityByKey(page, "send", beforeMode.key);
+  expect(inMode.stateValue).toBe(2);
+  expect(inMode.storedValue).toBe(2);
+  expect(inMode.pending).toBe(false);
+  expect(inMode.mode).toBe("dist");
+  await page.evaluate(() => {
+    const tab = [...document.querySelectorAll(".tab")].find(
+      (button) => button.textContent.trim() === "ถอดของ Pro",
+    );
+    tab.click();
+  });
+  await expect(secondSend).toHaveValue("2");
+
+  await page.evaluate(async () => {
+    const stateModule = await import("/assets/pro/state.js");
+    stateModule.state.pageSize = 1;
+    document.querySelector("#searchBtn").click();
+  });
+  const beforePage = await quantitySnapshot(page, "send", 0);
+  await firstSend.focus();
+  await firstSend.fill("5");
+  await page.evaluate(() =>
+    document.querySelector('[data-p="2"]').click(),
+  );
+  const pageTwo = await quantityByKey(page, "send", beforePage.key);
+  expect(pageTwo.stateValue).toBe(5);
+  expect(pageTwo.storedValue).toBe(5);
+  expect(pageTwo.pending).toBe(false);
+  expect(pageTwo.page).toBe(2);
+  await page.evaluate(() =>
+    document.querySelector('[data-p="1"]').click(),
+  );
+  await expect(firstSend).toHaveValue("5");
+
+  await firstSend.focus();
+  await firstSend.fill("6");
+  const beforeFilter = await quantitySnapshot(page, "send", 0);
+  await page.evaluate(() =>
+    document.querySelector('[data-pick="brands"]').click(),
+  );
+  const afterFilter = await quantityByKey(page, "send", beforeFilter.key);
+  expect(afterFilter.stateValue).toBe(6);
+  expect(afterFilter.storedValue).toBe(6);
+  expect(afterFilter.pending).toBe(false);
+  await expect(page.locator("#pickShade")).toHaveClass(/on/);
+  await page.locator("#pickClose").click();
+
+  await firstSend.fill("7");
+  const beforeSearch = await quantitySnapshot(page, "send", 0);
+  await page.evaluate(() => {
+    document.querySelector("#q").value = "SKU-001";
+    document.querySelector("#searchBtn").click();
+  });
+  const afterSearch = await quantityByKey(page, "send", beforeSearch.key);
+  expect(afterSearch.stateValue).toBe(7);
+  expect(afterSearch.storedValue).toBe(7);
+  expect(afterSearch.pending).toBe(false);
+  await expect(firstSend).toHaveValue("7");
+  await expect(page.locator("#table")).toContainText("สินค้า Fixture 001");
+
+  expect(runtime.errors).toEqual([]);
+});
+
+test("keeps the browser history at 80 entries and 2 MiB", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+  const stats = await page.evaluate(async () => {
+    const stateModule = await import("/assets/pro/state.js");
+    stateModule.state.hist = [];
+    stateModule.state.redoStack = [];
+    stateModule.state.sel.billStores = Array.from(
+      { length: 7106 },
+      (_, index) => `ร้าน ${index}`,
+    );
+    for (let index = 0; index < 100; index += 1) {
+      stateModule.state.q = `history-${index}`;
+      stateModule.push();
+    }
+    for (let index = 0; index < 20; index += 1) {
+      stateModule.state.q = `${index}:${"x".repeat(300_000)}`;
+      stateModule.push();
+    }
+    return stateModule.historyStats();
+  });
+  expect(stats.historyEntries).toBeLessThanOrEqual(80);
+  expect(stats.totalBytes).toBeLessThanOrEqual(2 * 1024 * 1024);
+  expect(stats.historyEntries).toBeGreaterThan(0);
   expect(runtime.errors).toEqual([]);
 });
 

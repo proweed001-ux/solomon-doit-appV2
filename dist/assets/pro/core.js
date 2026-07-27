@@ -1,4 +1,8 @@
-import { bindQuantityInputs } from "./send-store.js";
+import {
+  bindQuantityInputs,
+  commitPendingQuantityEdit,
+  pendingQuantityEdit,
+} from "./send-store.js";
 import { renderOrderMode } from "./order.js";
 import { renderDoneMode } from "./done.js";
 import {
@@ -199,6 +203,7 @@ import { preparePrint } from "./print.js";
     return keepSelectedPickerOptions(kind, pickerItems);
   }
   function undo() {
+    commitPendingQuantityEdit({ render: false, reason: "undo" });
     if (!state.hist.length) return msg("ไม่มีรายการ Undo");
     closePick();
     state.redoStack.push(snap());
@@ -210,6 +215,7 @@ import { preparePrint } from "./print.js";
     msg("Undo แล้ว");
   }
   function redo() {
+    commitPendingQuantityEdit({ render: false, reason: "redo" });
     if (!state.redoStack.length) return msg("ไม่มีรายการ Redo");
     closePick();
     state.hist.push(snap());
@@ -258,6 +264,7 @@ import { preparePrint } from "./print.js";
     if (heading) heading.textContent = modeName();
   }
   function openPick(requestedKind) {
+    commitPendingQuantityEdit({ render: false, reason: "open-picker" });
     const k = activePickerKind(requestedKind);
     state.pickKind = k;
     state.tmp = [...(state.sel[k] || [])];
@@ -533,6 +540,10 @@ import { preparePrint } from "./print.js";
   }
   function removeInsert(id) {
     if (!id) return;
+    commitPendingQuantityEdit({
+      render: false,
+      reason: "remove-insert",
+    });
     push();
     state.ins = state.ins.filter((x) => T(x.id) !== T(id));
     [state.send, state.add, state.pull].forEach((o) =>
@@ -727,11 +738,15 @@ import { preparePrint } from "./print.js";
       $("#table").innerHTML = pickTable(pool);
       bindQuantityInputs({
         inputs: $$(".jdata"),
-        onInput: (input) => recalcPickRow(input.closest("tr")),
-        onCommit: (input) => {
-          push();
+        onEditStart: () => push(),
+        onInput: (input) => {
+          state[input.dataset.map][input.dataset.k] = N(input.value);
+          recalcPickRow(input.closest("tr"));
+        },
+        onCommit: (input, { render: shouldRender = true } = {}) => {
           state[input.dataset.map][input.dataset.k] = N(input.value);
           save();
+          if (!shouldRender) return;
           render();
         },
       });
@@ -894,6 +909,10 @@ import { preparePrint } from "./print.js";
     $$("[data-p]").forEach(
       (b) =>
         (b.onclick = () => {
+          commitPendingQuantityEdit({
+            render: false,
+            reason: "pagination",
+          });
           state.page = N(b.dataset.p) || 1;
           render();
         }),
@@ -1076,6 +1095,7 @@ import { preparePrint } from "./print.js";
     });
   }
   function addInsert() {
+    commitPendingQuantityEdit({ render: false, reason: "add-insert" });
     push();
     const name = T(prompt("ชื่อสินค้าที่ต้องการแทรก"));
     if (!name) return;
@@ -1151,6 +1171,7 @@ import { preparePrint } from "./print.js";
   }
   function resetDone() {
     if (!confirm("รีเซ็ตจำนวนที่คีย์เองทั้งหมด?")) return;
+    commitPendingQuantityEdit({ render: false, reason: "reset" });
     push();
     state.send = {};
     state.add = {};
@@ -1160,6 +1181,7 @@ import { preparePrint } from "./print.js";
     msg("รีเซ็ตแล้ว");
   }
   function autosave() {
+    commitPendingQuantityEdit({ render: false, reason: "autosave" });
     save();
     msg("บันทึกแล้ว " + new Date().toLocaleTimeString("th-TH"));
   }
@@ -1185,6 +1207,10 @@ import { preparePrint } from "./print.js";
       if (b && !b.dataset.bound) {
         b.dataset.bound = "1";
         b.onclick = () => {
+          commitPendingQuantityEdit({
+            render: false,
+            reason: "remain-mode",
+          });
           push();
           state.mode = "remain";
           state.page = 1;
@@ -1229,6 +1255,7 @@ import { preparePrint } from "./print.js";
     $("#cloudCheckBtn").onclick = check;
     $("#cloudLoadBtn").onclick = loadCloud;
     $("#searchBtn").onclick = () => {
+      commitPendingQuantityEdit({ render: false, reason: "search" });
       closePick();
       push();
       state.q = $("#q").value;
@@ -1238,6 +1265,10 @@ import { preparePrint } from "./print.js";
       render();
     };
     $("#clearFilter").onclick = () => {
+      commitPendingQuantityEdit({
+        render: false,
+        reason: "clear-filter",
+      });
       closePick();
       push();
       state.sel = createSelection();
@@ -1256,6 +1287,10 @@ import { preparePrint } from "./print.js";
     $("#pickClear").onclick = clearPick;
     $("#pickAll").onclick = allPick;
     $("#teleBtn").onclick = () => {
+      commitPendingQuantityEdit({
+        render: false,
+        reason: "telesale-drawer",
+      });
       $("#drawerShade").classList.add("on");
       $("#teleDrawer").classList.add("on");
       renderTele();
@@ -1266,6 +1301,7 @@ import { preparePrint } from "./print.js";
     };
     $("#insertBtn").onclick = addInsert;
     $("#prepPrint").onclick = () => {
+      commitPendingQuantityEdit({ render: false, reason: "print" });
       const realBillResult =
         state.mode === "ship" ? currentRealBillResult() : null;
       preparePrint({
@@ -1283,12 +1319,20 @@ import { preparePrint } from "./print.js";
     const sd = $("#showDetailBtn");
     if (sd)
       sd.onclick = () => {
+        commitPendingQuantityEdit({
+          render: false,
+          reason: "show-details",
+        });
         push();
         state.showDetails = !state.showDetails;
         render();
         msg(state.showDetails ? "แสดงรายละเอียดแล้ว" : "ซ่อนรายละเอียดแล้ว");
       };
     $("#displayBtn").onclick = () => {
+      commitPendingQuantityEdit({
+        render: false,
+        reason: "page-size",
+      });
       push();
       state.pageSize =
         Number(prompt("จำนวนแถวต่อหน้า", state.pageSize)) || state.pageSize;
@@ -1302,6 +1346,10 @@ import { preparePrint } from "./print.js";
       (t, i) =>
         (t.onclick = () => {
           const startedAt = performance.now();
+          commitPendingQuantityEdit({
+            render: false,
+            reason: "mode",
+          });
           closePick();
           push();
           state.mode =
@@ -1347,6 +1395,7 @@ import { preparePrint } from "./print.js";
         pageSize: REAL_BILL_PAGE_SIZE,
       },
       history: historyStats(),
+      pendingQuantityEdit: pendingQuantityEdit(),
       manualKeys: Object.keys(state.send).length,
       inserted: state.ins.length,
       mode: state.mode,

@@ -1,7 +1,15 @@
 const SEND_SELECTOR = '#table input.jdata[data-map="send"]';
+const QUANTITY_SELECTOR = "#table input.jdata[data-map]";
+let editSession = null;
 
 function sendInputs() {
   return [...document.querySelectorAll(SEND_SELECTOR)].filter(
+    (input) => !input.disabled,
+  );
+}
+
+function quantityInputs() {
+  return [...document.querySelectorAll(QUANTITY_SELECTOR)].filter(
     (input) => !input.disabled,
   );
 }
@@ -13,44 +21,109 @@ function refreshSendInputs() {
   });
 }
 
-function nextIndexFor(input) {
-  const inputs = sendInputs();
-  return Math.max(0, inputs.indexOf(input)) + 1;
+function inputTarget(input) {
+  return {
+    map: input.dataset.map || "",
+    key: input.dataset.k || "",
+  };
 }
 
-function focusSendAt(index) {
-  setTimeout(() => {
-    requestAnimationFrame(() => {
-      refreshSendInputs();
-      const inputs = sendInputs();
-      const next = inputs[index] || inputs[inputs.length - 1] || inputs[0];
-      if (!next) return;
-      next.focus({ preventScroll: true });
-      next.scrollIntoView({ block: "center", inline: "nearest" });
-      try {
-        next.select();
-      } catch {}
-    });
-  }, 140);
+function sameTarget(input, target) {
+  return (
+    input.dataset.map === target?.map && input.dataset.k === target?.key
+  );
 }
 
-export function bindQuantityInputs({ inputs, onInput, onCommit }) {
+function nextTargetFor(input, backwards = false) {
+  const inputs = input.matches(SEND_SELECTOR) ? sendInputs() : quantityInputs();
+  const index = Math.max(0, inputs.indexOf(input));
+  const nextIndex = Math.min(
+    inputs.length - 1,
+    Math.max(0, index + (backwards ? -1 : 1)),
+  );
+  return inputTarget(inputs[nextIndex] || input);
+}
+
+function focusTarget(target) {
+  refreshSendInputs();
+  const next = quantityInputs().find((input) => sameTarget(input, target));
+  if (!next) return;
+  next.focus({ preventScroll: true });
+  next.scrollIntoView({ block: "center", inline: "nearest" });
+  try {
+    next.select();
+  } catch {}
+}
+
+function beginEdit(input, callbacks) {
+  if (editSession?.input === input) return editSession;
+  if (editSession) commitPendingQuantityEdit({ render: false });
+  editSession = {
+    input,
+    callbacks,
+    beforeValue: input.value,
+    changed: false,
+  };
+  return editSession;
+}
+
+function updateEdit(input, callbacks) {
+  const session = beginEdit(input, callbacks);
+  if (!session.changed && input.value !== session.beforeValue) {
+    session.callbacks.onEditStart(input);
+    session.changed = true;
+  }
+  session.callbacks.onInput(input);
+}
+
+function finishEdit(input, options = {}) {
+  const session = editSession;
+  if (!session || session.input !== input) return false;
+  editSession = null;
+  if (!session.changed) return false;
+  session.callbacks.onCommit(input, options);
+  return true;
+}
+
+export function commitPendingQuantityEdit(options = {}) {
+  if (!editSession) return false;
+  return finishEdit(editSession.input, options);
+}
+
+export function pendingQuantityEdit() {
+  return Boolean(editSession?.changed);
+}
+
+export function bindQuantityInputs({
+  inputs,
+  onEditStart,
+  onInput,
+  onCommit,
+}) {
   refreshSendInputs();
   inputs.forEach((input) => {
-    input.oninput = () => onInput(input);
-    input.onchange = () => {
-      const isSend = input.matches(SEND_SELECTOR);
-      const nextIndex = isSend ? nextIndexFor(input) : -1;
-      onCommit(input);
-      if (isSend) focusSendAt(nextIndex);
+    const callbacks = { onEditStart, onInput, onCommit };
+    input.onfocus = () => {
+      beginEdit(input, callbacks);
+      if (input.matches(SEND_SELECTOR)) refreshSendInputs();
     };
-    if (!input.matches(SEND_SELECTOR)) return;
-    input.onfocus = refreshSendInputs;
+    input.oninput = () => updateEdit(input, callbacks);
+    input.onchange = () => {
+      finishEdit(input, { reason: "change", render: true });
+    };
+    input.onblur = () => {
+      finishEdit(input, { reason: "blur", render: true });
+    };
     input.onkeydown = (event) => {
-      if (event.key !== "Enter") return;
+      if (event.key !== "Enter" && event.key !== "Tab") return;
+      const moveTarget = nextTargetFor(input, event.shiftKey);
       event.preventDefault();
       event.stopPropagation();
-      input.blur();
+      const committed = finishEdit(input, {
+        reason: event.key.toLowerCase(),
+        render: true,
+      });
+      if (committed || input.matches(SEND_SELECTOR)) focusTarget(moveTarget);
     };
   });
 }
