@@ -1165,8 +1165,12 @@
                 parts.rank.textContent = String(rank);
                 parts.name.textContent = person.name;
                 const image = parts.image;
-                image.src = personImageUrl(person.photoKey || person.name);
-                image.onerror = () => safeImageOnError(image, person.name);
+                const profileSignature = person.photoKey || person.name;
+                if (row._raceProfileSignature !== profileSignature) {
+                    row._raceProfileSignature = profileSignature;
+                    image.src = personImageUrl(profileSignature);
+                    image.onerror = () => safeImageOnError(image, person.name);
+                }
                 parts.bar.style.height = person.value > 0
                     ? `${Math.max((person.value / maximum) * 100, 1.5)}%`
                     : "0%";
