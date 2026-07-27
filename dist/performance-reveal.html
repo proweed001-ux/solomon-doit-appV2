@@ -1085,6 +1085,104 @@
             margin-top: 0;
         }
 
+        .presentation-arrows {
+            display: none;
+        }
+        .presentation-arrow {
+            position: fixed;
+            top: 50%;
+            z-index: 110;
+            width: clamp(42px, 6vmin, 64px);
+            height: clamp(64px, 14vmin, 110px);
+            padding: 0;
+            border: 1px solid rgba(250,204,21,0.28);
+            border-radius: 14px;
+            background: rgba(0,0,0,0.22);
+            color: rgba(255,255,255,0.86);
+            font-size: clamp(2rem, 6vmin, 4rem);
+            line-height: 1;
+            transform: translateY(-50%);
+            backdrop-filter: blur(5px);
+            opacity: 0.7;
+            transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
+        }
+        .presentation-arrow:hover,
+        .presentation-arrow:focus-visible {
+            opacity: 1;
+            color: #facc15;
+            background: rgba(0,0,0,0.58);
+        }
+        .presentation-arrow.previous {
+            left: max(6px, env(safe-area-inset-left));
+        }
+        .presentation-arrow.next {
+            right: max(6px, env(safe-area-inset-right));
+        }
+        body.presentation-mode {
+            padding: 0 !important;
+        }
+        body.presentation-mode .mode-tabs,
+        body.presentation-mode .mode-label,
+        body.presentation-mode .award-controls,
+        body.presentation-mode .race-header,
+        body.presentation-mode .race-footer,
+        body.presentation-mode .nav-actions {
+            display: none !important;
+        }
+        body.presentation-mode .page-nav {
+            display: flex;
+            top: max(8px, env(safe-area-inset-top));
+            right: auto;
+            left: max(8px, env(safe-area-inset-left));
+            width: auto;
+            pointer-events: auto;
+        }
+        body.presentation-mode .page-nav > .performance-back-link {
+            display: inline-flex;
+            width: 42px;
+            height: 42px;
+            min-height: 42px;
+            padding: 0;
+            border-radius: 999px;
+            font-size: 0;
+            background: rgba(0,0,0,0.34);
+            backdrop-filter: blur(6px);
+        }
+        body.presentation-mode .page-nav > .performance-back-link::before {
+            content: "←";
+            font-size: 1.25rem;
+        }
+        body.presentation-mode .presentation-arrows {
+            display: block;
+        }
+        body.presentation-mode.winner-overlay-open .page-nav,
+        body.presentation-mode.winner-overlay-open .presentation-arrows {
+            display: none;
+        }
+        body.presentation-mode .award-shell {
+            grid-template-rows: minmax(0, 1fr);
+            gap: 0;
+        }
+        body.presentation-mode .category-card,
+        body.presentation-mode .race-card {
+            border: 0;
+            border-radius: 0;
+        }
+        body.presentation-mode .race-card {
+            padding: clamp(6px, 1.2vmin, 14px);
+            grid-template-rows: minmax(0, 1fr);
+            row-gap: 0;
+        }
+        body.presentation-mode .race-track {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+        }
+        body.presentation-mode .race-cover h2,
+        body.presentation-mode .race-cover p {
+            display: none;
+        }
+
         .page-nav-link {
             min-height: 42px;
             display: inline-flex;
@@ -1110,13 +1208,18 @@
     <div class="bg-rays"></div>
 
     <nav class="page-nav max-w-7xl w-full relative z-20 flex items-center justify-between gap-3 mb-6" aria-label="เมนูนำทาง">
-        <a class="page-nav-link" href="/performance?mode=ds">← Performance</a>
+        <a class="page-nav-link performance-back-link" href="/performance?mode=ds" aria-label="กลับไปหน้า Performance">← Performance</a>
         <div class="nav-actions">
             <button id="fullscreen-toggle" class="page-nav-link fullscreen-toggle" type="button"
                     aria-pressed="false" onclick="toggleFullscreenMode()">⛶ เต็มจอ</button>
             <a class="page-nav-link home-link" href="/">หน้าหลัก</a>
         </div>
     </nav>
+
+    <div class="presentation-arrows" aria-label="เปลี่ยนรางวัล">
+        <button class="presentation-arrow previous" type="button" aria-label="รางวัลก่อนหน้า" onclick="movePresentationAward(-1)">‹</button>
+        <button class="presentation-arrow next" type="button" aria-label="รางวัลถัดไป" onclick="movePresentationAward(1)">›</button>
+    </div>
 
     <div class="app-shell max-w-7xl w-full mx-auto relative z-10 flex flex-col items-center">
         <header class="page-header text-center mb-8 w-full">
@@ -1187,6 +1290,7 @@
         let performanceCacheStats = { remembered: 0, downloaded: 0 };
         const awardIndex = { ps: 0, ads: 0 };
         const raceRuns = new Map();
+        let pseudoFullscreenHistoryPushed = false;
 
         let boardData = {
             ps: {
@@ -1527,8 +1631,12 @@
             const pseudo = document.body.classList.contains("pseudo-fullscreen");
             const fullscreen = activeFullscreenElement();
             if (pseudo) {
-                document.body.classList.remove("pseudo-fullscreen");
-                syncFullscreenMode();
+                if (pseudoFullscreenHistoryPushed) {
+                    history.back();
+                } else {
+                    document.body.classList.remove("pseudo-fullscreen");
+                    syncFullscreenMode();
+                }
                 return;
             }
             if (fullscreen) {
@@ -1550,16 +1658,38 @@
                 }
             }
 
+            history.pushState({ ayaPerformanceFullscreen: true }, "", location.href);
+            pseudoFullscreenHistoryPushed = true;
             document.body.classList.add("pseudo-fullscreen");
             syncFullscreenMode();
         }
 
         document.addEventListener("fullscreenchange", syncFullscreenMode);
         document.addEventListener("webkitfullscreenchange", syncFullscreenMode);
+        window.addEventListener("popstate", () => {
+            if (!document.body.classList.contains("pseudo-fullscreen")) return;
+            pseudoFullscreenHistoryPushed = false;
+            document.body.classList.remove("pseudo-fullscreen");
+            syncFullscreenMode();
+        });
         document.addEventListener("keydown", event => {
             if (event.key === "Escape" && document.body.classList.contains("pseudo-fullscreen")) {
-                document.body.classList.remove("pseudo-fullscreen");
-                syncFullscreenMode();
+                if (pseudoFullscreenHistoryPushed) {
+                    history.back();
+                } else {
+                    document.body.classList.remove("pseudo-fullscreen");
+                    syncFullscreenMode();
+                }
+                return;
+            }
+            if (!document.body.classList.contains("presentation-mode")) return;
+            if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                movePresentationAward(-1);
+            }
+            if (event.key === "ArrowRight") {
+                event.preventDefault();
+                movePresentationAward(1);
             }
         });
 
@@ -1602,6 +1732,16 @@
 
         function moveAward(mode, direction) {
             showAward(mode, awardIndex[mode] + direction, true);
+        }
+
+        function movePresentationAward(direction) {
+            const activeTab = document.querySelector(".tab-content.active");
+            const mode = activeTab?.dataset.mode;
+            if (!mode) return;
+            const slides = getAwardSlides(mode);
+            if (!slides.length) return;
+            const nextIndex = (awardIndex[mode] + direction + slides.length) % slides.length;
+            showAward(mode, nextIndex, false);
         }
 
         function safeImageOnError(img, seed) {
@@ -1775,6 +1915,7 @@
             overlay.classList.remove("is-visible");
             overlay.setAttribute("aria-hidden", "true");
             card.classList.remove("winner-open");
+            document.body.classList.remove("winner-overlay-open");
         }
 
         function showWinnerReveal(card, container) {
@@ -1857,6 +1998,7 @@
             percent.textContent = hidePercent ? "" : formatRacePercent(winner.percent);
 
             card.classList.add("winner-open");
+            document.body.classList.add("winner-overlay-open");
             overlay.setAttribute("aria-hidden", "false");
             overlay.classList.remove("is-visible");
             requestAnimationFrame(() => overlay.classList.add("is-visible"));
@@ -2019,7 +2161,7 @@
                 card.dataset.awardKey = key;
                 card.dataset.raceContainerId = raceId;
                 card.innerHTML = `
-                    <div class="absolute inset-0 bg-[#070707] z-30 flex flex-col items-center justify-center cursor-pointer transition-all duration-700 hover:bg-[#111]"
+                    <div class="race-cover absolute inset-0 bg-[#070707] z-30 flex flex-col items-center justify-center cursor-pointer transition-all duration-700 hover:bg-[#111]"
                          onclick="revealRace(this, '${mode}', '${key}', '${safeTitle}', '${raceId}')">
                         <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
                             <span class="text-4xl font-black text-black">TOP 5</span>
