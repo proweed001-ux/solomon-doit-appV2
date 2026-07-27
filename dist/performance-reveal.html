@@ -666,10 +666,12 @@
         const PERFORMANCE_DATA_URL = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/performance/current.min.json";
         const PERFORMANCE_OBJECT_BASE = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/";
         const PERFORMANCE_HISTORY_INDEX = "performance/history-index.json";
+        const PERFORMANCE_HISTORY_CACHE = "aya-performance-history-v1";
         const PERFORMANCE_PUBLIC_KEY = String.fromCharCode(115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,74,84,104,89,119,65,108,95,45,97,115,107,107,95,99,73,97,67,100,55,53,119,95,84,67,87,75,50,66,84,84);
         let performanceReady = false;
         let performanceLoadFailed = false;
         let performanceTimeline = [];
+        let performanceCacheStats = { remembered: 0, downloaded: 0 };
         const awardIndex = { ps: 0, ads: 0 };
         const raceRuns = new Map();
 
@@ -851,12 +853,32 @@
             period.textContent = `CHAMPIONS OF ${monthYear.toUpperCase()}`;
         }
 
-        async function fetchPerformanceJson(path, timeoutMs = 12000) {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), timeoutMs);
-            const url = /^https?:\/\//i.test(path)
+        function performanceObjectUrl(path) {
+            return /^https?:\/\//i.test(path)
                 ? path
                 : `${PERFORMANCE_OBJECT_BASE}${String(path || "").replace(/^\/+/, "")}`;
+        }
+
+        async function fetchPerformanceJson(path, timeoutMs = 12000, options = {}) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
+            const url = performanceObjectUrl(path);
+            const rememberHistory = options.rememberHistory === true && "caches" in window;
+
+            if (rememberHistory) {
+                try {
+                    const cache = await caches.open(PERFORMANCE_HISTORY_CACHE);
+                    const cached = await cache.match(url);
+                    if (cached) {
+                        const data = await cached.json();
+                        if (options.stats) options.stats.remembered += 1;
+                        clearTimeout(timeout);
+                        return data;
+                    }
+                } catch (error) {
+                    console.warn("[AYA Performance Cache Read]", error);
+                }
+            }
 
             try {
                 const response = await fetch(url, {
@@ -868,7 +890,21 @@
                     signal: controller.signal
                 });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return await response.json();
+                const data = await response.json();
+                if (rememberHistory && options.stats) options.stats.downloaded += 1;
+
+                if (rememberHistory) {
+                    try {
+                        const cache = await caches.open(PERFORMANCE_HISTORY_CACHE);
+                        await cache.put(url, new Response(JSON.stringify(data), {
+                            headers: { "content-type": "application/json; charset=utf-8" }
+                        }));
+                    } catch (error) {
+                        console.warn("[AYA Performance Cache Write]", error);
+                    }
+                }
+
+                return data;
             } finally {
                 clearTimeout(timeout);
             }
@@ -904,20 +940,25 @@
                         const label = String(item.reportDate || item.reportKey || "");
                         return !currentLabel || !label || label < currentLabel;
                     })
-                    .sort((a, b) => String(a.reportDate || a.reportKey || "").localeCompare(String(b.reportDate || b.reportKey || "")))
-                    .slice(-6);
+                    .sort((a, b) => String(a.reportDate || a.reportKey || "").localeCompare(String(b.reportDate || b.reportKey || "")));
 
+                const stats = { remembered: 0, downloaded: 0 };
                 const loaded = await Promise.allSettled(
-                    selected.map(item => fetchPerformanceJson(item.path, 12000))
+                    selected.map(item => fetchPerformanceJson(item.path, 12000, {
+                        rememberHistory: true,
+                        stats
+                    }))
                 );
                 const history = loaded
                     .filter(result => result.status === "fulfilled")
                     .map(result => result.value)
                     .filter(snapshot => Array.isArray(snapshot?.ps) && Array.isArray(snapshot?.ads));
 
+                performanceCacheStats = stats;
                 return [...history, latest];
             } catch (error) {
                 console.warn("[AYA Performance History]", error);
+                performanceCacheStats = { remembered: 0, downloaded: 0 };
                 return [latest];
             }
         }
@@ -945,7 +986,7 @@
                 const reportLabel = latest?.meta?.reportDate || latest?.meta?.reportKey || "ล่าสุด";
                 const historyCount = Math.max(performanceTimeline.length - 1, 0);
                 status.textContent = historyCount
-                    ? `ข้อมูลล่าสุด • ${reportLabel} • การแข่งขัน ${performanceTimeline.length} ช่วงจริง`
+                    ? `ข้อมูลล่าสุด • ${reportLabel} • ${performanceTimeline.length} ช่วงจริง • จำไว้แล้ว ${performanceCacheStats.remembered} • โหลดใหม่ ${performanceCacheStats.downloaded}`
                     : `ข้อมูลล่าสุด • ${reportLabel} • ยังไม่มีช่วงย้อนหลังสำหรับการแซง`;
                 status.className = historyCount
                     ? "text-[11px] text-emerald-400/80 mt-3 tracking-wider"
