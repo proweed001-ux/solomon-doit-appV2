@@ -194,26 +194,26 @@
         @keyframes dropIn { from { transform: translateY(-50px) scale(0.5); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
         @keyframes fadeInReveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* ----- Leaderboard Styles: จากเวอร์ชันแรก ปรับรองรับ 7 การ์ด ----- */
+        /* ----- One award per screen ----- */
         .top5-list li {
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 8px;
-            padding: 8px 0;
+            padding: 12px 0;
             border-bottom: 1px dashed rgba(255,255,255,0.06);
-            font-size: 0.78rem;
+            font-size: clamp(0.9rem, 1.2vw, 1.1rem);
         }
         .top5-list li:last-child { border-bottom: none; }
         .rank-badge {
-            width: 20px;
-            height: 20px;
+            width: 30px;
+            height: 30px;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: 4px;
             font-weight: 900;
-            font-size: 0.7rem;
+            font-size: 0.82rem;
             color: black;
             flex: 0 0 auto;
         }
@@ -223,10 +223,108 @@
         .rank-normal { background: #333; color: #aaa; }
 
         .category-card {
-            min-height: 320px;
+            width: 100%;
+            max-width: 860px;
+            min-height: clamp(430px, calc(100vh - 310px), 620px);
+            height: clamp(430px, calc(100vh - 310px), 620px);
+            margin: 0 auto;
             border-radius: 1rem;
             overflow: hidden;
             position: relative;
+        }
+
+        .award-shell {
+            width: 100%;
+            max-width: 980px;
+            margin: 0 auto;
+        }
+        .award-stage {
+            width: 100%;
+            min-height: clamp(430px, calc(100vh - 310px), 620px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .award-slide {
+            display: none;
+            width: 100%;
+        }
+        .award-slide.active {
+            display: flex;
+            animation: awardEnter 0.42s ease both;
+        }
+        .award-slide.category-card.active {
+            display: block;
+        }
+        .overall-award {
+            min-height: clamp(430px, calc(100vh - 310px), 620px);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .overall-award .podium-wrap {
+            margin-bottom: 0;
+        }
+        .award-controls {
+            display: grid;
+            grid-template-columns: minmax(110px, 1fr) minmax(150px, 1.4fr) minmax(110px, 1fr);
+            align-items: center;
+            gap: 12px;
+            margin-top: 18px;
+        }
+        .award-nav-btn {
+            min-height: 48px;
+            padding: 10px 16px;
+            border: 1px solid rgba(234, 179, 8, 0.35);
+            border-radius: 14px;
+            background: rgba(17, 17, 17, 0.94);
+            color: #facc15;
+            font-weight: 900;
+            transition: 0.2s ease;
+        }
+        .award-nav-btn:hover:not(:disabled) {
+            background: #facc15;
+            color: #050505;
+            transform: translateY(-1px);
+        }
+        .award-nav-btn:disabled {
+            opacity: 0.28;
+            cursor: not-allowed;
+        }
+        .award-position {
+            text-align: center;
+            min-width: 0;
+        }
+        .award-position strong {
+            display: block;
+            color: #facc15;
+            font-size: 0.95rem;
+            letter-spacing: 0.08em;
+        }
+        .award-position span {
+            display: block;
+            margin-top: 3px;
+            color: #9ca3af;
+            font-size: 0.78rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        @keyframes awardEnter {
+            from { opacity: 0; transform: translateX(24px) scale(0.985); }
+            to { opacity: 1; transform: translateX(0) scale(1); }
+        }
+        @media (max-width: 640px) {
+            .award-controls {
+                grid-template-columns: 1fr 1fr;
+            }
+            .award-position {
+                grid-column: 1 / -1;
+                grid-row: 1;
+            }
+            .award-nav-btn {
+                grid-row: 2;
+            }
         }
 
         .mode-pill {
@@ -294,43 +392,61 @@
 
         <main class="w-full">
             <section id="tab-ps" class="tab-content active w-full" data-mode="ps">
-                <div class="text-center mb-6"><span class="mode-pill">PS MODE</span></div>
-                <div class="relative w-full max-w-4xl h-[400px] mb-20 mx-auto flex justify-center items-end podium-wrap">
-                    <div id="podium-lock-ps" onclick="revealPodium('ps')" class="absolute inset-0 z-50 flex flex-col items-center justify-center cursor-pointer glass-panel rounded-[2rem] transition-all duration-700 hover:bg-black/90 hover:scale-[1.02] border-yellow-500/50 shadow-[0_0_50px_rgba(234,179,8,0.15)]">
-                        <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
-                            <svg class="w-12 h-12 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                        </div>
-                        <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">TAP TO REVEAL</h2>
-                        <p class="text-gray-400 tracking-widest text-sm uppercase">PS Overall Champions</p>
+                <div class="text-center mb-4"><span class="mode-pill">PS MODE</span></div>
+                <div class="award-shell">
+                    <div id="award-stage-ps" class="award-stage">
+                        <article class="award-slide overall-award active" data-award-slide data-award-title="Overall Champions">
+                            <div class="relative w-full max-w-4xl h-[400px] mx-auto flex justify-center items-end podium-wrap">
+                                <div id="podium-lock-ps" onclick="revealPodium('ps')" class="absolute inset-0 z-50 flex flex-col items-center justify-center cursor-pointer glass-panel rounded-[2rem] transition-all duration-700 hover:bg-black/90 hover:scale-[1.02] border-yellow-500/50 shadow-[0_0_50px_rgba(234,179,8,0.15)]">
+                                    <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
+                                        <svg class="w-12 h-12 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                                    </div>
+                                    <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">TAP TO REVEAL</h2>
+                                    <p class="text-gray-400 tracking-widest text-sm uppercase">PS Overall Champions</p>
+                                </div>
+                                <div id="podium-area-ps" class="w-full h-full flex items-end justify-center gap-2 md:gap-4 hidden"></div>
+                            </div>
+                        </article>
+                        <div id="categories-area-ps"></div>
                     </div>
-                    <div id="podium-area-ps" class="w-full h-full flex items-end justify-center gap-2 md:gap-4 hidden"></div>
+                    <div class="award-controls">
+                        <button id="award-prev-ps" class="award-nav-btn" type="button" onclick="moveAward('ps', -1)">← ก่อนหน้า</button>
+                        <div class="award-position">
+                            <strong id="award-counter-ps">รางวัล 1 / 1</strong>
+                            <span id="award-title-ps">Overall Champions</span>
+                        </div>
+                        <button id="award-next-ps" class="award-nav-btn" type="button" onclick="moveAward('ps', 1)">รางวัลถัดไป →</button>
+                    </div>
                 </div>
-                <div class="text-center mb-8 w-full">
-                    <h2 class="text-lg md:text-xl font-bold tracking-[0.2em] uppercase text-gray-500 border-b border-gray-800 pb-4 inline-block px-10">
-                        EXCELLENCE CATEGORIES (PS)
-                    </h2>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-6 w-full" id="categories-area-ps"></div>
             </section>
 
             <section id="tab-ads" class="tab-content w-full" data-mode="ads">
-                <div class="text-center mb-6"><span class="mode-pill">ADS MODE</span></div>
-                <div class="relative w-full max-w-4xl h-[400px] mb-20 mx-auto flex justify-center items-end podium-wrap">
-                    <div id="podium-lock-ads" onclick="revealPodium('ads')" class="absolute inset-0 z-50 flex flex-col items-center justify-center cursor-pointer glass-panel rounded-[2rem] transition-all duration-700 hover:bg-black/90 hover:scale-[1.02] border-yellow-500/50 shadow-[0_0_50px_rgba(234,179,8,0.15)]">
-                        <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
-                            <svg class="w-12 h-12 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                        </div>
-                        <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">TAP TO REVEAL</h2>
-                        <p class="text-gray-400 tracking-widest text-sm uppercase">ADS Overall Champions</p>
+                <div class="text-center mb-4"><span class="mode-pill">ADS MODE</span></div>
+                <div class="award-shell">
+                    <div id="award-stage-ads" class="award-stage">
+                        <article class="award-slide overall-award active" data-award-slide data-award-title="Overall Champions">
+                            <div class="relative w-full max-w-4xl h-[400px] mx-auto flex justify-center items-end podium-wrap">
+                                <div id="podium-lock-ads" onclick="revealPodium('ads')" class="absolute inset-0 z-50 flex flex-col items-center justify-center cursor-pointer glass-panel rounded-[2rem] transition-all duration-700 hover:bg-black/90 hover:scale-[1.02] border-yellow-500/50 shadow-[0_0_50px_rgba(234,179,8,0.15)]">
+                                    <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
+                                        <svg class="w-12 h-12 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                                    </div>
+                                    <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">TAP TO REVEAL</h2>
+                                    <p class="text-gray-400 tracking-widest text-sm uppercase">ADS Overall Champions</p>
+                                </div>
+                                <div id="podium-area-ads" class="w-full h-full flex items-end justify-center gap-2 md:gap-4 hidden"></div>
+                            </div>
+                        </article>
+                        <div id="categories-area-ads"></div>
                     </div>
-                    <div id="podium-area-ads" class="w-full h-full flex items-end justify-center gap-2 md:gap-4 hidden"></div>
+                    <div class="award-controls">
+                        <button id="award-prev-ads" class="award-nav-btn" type="button" onclick="moveAward('ads', -1)">← ก่อนหน้า</button>
+                        <div class="award-position">
+                            <strong id="award-counter-ads">รางวัล 1 / 1</strong>
+                            <span id="award-title-ads">Overall Champions</span>
+                        </div>
+                        <button id="award-next-ads" class="award-nav-btn" type="button" onclick="moveAward('ads', 1)">รางวัลถัดไป →</button>
+                    </div>
                 </div>
-                <div class="text-center mb-8 w-full">
-                    <h2 class="text-lg md:text-xl font-bold tracking-[0.2em] uppercase text-gray-500 border-b border-gray-800 pb-4 inline-block px-10">
-                        EXCELLENCE CATEGORIES (ADS)
-                    </h2>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-6 w-full" id="categories-area-ads"></div>
             </section>
         </main>
     </div>
@@ -341,6 +457,7 @@
         const PERFORMANCE_PUBLIC_KEY = String.fromCharCode(115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,74,84,104,89,119,65,108,95,45,97,115,107,107,95,99,73,97,67,100,55,53,119,95,84,67,87,75,50,66,84,84);
         let performanceReady = false;
         let performanceLoadFailed = false;
+        const awardIndex = { ps: 0, ads: 0 };
 
         let boardData = {
             ps: {
@@ -556,6 +673,40 @@
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             document.getElementById(`btn-${tab}`).classList.add('active');
             document.getElementById(`tab-${tab}`).classList.add('active');
+            showAward(tab, awardIndex[tab]);
+        }
+
+        function getAwardSlides(mode) {
+            return Array.from(document.querySelectorAll(`#award-stage-${mode} [data-award-slide]`));
+        }
+
+        function showAward(mode, index, shouldScroll = false) {
+            const slides = getAwardSlides(mode);
+            if (!slides.length) return;
+
+            const safeIndex = Math.max(0, Math.min(index, slides.length - 1));
+            awardIndex[mode] = safeIndex;
+            slides.forEach((slide, slideIndex) => {
+                slide.classList.toggle('active', slideIndex === safeIndex);
+            });
+
+            const activeSlide = slides[safeIndex];
+            document.getElementById(`award-counter-${mode}`).textContent = `รางวัล ${safeIndex + 1} / ${slides.length}`;
+            document.getElementById(`award-title-${mode}`).textContent = activeSlide.dataset.awardTitle || 'Performance Award';
+
+            const previous = document.getElementById(`award-prev-${mode}`);
+            const next = document.getElementById(`award-next-${mode}`);
+            previous.disabled = safeIndex === 0;
+            next.disabled = safeIndex === slides.length - 1;
+            next.textContent = safeIndex === slides.length - 1 ? 'ครบทุกรางวัล' : 'รางวัลถัดไป →';
+
+            if (shouldScroll) {
+                document.getElementById(`tab-${mode}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function moveAward(mode, direction) {
+            showAward(mode, awardIndex[mode] + direction, true);
         }
 
         function safeImageOnError(img, seed) {
@@ -722,7 +873,7 @@
                         <li>
                             <div class="flex items-center gap-2 overflow-hidden min-w-0">
                                 <span class="rank-badge ${badgeClass(person.rank)}">${person.rank}</span>
-                                <div class="w-5 h-5 rounded-full overflow-hidden border border-gray-600 shrink-0 bg-black">
+                                <div class="w-9 h-9 rounded-full overflow-hidden border border-gray-600 shrink-0 bg-black">
                                     <img src="${personImageUrl(person.photoKey || person.name)}" class="w-full h-full object-cover" alt="" onerror="safeImageOnError(this, '${person.name.replace(/'/g, '')}')">
                                 </div>
                                 <span class="truncate ${nameStyle}">${person.name}</span>
@@ -732,8 +883,10 @@
                     `;
                 }).join('');
 
-                const card = document.createElement('div');
-                card.className = 'category-card glass-panel group shadow-lg';
+                const card = document.createElement('article');
+                card.className = 'award-slide category-card glass-panel group shadow-lg';
+                card.dataset.awardSlide = '';
+                card.dataset.awardTitle = cat.title;
                 card.innerHTML = `
                     <div class="absolute inset-0 bg-[#0a0a0a] z-30 flex flex-col items-center justify-center cursor-pointer transition-all duration-700 hover:bg-[#111]"
                          onclick="revealCategory(this, '${cat.title.replace(/'/g, '')}')">
@@ -747,28 +900,28 @@
 
                     <div id="slider-${cat.id}" class="flex w-full h-full overflow-x-auto snap-x snap-mandatory hide-scrollbar scroll-smooth">
                         <div class="snap-center shrink-0 w-full h-full flex flex-col items-center justify-center p-6 relative">
-                            <h4 class="text-[10px] font-black text-yellow-500 tracking-widest uppercase mb-1 text-center">${cat.title}</h4>
-                            <p class="text-[10px] text-gray-500 mb-4 text-center">${cat.subtitle || ''}</p>
-                            <div class="w-20 h-20 rounded-full overflow-hidden border-2 border-yellow-500 mb-4 bg-black shadow-[0_0_20px_rgba(234,179,8,0.3)] shrink-0">
+                            <h4 class="text-sm md:text-lg font-black text-yellow-500 tracking-widest uppercase mb-1 text-center">${cat.title}</h4>
+                            <p class="text-xs md:text-sm text-gray-500 mb-5 text-center">${cat.subtitle || ''}</p>
+                            <div class="w-28 h-28 md:w-40 md:h-40 rounded-full overflow-hidden border-2 border-yellow-500 mb-5 bg-black shadow-[0_0_30px_rgba(234,179,8,0.35)] shrink-0">
                                 <img src="${personImageUrl(champ.photoKey || champ.name)}" class="w-full h-full object-cover" alt="" onerror="safeImageOnError(this, '${champ.name.replace(/'/g, '')}')">
                             </div>
-                            <p class="text-sm md:text-base text-white font-bold text-center w-full truncate">${champ.name}</p>
-                            <p class="text-2xl md:text-3xl font-black gold-text mt-1">${champ.value} <span class="text-[10px] font-normal text-gray-400">${cat.unit}</span></p>
-                            <button onclick="document.getElementById('slider-${cat.id}').scrollBy({left: 300, behavior: 'smooth'})"
-                                    class="absolute bottom-4 right-4 text-[10px] font-bold text-yellow-500 flex items-center gap-1 animate-pulse hover:text-white bg-black/50 px-2 py-1 rounded">
+                            <p class="text-xl md:text-3xl text-white font-bold text-center w-full truncate px-4">${champ.name}</p>
+                            <p class="text-4xl md:text-6xl font-black gold-text mt-3">${champ.value} <span class="text-sm font-normal text-gray-400">${cat.unit}</span></p>
+                            <button onclick="const slider=document.getElementById('slider-${cat.id}'); slider.scrollBy({left: slider.clientWidth, behavior: 'smooth'})"
+                                    class="absolute bottom-4 right-4 text-xs md:text-sm font-bold text-yellow-500 flex items-center gap-1 animate-pulse hover:text-white bg-black/50 px-3 py-2 rounded">
                                 ดู TOP ${cat.top.length}
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             </button>
                         </div>
 
                         <div class="snap-center shrink-0 w-full h-full flex flex-col p-5 relative bg-black/40">
-                            <h4 class="text-[11px] font-black text-yellow-500 tracking-widest uppercase mb-1 text-center">${cat.title}</h4>
-                            <p class="text-[10px] text-gray-500 mb-3 text-center border-b border-gray-700 pb-2">TOP ${cat.top.length} • ${cat.subtitle || cat.unit}</p>
+                            <h4 class="text-sm md:text-lg font-black text-yellow-500 tracking-widest uppercase mb-1 text-center">${cat.title}</h4>
+                            <p class="text-xs md:text-sm text-gray-500 mb-3 text-center border-b border-gray-700 pb-2">TOP ${cat.top.length} • ${cat.subtitle || cat.unit}</p>
                             <ul class="top5-list w-full flex-grow flex flex-col justify-center">
                                 ${listHTML}
                             </ul>
-                            <button onclick="document.getElementById('slider-${cat.id}').scrollBy({left: -300, behavior: 'smooth'})"
-                                    class="absolute bottom-4 left-4 text-[10px] font-bold text-gray-400 flex items-center gap-1 hover:text-white transition-colors bg-black/50 px-2 py-1 rounded">
+                            <button onclick="const slider=document.getElementById('slider-${cat.id}'); slider.scrollBy({left: -slider.clientWidth, behavior: 'smooth'})"
+                                    class="absolute bottom-4 left-4 text-xs md:text-sm font-bold text-gray-400 flex items-center gap-1 hover:text-white transition-colors bg-black/50 px-3 py-2 rounded">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                                 กลับ
                             </button>
@@ -777,6 +930,7 @@
                 `;
                 container.appendChild(card);
             });
+            showAward(mode, awardIndex[mode]);
         }
 
         renderCategories('ps');
