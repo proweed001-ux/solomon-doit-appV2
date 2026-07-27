@@ -224,9 +224,9 @@
 
         .category-card {
             width: 100%;
-            max-width: 860px;
-            min-height: clamp(430px, calc(100vh - 310px), 620px);
-            height: clamp(430px, calc(100vh - 310px), 620px);
+            max-width: 1280px;
+            min-height: clamp(560px, calc(100vh - 220px), 780px);
+            height: clamp(560px, calc(100vh - 220px), 780px);
             margin: 0 auto;
             border-radius: 1rem;
             overflow: hidden;
@@ -235,12 +235,12 @@
 
         .award-shell {
             width: 100%;
-            max-width: 980px;
+            max-width: 1360px;
             margin: 0 auto;
         }
         .award-stage {
             width: 100%;
-            min-height: clamp(430px, calc(100vh - 310px), 620px);
+            min-height: clamp(560px, calc(100vh - 220px), 780px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -257,7 +257,7 @@
             display: block;
         }
         .overall-award {
-            min-height: clamp(430px, calc(100vh - 310px), 620px);
+            min-height: clamp(560px, calc(100vh - 220px), 780px);
             flex-direction: column;
             align-items: center;
             justify-content: center;
@@ -329,14 +329,20 @@
 
         .race-card {
             width: 100%;
-            max-width: 900px;
-            min-height: clamp(430px, calc(100vh - 310px), 620px);
-            height: clamp(430px, calc(100vh - 310px), 620px);
+            max-width: 1280px;
+            min-height: clamp(560px, calc(100vh - 220px), 780px);
+            height: clamp(560px, calc(100vh - 220px), 780px);
             margin: 0 auto;
             padding: 24px;
             border-radius: 24px;
             overflow: hidden;
             position: relative;
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr) auto;
+            row-gap: 16px;
+        }
+        .award-slide.category-card.race-card.active {
+            display: grid;
         }
         .race-header {
             display: flex;
@@ -368,8 +374,9 @@
             font-weight: 800;
         }
         .race-track {
-            height: 350px;
-            margin-top: 16px;
+            height: auto;
+            min-height: 0;
+            margin-top: 0;
             overflow: hidden;
             position: relative;
             border-bottom: 1px solid rgba(250, 204, 21, 0.18);
@@ -479,12 +486,20 @@
         }
         .race-name {
             width: 100%;
-            overflow: hidden;
+            overflow: visible;
             color: #f4f4f5;
-            font-size: clamp(0.58rem, 1vw, 0.8rem);
+            font-size: clamp(0.68rem, 1.05vw, 0.9rem);
             font-weight: 800;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            line-height: 1.15;
+            text-overflow: clip;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+        .race-actual {
+            color: #f4f4f5;
+            font-size: clamp(0.72rem, 1.2vw, 0.98rem);
+            font-weight: 900;
+            line-height: 1;
         }
         .race-percent {
             color: #facc15;
@@ -493,24 +508,7 @@
             line-height: 1;
             text-shadow: 0 0 14px rgba(250,204,21,0.2);
         }
-        .race-row.race-finished[data-rank="1"] .race-bar {
-            border-top-color: #fde047;
-            background: linear-gradient(180deg, rgba(120,90,12,0.98), rgba(56,45,13,0.98) 48%, rgba(14,13,8,1));
-            box-shadow: 0 -12px 34px rgba(250,204,21,0.38), inset 10px 0 18px rgba(255,255,255,0.055);
-        }
-        .race-row.race-finished[data-rank="2"] .race-bar {
-            border-top-color: #cbd5e1;
-            background: linear-gradient(180deg, rgba(51,65,85,0.98), rgba(24,32,44,0.98) 52%, rgba(9,11,15,1));
-            box-shadow: 0 -10px 28px rgba(203,213,225,0.2), inset 10px 0 18px rgba(255,255,255,0.045);
-        }
-        .race-row.race-finished[data-rank="3"] .race-bar {
-            border-top-color: #d97706;
-            background: linear-gradient(180deg, rgba(108,45,8,0.98), rgba(55,25,10,0.98) 52%, rgba(15,9,6,1));
-            box-shadow: 0 -10px 28px rgba(217,119,6,0.22), inset 10px 0 18px rgba(255,255,255,0.04);
-        }
-        .race-row.race-finished[data-rank="1"] .race-avatar { border-color: #fde047; box-shadow: 0 0 0 4px #090909, 0 0 28px rgba(250,204,21,0.5); }
-        .race-row.race-finished[data-rank="2"] .race-avatar { border-color: #cbd5e1; box-shadow: 0 0 0 4px #090909, 0 0 24px rgba(203,213,225,0.28); }
-        .race-row.race-finished[data-rank="3"] .race-avatar { border-color: #d97706; box-shadow: 0 0 0 4px #090909, 0 0 24px rgba(217,119,6,0.3); }
+
         .race-row.race-finished[data-rank="1"] .race-rank::before { content: "♛ "; }
         .race-footer {
             display: flex;
@@ -559,10 +557,14 @@
                 font-size: 0.52rem;
             }
             .race-name {
-                font-size: 0.52rem;
+                font-size: 0.58rem;
+                line-height: 1.12;
+            }
+            .race-actual {
+                font-size: 0.64rem;
             }
             .race-percent {
-                font-size: 0.72rem;
+                font-size: 0.74rem;
             }
             .race-date {
                 max-width: 126px;
@@ -659,7 +661,7 @@
                                 </div>
                                 <div id="race-ps-overall" class="race-track"></div>
                                 <div class="race-footer">
-                                    <span>แท่งเริ่มจาก 0 • แข่งขัน 5 วินาที • เปิดอันดับตอนจบ</span>
+                                    <span>แท่งเริ่มจาก 0 • แข่งขัน 10 วินาที • เปิดอันดับตอนจบ</span>
                                     <button class="race-replay" type="button" onclick="startRace('ps', 'overall', 'race-ps-overall')">↻ แข่งใหม่</button>
                                 </div>
                             </div>
@@ -697,7 +699,7 @@
                                 </div>
                                 <div id="race-ads-overall" class="race-track"></div>
                                 <div class="race-footer">
-                                    <span>แท่งเริ่มจาก 0 • แข่งขัน 5 วินาที • เปิดอันดับตอนจบ</span>
+                                    <span>แท่งเริ่มจาก 0 • แข่งขัน 10 วินาที • เปิดอันดับตอนจบ</span>
                                     <button class="race-replay" type="button" onclick="startRace('ads', 'overall', 'race-ads-overall')">↻ แข่งใหม่</button>
                                 </div>
                             </div>
@@ -723,7 +725,7 @@
         const PERFORMANCE_OBJECT_BASE = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/";
         const PERFORMANCE_HISTORY_INDEX = "performance/history-index.json";
         const PERFORMANCE_HISTORY_CACHE = "aya-performance-history-v1";
-        const RACE_DURATION_MS = 5000;
+        const RACE_DURATION_MS = 10000;
         const PERFORMANCE_PUBLIC_KEY = String.fromCharCode(115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,74,84,104,89,119,65,108,95,45,97,115,107,107,95,99,73,97,67,100,55,53,119,95,84,67,87,75,50,66,84,84);
         let performanceReady = false;
         let performanceLoadFailed = false;
@@ -1111,6 +1113,25 @@
             ).trim();
         }
 
+        function raceActualValue(row, key) {
+            if (key === "overall") return metricPercent(row, key);
+            if (key === "cd13" && !row?.cd13) {
+                return ["dc1", "dc2", "dc3"].reduce((sum, metricKey) => sum + metricActual(row, metricKey), 0);
+            }
+            return metricActual(row, key);
+        }
+
+        function formatRaceActual(value, key) {
+            const number = numberValue(value);
+            if (key === "overall") {
+                return `${number.toLocaleString("th-TH", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} คะแนน`;
+            }
+            const unit = performanceCategories.find(category => category.key === key)?.unit || "";
+            const formatted = number.toLocaleString("th-TH", { maximumFractionDigits: 0 });
+            if (unit === "บาท") return `${formatted} ฿`;
+            return unit ? `${formatted} ${unit}` : formatted;
+        }
+
         function raceFrame(snapshot, mode, key) {
             const rows = Array.isArray(snapshot?.[mode]) ? snapshot[mode] : [];
             return {
@@ -1119,6 +1140,7 @@
                     id: rowIdentity(row, mode),
                     name: displayName(row, mode),
                     photoKey: profileKey(row, mode),
+                    actual: raceActualValue(row, key),
                     value: metricPercent(row, key)
                 })).filter(row => row.id)
             };
@@ -1133,10 +1155,13 @@
                 const to = toMap.get(id);
                 const start = from?.value || 0;
                 const end = to?.value || 0;
+                const startActual = from?.actual || 0;
+                const endActual = to?.actual || 0;
                 return {
                     id,
                     name: to?.name || from?.name || id,
                     photoKey: to?.photoKey || from?.photoKey || id,
+                    actual: startActual + (endActual - startActual) * progress,
                     value: start + (end - start) * progress
                 };
             });
@@ -1179,6 +1204,7 @@
                                 <div class="race-bar-copy">
                                     <span class="race-rank"></span>
                                     <span class="race-name"></span>
+                                    <strong class="race-actual"></strong>
                                     <strong class="race-percent"></strong>
                                 </div>
                             </div>
@@ -1188,6 +1214,7 @@
                         rank: row.querySelector(".race-rank"),
                         name: row.querySelector(".race-name"),
                         image: row.querySelector(".race-avatar img"),
+                        actual: row.querySelector(".race-actual"),
                         bar: row.querySelector(".race-bar"),
                         percent: row.querySelector(".race-percent")
                     };
@@ -1198,7 +1225,7 @@
                 const rank = rankById.get(id) || laneIds.length;
                 const parts = row._raceParts;
                 row.classList.toggle("race-finished", showRanks);
-                row.classList.toggle("race-started", person.value / maximum > 0.3);
+                row.classList.toggle("race-started", person.value / maximum > 0.08);
                 row.dataset.rank = String(rank);
                 row.style.transform = `translateX(${laneIndex * 100}%)`;
                 parts.rank.textContent = String(rank);
@@ -1213,6 +1240,7 @@
                 parts.bar.style.height = person.value > 0
                     ? `${Math.max((person.value / maximum) * 100, 1.5)}%`
                     : "0%";
+                parts.actual.textContent = formatRaceActual(person.actual, container._raceMetricKey);
                 parts.percent.textContent = formatRacePercent(person.value);
             });
         }
@@ -1221,7 +1249,7 @@
             return new Promise(resolve => {
                 const startFrame = {
                     label: "เริ่มต้น",
-                    rows: [...(container._raceProfiles?.values() || [])].map(row => ({ ...row, value: 0 }))
+                    rows: [...(container._raceProfiles?.values() || [])].map(row => ({ ...row, value: 0, actual: 0 }))
                 };
                 let startedAt = 0;
                 const step = timestamp => {
@@ -1267,17 +1295,18 @@
                 const frameRows = new Map(frame.rows.filter(row => finalistIds.has(row.id)).map(row => [row.id, row]));
                 return {
                     ...frame,
-                    rows: finalists.map(profile => frameRows.get(profile.id) || { ...profile, value: 0 })
+                    rows: finalists.map(profile => frameRows.get(profile.id) || { ...profile, value: 0, actual: 0 })
                 };
             });
 
             container._raceLaneIds = finalists.map(row => row.id);
             container._raceProfiles = new Map(finalists.map(row => [row.id, row]));
+            container._raceMetricKey = key;
             container._raceMaximum = Math.max(...frames.flatMap(frame => frame.rows.map(row => row.value)), 1) * 1.05;
             container.style.setProperty("--race-lanes", String(finalists.length));
 
             const dateLabel = document.getElementById(`race-date-${mode}-${key}`);
-            renderRaceRows(container, finalists.map(row => ({ ...row, value: 0 })), false);
+            renderRaceRows(container, finalists.map(row => ({ ...row, value: 0, actual: 0 })), false);
             const completed = await animateRaceTimeline(container, frames, RACE_DURATION_MS, dateLabel, runKey, token);
             if (!completed || raceRuns.get(runKey) !== token) return;
 
