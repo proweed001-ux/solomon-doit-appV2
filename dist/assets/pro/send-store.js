@@ -109,7 +109,7 @@ function finishEdit(input, options = {}) {
   editSession = null;
   if (!session.editStarted) return false;
   if (!session.changed) {
-    session.callbacks.onEditRevert?.(
+    session.callbacks.onRevert?.(
       input,
       session.historyCheckpoint,
       options,
@@ -132,14 +132,14 @@ export function pendingQuantityEdit() {
 export function bindQuantityInputs({
   inputs,
   onEditStart,
-  onEditRevert,
+  onRevert,
   onInput,
   onCommit,
 }) {
   ensurePointerTracking();
   refreshSendInputs();
   inputs.forEach((input) => {
-    const callbacks = { onEditStart, onEditRevert, onInput, onCommit };
+    const callbacks = { onEditStart, onRevert, onInput, onCommit };
     input.onfocus = () => {
       pointerTarget = null;
       beginEdit(input, callbacks);
