@@ -689,27 +689,6 @@
                 <div class="text-center mb-4"><span class="mode-pill">PS MODE</span></div>
                 <div class="award-shell">
                     <div id="award-stage-ps" class="award-stage">
-                        <article class="award-slide overall-award active" data-award-slide data-award-title="Overall Champions" data-award-key="overall">
-                            <div class="race-card glass-panel">
-                                <div class="absolute inset-0 bg-[#070707] z-30 flex flex-col items-center justify-center cursor-pointer transition-all duration-700 hover:bg-[#111]"
-                                     onclick="revealRace(this, 'ps', 'overall', 'Overall Champions', 'race-ps-overall')">
-                                    <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
-                                        <span class="text-4xl font-black text-black">TOP 5</span>
-                                    </div>
-                                    <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">START THE RACE</h2>
-                                    <p class="text-gray-400 tracking-widest text-sm uppercase">PS Overall Champions</p>
-                                </div>
-                                <div class="race-header">
-                                    <div><h3>Overall Champions</h3><p>คะแนนเฉลี่ย Index ของหมวดหลัก</p></div>
-                                    <span id="race-date-ps-overall" class="race-date">พร้อมเริ่ม</span>
-                                </div>
-                                <div id="race-ps-overall" class="race-track"></div>
-                                <div class="race-footer">
-                                    <span>แท่งเริ่มจาก 0 • แข่งขัน 10 วินาที • เปิดอันดับตอนจบ</span>
-                                    <button class="race-replay" type="button" onclick="startRace('ps', 'overall', 'race-ps-overall')">↻ แข่งใหม่</button>
-                                </div>
-                            </div>
-                        </article>
                         <div id="categories-area-ps"></div>
                     </div>
                     <div class="award-controls">
@@ -727,27 +706,6 @@
                 <div class="text-center mb-4"><span class="mode-pill">ADS MODE</span></div>
                 <div class="award-shell">
                     <div id="award-stage-ads" class="award-stage">
-                        <article class="award-slide overall-award active" data-award-slide data-award-title="Overall Champions" data-award-key="overall">
-                            <div class="race-card glass-panel">
-                                <div class="absolute inset-0 bg-[#070707] z-30 flex flex-col items-center justify-center cursor-pointer transition-all duration-700 hover:bg-[#111]"
-                                     onclick="revealRace(this, 'ads', 'overall', 'Overall Champions', 'race-ads-overall')">
-                                    <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
-                                        <span class="text-4xl font-black text-black">TOP 5</span>
-                                    </div>
-                                    <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">START THE RACE</h2>
-                                    <p class="text-gray-400 tracking-widest text-sm uppercase">ADS Overall Champions</p>
-                                </div>
-                                <div class="race-header">
-                                    <div><h3>Overall Champions</h3><p>คะแนนเฉลี่ย Index ของหมวดหลัก</p></div>
-                                    <span id="race-date-ads-overall" class="race-date">พร้อมเริ่ม</span>
-                                </div>
-                                <div id="race-ads-overall" class="race-track"></div>
-                                <div class="race-footer">
-                                    <span>แท่งเริ่มจาก 0 • แข่งขัน 10 วินาที • เปิดอันดับตอนจบ</span>
-                                    <button class="race-replay" type="button" onclick="startRace('ads', 'overall', 'race-ads-overall')">↻ แข่งใหม่</button>
-                                </div>
-                            </div>
-                        </article>
                         <div id="categories-area-ads"></div>
                     </div>
                     <div class="award-controls">
@@ -788,7 +746,6 @@
                 ],
                 categories: [
                     { id: "ps-vol", title: "Top Best Volume", subtitle: "ยอดขายใน DOIT", unit: "บาท", top: [ {rank:1,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"387,166"}, {rank:2,name:"นาย นันทภพ ฐิตานุกูล",value:"361,898"}, {rank:3,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"352,480"}, {rank:4,name:"นางสาว วันเพ็ญ กฤษเพชร์",value:"342,310"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"306,044"} ] },
-                    { id: "ps-giv", title: "Top Volume GIV", subtitle: "ยอดขาย GIV", unit: "บาท", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"434,052"}, {rank:2,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"430,282"}, {rank:3,name:"นาย นันทภพ ฐิตานุกูล",value:"408,467"}, {rank:4,name:"นางสาว วันเพ็ญ กฤษเพชร์",value:"405,635"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"343,451"} ] },
                     { id: "ps-moq", title: "Top MOQ", subtitle: "จำนวนรายการ", unit: "รายการ", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"9,665"}, {rank:2,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"8,208"}, {rank:3,name:"นางสาว ปพิชญา ทางาม",value:"7,862"}, {rank:4,name:"นาย มณเฑียร ตะเคียนงาม",value:"7,840"}, {rank:5,name:"นาย นันทภพ ฐิตานุกูล",value:"7,675"} ] },
                     { id: "ps-cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"468"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"460"}, {rank:3,name:"นาย นันทภพ ฐิตานุกูล",value:"453"}, {rank:4,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"452"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"448"} ] },
                     { id: "ps-cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"468"}, {rank:2,name:"นางสาว พัทนันธ์ บุญธรรม",value:"415"}, {rank:3,name:"นางสาว วิรัตน์ ซืสเลอร์",value:"385"}, {rank:4,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"382"}, {rank:5,name:"นาย นันทภพ ฐิตานุกูล",value:"368"} ] },
@@ -805,7 +762,6 @@
                 ],
                 categories: [
                     { id: "ads-vol", title: "Top Best Volume", subtitle: "ยอดขายใน DOIT", unit: "บาท", top: [ {rank:1,name:"AYAADS03",value:"1,613,303"}, {rank:2,name:"AYAADS02",value:"1,611,261"}, {rank:3,name:"AYAADS01",value:"1,405,280"}, {rank:4,name:"AYAADS04",value:"1,168,723"} ] },
-                    { id: "ads-giv", title: "Top Volume GIV", subtitle: "ยอดขาย GIV", unit: "บาท", top: [ {rank:1,name:"AYAADS02",value:"1,860,975"}, {rank:2,name:"AYAADS03",value:"1,819,634"}, {rank:3,name:"AYAADS01",value:"1,579,758"}, {rank:4,name:"AYAADS04",value:"1,346,783"} ] },
                     { id: "ads-moq", title: "Top MOQ", subtitle: "จำนวนรายการ", unit: "รายการ", top: [ {rank:1,name:"AYAADS02",value:"45,117"}, {rank:2,name:"AYAADS03",value:"39,711"}, {rank:3,name:"AYAADS01",value:"39,240"}, {rank:4,name:"AYAADS04",value:"31,376"} ] },
                     { id: "ads-cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"2,499"}, {rank:2,name:"AYAADS03",value:"2,374"}, {rank:3,name:"AYAADS01",value:"2,001"}, {rank:4,name:"AYAADS04",value:"1,656"} ] },
                     { id: "ads-cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS03",value:"2,134"}, {rank:2,name:"AYAADS02",value:"2,080"}, {rank:3,name:"AYAADS01",value:"1,716"}, {rank:4,name:"AYAADS04",value:"1,427"} ] },
@@ -817,7 +773,6 @@
 
         const performanceCategories = [
             { key: "sales", suffix: "vol", title: "Top Best Volume", subtitle: "ยอดขายใน DOIT", unit: "บาท" },
-            { key: "giv", suffix: "giv", title: "Top Volume GIV", subtitle: "ยอดขาย GIV", unit: "บาท" },
             { key: "moq", suffix: "moq", title: "Top MOQ", subtitle: "จำนวนรายการ", unit: "รายการ" },
             { key: "dc1", suffix: "cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน" },
             { key: "dc2", suffix: "cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน" },
@@ -1176,6 +1131,12 @@
             return unit ? `${formatted} ${unit}` : formatted;
         }
 
+        function raceRankingValue(row, key) {
+            return key === "sales"
+                ? raceActualValue(row, key)
+                : metricPercent(row, key);
+        }
+
         function raceFrame(snapshot, mode, key) {
             const rows = Array.isArray(snapshot?.[mode]) ? snapshot[mode] : [];
             return {
@@ -1185,7 +1146,8 @@
                     name: displayName(row, mode),
                     photoKey: profileKey(row, mode),
                     actual: raceActualValue(row, key),
-                    value: metricPercent(row, key)
+                    percent: metricPercent(row, key),
+                    value: raceRankingValue(row, key)
                 })).filter(row => row.id)
             };
         }
@@ -1201,11 +1163,14 @@
                 const end = to?.value || 0;
                 const startActual = from?.actual || 0;
                 const endActual = to?.actual || 0;
+                const startPercent = from?.percent || 0;
+                const endPercent = to?.percent || 0;
                 return {
                     id,
                     name: to?.name || from?.name || id,
                     photoKey: to?.photoKey || from?.photoKey || id,
                     actual: startActual + (endActual - startActual) * progress,
+                    percent: startPercent + (endPercent - startPercent) * progress,
                     value: start + (end - start) * progress
                 };
             });
@@ -1236,7 +1201,7 @@
             const maximum = Math.max(container._raceMaximum || 1, 1);
 
             laneIds.forEach((id, laneIndex) => {
-                const person = rowMap.get(id) || { ...profiles.get(id), value: 0 };
+                const person = rowMap.get(id) || { ...profiles.get(id), value: 0, actual: 0, percent: 0 };
                 let row = container._raceRows.get(id);
                 if (!row) {
                     row = document.createElement("div");
@@ -1287,7 +1252,9 @@
                     ? `${Math.max((person.value / maximum) * 100, 1.5)}%`
                     : "0%";
                 parts.actual.textContent = formatRaceActual(person.actual, container._raceMetricKey);
-                parts.percent.textContent = formatRacePercent(person.value);
+                const hidePercent = container._raceMetricKey === "sales";
+                parts.percent.hidden = hidePercent;
+                parts.percent.textContent = hidePercent ? "" : formatRacePercent(person.percent);
             });
         }
 
@@ -1301,7 +1268,7 @@
             return new Promise(resolve => {
                 const startFrame = {
                     label: "เริ่มต้น",
-                    rows: [...(container._raceProfiles?.values() || [])].map(row => ({ ...row, value: 0, actual: 0 }))
+                    rows: [...(container._raceProfiles?.values() || [])].map(row => ({ ...row, value: 0, actual: 0, percent: 0 }))
                 };
                 let startedAt = 0;
                 const step = timestamp => {
@@ -1347,7 +1314,7 @@
                 const frameRows = new Map(frame.rows.filter(row => finalistIds.has(row.id)).map(row => [row.id, row]));
                 return {
                     ...frame,
-                    rows: finalists.map(profile => frameRows.get(profile.id) || { ...profile, value: 0, actual: 0 })
+                    rows: finalists.map(profile => frameRows.get(profile.id) || { ...profile, value: 0, actual: 0, percent: 0 })
                 };
             });
 
@@ -1363,7 +1330,7 @@
             container.style.setProperty("--race-lanes", String(finalists.length));
 
             const dateLabel = document.getElementById(`race-date-${mode}-${key}`);
-            renderRaceRows(container, finalists.map(row => ({ ...row, value: 0, actual: 0 })), false);
+            renderRaceRows(container, finalists.map(row => ({ ...row, value: 0, actual: 0, percent: 0 })), false);
             const completed = await animateRaceTimeline(container, frames, RACE_DURATION_MS, dateLabel, runKey, token);
             if (!completed || raceRuns.get(runKey) !== token) return;
 
@@ -1442,7 +1409,7 @@
                     <div class="race-header">
                         <div>
                             <h3>${cat.title}</h3>
-                            <p>${cat.subtitle || ""} • แข่งขันด้วย % Index เทียบเป้า</p>
+                            <p>${cat.subtitle || ""} • ${key === "sales" ? "จัดอันดับตามยอดขายสูงสุด" : "แข่งขันด้วย % Index เทียบเป้า"}</p>
                         </div>
                         <span id="race-date-${mode}-${key}" class="race-date">พร้อมเริ่ม</span>
                     </div>
