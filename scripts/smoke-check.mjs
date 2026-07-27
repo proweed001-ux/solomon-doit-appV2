@@ -296,6 +296,14 @@ mustContain("dist/performance-reveal.html", "container._raceFinished = Boolean(w
 mustContain("dist/performance-reveal.html", "แตะกรอบเพื่อเปิดผู้ชนะ");
 mustContain("dist/performance-reveal.html", ".race-row .race-rank,");
 mustContain("dist/performance-reveal.html", "color: #ffffff");
+mustContain("dist/performance-reveal.html", 'id="fullscreen-toggle"');
+mustContain("dist/performance-reveal.html", "function toggleFullscreenMode");
+mustContain("dist/performance-reveal.html", "requestFullscreen");
+mustContain("dist/performance-reveal.html", "webkitRequestFullscreen");
+mustContain("dist/performance-reveal.html", "fullscreenchange");
+mustContain("dist/performance-reveal.html", "pseudo-fullscreen");
+mustContain("dist/performance-reveal.html", "100dvh");
+mustContain("dist/performance-reveal.html", "safe-area-inset-top");
 mustNotContain("dist/performance-reveal.html", 'data-award-key="overall"');
 mustNotContain("dist/performance-reveal.html", '{ key: "giv", suffix: "giv"');
 mustContain("dist/performance-reveal.html", "function formatRaceActual");
