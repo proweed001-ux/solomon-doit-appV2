@@ -29,6 +29,10 @@
     {
       "source": "/performance",
       "destination": "/performance.html"
+    },
+    {
+      "source": "/performance-reveal",
+      "destination": "/performance-reveal.html"
     }
   ]
 }
