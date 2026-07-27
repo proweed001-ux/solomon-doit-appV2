@@ -245,6 +245,11 @@
             align-items: center;
             justify-content: center;
         }
+        .award-stage > [id^="categories-area-"] {
+            width: 100%;
+            min-width: 0;
+            flex: 0 0 100%;
+        }
         .award-slide {
             display: none;
             width: 100%;
@@ -1286,6 +1291,12 @@
             });
         }
 
+        function revealRaceRanks(container) {
+            container.querySelectorAll(".race-row").forEach(row => {
+                row.classList.add("race-finished");
+            });
+        }
+
         function animateRaceTimeline(container, frames, duration, dateLabel, runKey, token) {
             return new Promise(resolve => {
                 const startFrame = {
@@ -1358,7 +1369,7 @@
 
             await new Promise(resolve => setTimeout(resolve, 650));
             if (raceRuns.get(runKey) !== token) return;
-            renderRaceRows(container, frames.at(-1).rows, true);
+            revealRaceRanks(container);
             if (dateLabel) dateLabel.textContent = `เปิดอันดับแล้ว • ${frames.at(-1).label}`;
         }
 
