@@ -362,6 +362,7 @@ mustContain("dist/performance-reveal.html", 'const IMAGEKIT_PROFILE_URL = "https
 mustContain("dist/performance-reveal.html", "`${IMAGEKIT_PROFILE_URL}/${encodeURIComponent(code)}.webp`");
 mustContain("dist/performance-reveal.html", "code: profileKey(row, mode) || rowIdentity(row, mode)");
 mustContain("dist/performance-reveal.html", "winnerCode.textContent = code");
+mustNotContain("dist/performance-reveal.html", 'if (mode === "ads") return code || name || "-";');
 mustContain("dist/performance-reveal.html", "race-started");
 mustNotContain("dist/performance-reveal.html", "race-person");
 mustContain("dist/performance-reveal.html", "ตำแหน่งคงที่ • แท่งแซงกัน • เปิดอันดับตอนจบ");
