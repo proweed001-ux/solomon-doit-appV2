@@ -370,20 +370,22 @@
         .race-track {
             height: 350px;
             margin-top: 16px;
+            overflow: hidden;
             position: relative;
+            border-bottom: 1px solid rgba(250, 204, 21, 0.18);
         }
         .race-row {
             position: absolute;
-            top: 0;
+            bottom: 0;
             left: 0;
-            width: 100%;
-            height: 62px;
+            width: 20%;
+            height: 100%;
             display: grid;
-            grid-template-columns: 42px minmax(110px, 210px) minmax(100px, 1fr) 78px;
-            align-items: center;
-            gap: 10px;
+            grid-template-rows: 34px 34px minmax(80px, 1fr) 62px;
+            justify-items: center;
+            align-items: end;
             opacity: 0;
-            transform: translateY(310px);
+            transform: translateX(520%);
             transition: transform 0.52s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease;
             will-change: transform;
         }
@@ -391,6 +393,7 @@
             opacity: 1;
         }
         .race-rank {
+            grid-row: 1;
             width: 34px;
             height: 34px;
             display: flex;
@@ -407,14 +410,18 @@
             box-shadow: 0 0 18px rgba(234, 179, 8, 0.4);
         }
         .race-person {
+            grid-row: 4;
+            width: 100%;
             min-width: 0;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 9px;
+            justify-content: flex-start;
+            gap: 3px;
         }
         .race-person img {
-            width: 38px;
-            height: 38px;
+            width: 36px;
+            height: 36px;
             flex: 0 0 auto;
             border-radius: 999px;
             border: 1px solid rgba(250, 204, 21, 0.4);
@@ -422,38 +429,45 @@
             object-fit: cover;
         }
         .race-person span {
+            width: 100%;
             min-width: 0;
             overflow: hidden;
             color: #f4f4f5;
-            font-size: clamp(0.78rem, 1.2vw, 1rem);
+            font-size: clamp(0.68rem, 1vw, 0.86rem);
             font-weight: 800;
+            text-align: center;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
         .race-bar-lane {
-            height: 30px;
+            grid-row: 3;
+            width: min(72%, 76px);
+            height: 100%;
+            display: flex;
+            align-items: flex-end;
             overflow: hidden;
-            border-radius: 999px;
+            border-radius: 16px 16px 4px 4px;
             background: rgba(255,255,255,0.055);
             position: relative;
         }
         .race-bar {
-            width: 0;
-            height: 100%;
+            width: 100%;
+            height: 0;
             border-radius: inherit;
-            background: linear-gradient(90deg, #713f12, #eab308 70%, #fef08a);
+            background: linear-gradient(0deg, #713f12, #eab308 70%, #fef08a);
             box-shadow: 0 0 20px rgba(234,179,8,0.2);
-            transition: width 0.28s linear;
+            transition: height 0.28s linear;
         }
         .race-row[data-rank="1"] .race-bar {
-            background: linear-gradient(90deg, #a16207, #facc15 70%, #fff7ae);
+            background: linear-gradient(0deg, #a16207, #facc15 70%, #fff7ae);
             box-shadow: 0 0 24px rgba(250,204,21,0.42);
         }
         .race-percent {
+            grid-row: 2;
             color: #facc15;
-            font-size: clamp(1rem, 1.7vw, 1.28rem);
+            font-size: clamp(0.88rem, 1.5vw, 1.18rem);
             font-weight: 900;
-            text-align: right;
+            text-align: center;
         }
         .race-footer {
             display: flex;
@@ -480,12 +494,25 @@
                 padding: 16px 12px;
             }
             .race-row {
-                grid-template-columns: 34px minmax(92px, 128px) minmax(70px, 1fr) 64px;
-                gap: 6px;
+                grid-template-rows: 30px 30px minmax(74px, 1fr) 58px;
             }
             .race-person img {
+                width: 28px;
+                height: 28px;
+            }
+            .race-person span {
+                font-size: 0.62rem;
+            }
+            .race-rank {
                 width: 30px;
                 height: 30px;
+                font-size: 0.78rem;
+            }
+            .race-date {
+                max-width: 126px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
             .race-track {
                 height: 335px;
@@ -697,6 +724,7 @@
             const number = Number(String(value ?? 0).replace(/,/g, '').replace(/%/g, '').trim());
             return Number.isFinite(number) ? number : 0;
         }
+
         function metricActual(row, key) {
             return numberValue(row?.[key]?.actual);
         }
@@ -861,14 +889,15 @@
                 const index = await fetchPerformanceJson(PERFORMANCE_HISTORY_INDEX, 8000);
                 const currentLabel = snapshotLabel(latest);
                 const unique = new Map();
+                const indexed = (Array.isArray(index) ? index : []).filter(item => item?.path);
+                const compactHistory = indexed.filter(item => String(item.path).startsWith("performance/compare/"));
+                const candidates = compactHistory.length ? compactHistory : indexed;
 
-                (Array.isArray(index) ? index : [])
-                    .filter(item => item?.path)
-                    .forEach(item => {
-                        const label = String(item.reportDate || item.reportKey || item.path);
-                        if (label === currentLabel || unique.has(label)) return;
-                        unique.set(label, item);
-                    });
+                candidates.forEach(item => {
+                    const label = String(item.reportDate || item.reportKey || item.path);
+                    if (label === currentLabel || unique.has(label)) return;
+                    unique.set(label, item);
+                });
 
                 const selected = [...unique.values()]
                     .filter(item => {
@@ -1053,13 +1082,13 @@
                 const parts = row._raceParts;
                 row.classList.toggle("is-top-five", visible);
                 row.dataset.rank = String(rank + 1);
-                row.style.transform = `translateY(${visible ? rank * 66 : 330}px)`;
+                row.style.transform = `translateX(${visible ? rank * 100 : 520}%)`;
                 parts.rank.textContent = String(rank + 1);
                 parts.name.textContent = person.name;
                 const image = parts.image;
                 image.src = personImageUrl(person.photoKey || person.name);
                 image.onerror = () => safeImageOnError(image, person.name);
-                parts.bar.style.width = `${Math.max((person.value / maximum) * 100, 1.5)}%`;
+                parts.bar.style.height = `${Math.max((person.value / maximum) * 100, 1.5)}%`;
                 parts.percent.textContent = formatRacePercent(person.value);
             });
         }
