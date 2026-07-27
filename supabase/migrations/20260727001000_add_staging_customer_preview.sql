@@ -160,7 +160,7 @@ revoke all on function public.get_promo_test_published_catalog_v1(text) from pub
 revoke all on function public.save_promo_test_card_image_v1(uuid,text,text,text,text) from public;
 revoke all on function public.get_promo_test_card_image_v1(uuid,text) from public;
 
-grant execute on function public.publish_promo_test_version_v1(uuid,text) to anon, authenticated;
-grant execute on function public.get_promo_test_published_catalog_v1(text) to anon, authenticated;
-grant execute on function public.save_promo_test_card_image_v1(uuid,text,text,text,text) to anon, authenticated;
-grant execute on function public.get_promo_test_card_image_v1(uuid,text) to anon, authenticated;
+grant execute on function public.publish_promo_test_version_v1(uuid,text) to anon;
+grant execute on function public.get_promo_test_published_catalog_v1(text) to anon;
+grant execute on function public.save_promo_test_card_image_v1(uuid,text,text,text,text) to anon;
+grant execute on function public.get_promo_test_card_image_v1(uuid,text) to anon;
