@@ -4,12 +4,14 @@ import react from '@vitejs/plugin-react';
 export const PROMO_BUILD_FLAVOR = 'HARDENED-SNAPSHOT-V2-CARD-UUID-V9' as const;
 const commit = String(process.env.VERCEL_GIT_COMMIT_SHA || 'LOCAL').slice(0, 8).toUpperCase();
 const buildId = `PROMO-${commit}-${PROMO_BUILD_FLAVOR}`;
+const stagingPreview = process.env.VERCEL_ENV !== 'production' && process.env.PROMO_TEST_DATABASE === '1';
 
 export default defineConfig({
   plugins: [react()],
   define: {
     'process.env.NODE_ENV': JSON.stringify('production'),
     __PROMO_BUILD_ID__: JSON.stringify(buildId),
+    __PROMO_STAGING_PREVIEW__: JSON.stringify(stagingPreview),
   },
   publicDir: false,
   build: {
