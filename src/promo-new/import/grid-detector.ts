@@ -18,6 +18,7 @@ export interface GridDiagnostics {
   outerCandidateCount?: number;
   anchorValidatedCards?: number;
   referenceAnchorCount?: number;
+  referenceAnchorComponentCount?: number;
   promotionAnchorCount?: number;
 }
 
@@ -204,6 +205,59 @@ function relativeRect(component: PixelComponent, region: Rect): Rect {
   };
 }
 
+const REFERENCE_FRAGMENT_GAP_X = 0.055;
+const REFERENCE_FRAGMENT_GAP_Y = 0.06;
+
+function axisGap(leftStart: number, leftSize: number, rightStart: number, rightSize: number): number {
+  return Math.max(0, Math.max(leftStart, rightStart) - Math.min(leftStart + leftSize, rightStart + rightSize));
+}
+
+/**
+ * A printed yellow reference box can be split into multiple connected
+ * components by dark text or a separator. Count nearby fragments as one
+ * logical anchor, while keeping genuinely separate boxes as separate anchors.
+ */
+export function countLogicalReferenceAnchors(candidateRects: Rect[], region: Rect): number {
+  if (candidateRects.length < 2) return candidateRects.length;
+  const parents = candidateRects.map((_, index) => index);
+  const find = (index: number): number => {
+    let current = index;
+    while (parents[current] !== current) {
+      parents[current] = parents[parents[current]];
+      current = parents[current];
+    }
+    return current;
+  };
+  const join = (left: number, right: number) => {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (leftRoot !== rightRoot) parents[rightRoot] = leftRoot;
+  };
+
+  for (let left = 0; left < candidateRects.length; left += 1) {
+    for (let right = left + 1; right < candidateRects.length; right += 1) {
+      const horizontalGap = axisGap(
+        candidateRects[left].x,
+        candidateRects[left].width,
+        candidateRects[right].x,
+        candidateRects[right].width,
+      );
+      const verticalGap = axisGap(
+        candidateRects[left].y,
+        candidateRects[left].height,
+        candidateRects[right].y,
+        candidateRects[right].height,
+      );
+      if (
+        horizontalGap <= region.width * REFERENCE_FRAGMENT_GAP_X
+        && verticalGap <= region.height * REFERENCE_FRAGMENT_GAP_Y
+      ) join(left, right);
+    }
+  }
+
+  return new Set(candidateRects.map((_, index) => find(index))).size;
+}
+
 function referenceAnchorCandidates(components: PixelComponent[], region: Rect): PixelComponent[] {
   return components.filter(component => {
     if (!componentCenteredInside(component, region) || componentFill(component) < 0.5) return false;
@@ -370,16 +424,19 @@ export function detectCardGrid(canvas: HTMLCanvasElement, page: number): GridRes
   const structuralReasons = [...base.diagnostics.reasons];
   let anchorValidatedCards = 0;
   let referenceAnchorCount = 0;
+  let referenceAnchorComponentCount = 0;
   let promotionAnchorCount = 0;
 
   interiorRegions.forEach((region, index) => {
     const references = referenceAnchorCandidates(referenceComponents, region);
     const promotions = promotionAnchorCandidates(promotionComponents, region);
-    referenceAnchorCount += references.length;
+    const logicalReferences = countLogicalReferenceAnchors(references.map(component => component.rect), region);
+    referenceAnchorCount += logicalReferences;
+    referenceAnchorComponentCount += references.length;
     promotionAnchorCount += promotions.length;
     const outerEvidence = borderStripEvidence(masks.image, canvas.width, canvas.height, region);
-    if (references.length !== 1 || promotions.length !== 1) {
-      structuralReasons.push(`grid_anchor_set_invalid:${index + 1}:reference=${references.length}:promotion=${promotions.length}`);
+    if (logicalReferences !== 1 || promotions.length !== 1) {
+      structuralReasons.push(`grid_anchor_set_invalid:${index + 1}:reference=${logicalReferences}:reference_components=${references.length}:promotion=${promotions.length}`);
       return;
     }
     if (outerEvidence < 0.45) {
@@ -407,6 +464,7 @@ export function detectCardGrid(canvas: HTMLCanvasElement, page: number): GridRes
       outerCandidateCount: interiorRegions.length,
       anchorValidatedCards,
       referenceAnchorCount,
+      referenceAnchorComponentCount,
       promotionAnchorCount,
     },
   };
