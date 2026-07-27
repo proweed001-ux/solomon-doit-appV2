@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AYA Top Performance · Reveal Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;700;900&display=swap');
+
+        :root {
+            --gold: #eab308;
+            --gold-light: #fef08a;
+            --gold-deep: #a16207;
+            --panel: rgba(15, 15, 15, 0.86);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: #050505;
+            color: white;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* ----- Background Effects: จากเวอร์ชันแรก ----- */
+        .bg-rays {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 150vw;
+            height: 150vw;
+            background: conic-gradient(from 0deg, transparent 0deg, rgba(234, 179, 8, 0.05) 45deg, transparent 90deg);
+            animation: spin 80s linear infinite;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+        @keyframes spin { 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+
+        .glass-panel {
+            background: var(--panel);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(250, 204, 21, 0.2);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .gold-text {
+            background: linear-gradient(to right, #fef08a, #eab308, #a16207);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        /* ----- Tabs: เพิ่มจากเวอร์ชัน 2 แต่คุมให้เข้ากับเวอร์ชันแรก ----- */
+        .tab-btn {
+            padding: 10px 24px;
+            font-size: 1.05rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            color: #777;
+            background: rgba(17, 17, 17, 0.86);
+            border: 1px solid rgba(234, 179, 8, 0.22);
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .tab-btn:hover { color: #facc15; border-color: rgba(234,179,8,0.55); }
+        .tab-btn.active {
+            color: #050505;
+            background: linear-gradient(135deg, #fef08a, #eab308);
+            border-color: #facc15;
+            box-shadow: 0 0 28px rgba(234,179,8,0.24);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.35s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ----- Suspense Reveal: หน่วงจังหวะก่อนเปิดผล ----- */
+        .suspense-ring {
+            width: 104px;
+            height: 104px;
+            border-radius: 999px;
+            border: 2px solid rgba(234, 179, 8, 0.18);
+            border-top-color: #facc15;
+            border-right-color: #fef08a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 35px rgba(234, 179, 8, 0.2), inset 0 0 25px rgba(234, 179, 8, 0.08);
+            animation: suspenseSpin 1.35s linear infinite;
+        }
+        .suspense-ring-inner {
+            width: 76px;
+            height: 76px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle, rgba(250,204,21,0.2), rgba(0,0,0,0.95) 72%);
+            animation: suspenseSpinReverse 1.35s linear infinite;
+        }
+        .suspense-number {
+            font-size: 2.6rem;
+            line-height: 1;
+            font-weight: 900;
+            color: #facc15;
+            text-shadow: 0 0 24px rgba(250,204,21,0.7);
+            animation: countdownPop 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .suspense-dots {
+            display: flex;
+            gap: 8px;
+            margin-top: 18px;
+        }
+        .suspense-dots span {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: #3f3f46;
+            transition: all 0.3s ease;
+        }
+        .suspense-dots span.active {
+            width: 24px;
+            background: #facc15;
+            box-shadow: 0 0 16px rgba(250,204,21,0.65);
+        }
+        .category-spinner {
+            width: 58px;
+            height: 58px;
+            border-radius: 999px;
+            border: 2px solid rgba(234, 179, 8, 0.18);
+            border-top-color: #facc15;
+            box-shadow: 0 0 22px rgba(234,179,8,0.18);
+            animation: suspenseSpin 0.9s linear infinite;
+        }
+        @keyframes suspenseSpin { to { transform: rotate(360deg); } }
+        @keyframes suspenseSpinReverse { to { transform: rotate(-360deg); } }
+        @keyframes countdownPop {
+            0% { opacity: 0; transform: scale(0.35); }
+            65% { opacity: 1; transform: scale(1.18); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* ----- Podium Animation Styles: จากเวอร์ชันแรก ----- */
+        .podium-wrap { min-height: 430px; }
+        .podium-step {
+            width: 120px;
+            background: linear-gradient(to top, #111 0%, #2d2a19 100%);
+            border-top: 4px solid #eab308;
+            box-shadow: 0 -10px 40px rgba(234, 179, 8, 0.15);
+            border-radius: 12px 12px 0 0;
+            position: relative;
+            transform-origin: bottom;
+            opacity: 0;
+            transform: scaleY(0);
+        }
+        @media (min-width: 430px) { .podium-step { width: 145px; } }
+        @media (min-width: 768px) { .podium-step { width: 200px; } }
+
+        .podium-step.rank-1 { height: 100%; border-color: #fbbf24; background: linear-gradient(to top, #111 0%, #42350a 100%); z-index: 3; }
+        .podium-step.rank-2 { height: 75%; border-color: #94a3b8; background: linear-gradient(to top, #111 0%, #1e293b 100%); z-index: 2; }
+        .podium-step.rank-3 { height: 60%; border-color: #b45309; background: linear-gradient(to top, #111 0%, #451a03 100%); z-index: 1; }
+        @keyframes riseUp { to { opacity: 1; transform: scaleY(1); } }
+
+        .avatar-container {
+            position: absolute;
+            top: -58px;
+            left: 50%;
+            margin-left: -40px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid #eab308;
+            background: #000;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            opacity: 0;
+        }
+        @media (min-width: 768px) {
+            .avatar-container { top: -75px; margin-left: -50px; width: 100px; height: 100px; border-width: 4px; }
+            .rank-1 .avatar-container { width: 140px; height: 140px; top: -100px; margin-left: -70px; }
+        }
+        .rank-1 .avatar-container { border-color: #fbbf24; box-shadow: 0 0 30px rgba(251, 191, 36, 0.4); }
+        .rank-2 .avatar-container { border-color: #cbd5e1; }
+        .rank-3 .avatar-container { border-color: #d97706; }
+
+        @keyframes dropIn { from { transform: translateY(-50px) scale(0.5); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+        @keyframes fadeInReveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ----- Leaderboard Styles: จากเวอร์ชันแรก ปรับรองรับ 7 การ์ด ----- */
+        .top5-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 0;
+            border-bottom: 1px dashed rgba(255,255,255,0.06);
+            font-size: 0.78rem;
+        }
+        .top5-list li:last-child { border-bottom: none; }
+        .rank-badge {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            font-weight: 900;
+            font-size: 0.7rem;
+            color: black;
+            flex: 0 0 auto;
+        }
+        .rank-1-badge { background: linear-gradient(135deg, #fef08a, #eab308); box-shadow: 0 0 10px rgba(234, 179, 8, 0.5); }
+        .rank-2-badge { background: linear-gradient(135deg, #e2e8f0, #94a3b8); }
+        .rank-3-badge { background: linear-gradient(135deg, #fed7aa, #b45309); }
+        .rank-normal { background: #333; color: #aaa; }
+
+        .category-card {
+            min-height: 320px;
+            border-radius: 1rem;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .mode-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 5px 12px;
+            border: 1px solid rgba(234, 179, 8, 0.25);
+            border-radius: 999px;
+            background: rgba(234,179,8,0.07);
+            color: #facc15;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        .page-nav-link {
+            min-height: 42px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 14px;
+            border: 1px solid rgba(234, 179, 8, 0.3);
+            border-radius: 999px;
+            background: rgba(15, 15, 15, 0.9);
+            color: #facc15;
+            font-size: 0.82rem;
+            font-weight: 800;
+            text-decoration: none;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+        .page-nav-link:focus-visible {
+            outline: 3px solid rgba(250, 204, 21, 0.45);
+            outline-offset: 3px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 relative min-h-screen flex flex-col items-center">
+    <div class="bg-rays"></div>
+
+    <nav class="max-w-7xl w-full relative z-20 flex items-center justify-between gap-3 mb-6" aria-label="เมนูนำทาง">
+        <a class="page-nav-link" href="/performance?mode=ds">← Performance</a>
+        <a class="page-nav-link" href="/">หน้าหลัก</a>
+    </nav>
+
+    <div class="max-w-7xl w-full mx-auto relative z-10 flex flex-col items-center">
+        <header class="text-center mb-8 w-full">
+            <h1 class="text-4xl md:text-6xl font-black uppercase tracking-widest gold-text drop-shadow-[0_0_20px_rgba(234,179,8,0.2)]">
+                AYA TOP PERFORMANCE
+            </h1>
+            <p class="text-lg text-yellow-500/80 mt-2 font-medium tracking-[0.3em]">
+                <span id="performance-period">CHAMPIONS OF JUNE 2026</span>
+            </p>
+            <p id="performance-data-status" class="text-[11px] text-gray-500 mt-3 tracking-wider">
+                กำลังดึงข้อมูล Performance ล่าสุด...
+            </p>
+        </header>
+
+        <div class="flex gap-3 md:gap-4 mb-10 flex-wrap justify-center">
+            <button id="btn-ps" class="tab-btn active" onclick="switchTab('ps')">หมวด PS</button>
+            <button id="btn-ads" class="tab-btn" onclick="switchTab('ads')">หมวด ADS</button>
+        </div>
+
+        <main class="w-full">
+            <section id="tab-ps" class="tab-content active w-full" data-mode="ps">
+                <div class="text-center mb-6"><span class="mode-pill">PS MODE</span></div>
+                <div class="relative w-full max-w-4xl h-[400px] mb-20 mx-auto flex justify-center items-end podium-wrap">
+                    <div id="podium-lock-ps" onclick="revealPodium('ps')" class="absolute inset-0 z-50 flex flex-col items-center justify-center cursor-pointer glass-panel rounded-[2rem] transition-all duration-700 hover:bg-black/90 hover:scale-[1.02] border-yellow-500/50 shadow-[0_0_50px_rgba(234,179,8,0.15)]">
+                        <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
+                            <svg class="w-12 h-12 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        </div>
+                        <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">TAP TO REVEAL</h2>
+                        <p class="text-gray-400 tracking-widest text-sm uppercase">PS Overall Champions</p>
+                    </div>
+                    <div id="podium-area-ps" class="w-full h-full flex items-end justify-center gap-2 md:gap-4 hidden"></div>
+                </div>
+                <div class="text-center mb-8 w-full">
+                    <h2 class="text-lg md:text-xl font-bold tracking-[0.2em] uppercase text-gray-500 border-b border-gray-800 pb-4 inline-block px-10">
+                        EXCELLENCE CATEGORIES (PS)
+                    </h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-6 w-full" id="categories-area-ps"></div>
+            </section>
+
+            <section id="tab-ads" class="tab-content w-full" data-mode="ads">
+                <div class="text-center mb-6"><span class="mode-pill">ADS MODE</span></div>
+                <div class="relative w-full max-w-4xl h-[400px] mb-20 mx-auto flex justify-center items-end podium-wrap">
+                    <div id="podium-lock-ads" onclick="revealPodium('ads')" class="absolute inset-0 z-50 flex flex-col items-center justify-center cursor-pointer glass-panel rounded-[2rem] transition-all duration-700 hover:bg-black/90 hover:scale-[1.02] border-yellow-500/50 shadow-[0_0_50px_rgba(234,179,8,0.15)]">
+                        <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
+                            <svg class="w-12 h-12 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        </div>
+                        <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">TAP TO REVEAL</h2>
+                        <p class="text-gray-400 tracking-widest text-sm uppercase">ADS Overall Champions</p>
+                    </div>
+                    <div id="podium-area-ads" class="w-full h-full flex items-end justify-center gap-2 md:gap-4 hidden"></div>
+                </div>
+                <div class="text-center mb-8 w-full">
+                    <h2 class="text-lg md:text-xl font-bold tracking-[0.2em] uppercase text-gray-500 border-b border-gray-800 pb-4 inline-block px-10">
+                        EXCELLENCE CATEGORIES (ADS)
+                    </h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-6 w-full" id="categories-area-ads"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/assets/performance-cd-adapter-v1.js?v=3"></script>
+    <script>
+        const PERFORMANCE_DATA_URL = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/performance/current.min.json";
+        const PERFORMANCE_PUBLIC_KEY = String.fromCharCode(115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,74,84,104,89,119,65,108,95,45,97,115,107,107,95,99,73,97,67,100,55,53,119,95,84,67,87,75,50,66,84,84);
+        let performanceReady = false;
+        let performanceLoadFailed = false;
+
+        let boardData = {
+            ps: {
+                label: "PS",
+                main_podium: [
+                    { rank: 2, name: "นาย นันทภพ ฐิตานุกูล", sales: 361898, color: "text-slate-300" },
+                    { rank: 1, name: "นาย สรายุทธ ภู่หลักแก้ว", sales: 387166, color: "text-yellow-400" },
+                    { rank: 3, name: "นาย ศุกิจ ปิ่นวิเศษ", sales: 352480, color: "text-amber-600" }
+                ],
+                categories: [
+                    { id: "ps-vol", title: "Top Best Volume", subtitle: "ยอดขายใน DOIT", unit: "บาท", top: [ {rank:1,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"387,166"}, {rank:2,name:"นาย นันทภพ ฐิตานุกูล",value:"361,898"}, {rank:3,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"352,480"}, {rank:4,name:"นางสาว วันเพ็ญ กฤษเพชร์",value:"342,310"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"306,044"} ] },
+                    { id: "ps-giv", title: "Top Volume GIV", subtitle: "ยอดขาย GIV", unit: "บาท", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"434,052"}, {rank:2,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"430,282"}, {rank:3,name:"นาย นันทภพ ฐิตานุกูล",value:"408,467"}, {rank:4,name:"นางสาว วันเพ็ญ กฤษเพชร์",value:"405,635"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"343,451"} ] },
+                    { id: "ps-moq", title: "Top MOQ", subtitle: "จำนวนรายการ", unit: "รายการ", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"9,665"}, {rank:2,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"8,208"}, {rank:3,name:"นางสาว ปพิชญา ทางาม",value:"7,862"}, {rank:4,name:"นาย มณเฑียร ตะเคียนงาม",value:"7,840"}, {rank:5,name:"นาย นันทภพ ฐิตานุกูล",value:"7,675"} ] },
+                    { id: "ps-cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"468"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"460"}, {rank:3,name:"นาย นันทภพ ฐิตานุกูล",value:"453"}, {rank:4,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"452"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"448"} ] },
+                    { id: "ps-cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"468"}, {rank:2,name:"นางสาว พัทนันธ์ บุญธรรม",value:"415"}, {rank:3,name:"นางสาว วิรัตน์ ซืสเลอร์",value:"385"}, {rank:4,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"382"}, {rank:5,name:"นาย นันทภพ ฐิตานุกูล",value:"368"} ] },
+                    { id: "ps-cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย นันทภพ ฐิตานุกูล",value:"426"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"393"}, {rank:3,name:"นาย พลภัทร มีเอี่ยม",value:"389"}, {rank:4,name:"นางสาว วิรัตน์ ซืสเลอร์",value:"385"}, {rank:5,name:"นาย มณเฑียร ตะเคียนงาม",value:"382"} ] },
+                    { id: "ps-cd123", title: "Top CD1-3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย นันทภพ ฐิตานุกูล",value:"879"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"855"}, {rank:3,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"826"}, {rank:4,name:"นางสาว ชัญญ์ญาณ์ เจี๊ยะจิ๋ว",value:"813"}, {rank:5,name:"นาย มณเฑียร ตะเคียนงาม",value:"806"} ] }
+                ]
+            },
+            ads: {
+                label: "ADS",
+                main_podium: [
+                    { rank: 2, name: "AYAADS02", sales: 1611261, color: "text-slate-300" },
+                    { rank: 1, name: "AYAADS03", sales: 1613303, color: "text-yellow-400" },
+                    { rank: 3, name: "AYAADS01", sales: 1405280, color: "text-amber-600" }
+                ],
+                categories: [
+                    { id: "ads-vol", title: "Top Best Volume", subtitle: "ยอดขายใน DOIT", unit: "บาท", top: [ {rank:1,name:"AYAADS03",value:"1,613,303"}, {rank:2,name:"AYAADS02",value:"1,611,261"}, {rank:3,name:"AYAADS01",value:"1,405,280"}, {rank:4,name:"AYAADS04",value:"1,168,723"} ] },
+                    { id: "ads-giv", title: "Top Volume GIV", subtitle: "ยอดขาย GIV", unit: "บาท", top: [ {rank:1,name:"AYAADS02",value:"1,860,975"}, {rank:2,name:"AYAADS03",value:"1,819,634"}, {rank:3,name:"AYAADS01",value:"1,579,758"}, {rank:4,name:"AYAADS04",value:"1,346,783"} ] },
+                    { id: "ads-moq", title: "Top MOQ", subtitle: "จำนวนรายการ", unit: "รายการ", top: [ {rank:1,name:"AYAADS02",value:"45,117"}, {rank:2,name:"AYAADS03",value:"39,711"}, {rank:3,name:"AYAADS01",value:"39,240"}, {rank:4,name:"AYAADS04",value:"31,376"} ] },
+                    { id: "ads-cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"2,499"}, {rank:2,name:"AYAADS03",value:"2,374"}, {rank:3,name:"AYAADS01",value:"2,001"}, {rank:4,name:"AYAADS04",value:"1,656"} ] },
+                    { id: "ads-cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS03",value:"2,134"}, {rank:2,name:"AYAADS02",value:"2,080"}, {rank:3,name:"AYAADS01",value:"1,716"}, {rank:4,name:"AYAADS04",value:"1,427"} ] },
+                    { id: "ads-cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"2,000"}, {rank:2,name:"AYAADS03",value:"1,797"}, {rank:3,name:"AYAADS01",value:"1,693"}, {rank:4,name:"AYAADS04",value:"1,376"} ] },
+                    { id: "ads-cd123", title: "Top CD1-3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"4,503"}, {rank:2,name:"AYAADS03",value:"4,177"}, {rank:3,name:"AYAADS01",value:"3,696"}, {rank:4,name:"AYAADS04",value:"3,032"} ] }
+                ]
+            }
+        };
+
+        const performanceCategories = [
+            { key: "sales", suffix: "vol", title: "Top Best Volume", subtitle: "ยอดขายใน DOIT", unit: "บาท" },
+            { key: "giv", suffix: "giv", title: "Top Volume GIV", subtitle: "ยอดขาย GIV", unit: "บาท" },
+            { key: "moq", suffix: "moq", title: "Top MOQ", subtitle: "จำนวนรายการ", unit: "รายการ" },
+            { key: "dc1", suffix: "cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน" },
+            { key: "dc2", suffix: "cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน" },
+            { key: "dc3", suffix: "cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน" },
+            { key: "cd13", suffix: "cd123", title: "Top CD1-3", subtitle: "ร้าน", unit: "ร้าน" }
+        ];
+
+        function numberValue(value) {
+            const number = Number(String(value ?? 0).replace(/,/g, '').replace(/%/g, '').trim());
+            return Number.isFinite(number) ? number : 0;
+        }
+
+        function metricActual(row, key) {
+            return numberValue(row?.[key]?.actual);
+        }
+
+        function displayName(row, mode) {
+            const code = String(
+                mode === "ps"
+                    ? (row?.ps || row?.psCode || row?.code || "")
+                    : (row?.ads || row?.adsCode || row?.code || "")
+            ).trim();
+            const name = String(
+                mode === "ps"
+                    ? (row?.name || row?.psName || "")
+                    : (row?.name || row?.adsName || "")
+            ).trim();
+
+            if (mode === "ads") return code || name || "-";
+            if (!name || name === code) return code || name || "-";
+            return name;
+        }
+
+        function profileKey(row, mode) {
+            return String(
+                mode === "ps"
+                    ? (row?.ps || row?.psCode || row?.code || "")
+                    : (row?.ads || row?.adsCode || row?.code || "")
+            ).trim();
+        }
+
+        function avatarDataUrl(seed) {
+            const clean = String(seed || "AYA")
+                .replace(/^(นาย|นางสาว|นาง)\s*/u, "")
+                .trim();
+            const label = (clean || "AYA").slice(0, 2).toUpperCase();
+            const safeLabel = label
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;");
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><defs><radialGradient id="g"><stop stop-color="#2d2a19"/><stop offset="1" stop-color="#050505"/></radialGradient></defs><rect width="256" height="256" rx="128" fill="url(#g)"/><circle cx="128" cy="128" r="118" fill="none" stroke="#eab308" stroke-width="4" opacity=".55"/><text x="128" y="145" text-anchor="middle" font-family="Tahoma,Arial,sans-serif" font-size="72" font-weight="700" fill="#facc15">${safeLabel}</text></svg>`;
+            return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+        }
+
+        function personImageUrl(seed) {
+            return avatarDataUrl(seed);
+        }
+
+        function rankByActual(rows, key, limit) {
+            return [...(rows || [])]
+                .filter(row => metricActual(row, key) > 0)
+                .sort((a, b) => metricActual(b, key) - metricActual(a, key))
+                .slice(0, limit);
+        }
+
+        function buildModeBoard(mode, rows) {
+            const salesWinners = rankByActual(rows, "sales", 3);
+            const rankMap = salesWinners.map((row, index) => ({
+                rank: index + 1,
+                name: displayName(row, mode),
+                photoKey: profileKey(row, mode),
+                sales: metricActual(row, "sales"),
+                color: index === 0 ? "text-yellow-400" : index === 1 ? "text-slate-300" : "text-amber-600"
+            }));
+
+            const mainPodium = [rankMap[1], rankMap[0], rankMap[2]].filter(Boolean);
+            const categories = performanceCategories.map(category => ({
+                id: `${mode}-${category.suffix}`,
+                title: category.title,
+                subtitle: category.subtitle,
+                unit: category.unit,
+                top: rankByActual(rows, category.key, 5).map((row, index) => ({
+                    rank: index + 1,
+                    name: displayName(row, mode),
+                    photoKey: profileKey(row, mode),
+                    value: metricActual(row, category.key).toLocaleString("th-TH", { maximumFractionDigits: 0 })
+                }))
+            }));
+
+            return {
+                label: mode.toUpperCase(),
+                main_podium: mainPodium,
+                categories
+            };
+        }
+
+        function updatePerformancePeriod(meta) {
+            const period = document.getElementById("performance-period");
+            if (!period) return;
+
+            const rawDate = String(meta?.reportDate || meta?.reportKey || "").trim();
+            const dateMatch = rawDate.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+            if (!dateMatch) {
+                period.textContent = rawDate ? `CHAMPIONS • ${rawDate}` : "LATEST PERFORMANCE CHAMPIONS";
+                return;
+            }
+
+            const date = new Date(Date.UTC(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3])));
+            const monthYear = new Intl.DateTimeFormat("en-US", {
+                month: "long",
+                year: "numeric",
+                timeZone: "Asia/Bangkok"
+            }).format(date);
+            period.textContent = `CHAMPIONS OF ${monthYear.toUpperCase()}`;
+        }
+
+        function resetReveal(mode) {
+            const area = document.getElementById(`podium-area-${mode}`);
+            if (!area || area.dataset.rendered !== "true") return;
+            area.innerHTML = "";
+            area.dataset.rendered = "false";
+        }
+
+        async function loadPerformanceData() {
+            const status = document.getElementById("performance-data-status");
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 12000);
+
+            try {
+                const response = await fetch(PERFORMANCE_DATA_URL, {
+                    headers: {
+                        apikey: PERFORMANCE_PUBLIC_KEY,
+                        authorization: `Bearer ${PERFORMANCE_PUBLIC_KEY}`
+                    },
+                    cache: "no-store",
+                    signal: controller.signal
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const latest = await response.json();
+                if (!Array.isArray(latest?.ps) || !Array.isArray(latest?.ads)) {
+                    throw new Error("รูปแบบข้อมูล Performance ไม่ครบ");
+                }
+
+                boardData = {
+                    ps: buildModeBoard("ps", latest.ps),
+                    ads: buildModeBoard("ads", latest.ads)
+                };
+                updatePerformancePeriod(latest.meta || {});
+                resetReveal("ps");
+                resetReveal("ads");
+                renderCategories("ps");
+                renderCategories("ads");
+                performanceReady = true;
+                performanceLoadFailed = false;
+
+                const reportLabel = latest?.meta?.reportDate || latest?.meta?.reportKey || "ล่าสุด";
+                status.textContent = `ข้อมูล Performance ล่าสุด • ${reportLabel}`;
+                status.className = "text-[11px] text-emerald-400/80 mt-3 tracking-wider";
+            } catch (error) {
+                performanceLoadFailed = true;
+                status.textContent = `โหลดข้อมูลล่าสุดไม่สำเร็จ • กำลังใช้ข้อมูลสำรอง (${error.name === "AbortError" ? "หมดเวลา" : error.message})`;
+                status.className = "text-[11px] text-amber-500/80 mt-3 tracking-wider";
+                console.warn("[AYA Performance]", error);
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`btn-${tab}`).classList.add('active');
+            document.getElementById(`tab-${tab}`).classList.add('active');
+        }
+
+        function safeImageOnError(img, seed) {
+            img.onerror = null;
+            img.src = avatarDataUrl(seed);
+        }
+
+        function animateValue(obj, start, end, duration, suffix) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const currentVal = Math.floor(progress * (end - start) + start);
+                obj.innerHTML = currentVal.toLocaleString('th-TH') + suffix;
+                if (progress < 1) window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        function revealPodium(mode) {
+            const lockScreen = document.getElementById(`podium-lock-${mode}`);
+            const podiumArea = document.getElementById(`podium-area-${mode}`);
+            const data = boardData[mode].main_podium;
+            const delayByRank = { 3: 0.2, 2: 2.8, 1: 6.2 };
+
+            if (!performanceReady && !performanceLoadFailed) {
+                const waitingText = lockScreen.querySelector("p");
+                if (waitingText) waitingText.textContent = "กำลังโหลดข้อมูล Performance ล่าสุด...";
+                return;
+            }
+            if (lockScreen.dataset.revealing === 'true') return;
+            lockScreen.dataset.revealing = 'true';
+            lockScreen.style.pointerEvents = 'none';
+            lockScreen.classList.remove('hover:scale-[1.02]');
+            lockScreen.innerHTML = `
+                <div class="suspense-ring mb-7">
+                    <div class="suspense-ring-inner">
+                        <span id="suspense-number-${mode}" class="suspense-number">3</span>
+                    </div>
+                </div>
+                <h2 id="suspense-title-${mode}" class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">
+                    เตรียมเปิดผล
+                </h2>
+                <p id="suspense-status-${mode}" class="text-gray-400 tracking-widest text-xs md:text-sm uppercase">
+                    ${boardData[mode].label} OVERALL CHAMPIONS
+                </p>
+                <div class="suspense-dots">
+                    <span id="suspense-dot-1-${mode}" class="active"></span>
+                    <span id="suspense-dot-2-${mode}"></span>
+                    <span id="suspense-dot-3-${mode}"></span>
+                </div>
+            `;
+
+            const updateCountdown = (number, activeDot, title, status) => {
+                const numberEl = document.getElementById(`suspense-number-${mode}`);
+                const titleEl = document.getElementById(`suspense-title-${mode}`);
+                const statusEl = document.getElementById(`suspense-status-${mode}`);
+                if (!numberEl) return;
+                numberEl.textContent = number;
+                numberEl.style.animation = 'none';
+                void numberEl.offsetWidth;
+                numberEl.style.animation = 'countdownPop 0.65s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                titleEl.textContent = title;
+                statusEl.textContent = status;
+                for (let i = 1; i <= 3; i++) {
+                    document.getElementById(`suspense-dot-${i}-${mode}`)?.classList.toggle('active', i === activeDot);
+                }
+            };
+
+            setTimeout(() => updateCountdown('2', 2, 'อีกนิดเดียว', 'กำลังตรวจสอบคะแนนทั้งหมด'), 950);
+            setTimeout(() => updateCountdown('1', 3, 'พร้อมหรือยัง', 'อันดับที่ 3 กำลังจะปรากฏ'), 1900);
+            setTimeout(() => {
+                updateCountdown('!', 3, 'เริ่มเปิดผล', 'อันดับ 3 → อันดับ 2 → CHAMPION');
+                lockScreen.style.boxShadow = '0 0 90px rgba(234,179,8,0.38)';
+            }, 2850);
+
+            setTimeout(() => {
+                lockScreen.style.opacity = '0';
+                lockScreen.style.transform = 'scale(1.08)';
+            }, 3550);
+
+            setTimeout(() => {
+                lockScreen.style.display = 'none';
+                podiumArea.classList.remove('hidden');
+
+                if (podiumArea.dataset.rendered === 'true') return;
+                podiumArea.dataset.rendered = 'true';
+
+                data.forEach((person) => {
+                    const delay = delayByRank[person.rank] ?? 0;
+                    const rankLabel = person.rank === 1 ? '👑 CHAMPION' : `RANK ${person.rank}`;
+                    const textSize = person.rank === 1 ? 'text-2xl md:text-3xl' : 'text-lg md:text-xl';
+                    const podium = document.createElement('div');
+                    podium.className = `podium-step rank-${person.rank}`;
+                    podium.style.animation = `riseUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards ${delay}s`;
+                    podium.innerHTML = `
+                        <div class="avatar-container" style="animation: dropIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards ${delay + 0.8}s;">
+                            <img src="${personImageUrl(person.photoKey || person.name)}" class="w-full h-full object-cover" alt="" onerror="safeImageOnError(this, '${person.name.replace(/'/g, '')}')">
+                        </div>
+                        <div class="pt-10 md:pt-14 text-center w-full px-1 opacity-0" style="animation: fadeInReveal 0.5s forwards ${delay + 1.2}s;">
+                            <span class="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] bg-black/60 px-2 py-1 rounded ${person.color}">${rankLabel}</span>
+                            <h3 class="text-xs md:text-sm font-semibold mt-2 text-gray-200 truncate w-full px-1">${person.name}</h3>
+                            <p id="counter-${mode}-${person.rank}" class="${textSize} font-black ${person.color} mt-1 drop-shadow-md">0</p>
+                        </div>
+                    `;
+                    podiumArea.appendChild(podium);
+
+                    setTimeout(() => {
+                        const el = document.getElementById(`counter-${mode}-${person.rank}`);
+                        if (el) animateValue(el, 0, person.sales, 2000, ' ฿');
+                    }, (delay + 1.5) * 1000);
+                });
+            }, 4200);
+        }
+
+        function revealCategory(cover, title) {
+            if (cover.dataset.revealing === 'true') return;
+            cover.dataset.revealing = 'true';
+            cover.style.pointerEvents = 'none';
+            cover.innerHTML = `
+                <div class="category-spinner mb-5"></div>
+                <span class="text-yellow-500 font-black tracking-widest uppercase text-sm text-center px-3">
+                    กำลังเปิดผล...
+                </span>
+                <span class="text-gray-500 text-xs mt-2 text-center px-4">${title}</span>
+                <span class="text-gray-600 text-[10px] mt-3 tracking-[0.25em]">3 • 2 • 1</span>
+            `;
+
+            setTimeout(() => {
+                const label = cover.querySelector('.text-yellow-500');
+                if (label) label.textContent = 'ผู้ชนะคือ...';
+            }, 1050);
+
+            setTimeout(() => {
+                cover.style.opacity = '0';
+                cover.style.transform = 'scale(1.08)';
+            }, 1850);
+
+            setTimeout(() => {
+                cover.style.display = 'none';
+            }, 2550);
+        }
+
+        function badgeClass(rank) {
+            if (rank === 1) return 'rank-1-badge';
+            if (rank === 2) return 'rank-2-badge';
+            if (rank === 3) return 'rank-3-badge';
+            return 'rank-normal';
+        }
+
+        function renderCategories(mode) {
+            const container = document.getElementById(`categories-area-${mode}`);
+            const categories = boardData[mode].categories;
+            container.innerHTML = '';
+
+            categories.forEach(cat => {
+                const champ = cat.top[0];
+                if (!champ) return;
+
+                const listHTML = cat.top.map(person => {
+                    const nameStyle = person.rank === 1 ? 'text-yellow-400 font-bold' : 'text-gray-300';
+                    const valStyle = person.rank === 1 ? 'text-yellow-400 font-bold' : 'text-white font-medium';
+                    return `
+                        <li>
+                            <div class="flex items-center gap-2 overflow-hidden min-w-0">
+                                <span class="rank-badge ${badgeClass(person.rank)}">${person.rank}</span>
+                                <div class="w-5 h-5 rounded-full overflow-hidden border border-gray-600 shrink-0 bg-black">
+                                    <img src="${personImageUrl(person.photoKey || person.name)}" class="w-full h-full object-cover" alt="" onerror="safeImageOnError(this, '${person.name.replace(/'/g, '')}')">
+                                </div>
+                                <span class="truncate ${nameStyle}">${person.name}</span>
+                            </div>
+                            <span class="${valStyle} shrink-0">${person.value}</span>
+                        </li>
+                    `;
+                }).join('');
+
+                const card = document.createElement('div');
+                card.className = 'category-card glass-panel group shadow-lg';
+                card.innerHTML = `
+                    <div class="absolute inset-0 bg-[#0a0a0a] z-30 flex flex-col items-center justify-center cursor-pointer transition-all duration-700 hover:bg-[#111]" 
+                         onclick="revealCategory(this, '${cat.title.replace(/'/g, '')}')">
+                        <div class="w-14 h-14 bg-yellow-500/10 rounded-full flex items-center justify-center mb-4 border border-yellow-500/30 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+                            <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        </div>
+                        <span class="text-yellow-500 font-bold tracking-widest uppercase text-sm text-center px-3">TAP TO REVEAL</span>
+                        <span class="text-gray-500 text-xs mt-2 text-center px-4">${cat.title}</span>
+                        <span class="text-gray-600 text-[10px] mt-1 text-center px-4">${cat.subtitle || ''}</span>
+                    </div>
+
+                    <div id="slider-${cat.id}" class="flex w-full h-full overflow-x-auto snap-x snap-mandatory hide-scrollbar scroll-smooth">
+                        <div class="snap-center shrink-0 w-full h-full flex flex-col items-center justify-center p-6 relative">
+                            <h4 class="text-[10px] font-black text-yellow-500 tracking-widest uppercase mb-1 text-center">${cat.title}</h4>
+                            <p class="text-[10px] text-gray-500 mb-4 text-center">${cat.subtitle || ''}</p>
+                            <div class="w-20 h-20 rounded-full overflow-hidden border-2 border-yellow-500 mb-4 bg-black shadow-[0_0_20px_rgba(234,179,8,0.3)] shrink-0">
+                                <img src="${personImageUrl(champ.photoKey || champ.name)}" class="w-full h-full object-cover" alt="" onerror="safeImageOnError(this, '${champ.name.replace(/'/g, '')}')">
+                            </div>
+                            <p class="text-sm md:text-base text-white font-bold text-center w-full truncate">${champ.name}</p>
+                            <p class="text-2xl md:text-3xl font-black gold-text mt-1">${champ.value} <span class="text-[10px] font-normal text-gray-400">${cat.unit}</span></p>
+                            <button onclick="document.getElementById('slider-${cat.id}').scrollBy({left: 300, behavior: 'smooth'})" 
+                                    class="absolute bottom-4 right-4 text-[10px] font-bold text-yellow-500 flex items-center gap-1 animate-pulse hover:text-white bg-black/50 px-2 py-1 rounded">
+                                ดู TOP ${cat.top.length}
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            </button>
+                        </div>
+
+                        <div class="snap-center shrink-0 w-full h-full flex flex-col p-5 relative bg-black/40">
+                            <h4 class="text-[11px] font-black text-yellow-500 tracking-widest uppercase mb-1 text-center">${cat.title}</h4>
+                            <p class="text-[10px] text-gray-500 mb-3 text-center border-b border-gray-700 pb-2">TOP ${cat.top.length} • ${cat.subtitle || cat.unit}</p>
+                            <ul class="top5-list w-full flex-grow flex flex-col justify-center">
+                                ${listHTML}
+                            </ul>
+                            <button onclick="document.getElementById('slider-${cat.id}').scrollBy({left: -300, behavior: 'smooth'})" 
+                                    class="absolute bottom-4 left-4 text-[10px] font-bold text-gray-400 flex items-center gap-1 hover:text-white transition-colors bg-black/50 px-2 py-1 rounded">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                                กลับ
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        renderCategories('ps');
+        renderCategories('ads');
+        loadPerformanceData();
+    </script>
+</body>
+</html>
