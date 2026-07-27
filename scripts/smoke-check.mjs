@@ -25,6 +25,7 @@ const required = [
   "dist/admin.html",
   "dist/admin-login.html",
   "dist/performance.html",
+  "dist/performance-reveal.html",
   "dist/assets/pro/app.js",
   "dist/assets/pro/core.js",
   "dist/assets/pro/state.js",
@@ -259,6 +260,15 @@ mustNotContain("dist/assets/admin-progress-popup-v1.js", "lastAutoActive");
 
 // Performance dashboard and active metadata guardrails.
 mustContain("dist/performance.html", "/assets/performance-board-v4.js");
+mustContain("dist/performance.html", "href='/performance-reveal'");
+mustContain("dist/performance-reveal.html", "/performance?mode=ds");
+mustContain("dist/performance-reveal.html", "performance/current.min.json");
+mustContain("dist/performance-reveal.html", "loadPerformanceData()");
+mustContain("dist/performance-reveal.html", "function revealPodium");
+mustContain("dist/performance-reveal.html", "delayByRank = { 3: 0.2, 2: 2.8, 1: 6.2 }");
+mustNotContain("dist/performance-reveal.html", "scontent.");
+mustNotContain("dist/performance-reveal.html", "raw.githubusercontent.com");
+mustContain("vercel.json", "\"source\": \"/performance-reveal\"");
 mustContain("dist/assets/performance-board-v4.js", "Smart Compare วันต่อวัน");
 mustContain("dist/assets/performance-board-v4.js", "sameDayRevisions");
 mustContain("dist/assets/performance-board-v4.js", "Month Trend Dashboard");
