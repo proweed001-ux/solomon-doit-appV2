@@ -300,6 +300,8 @@ mustContain("dist/performance-reveal.html", "inset: 0 0 auto 0");
 mustContain("dist/performance-reveal.html", "height: calc(100% - var(--winner-caption-height))");
 mustNotContain("dist/performance-reveal.html", "height: auto;\n            object-fit: contain");
 mustContain("dist/performance-reveal.html", "background: transparent");
+mustContain("dist/performance-reveal.html", "position: absolute;\n            left: 0;\n            right: 0;\n            bottom: 0;");
+mustNotContain("dist/performance-reveal.html", "flex: 0 0 var(--winner-caption-height)");
 mustContain("dist/performance-reveal.html", 'aria-label="กลับไปดูอันดับ"');
 mustContain("dist/performance-reveal.html", "winner-fireworks");
 mustContain("dist/performance-reveal.html", "@keyframes winnerFirework");
