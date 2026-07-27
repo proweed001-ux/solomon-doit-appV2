@@ -1424,6 +1424,79 @@
             });
         }
 
+        function closeWinnerReveal(card) {
+            const overlay = card?.querySelector(".winner-reveal");
+            if (!overlay) return;
+            overlay.classList.remove("is-visible");
+            overlay.setAttribute("aria-hidden", "true");
+            card.classList.remove("winner-open");
+        }
+
+        function showWinnerReveal(card, container) {
+            const winner = container?._raceWinner;
+            if (!card || !winner) return;
+
+            let overlay = card.querySelector(".winner-reveal");
+            if (!overlay) {
+                overlay = document.createElement("section");
+                overlay.className = "winner-reveal";
+                overlay.setAttribute("aria-hidden", "true");
+                overlay.innerHTML = `
+                    <div class="winner-rays" aria-hidden="true"></div>
+                    <img class="winner-photo" alt="">
+                    <div class="winner-shade" aria-hidden="true"></div>
+                    <div class="winner-confetti" aria-hidden="true"></div>
+                    <div class="winner-content">
+                        <span class="winner-crown">♛ อันดับ 1</span>
+                        <h2 class="winner-title"></h2>
+                        <strong class="winner-value"></strong>
+                        <strong class="winner-percent"></strong>
+                        <button class="winner-back" type="button">← กลับไปดูอันดับ</button>
+                    </div>
+                `;
+                overlay.querySelector(".winner-back").addEventListener("click", event => {
+                    event.stopPropagation();
+                    closeWinnerReveal(card);
+                });
+                const confetti = overlay.querySelector(".winner-confetti");
+                const colors = ["#facc15", "#fef08a", "#ffffff", "#d97706"];
+                for (let index = 0; index < 22; index += 1) {
+                    const piece = document.createElement("i");
+                    piece.style.setProperty("--left", `${(index * 37) % 100}%`);
+                    piece.style.setProperty("--delay", `${(index % 8) * 0.12}s`);
+                    piece.style.setProperty("--drift", `${((index % 7) - 3) * 18}px`);
+                    piece.style.setProperty("--color", colors[index % colors.length]);
+                    confetti.appendChild(piece);
+                }
+                card.appendChild(overlay);
+            }
+
+            const image = overlay.querySelector(".winner-photo");
+            image.src = personImageUrl(winner.photoKey || winner.name);
+            image.alt = `ผู้ชนะอันดับ 1 ${winner.name}`;
+            image.onerror = () => safeImageOnError(image, winner.name);
+            overlay.querySelector(".winner-title").textContent = winner.name;
+            overlay.querySelector(".winner-value").textContent =
+                formatRaceActual(winner.actual, container._raceMetricKey);
+            const percent = overlay.querySelector(".winner-percent");
+            const hidePercent = container._raceMetricKey === "sales";
+            percent.hidden = hidePercent;
+            percent.textContent = hidePercent ? "" : formatRacePercent(winner.percent);
+
+            card.classList.add("winner-open");
+            overlay.setAttribute("aria-hidden", "false");
+            overlay.classList.remove("is-visible");
+            requestAnimationFrame(() => overlay.classList.add("is-visible"));
+        }
+
+        function handleRaceCardClick(event) {
+            if (event.target.closest("button, a")) return;
+            const card = event.currentTarget;
+            const container = document.getElementById(card.dataset.raceContainerId || "");
+            if (!container?._raceFinished || card.classList.contains("winner-open")) return;
+            showWinnerReveal(card, container);
+        }
+
         function animateRaceTimeline(container, frames, duration, dateLabel, runKey, token) {
             return new Promise(resolve => {
                 const startFrame = {
@@ -1459,6 +1532,12 @@
             if (!performanceReady || !performanceTimeline.length) return;
             const container = document.getElementById(containerId);
             if (!container) return;
+
+            const card = container.closest(".race-card");
+            closeWinnerReveal(card);
+            card?.classList.remove("winner-ready");
+            container._raceFinished = false;
+            container._raceWinner = null;
 
             const runKey = `${mode}:${key}:${containerId}`;
             const token = (raceRuns.get(runKey) || 0) + 1;
@@ -1497,7 +1576,15 @@
             await new Promise(resolve => setTimeout(resolve, 650));
             if (raceRuns.get(runKey) !== token) return;
             revealRaceRanks(container);
-            if (dateLabel) dateLabel.textContent = `เปิดอันดับแล้ว • ${frames.at(-1).label}`;
+            const winner = [...frames.at(-1).rows].sort((a, b) => b.value - a.value)[0] || null;
+            container._raceWinner = winner;
+            container._raceFinished = Boolean(winner);
+            card?.classList.toggle("winner-ready", Boolean(winner));
+            if (dateLabel) {
+                dateLabel.textContent = winner
+                    ? "เปิดอันดับแล้ว • แตะกรอบเพื่อเปิดผู้ชนะ"
+                    : `เปิดอันดับแล้ว • ${frames.at(-1).label}`;
+            }
         }
 
         function revealRace(cover, mode, key, title, containerId) {
@@ -1557,6 +1644,7 @@
                 card.dataset.awardSlide = "";
                 card.dataset.awardTitle = cat.title;
                 card.dataset.awardKey = key;
+                card.dataset.raceContainerId = raceId;
                 card.innerHTML = `
                     <div class="absolute inset-0 bg-[#070707] z-30 flex flex-col items-center justify-center cursor-pointer transition-all duration-700 hover:bg-[#111]"
                          onclick="revealRace(this, '${mode}', '${key}', '${safeTitle}', '${raceId}')">
@@ -1579,6 +1667,7 @@
                         <button class="race-replay" type="button" onclick="startRace('${mode}', '${key}', '${raceId}')">↻ แข่งใหม่</button>
                     </div>
                 `;
+                card.addEventListener("click", handleRaceCardClick);
                 container.appendChild(card);
             });
             showAward(mode, awardIndex[mode]);
