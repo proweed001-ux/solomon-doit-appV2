@@ -30,6 +30,7 @@ type Session = NonNullable<ReturnType<typeof loadSession>>;
 type MasterData = Awaited<ReturnType<typeof fetchPromoMasterData>>;
 
 const BUILD_ID = __PROMO_BUILD_ID__;
+const STAGING_PREVIEW = __PROMO_STAGING_PREVIEW__;
 const PROMO_CLASSES = new Set(['HFSS', 'HFSM', 'HFSL', 'HFSXL', 'HFSWS-S', 'HFSWS-L']);
 
 const defaultMonth = () => {
@@ -549,12 +550,13 @@ function AdminApp() {
   if (!session && !demo) return <LoginPage onLogin={value => setSession(value)} onDemo={() => { setDemo(true); setDataset(createDemoDataset('draft')); }} allowDemo={!dryRun} />;
   const ready = dataset?.productGroups.filter(group => group.status === 'ready').length || 0;
   const blocked = dataset?.productGroups.filter(group => group.status === 'blocked').length || 0;
-  const publishable = Boolean(dataset && savedVersionId && previewChecked && !busy && !demo && !dryRun && ready === dataset.productGroups.length && blocked === 0 && quarantine.length === 0 && dataset.version.status !== 'published');
+  const publishable = Boolean(STAGING_PREVIEW && dataset && savedVersionId && previewChecked && !busy && !demo && !dryRun && ready === dataset.productGroups.length && blocked === 0 && quarantine.length === 0 && dataset.version.status !== 'published');
 
   return <div className="admin-shell">
-    <header className="admin-hero"><div className="hero-inner"><div className="hero-row"><div><div className="eyebrow">PROMO SYSTEM REBUILD · {demo ? 'DEMO READ-ONLY' : dryRun ? 'FILE DRY-RUN' : 'AUTHENTICATED ADMIN'}</div><h1>จัดโปรโมชั่นเป็นกลุ่ม ไม่ไล่ติ๊กทีละการ์ด</h1><p>นำเข้า PDF + CSV/XLSM แล้วจัด SKU, Product Group, โปรราย Class และราคากลางในหน้าจอเดียว</p></div><div className="hero-actions"><a className="btn ghost" href="/promo-new.html?demo=1">ดูหน้าลูกค้า</a>{session && <button className="btn ghost" onClick={() => logout(session).finally(() => setSession(null))}><LogOut size={16} /> ออกจากระบบ</button>}</div></div></div></header>
+    <header className="admin-hero"><div className="hero-inner"><div className="hero-row"><div><div className="eyebrow">PROMO SYSTEM REBUILD · {demo ? 'DEMO READ-ONLY' : dryRun ? 'FILE DRY-RUN' : 'AUTHENTICATED ADMIN'}</div><h1>จัดโปรโมชั่นเป็นกลุ่ม ไม่ไล่ติ๊กทีละการ์ด</h1><p>นำเข้า PDF + CSV/XLSM แล้วจัด SKU, Product Group, โปรราย Class และราคากลางในหน้าจอเดียว</p></div><div className="hero-actions"><a className="btn ghost" href={demo ? '/promo-new.html?demo=1' : '/promo-new.html'}>ดูหน้าลูกค้า</a>{session && <button className="btn ghost" onClick={() => logout(session).finally(() => setSession(null))}><LogOut size={16} /> ออกจากระบบ</button>}</div></div></div></header>
     <main className="admin-main">
       {demo && <div className="notice warn">นี่คือข้อมูลสาธิตสำหรับตรวจ UI เท่านั้น ปุ่มบันทึก/Publish ถูกปิด และไม่มีการเชื่อม Production</div>}
+      {STAGING_PREVIEW && !demo && !dryRun && <div className="notice warn"><b>Preview ฐานทดสอบ</b> · Draft และ Publish จะไปหน้าลูกค้าทดสอบเท่านั้น ไม่แตะ Production</div>}
       {dryRun && <div className="notice warn" data-testid="dryrun-banner"><b>โหมดทดลอง — ไม่บันทึกฐานข้อมูล</b> · Build {BUILD_ID} · state แยกจากโหมดจริงและไม่โหลดล็อกเดิม</div>}
       {error && <div className="notice error"><AlertTriangle size={15} /> {error}</div>}
       <section className="panel">
@@ -625,7 +627,7 @@ function AdminApp() {
           onApplyGroupPromotion={familyId => applyGroupPromotion(group.id, familyId)}
         />) : <div className="empty">เลือกไฟล์แล้วกดประมวลผล หรือกดตรวจและจัดกลุ่มจากแคช</div>}</div>
       </section>
-      <div className="footer-actions"><button className="btn soft" disabled={!dataset || busy || (!dryRun && !savedVersionId)} title={!dataset ? 'ยังไม่มี Dataset' : busy ? 'กำลังทำงาน' : !dryRun && !savedVersionId ? 'Draft รุ่นเดิมถูกปิดอยู่' : ''} onClick={validatePreview}><CheckCircle2 size={16} /> {previewChecked ? 'ตรวจความพร้อมผ่าน' : 'ตรวจความพร้อมจริง'}</button><button className="btn primary" disabled={!dataset || !session || demo || dryRun || busy || Boolean(savedVersionId) || dataset.version.status === 'published'} title="Legacy Draft ถูกปิดจนกว่าจะผ่าน revision staging" onClick={save}><Save size={16} /> {savedVersionId ? 'Draft บันทึกแล้ว' : 'บันทึก Draft'}</button><button className="btn dark" disabled={!publishable} title={!publishable ? 'ต้องผ่าน Preview validation และ Legacy Publish ยังถูกปิดใน rebuild' : ''} onClick={publish}>Publish เวอร์ชันนี้</button></div>
+      <div className="footer-actions"><button className="btn soft" disabled={!dataset || busy || (!dryRun && !savedVersionId)} title={!dataset ? 'ยังไม่มี Dataset' : busy ? 'กำลังทำงาน' : !dryRun && !savedVersionId ? 'บันทึก Draft สำหรับหน้าลูกค้าทดสอบก่อน' : ''} onClick={validatePreview}><CheckCircle2 size={16} /> {previewChecked ? 'ตรวจความพร้อมผ่าน' : 'ตรวจความพร้อมจริง'}</button><button className="btn primary" disabled={!STAGING_PREVIEW || !dataset || !session || demo || dryRun || busy || Boolean(savedVersionId) || dataset.version.status === 'published'} title={!STAGING_PREVIEW ? 'ปุ่มนี้เปิดเฉพาะ Preview ที่เชื่อมฐานทดสอบ และปิดบน Production' : 'บันทึกข้อมูลและรูปทั้งหมดเป็น Draft ในฐานทดสอบ'} onClick={save}><Save size={16} /> {savedVersionId ? 'Draft หน้าลูกค้าบันทึกแล้ว' : 'บันทึก Draft สำหรับหน้าลูกค้า'}</button><button className="btn dark" disabled={!publishable} title={!publishable ? 'ต้องบันทึก Draft และผ่านการตรวจความพร้อมก่อน; Production ยังถูกปิด' : 'Publish ไปหน้าลูกค้าทดสอบเท่านั้น'} onClick={publish}>Publish ไปหน้าลูกค้าทดสอบ</button></div>
     </main>
   </div>;
 }
