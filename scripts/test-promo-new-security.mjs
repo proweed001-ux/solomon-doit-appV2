@@ -214,6 +214,25 @@ check(snapshotPermissionMigration.includes('promo_test_key_is_valid(text) from p
 check(snapshotPermissionMigration.includes('to anon;'), 'snapshot_rpc_anon_grants_missing');
 check(!snapshotPermissionMigration.includes('to anon, authenticated;'), 'snapshot_rpc_authenticated_grant_reintroduced');
 check(snapshotPermissionMigration.match(/using \(false\)/gu)?.length === 6, 'snapshot_direct_access_deny_policies_missing');
+const stagingWriteApi = read('api/promo-new-staging-write.js');
+const stagingPublishApi = read('api/promo-new-staging-publish.js');
+const stagingImageApi = read('api/promo-new-staging-image.js');
+const stagingPreviewMigration = read('supabase/migrations/20260727001000_add_staging_customer_preview.sql');
+check(stagingWriteApi.includes('production_backend_rejected'), 'staging_write_production_guard_missing');
+check(stagingPublishApi.includes('production_backend_rejected'), 'staging_publish_production_guard_missing');
+check(stagingImageApi.includes('production_backend_rejected'), 'staging_image_production_guard_missing');
+check(stagingImageApi.includes('MAX_IMAGE_BYTES = 1024 * 1024'), 'staging_image_size_guard_missing');
+check(stagingPreviewMigration.includes('promo_test_admin_keys_missing'), 'staging_preview_database_guard_missing');
+check(stagingPreviewMigration.includes('alter table public.promo_test_card_images enable row level security;'), 'staging_image_rls_missing');
+check(stagingPreviewMigration.includes("v.status = 'published'"), 'staging_image_published_only_guard_missing');
+check(!stagingPreviewMigration.includes('storage.objects'), 'anonymous_storage_policy_reintroduced');
+
+const sharedApi = read('src/promo-new/shared/api.ts');
+check(sharedApi.includes('/api/promo-new-staging-write'), 'staging_draft_not_wired');
+check(sharedApi.includes('/api/promo-new-staging-publish'), 'staging_publish_not_wired');
+check(sharedApi.includes('/api/promo-new-staging-image'), 'staging_image_not_wired');
+check(sharedApi.includes('const LEGACY_WRITES_ENABLED = false'), 'production_legacy_write_guard_removed');
+
 const stagingBlockers = read('docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md');
 check(stagingBlockers.includes('must not be applied to Production'), 'migration_blocker_notice_missing');
 check(stagingBlockers.includes('LEGACY_WRITES_ENABLED = false'), 'migration_write_guard_notice_missing');
@@ -227,6 +246,8 @@ check(!promoVite.includes('manual-workbench.tsx'), 'build_time_workbench_rewrite
 check(!promoVite.includes('replaceRequired'), 'build_time_admin_source_rewrite_reintroduced');
 check(!/\btransform\s*\(/u.test(promoVite), 'vite_business_logic_transform_reintroduced');
 check(promoVite.includes('VERCEL_GIT_COMMIT_SHA'), 'deployment_build_id_sha_missing');
+check(promoVite.includes("process.env.VERCEL_ENV !== 'production'"), 'staging_preview_production_exclusion_missing');
+check(promoVite.includes("process.env.PROMO_TEST_DATABASE === '1'"), 'staging_preview_database_flag_missing');
 const vercel = JSON.parse(read('vercel.json'));
 const packageJson = JSON.parse(read('package.json'));
 const verifiedBuild = vercel.buildCommand === 'npm run verify:promo-new'
