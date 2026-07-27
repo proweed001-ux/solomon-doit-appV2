@@ -337,9 +337,14 @@
             border-radius: 24px;
             overflow: hidden;
             position: relative;
-            display: grid;
             grid-template-rows: auto minmax(0, 1fr) auto;
             row-gap: 16px;
+        }
+        .overall-award > .race-card {
+            display: grid;
+        }
+        .award-slide.category-card.race-card {
+            display: none;
         }
         .award-slide.category-card.race-card.active {
             display: grid;
@@ -509,7 +514,41 @@
             text-shadow: 0 0 14px rgba(250,204,21,0.2);
         }
 
-        .race-row.race-finished[data-rank="1"] .race-rank::before { content: "♛ "; }
+        .race-row[data-final-rank="1"] .race-bar {
+            border-top-color: #fde047;
+            background: linear-gradient(180deg, rgba(128,97,16,0.98), rgba(61,48,13,0.99) 50%, rgba(13,12,7,1));
+            box-shadow: 0 -12px 36px rgba(250,204,21,0.34), inset 12px 0 20px rgba(255,255,255,0.055), inset -12px 0 22px rgba(0,0,0,0.42);
+        }
+        .race-row[data-final-rank="2"] .race-bar {
+            border-top-color: #cbd5e1;
+            background: linear-gradient(180deg, rgba(51,65,85,0.98), rgba(25,34,48,0.99) 52%, rgba(8,11,16,1));
+            box-shadow: 0 -11px 32px rgba(203,213,225,0.2), inset 12px 0 20px rgba(255,255,255,0.05), inset -12px 0 22px rgba(0,0,0,0.44);
+        }
+        .race-row[data-final-rank="3"] .race-bar {
+            border-top-color: #f59e0b;
+            background: linear-gradient(180deg, rgba(119,49,8,0.98), rgba(62,28,9,0.99) 52%, rgba(16,9,5,1));
+            box-shadow: 0 -11px 32px rgba(245,158,11,0.24), inset 12px 0 20px rgba(255,255,255,0.045), inset -12px 0 22px rgba(0,0,0,0.44);
+        }
+        .race-row[data-final-rank="4"] .race-bar {
+            border-top-color: #a8a29e;
+            background: linear-gradient(180deg, rgba(55,53,49,0.98), rgba(31,29,27,0.99) 52%, rgba(9,9,9,1));
+        }
+        .race-row[data-final-rank="5"] .race-bar {
+            border-top-color: #b45309;
+            background: linear-gradient(180deg, rgba(76,38,14,0.98), rgba(39,22,12,0.99) 52%, rgba(11,8,6,1));
+        }
+        .race-row[data-final-rank="1"] .race-avatar { border-color: #fde047; box-shadow: 0 0 0 4px #090909, 0 0 28px rgba(250,204,21,0.48); }
+        .race-row[data-final-rank="2"] .race-avatar { border-color: #cbd5e1; box-shadow: 0 0 0 4px #090909, 0 0 24px rgba(203,213,225,0.28); }
+        .race-row[data-final-rank="3"] .race-avatar { border-color: #f59e0b; box-shadow: 0 0 0 4px #090909, 0 0 24px rgba(245,158,11,0.3); }
+        .race-row[data-final-rank="4"] .race-avatar { border-color: #a8a29e; }
+        .race-row[data-final-rank="5"] .race-avatar { border-color: #b45309; }
+        .race-row[data-final-rank="1"] .race-actual,
+        .race-row[data-final-rank="1"] .race-percent { color: #fde047; }
+        .race-row[data-final-rank="2"] .race-actual,
+        .race-row[data-final-rank="2"] .race-percent { color: #e2e8f0; }
+        .race-row[data-final-rank="3"] .race-actual,
+        .race-row[data-final-rank="3"] .race-percent { color: #fb923c; }
+        .race-row.race-finished[data-final-rank="1"] .race-rank::before { content: "♛ "; }
         .race-footer {
             display: flex;
             align-items: center;
@@ -1223,10 +1262,12 @@
                 }
 
                 const rank = rankById.get(id) || laneIds.length;
+                const finalRank = container._raceFinalRankById?.get(id) || rank;
                 const parts = row._raceParts;
                 row.classList.toggle("race-finished", showRanks);
                 row.classList.toggle("race-started", person.value / maximum > 0.08);
                 row.dataset.rank = String(rank);
+                row.dataset.finalRank = String(finalRank);
                 row.style.transform = `translateX(${laneIndex * 100}%)`;
                 parts.rank.textContent = String(rank);
                 parts.name.textContent = person.name;
@@ -1301,6 +1342,11 @@
 
             container._raceLaneIds = finalists.map(row => row.id);
             container._raceProfiles = new Map(finalists.map(row => [row.id, row]));
+            container._raceFinalRankById = new Map(
+                [...finalists]
+                    .sort((a, b) => b.value - a.value)
+                    .map((row, index) => [row.id, index + 1])
+            );
             container._raceMetricKey = key;
             container._raceMaximum = Math.max(...frames.flatMap(frame => frame.rows.map(row => row.value)), 1) * 1.05;
             container.style.setProperty("--race-lanes", String(finalists.length));
