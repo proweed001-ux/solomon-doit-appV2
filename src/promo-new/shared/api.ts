@@ -9,6 +9,7 @@ const SUPABASE_URL = 'https://saodmeoilixfdqentofp.supabase.co';
 const PUBLISHABLE_KEY = 'sb_publishable_JThYwAl_-askk_cIaCd75w_TCWK2BTT';
 const UPLOAD_FUNCTION = 'promo-image-upload-v2-preview';
 const LEGACY_WRITES_ENABLED = false;
+const STAGING_PREVIEW = typeof __PROMO_STAGING_PREVIEW__ !== 'undefined' && __PROMO_STAGING_PREVIEW__;
 
 interface AdminSession {
   accessToken: string;
@@ -143,6 +144,20 @@ export async function fetchPromoMasterData(session: AdminSession): Promise<Promo
 }
 
 export async function saveDraft(dataset: PromoDataset, session: AdminSession) {
+  if (STAGING_PREVIEW) {
+    const response = await fetch('/api/promo-new-staging-write', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-promo-admin-key': session.accessToken,
+      },
+      body: JSON.stringify({ action: 'save-draft', dataset }),
+    });
+    const data = await response.json().catch(() => ({ ok: false, error: `http_${response.status}` }));
+    if (!response.ok || data?.ok === false) throw new Error(data?.error || `http_${response.status}`);
+    return data;
+  }
+
   assertWritableRuntime();
   const plan = await buildLegacyUploadPlan(dataset);
   const batches = chunkLegacyCards(plan.cards, 20);
@@ -177,11 +192,38 @@ export async function saveDraft(dataset: PromoDataset, session: AdminSession) {
   };
 }
 
-export async function uploadCardImage(_versionId: string, _cardId: string, dataUrl: string, _session: AdminSession): Promise<string> {
-  return dataUrl;
+export async function uploadCardImage(versionId: string, cardId: string, dataUrl: string, session: AdminSession): Promise<string> {
+  if (!STAGING_PREVIEW || !dataUrl.startsWith('data:')) return dataUrl;
+  const response = await fetch('/api/promo-new-staging-image', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-promo-admin-key': session.accessToken,
+    },
+    body: JSON.stringify({ versionId, cardId, dataUrl }),
+  });
+  const data = await response.json().catch(() => ({ ok: false, error: `http_${response.status}` }));
+  if (!response.ok || data?.ok === false) throw new Error(data?.error || `http_${response.status}`);
+  return String(data.data?.imageUrl || '');
 }
 
 export async function publishVersion(versionId: string, session: AdminSession) {
+  if (STAGING_PREVIEW) {
+    const confirmed = window.confirm('Publish Draft นี้ไปหน้าลูกค้าทดสอบหรือไม่? ข้อมูลอยู่ในฐานทดสอบเท่านั้น');
+    if (!confirmed) throw new Error('publish_cancelled');
+    const response = await fetch('/api/promo-new-staging-publish?action=publish', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-promo-admin-key': session.accessToken,
+      },
+      body: JSON.stringify({ action: 'publish', versionId }),
+    });
+    const data = await response.json().catch(() => ({ ok: false, error: `http_${response.status}` }));
+    if (!response.ok || data?.ok === false) throw new Error(data?.error || `http_${response.status}`);
+    return data;
+  }
+
   assertWritableRuntime();
   let saved: SavedLegacyDraft | null = null;
   try { saved = JSON.parse(sessionStorage.getItem(LAST_DRAFT_KEY) || 'null') as SavedLegacyDraft | null; } catch { saved = null; }
@@ -200,7 +242,7 @@ export async function publishVersion(versionId: string, session: AdminSession) {
 }
 
 export async function fetchPublished(monthKey = ''): Promise<PromoDataset | null> {
-  const url = new URL('/api/promo-new', window.location.origin);
+  const url = new URL(STAGING_PREVIEW ? '/api/promo-new-staging-publish' : '/api/promo-new', window.location.origin);
   url.searchParams.set('action', 'published');
   if (monthKey) url.searchParams.set('month', monthKey);
   const response = await fetch(url);
