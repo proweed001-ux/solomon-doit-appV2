@@ -405,12 +405,26 @@ import { preparePrint } from "./print.js";
         if (box) box.textContent = active ? "✓" : "";
       });
   }
+  function sameSelection(left, right) {
+    const leftValues = new Set((left || []).map(T));
+    const rightValues = new Set((right || []).map(T));
+    return (
+      leftValues.size === rightValues.size &&
+      [...leftValues].every((value) => rightValues.has(value))
+    );
+  }
   function applyPick() {
     if (state.mode === "ship" && !realBillPickerSession?.options) {
       return msg("กำลังเตรียมตัวเลือก กรุณารอสักครู่");
     }
+    const current = state.sel[state.pickKind] || [];
+    const next = uniq(state.tmp);
+    if (sameSelection(current, next)) {
+      closePick();
+      return msg("ตัวเลือกไม่เปลี่ยน");
+    }
     push();
-    state.sel[state.pickKind] = [...state.tmp];
+    state.sel[state.pickKind] = next;
     state.page = 1;
     realBillPage = 1;
     realBillSelector.refreshFilters();
@@ -730,6 +744,31 @@ import { preparePrint } from "./print.js";
     });
     return true;
   }
+  function quantityEditCheckpoint(input) {
+    const mapName = input.dataset.map;
+    const key = input.dataset.k;
+    const map = state[mapName] || {};
+    return {
+      ...push(),
+      quantity: {
+        mapName,
+        key,
+        hadValue: Object.prototype.hasOwnProperty.call(map, key),
+        value: map[key],
+      },
+    };
+  }
+  function revertQuantityEdit(input, checkpoint) {
+    restoreHistoryCheckpoint(checkpoint);
+    const original = checkpoint?.quantity;
+    const map = state[original?.mapName || input.dataset.map];
+    const key = original?.key || input.dataset.k;
+    if (map && key) {
+      if (original?.hadValue) map[key] = original.value;
+      else delete map[key];
+    }
+    recalcPickRow(input.closest("tr"));
+  }
   function renderMode(pool, renderId) {
     if (state.mode !== "ship") {
       realBillRenderToken += 1;
@@ -739,10 +778,8 @@ import { preparePrint } from "./print.js";
       $("#table").innerHTML = pickTable(pool);
       bindQuantityInputs({
         inputs: $$(".jdata"),
-        onEditStart: () => push(),
-        onRevert: (_input, checkpoint) => {
-          restoreHistoryCheckpoint(checkpoint);
-        },
+        onEditStart: quantityEditCheckpoint,
+        onRevert: revertQuantityEdit,
         onInput: (input) => {
           state[input.dataset.map][input.dataset.k] = N(input.value);
           recalcPickRow(input.closest("tr"));

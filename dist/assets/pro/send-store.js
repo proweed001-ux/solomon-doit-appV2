@@ -78,6 +78,17 @@ function restorePointerTarget() {
   queueMicrotask(() => focusTarget(target));
 }
 
+function quantityComparableValue(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return 0;
+  const number = Number(text);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function quantityValuesEqual(left, right) {
+  return quantityComparableValue(left) === quantityComparableValue(right);
+}
+
 function beginEdit(input, callbacks) {
   if (editSession?.input === input) return editSession;
   if (editSession) commitPendingQuantityEdit({ render: false });
@@ -86,6 +97,7 @@ function beginEdit(input, callbacks) {
     callbacks,
     beforeValue: input.value,
     changed: false,
+    touched: false,
     editStarted: false,
     historyCheckpoint: null,
   };
@@ -94,21 +106,28 @@ function beginEdit(input, callbacks) {
 
 function updateEdit(input, callbacks) {
   const session = beginEdit(input, callbacks);
-  const changed = input.value !== session.beforeValue;
+  const changed = !quantityValuesEqual(input.value, session.beforeValue);
+  session.touched = true;
   if (changed && !session.editStarted) {
     session.historyCheckpoint = session.callbacks.onEditStart(input);
     session.editStarted = true;
   }
   session.changed = changed;
-  session.callbacks.onInput(input);
+  if (changed || session.editStarted) {
+    session.callbacks.onInput(input);
+  }
 }
 
 function finishEdit(input, options = {}) {
   const session = editSession;
   if (!session || session.input !== input) return false;
   editSession = null;
-  if (!session.editStarted) return false;
+  if (!session.editStarted) {
+    if (session.touched) input.value = session.beforeValue;
+    return false;
+  }
   if (!session.changed) {
+    input.value = session.beforeValue;
     session.callbacks.onRevert?.(
       input,
       session.historyCheckpoint,

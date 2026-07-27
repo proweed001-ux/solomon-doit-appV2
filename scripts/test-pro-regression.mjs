@@ -1596,8 +1596,8 @@ assert.doesNotMatch(
 );
 assert.match(
   sendStoreSource,
-  /const changed = input\.value !== session\.beforeValue;[\s\S]*session\.changed = changed;/,
-  "Quantity edit sessions must return to unchanged when the final value equals the original value",
+  /const changed = !quantityValuesEqual\(input\.value, session\.beforeValue\);[\s\S]*session\.changed = changed;/,
+  "Quantity edit sessions must compare normalized numeric values and return to unchanged",
 );
 assert.match(
   sendStoreSource,
@@ -1616,13 +1616,31 @@ assert.match(
 );
 assert.match(
   coreSource,
-  /onEditStart:\s*\(\)\s*=>\s*push\(\)/,
-  "A quantity edit must snapshot history before its first state mutation",
+  /onEditStart:\s*quantityEditCheckpoint/,
+  "A quantity edit must snapshot history and the original map entry before its first state mutation",
 );
 assert.match(
   coreSource,
   /onInput:[\s\S]*state\[input\.dataset\.map\]\[input\.dataset\.k\]\s*=\s*N\(input\.value\)/,
   "Input must update the authoritative quantity state",
+);
+assert.match(
+  sendStoreSource,
+  /function quantityValuesEqual[\s\S]*quantityComparableValue\(left\)[\s\S]*quantityComparableValue\(right\)/,
+  "Equivalent quantity strings such as 1 and 1.0 must not create history",
+);
+assert.match(
+  coreSource,
+  /function revertQuantityEdit[\s\S]*original\?\.hadValue[\s\S]*delete map\[key\]/,
+  "A reverted blank quantity must restore key absence instead of retaining zero",
+);
+const applyPickSource =
+  coreSource.match(/function applyPick\(\)[\s\S]*?\n  \}/)?.[0] || "";
+assert.ok(
+  applyPickSource.indexOf("sameSelection(current, next)") >= 0 &&
+    applyPickSource.indexOf("sameSelection(current, next)") <
+      applyPickSource.indexOf("push()"),
+  "Applying an unchanged picker selection must not push history or clear redo",
 );
 const billLineSource =
   realBillSource.match(/function billLine[\s\S]*?\n\}/)?.[0] || "";

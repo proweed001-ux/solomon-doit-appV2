@@ -145,6 +145,12 @@ async function quantitySnapshot(page, map, index = 0) {
         key,
         stateValue: key ? stateModule.state[mapName][key] ?? null : null,
         storedValue: key ? stored[mapName]?.[key] ?? null : null,
+        stateHasKey: key
+          ? Object.prototype.hasOwnProperty.call(stateModule.state[mapName], key)
+          : false,
+        storedHasKey: key
+          ? Object.prototype.hasOwnProperty.call(stored[mapName] || {}, key)
+          : false,
         receivers: [...stateModule.state.sel.receivers],
         storedReceivers: [...(stored.sel?.receivers || [])],
         history: stateModule.state.hist.length,
@@ -619,6 +625,16 @@ test("drops a no-op edit history entry when a quantity returns to its original v
   expect(reverted.redo).toBe(committed.redo);
   expect(reverted.activeSendIndex).toBe(1);
 
+  await firstSend.focus();
+  await firstSend.fill("1.0");
+  await firstSend.press("Tab");
+  const numericEquivalent = await quantitySnapshot(page, "send", 0);
+  expect(numericEquivalent.dom).toBe("1");
+  expect(numericEquivalent.stateValue).toBe(1);
+  expect(numericEquivalent.storedValue).toBe(1);
+  expect(numericEquivalent.history).toBe(committed.history);
+  expect(numericEquivalent.redo).toBe(committed.redo);
+
   await page.locator("#undo").click();
   const undone = await quantitySnapshot(page, "send", 0);
   expect(undone.dom).toBe("");
@@ -631,8 +647,58 @@ test("drops a no-op edit history entry when a quantity returns to its original v
   await firstSend.press("Tab");
   const secondRevert = await quantitySnapshot(page, "send", 0);
   expect(secondRevert.dom).toBe("");
-  expect(secondRevert.stateValue).toBe(0);
+  expect(secondRevert.stateValue).toBeNull();
+  expect(secondRevert.storedValue).toBeNull();
+  expect(secondRevert.stateHasKey).toBe(false);
+  expect(secondRevert.storedHasKey).toBe(false);
+  expect(secondRevert.history).toBe(undone.history);
   expect(secondRevert.redo).toBe(1);
+
+  await page.locator("#redo").click();
+  const redone = await quantitySnapshot(page, "send", 0);
+  expect(redone.dom).toBe("1");
+  expect(redone.stateValue).toBe(1);
+  expect(redone.redo).toBe(0);
+  expect(runtime.errors).toEqual([]);
+});
+
+test("does not add history or clear redo when a picker is applied without changes", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+  await chooseOnly(page, "receivers", fixtureMeta.receiver);
+
+  const firstSend = page
+    .locator('#table input.jdata[data-map="send"]')
+    .first();
+  await firstSend.fill("1");
+  await firstSend.press("Tab");
+  await page.locator("#undo").click();
+
+  const beforeNoOp = await page.evaluate(async () => {
+    const stateModule = await import("/assets/pro/state.js");
+    return {
+      history: stateModule.state.hist.length,
+      redo: stateModule.state.redoStack.length,
+      brands: [...stateModule.state.sel.brands],
+    };
+  });
+  expect(beforeNoOp.redo).toBe(1);
+
+  await page.locator('[data-pick="brands"]').click();
+  await expect(page.locator("#pickShade")).toHaveClass(/on/);
+  await page.locator("#pickOk").click();
+
+  const afterNoOp = await page.evaluate(async () => {
+    const stateModule = await import("/assets/pro/state.js");
+    return {
+      history: stateModule.state.hist.length,
+      redo: stateModule.state.redoStack.length,
+      brands: [...stateModule.state.sel.brands],
+    };
+  });
+  expect(afterNoOp).toEqual(beforeNoOp);
 
   await page.locator("#redo").click();
   const redone = await quantitySnapshot(page, "send", 0);
