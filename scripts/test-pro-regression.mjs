@@ -76,6 +76,10 @@ const sendStoreSource = fs.readFileSync(
   "dist/assets/pro/send-store.js",
   "utf8",
 );
+const stateSource = fs.readFileSync(
+  "dist/assets/pro/state.js",
+  "utf8",
+);
 const realBillSource = fs.readFileSync(
   "dist/assets/pro/real-bills.js",
   "utf8",
