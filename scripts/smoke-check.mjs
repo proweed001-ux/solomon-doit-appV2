@@ -294,6 +294,9 @@ mustContain("dist/performance-reveal.html", "grid-template-rows: auto minmax(0, 
 mustContain("dist/performance-reveal.html", ".award-slide.category-card.race-card {");
 mustContain("dist/performance-reveal.html", "display: none;");
 mustContain("dist/performance-reveal.html", ".overall-award > .race-card");
+mustContain("dist/performance-reveal.html", ".award-stage > [id^=\"categories-area-\"]");
+mustContain("dist/performance-reveal.html", "function revealRaceRanks");
+mustNotContain("dist/performance-reveal.html", "renderRaceRows(container, frames.at(-1).rows, true)");
 mustContain("dist/performance-reveal.html", "data-final-rank=\"1\"");
 mustContain("dist/performance-reveal.html", "data-final-rank=\"2\"");
 mustContain("dist/performance-reveal.html", "data-final-rank=\"3\"");
