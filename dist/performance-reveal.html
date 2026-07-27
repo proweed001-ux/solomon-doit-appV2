@@ -378,15 +378,15 @@
             position: absolute;
             bottom: 0;
             left: 0;
-            width: 20%;
+            width: calc(100% / var(--race-lanes, 5));
             height: 100%;
             display: grid;
             grid-template-rows: 34px 34px minmax(80px, 1fr) 62px;
             justify-items: center;
             align-items: end;
             opacity: 0;
-            transform: translateX(520%);
-            transition: transform 0.52s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease;
+            transform: translateX(0);
+            transition: opacity 0.28s ease;
             will-change: transform;
         }
         .race-row.is-top-five {
@@ -403,8 +403,15 @@
             background: #262626;
             color: #d4d4d8;
             font-weight: 900;
+            opacity: 0;
+            transform: scale(0.55);
+            transition: opacity 0.38s ease, transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .race-row[data-rank="1"] .race-rank {
+        .race-row.race-finished .race-rank {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .race-row.race-finished[data-rank="1"] .race-rank {
             background: linear-gradient(135deg, #fef08a, #eab308);
             color: #050505;
             box-shadow: 0 0 18px rgba(234, 179, 8, 0.4);
@@ -441,26 +448,43 @@
         }
         .race-bar-lane {
             grid-row: 3;
-            width: min(72%, 76px);
+            width: min(62%, 66px);
             height: 100%;
             display: flex;
             align-items: flex-end;
             overflow: hidden;
-            border-radius: 16px 16px 4px 4px;
-            background: rgba(255,255,255,0.055);
+            padding: 4px;
+            border: 2px solid rgba(250, 204, 21, 0.24);
+            border-radius: 999px 999px 16px 16px;
+            background:
+                repeating-linear-gradient(to top, rgba(255,255,255,0.08) 0 1px, transparent 1px 20%),
+                rgba(255,255,255,0.045);
+            box-shadow: inset 0 0 18px rgba(0,0,0,0.65), 0 0 16px rgba(234,179,8,0.08);
             position: relative;
         }
         .race-bar {
             width: 100%;
             height: 0;
-            border-radius: inherit;
-            background: linear-gradient(0deg, #713f12, #eab308 70%, #fef08a);
-            box-shadow: 0 0 20px rgba(234,179,8,0.2);
-            transition: height 0.28s linear;
+            border-radius: 999px 999px 10px 10px;
+            background: linear-gradient(0deg, #713f12, #d97706 45%, #facc15 82%, #fef08a);
+            box-shadow: 0 0 20px rgba(234,179,8,0.22), inset 8px 0 10px rgba(255,255,255,0.08);
+            transition: height 0.08s linear;
+            position: relative;
         }
-        .race-row[data-rank="1"] .race-bar {
+        .race-bar::after {
+            content: "";
+            position: absolute;
+            top: 6px;
+            bottom: 6px;
+            left: 18%;
+            width: 16%;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.28);
+            filter: blur(1px);
+        }
+        .race-row.race-finished[data-rank="1"] .race-bar {
             background: linear-gradient(0deg, #a16207, #facc15 70%, #fff7ae);
-            box-shadow: 0 0 24px rgba(250,204,21,0.42);
+            box-shadow: 0 0 28px rgba(250,204,21,0.5), inset 8px 0 10px rgba(255,255,255,0.12);
         }
         .race-percent {
             grid-row: 2;
@@ -603,7 +627,7 @@
                                 </div>
                                 <div id="race-ps-overall" class="race-track"></div>
                                 <div class="race-footer">
-                                    <span>TOP 5 • ข้อมูลย้อนหลังจริง • Index เทียบเป้า</span>
+                                    <span>หลอดเริ่มจาก 0 • แข่งขัน 5 วินาที • เปิดอันดับตอนจบ</span>
                                     <button class="race-replay" type="button" onclick="startRace('ps', 'overall', 'race-ps-overall')">↻ แข่งใหม่</button>
                                 </div>
                             </div>
@@ -641,7 +665,7 @@
                                 </div>
                                 <div id="race-ads-overall" class="race-track"></div>
                                 <div class="race-footer">
-                                    <span>TOP 5 • ข้อมูลย้อนหลังจริง • Index เทียบเป้า</span>
+                                    <span>หลอดเริ่มจาก 0 • แข่งขัน 5 วินาที • เปิดอันดับตอนจบ</span>
                                     <button class="race-replay" type="button" onclick="startRace('ads', 'overall', 'race-ads-overall')">↻ แข่งใหม่</button>
                                 </div>
                             </div>
@@ -667,6 +691,7 @@
         const PERFORMANCE_OBJECT_BASE = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/";
         const PERFORMANCE_HISTORY_INDEX = "performance/history-index.json";
         const PERFORMANCE_HISTORY_CACHE = "aya-performance-history-v1";
+        const RACE_DURATION_MS = 5000;
         const PERFORMANCE_PUBLIC_KEY = String.fromCharCode(115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,74,84,104,89,119,65,108,95,45,97,115,107,107,95,99,73,97,67,100,55,53,119,95,84,67,87,75,50,66,84,84);
         let performanceReady = false;
         let performanceLoadFailed = false;
@@ -1092,16 +1117,29 @@
             })}%`;
         }
 
-        function renderRaceRows(container, rows) {
-            if (!container._raceRows) container._raceRows = new Map();
-            const sorted = [...rows].sort((a, b) => b.value - a.value);
-            const maximum = Math.max(sorted[0]?.value || 0, 1);
+        function latestRaceFinalists(frames) {
+            const latestRows = frames.at(-1)?.rows || [];
+            return [...latestRows]
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 5)
+                .sort((a, b) => a.name.localeCompare(b.name, "th"));
+        }
 
-            sorted.forEach((person, rank) => {
-                let row = container._raceRows.get(person.id);
+        function renderRaceRows(container, rows, showRanks = false) {
+            if (!container._raceRows) container._raceRows = new Map();
+            const laneIds = container._raceLaneIds || [];
+            const profiles = container._raceProfiles || new Map();
+            const rowMap = new Map(rows.map(row => [row.id, row]));
+            const ranked = [...rows].sort((a, b) => b.value - a.value);
+            const rankById = new Map(ranked.map((row, index) => [row.id, index + 1]));
+            const maximum = Math.max(container._raceMaximum || 1, 1);
+
+            laneIds.forEach((id, laneIndex) => {
+                const person = rowMap.get(id) || { ...profiles.get(id), value: 0 };
+                let row = container._raceRows.get(id);
                 if (!row) {
                     row = document.createElement("div");
-                    row.className = "race-row";
+                    row.className = "race-row is-top-five";
                     row.innerHTML = `
                         <span class="race-rank"></span>
                         <div class="race-person"><img alt=""><span></span></div>
@@ -1116,26 +1154,32 @@
                         percent: row.querySelector(".race-percent")
                     };
                     container.appendChild(row);
-                    container._raceRows.set(person.id, row);
+                    container._raceRows.set(id, row);
                 }
 
-                const visible = rank < 5;
+                const rank = rankById.get(id) || laneIds.length;
                 const parts = row._raceParts;
-                row.classList.toggle("is-top-five", visible);
-                row.dataset.rank = String(rank + 1);
-                row.style.transform = `translateX(${visible ? rank * 100 : 520}%)`;
-                parts.rank.textContent = String(rank + 1);
+                row.classList.toggle("race-finished", showRanks);
+                row.dataset.rank = String(rank);
+                row.style.transform = `translateX(${laneIndex * 100}%)`;
+                parts.rank.textContent = String(rank);
                 parts.name.textContent = person.name;
                 const image = parts.image;
                 image.src = personImageUrl(person.photoKey || person.name);
                 image.onerror = () => safeImageOnError(image, person.name);
-                parts.bar.style.height = `${Math.max((person.value / maximum) * 100, 1.5)}%`;
+                parts.bar.style.height = person.value > 0
+                    ? `${Math.max((person.value / maximum) * 100, 1.5)}%`
+                    : "0%";
                 parts.percent.textContent = formatRacePercent(person.value);
             });
         }
 
-        function animateRaceTransition(container, fromFrame, toFrame, duration, runKey, token) {
+        function animateRaceTimeline(container, frames, duration, dateLabel, runKey, token) {
             return new Promise(resolve => {
+                const startFrame = {
+                    label: "เริ่มต้น",
+                    rows: [...(container._raceProfiles?.values() || [])].map(row => ({ ...row, value: 0 }))
+                };
                 let startedAt = 0;
                 const step = timestamp => {
                     if (raceRuns.get(runKey) !== token) {
@@ -1144,8 +1188,13 @@
                     }
                     if (!startedAt) startedAt = timestamp;
                     const progress = Math.min((timestamp - startedAt) / duration, 1);
-                    const eased = 1 - Math.pow(1 - progress, 3);
-                    renderRaceRows(container, interpolateRaceRows(fromFrame.rows, toFrame.rows, eased));
+                    const scaled = progress * frames.length;
+                    const frameIndex = Math.min(Math.floor(scaled), frames.length - 1);
+                    const localProgress = progress >= 1 ? 1 : scaled - frameIndex;
+                    const fromFrame = frameIndex === 0 ? startFrame : frames[frameIndex - 1];
+                    const toFrame = frames[frameIndex];
+                    if (dateLabel) dateLabel.textContent = toFrame.label;
+                    renderRaceRows(container, interpolateRaceRows(fromFrame.rows, toFrame.rows, localProgress), false);
                     if (progress < 1) {
                         requestAnimationFrame(step);
                     } else {
@@ -1167,24 +1216,32 @@
             container.innerHTML = "";
             container._raceRows = new Map();
 
-            const frames = performanceTimeline.map(snapshot => raceFrame(snapshot, mode, key));
+            const rawFrames = performanceTimeline.map(snapshot => raceFrame(snapshot, mode, key));
+            const finalists = latestRaceFinalists(rawFrames);
+            if (!finalists.length) return;
+            const finalistIds = new Set(finalists.map(row => row.id));
+            const frames = rawFrames.map(frame => {
+                const frameRows = new Map(frame.rows.filter(row => finalistIds.has(row.id)).map(row => [row.id, row]));
+                return {
+                    ...frame,
+                    rows: finalists.map(profile => frameRows.get(profile.id) || { ...profile, value: 0 })
+                };
+            });
+
+            container._raceLaneIds = finalists.map(row => row.id);
+            container._raceProfiles = new Map(finalists.map(row => [row.id, row]));
+            container._raceMaximum = Math.max(...frames.flatMap(frame => frame.rows.map(row => row.value)), 1) * 1.05;
+            container.style.setProperty("--race-lanes", String(finalists.length));
+
             const dateLabel = document.getElementById(`race-date-${mode}-${key}`);
-            let previous = { label: "เริ่มต้น", rows: [] };
+            renderRaceRows(container, finalists.map(row => ({ ...row, value: 0 })), false);
+            const completed = await animateRaceTimeline(container, frames, RACE_DURATION_MS, dateLabel, runKey, token);
+            if (!completed || raceRuns.get(runKey) !== token) return;
 
-            for (const frame of frames) {
-                if (dateLabel) dateLabel.textContent = frame.label;
-                const completed = await animateRaceTransition(container, previous, frame, frames.length === 1 ? 2200 : 1450, runKey, token);
-                if (!completed) return;
-                previous = frame;
-                await new Promise(resolve => setTimeout(resolve, frames.length === 1 ? 0 : 320));
-                if (raceRuns.get(runKey) !== token) return;
-            }
-
-            if (dateLabel) {
-                dateLabel.textContent = frames.length > 1
-                    ? `ผลล่าสุด • ${frames.at(-1).label}`
-                    : `ข้อมูลล่าสุด • ${frames.at(-1).label}`;
-            }
+            await new Promise(resolve => setTimeout(resolve, 650));
+            if (raceRuns.get(runKey) !== token) return;
+            renderRaceRows(container, frames.at(-1).rows, true);
+            if (dateLabel) dateLabel.textContent = `เปิดอันดับแล้ว • ${frames.at(-1).label}`;
         }
 
         function revealRace(cover, mode, key, title, containerId) {
@@ -1262,7 +1319,7 @@
                     </div>
                     <div id="${raceId}" class="race-track"></div>
                     <div class="race-footer">
-                        <span>TOP 5 • ข้อมูลย้อนหลังจริง • แซงตามลำดับคะแนน</span>
+                        <span>ตำแหน่งคงที่ • หลอดแซงกัน • เปิดอันดับตอนจบ</span>
                         <button class="race-replay" type="button" onclick="startRace('${mode}', '${key}', '${raceId}')">↻ แข่งใหม่</button>
                     </div>
                 `;
