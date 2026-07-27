@@ -46,7 +46,7 @@ test('customer preview bridge stays staging-only and published-only', () => {
   assert.match(api, /\/api\/promo-new-staging-publish/u);
   assert.match(api, /\/api\/promo-new-staging-image/u);
   assert.match(admin, /href=\{demo \? '\/promo-new\.html\?demo=1' : '\/promo-new\.html'\}/u);
-  assert.match(admin, /Publish ไปหน้าลูกค้าทดสอบ/u);
+  assert.match(admin, /Publish หน้าลูกค้าทดสอบ/u);
 
   assert.match(migration, /promo_test_admin_keys_missing/u);
   assert.match(migration, /enable row level security/u);
