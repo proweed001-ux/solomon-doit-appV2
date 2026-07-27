@@ -283,8 +283,15 @@ mustNotContain("dist/performance-reveal.html", "translateX(${visible ? rank * 10
 mustNotContain("dist/performance-reveal.html", "parts.bar.style.width");
 mustContain("dist/performance-reveal.html", "function revealRace");
 mustNotContain("dist/performance-reveal.html", "function animateRaceTransition");
-mustContain("dist/performance-reveal.html", "หลอดเริ่มจาก 0 • แข่งขัน 5 วินาที");
-mustContain("dist/performance-reveal.html", "ตำแหน่งคงที่ • หลอดแซงกัน • เปิดอันดับตอนจบ");
+mustContain("dist/performance-reveal.html", "แท่งเริ่มจาก 0 • แข่งขัน 5 วินาที");
+mustContain("dist/performance-reveal.html", "race-avatar");
+mustContain("dist/performance-reveal.html", "race-bar-copy");
+mustContain("dist/performance-reveal.html", "race-name");
+mustContain("dist/performance-reveal.html", "race-started");
+mustContain("dist/performance-reveal.html", "race-finished[data-rank=\"2\"]");
+mustContain("dist/performance-reveal.html", "race-finished[data-rank=\"3\"]");
+mustNotContain("dist/performance-reveal.html", "race-person");
+mustContain("dist/performance-reveal.html", "ตำแหน่งคงที่ • แท่งแซงกัน • เปิดอันดับตอนจบ");
 mustContain("dist/performance-reveal.html", "แข่งขันด้วย % Index เทียบเป้า");
 mustNotContain("dist/performance-reveal.html", ".slice(-6)");
 mustContain("dist/performance-reveal.html", "PERFORMANCE_HISTORY_CACHE");
