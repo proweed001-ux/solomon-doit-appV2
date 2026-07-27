@@ -797,6 +797,111 @@
             text-transform: uppercase;
         }
 
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .fullscreen-toggle {
+            font-family: inherit;
+            cursor: pointer;
+        }
+        body.presentation-mode {
+            width: 100%;
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding:
+                max(8px, env(safe-area-inset-top))
+                max(8px, env(safe-area-inset-right))
+                max(8px, env(safe-area-inset-bottom))
+                max(8px, env(safe-area-inset-left)) !important;
+            overflow: auto;
+            overscroll-behavior: contain;
+        }
+        body.pseudo-fullscreen {
+            position: fixed;
+            inset: 0;
+            z-index: 90;
+            height: 100vh;
+            height: 100dvh;
+            background: #050505;
+        }
+        body.presentation-mode .page-header,
+        body.presentation-mode .mode-label {
+            display: none;
+        }
+        body.presentation-mode .page-nav {
+            position: fixed;
+            top: max(8px, env(safe-area-inset-top));
+            right: max(8px, env(safe-area-inset-right));
+            z-index: 120;
+            width: auto;
+            max-width: none;
+            margin: 0;
+            pointer-events: none;
+        }
+        body.presentation-mode .page-nav > a,
+        body.presentation-mode .home-link {
+            display: none;
+        }
+        body.presentation-mode .nav-actions {
+            pointer-events: auto;
+        }
+        body.presentation-mode .fullscreen-toggle {
+            min-height: 40px;
+            border-color: rgba(250,204,21,0.62);
+            background: rgba(5,5,5,0.86);
+            box-shadow: 0 0 24px rgba(250,204,21,0.2);
+        }
+        body.presentation-mode .app-shell,
+        body.presentation-mode .award-shell {
+            max-width: none;
+        }
+        body.presentation-mode .mode-tabs {
+            margin-top: 0;
+            margin-bottom: 8px;
+            padding-right: 118px;
+        }
+        body.presentation-mode .award-stage {
+            min-height: 0;
+        }
+        body.presentation-mode .category-card,
+        body.presentation-mode .race-card {
+            width: 100%;
+            max-width: none;
+            min-height: 420px;
+            height: calc(100vh - 132px);
+            height: calc(100dvh - 132px);
+        }
+        body.presentation-mode .award-controls {
+            margin-top: 8px;
+        }
+        @media (max-width: 640px) {
+            body.presentation-mode .mode-tabs {
+                justify-content: flex-start;
+                padding-right: 112px;
+            }
+            body.presentation-mode .category-card,
+            body.presentation-mode .race-card {
+                min-height: 360px;
+                height: calc(100vh - 188px);
+                height: calc(100dvh - 188px);
+            }
+        }
+        @media (max-height: 640px) and (orientation: landscape) {
+            body.presentation-mode .category-card,
+            body.presentation-mode .race-card {
+                min-height: 330px;
+                height: calc(100vh - 118px);
+                height: calc(100dvh - 118px);
+            }
+            body.presentation-mode .race-card {
+                padding-top: 12px;
+                padding-bottom: 12px;
+            }
+        }
+
         .page-nav-link {
             min-height: 42px;
             display: inline-flex;
@@ -821,13 +926,17 @@
 <body class="p-4 md:p-8 relative min-h-screen flex flex-col items-center">
     <div class="bg-rays"></div>
 
-    <nav class="max-w-7xl w-full relative z-20 flex items-center justify-between gap-3 mb-6" aria-label="เมนูนำทาง">
+    <nav class="page-nav max-w-7xl w-full relative z-20 flex items-center justify-between gap-3 mb-6" aria-label="เมนูนำทาง">
         <a class="page-nav-link" href="/performance?mode=ds">← Performance</a>
-        <a class="page-nav-link" href="/">หน้าหลัก</a>
+        <div class="nav-actions">
+            <button id="fullscreen-toggle" class="page-nav-link fullscreen-toggle" type="button"
+                    aria-pressed="false" onclick="toggleFullscreenMode()">⛶ เต็มจอ</button>
+            <a class="page-nav-link home-link" href="/">หน้าหลัก</a>
+        </div>
     </nav>
 
-    <div class="max-w-7xl w-full mx-auto relative z-10 flex flex-col items-center">
-        <header class="text-center mb-8 w-full">
+    <div class="app-shell max-w-7xl w-full mx-auto relative z-10 flex flex-col items-center">
+        <header class="page-header text-center mb-8 w-full">
             <h1 class="text-4xl md:text-6xl font-black uppercase tracking-widest gold-text drop-shadow-[0_0_20px_rgba(234,179,8,0.2)]">
                 AYA TOP PERFORMANCE
             </h1>
@@ -839,14 +948,14 @@
             </p>
         </header>
 
-        <div class="flex gap-3 md:gap-4 mb-10 flex-wrap justify-center">
+        <div class="mode-tabs flex gap-3 md:gap-4 mb-10 flex-wrap justify-center">
             <button id="btn-ps" class="tab-btn active" onclick="switchTab('ps')">หมวด PS</button>
             <button id="btn-ads" class="tab-btn" onclick="switchTab('ads')">หมวด ADS</button>
         </div>
 
         <main class="w-full">
             <section id="tab-ps" class="tab-content active w-full" data-mode="ps">
-                <div class="text-center mb-4"><span class="mode-pill">PS MODE</span></div>
+                <div class="mode-label text-center mb-4"><span class="mode-pill">PS MODE</span></div>
                 <div class="award-shell">
                     <div id="award-stage-ps" class="award-stage">
                         <div id="categories-area-ps"></div>
@@ -863,7 +972,7 @@
             </section>
 
             <section id="tab-ads" class="tab-content w-full" data-mode="ads">
-                <div class="text-center mb-4"><span class="mode-pill">ADS MODE</span></div>
+                <div class="mode-label text-center mb-4"><span class="mode-pill">ADS MODE</span></div>
                 <div class="award-shell">
                     <div id="award-stage-ads" class="award-stage">
                         <div id="categories-area-ads"></div>
@@ -1217,6 +1326,59 @@
                 console.warn("[AYA Performance]", error);
             }
         }
+
+        function activeFullscreenElement() {
+            return document.fullscreenElement || document.webkitFullscreenElement || null;
+        }
+
+        function syncFullscreenMode() {
+            const active = Boolean(activeFullscreenElement()) || document.body.classList.contains("pseudo-fullscreen");
+            document.body.classList.toggle("presentation-mode", active);
+            const button = document.getElementById("fullscreen-toggle");
+            if (!button) return;
+            button.textContent = active ? "✕ ออกจากเต็มจอ" : "⛶ เต็มจอ";
+            button.setAttribute("aria-pressed", String(active));
+        }
+
+        async function toggleFullscreenMode() {
+            const pseudo = document.body.classList.contains("pseudo-fullscreen");
+            const fullscreen = activeFullscreenElement();
+            if (pseudo) {
+                document.body.classList.remove("pseudo-fullscreen");
+                syncFullscreenMode();
+                return;
+            }
+            if (fullscreen) {
+                const exit = document.exitFullscreen || document.webkitExitFullscreen;
+                if (exit) await exit.call(document);
+                syncFullscreenMode();
+                return;
+            }
+
+            const root = document.documentElement;
+            const request = root.requestFullscreen || root.webkitRequestFullscreen;
+            if (request) {
+                try {
+                    await request.call(root);
+                    syncFullscreenMode();
+                    return;
+                } catch (error) {
+                    console.warn("[AYA Fullscreen]", error);
+                }
+            }
+
+            document.body.classList.add("pseudo-fullscreen");
+            syncFullscreenMode();
+        }
+
+        document.addEventListener("fullscreenchange", syncFullscreenMode);
+        document.addEventListener("webkitfullscreenchange", syncFullscreenMode);
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && document.body.classList.contains("pseudo-fullscreen")) {
+                document.body.classList.remove("pseudo-fullscreen");
+                syncFullscreenMode();
+            }
+        });
 
         function switchTab(tab) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
