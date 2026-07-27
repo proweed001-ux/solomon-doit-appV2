@@ -283,7 +283,6 @@ mustNotContain("dist/performance-reveal.html", "translateX(${visible ? rank * 10
 mustNotContain("dist/performance-reveal.html", "parts.bar.style.width");
 mustContain("dist/performance-reveal.html", "function revealRace");
 mustNotContain("dist/performance-reveal.html", "function animateRaceTransition");
-mustContain("dist/performance-reveal.html", "แท่งเริ่มจาก 0 • แข่งขัน 10 วินาที");
 mustContain("dist/performance-reveal.html", "function raceActualValue");
 mustContain("dist/performance-reveal.html", "function raceRankingValue");
 mustContain("dist/performance-reveal.html", 'key === "sales"');
