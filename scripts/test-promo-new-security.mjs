@@ -227,11 +227,11 @@ check(stagingPreviewMigration.includes('alter table public.promo_test_card_image
 check(stagingPreviewMigration.includes("v.status = 'published'"), 'staging_image_published_only_guard_missing');
 check(!stagingPreviewMigration.includes('storage.objects'), 'anonymous_storage_policy_reintroduced');
 
-const sharedApi = read('src/promo-new/shared/api.ts');
-check(sharedApi.includes('/api/promo-new-staging-write'), 'staging_draft_not_wired');
-check(sharedApi.includes('/api/promo-new-staging-publish'), 'staging_publish_not_wired');
-check(sharedApi.includes('/api/promo-new-staging-image'), 'staging_image_not_wired');
-check(sharedApi.includes('const LEGACY_WRITES_ENABLED = false'), 'production_legacy_write_guard_removed');
+const stagingSharedApi = read('src/promo-new/shared/api.ts');
+check(stagingSharedApi.includes('/api/promo-new-staging-write'), 'staging_draft_not_wired');
+check(stagingSharedApi.includes('/api/promo-new-staging-publish'), 'staging_publish_not_wired');
+check(stagingSharedApi.includes('/api/promo-new-staging-image'), 'staging_image_not_wired');
+check(stagingSharedApi.includes('const LEGACY_WRITES_ENABLED = false'), 'production_legacy_write_guard_removed');
 
 const stagingBlockers = read('docs/PROMO_NEW_REVISION_STAGING_BLOCKERS.md');
 check(stagingBlockers.includes('must not be applied to Production'), 'migration_blocker_notice_missing');
