@@ -566,13 +566,14 @@
             cursor: pointer;
         }
         .winner-reveal {
+            --winner-caption-height: clamp(68px, 10vmin, 104px);
             position: absolute;
             inset: 0;
             z-index: 70;
             display: flex;
             align-items: flex-end;
             justify-content: center;
-            padding: clamp(16px, 3vmin, 32px);
+            padding: 0;
             overflow: hidden;
             background: #050505;
             opacity: 0;
@@ -601,10 +602,10 @@
         }
         .winner-photo {
             z-index: 2;
-            inset: 0 0 clamp(92px, 13vmin, 132px);
+            inset: 0 0 var(--winner-caption-height);
             height: auto;
             object-fit: contain;
-            padding: clamp(10px, 1.6vmin, 24px);
+            padding: clamp(6px, 1.2vmin, 18px);
             padding-bottom: 0;
             filter: brightness(0.94) saturate(1.04) drop-shadow(0 12px 34px rgba(0,0,0,0.72));
             transform: scale(0.97);
@@ -644,18 +645,28 @@
         .winner-content {
             position: relative;
             z-index: 4;
+            flex: 0 0 var(--winner-caption-height);
             width: 100%;
-            min-height: clamp(72px, 11vmin, 108px);
-            padding: 6px clamp(18px, 4vw, 64px) max(4px, env(safe-area-inset-bottom));
+            height: var(--winner-caption-height);
+            min-height: 0;
+            padding: 4px clamp(18px, 4vw, 64px) max(4px, env(safe-area-inset-bottom));
             border: 0;
             border-radius: 0;
             background: transparent;
             box-shadow: none;
             backdrop-filter: none;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: center;
+            align-items: center;
+            justify-content: center;
+            column-gap: 0;
             text-align: center;
             pointer-events: none;
+            overflow: hidden;
         }
         .winner-title {
+            flex: 0 0 100%;
             margin: 0;
             color: #ffffff;
             font-size: clamp(1.35rem, 3.4vmin, 2.5rem);
@@ -707,12 +718,69 @@
             position: absolute;
             top: -10%;
             left: var(--left);
-            width: 8px;
-            height: 18px;
+            width: var(--piece-width, 8px);
+            height: var(--piece-height, 18px);
             border-radius: 2px;
             background: var(--color);
             opacity: 0;
-            animation: winnerConfetti 2.8s ease-in var(--delay) infinite;
+            animation: winnerConfetti var(--duration, 2.8s) ease-in var(--delay) infinite;
+        }
+        .winner-flash,
+        .winner-fireworks {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .winner-flash {
+            background:
+                radial-gradient(circle at 50% 32%, rgba(255,255,255,0.92) 0%, rgba(254,240,138,0.55) 5%, rgba(250,204,21,0.2) 18%, transparent 46%),
+                linear-gradient(110deg, transparent 38%, rgba(255,255,255,0.28) 49%, transparent 60%);
+            mix-blend-mode: screen;
+            opacity: 0;
+        }
+        .winner-reveal.is-visible .winner-flash {
+            animation: winnerFlash 2.6s ease-out both, winnerSweep 4.8s ease-in-out 2.6s infinite;
+        }
+        .winner-fireworks i {
+            position: absolute;
+            left: var(--x);
+            top: var(--y);
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            color: var(--color);
+            background: currentColor;
+            box-shadow:
+                0 -64px 0 -1px currentColor,
+                45px -45px 0 -1px currentColor,
+                64px 0 0 -1px currentColor,
+                45px 45px 0 -1px currentColor,
+                0 64px 0 -1px currentColor,
+                -45px 45px 0 -1px currentColor,
+                -64px 0 0 -1px currentColor,
+                -45px -45px 0 -1px currentColor,
+                24px -58px 0 -2px currentColor,
+                58px -24px 0 -2px currentColor,
+                58px 24px 0 -2px currentColor,
+                24px 58px 0 -2px currentColor,
+                -24px 58px 0 -2px currentColor,
+                -58px 24px 0 -2px currentColor,
+                -58px -24px 0 -2px currentColor,
+                -24px -58px 0 -2px currentColor;
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.12);
+            animation: winnerFirework 2.8s cubic-bezier(0.17,0.67,0.2,1) var(--delay) infinite;
+        }
+        .winner-fireworks i::after {
+            content: "";
+            position: absolute;
+            inset: -8px;
+            border: 2px solid currentColor;
+            border-radius: 999px;
+            opacity: 0;
+            animation: winnerFireworkRing 2.8s ease-out var(--delay) infinite;
         }
         @keyframes winnerBackdropIn {
             from { opacity: 0; transform: scale(1.2); }
@@ -730,11 +798,49 @@
             12% { opacity: 1; }
             100% { opacity: 0; transform: translate3d(var(--drift), 115vh, 0) rotate(720deg); }
         }
+        @keyframes winnerFlash {
+            0% { opacity: 0; transform: scale(0.55); }
+            12% { opacity: 0.96; }
+            34% { opacity: 0.24; transform: scale(1.18); }
+            100% { opacity: 0; transform: scale(1.45); }
+        }
+        @keyframes winnerSweep {
+            0%, 68%, 100% { opacity: 0; transform: translateX(-30%); }
+            78% { opacity: 0.38; }
+            92% { opacity: 0; transform: translateX(30%); }
+        }
+        @keyframes winnerFirework {
+            0%, 10% { opacity: 0; transform: translate(-50%, -50%) scale(0.08) rotate(0deg); }
+            18% { opacity: 1; }
+            60% { opacity: 0.94; transform: translate(-50%, -50%) scale(0.92) rotate(8deg); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.3) rotate(16deg); }
+        }
+        @keyframes winnerFireworkRing {
+            0%, 18% { opacity: 0; transform: scale(0.2); }
+            28% { opacity: 0.85; }
+            100% { opacity: 0; transform: scale(7); }
+        }
+        @media (max-height: 500px) and (orientation: landscape) {
+            .winner-reveal {
+                --winner-caption-height: 58px;
+            }
+            .winner-title {
+                font-size: clamp(1rem, 4.5vh, 1.45rem);
+            }
+            .winner-value,
+            .winner-percent {
+                margin-top: 2px;
+                font-size: clamp(0.76rem, 3.2vh, 1rem);
+            }
+        }
         @media (prefers-reduced-motion: reduce) {
             .winner-photo-bg,
             .winner-photo,
             .winner-rays,
-            .winner-confetti i {
+            .winner-confetti i,
+            .winner-flash,
+            .winner-fireworks i,
+            .winner-fireworks i::after {
                 animation: none !important;
             }
         }
@@ -925,6 +1031,58 @@
                 padding-top: 12px;
                 padding-bottom: 12px;
             }
+        }
+
+        /* Fullscreen layout uses the measured viewport instead of fixed subtractions. */
+        body.presentation-mode {
+            height: 100vh;
+            height: 100dvh;
+            min-height: 0;
+            overflow: hidden;
+        }
+        body.presentation-mode .app-shell {
+            flex: 1 1 auto;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+        body.presentation-mode main {
+            display: flex;
+            flex: 1 1 auto;
+            width: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+        body.presentation-mode .tab-content.active {
+            display: flex;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+        body.presentation-mode .award-shell {
+            display: grid;
+            grid-template-rows: minmax(0, 1fr) auto;
+            gap: 8px;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+        }
+        body.presentation-mode .award-stage,
+        body.presentation-mode .award-stage > [id^="categories-area-"] {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+        }
+        body.presentation-mode .category-card,
+        body.presentation-mode .race-card,
+        body.presentation-mode .award-slide.category-card.race-card.active {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            max-height: 100%;
+        }
+        body.presentation-mode .award-controls {
+            margin-top: 0;
         }
 
         .page-nav-link {
@@ -1631,6 +1789,8 @@
                 overlay.innerHTML = `
                     <img class="winner-photo-bg" alt="" aria-hidden="true">
                     <div class="winner-rays" aria-hidden="true"></div>
+                    <div class="winner-flash" aria-hidden="true"></div>
+                    <div class="winner-fireworks" aria-hidden="true"></div>
                     <img class="winner-photo" alt="">
                     <div class="winner-shade" aria-hidden="true"></div>
                     <div class="winner-confetti" aria-hidden="true"></div>
@@ -1646,15 +1806,37 @@
                     closeWinnerReveal(card);
                 });
                 const confetti = overlay.querySelector(".winner-confetti");
-                const colors = ["#facc15", "#fef08a", "#ffffff", "#d97706"];
-                for (let index = 0; index < 22; index += 1) {
+                const colors = ["#facc15", "#fef08a", "#ffffff", "#d97706", "#fb7185"];
+                for (let index = 0; index < 48; index += 1) {
                     const piece = document.createElement("i");
                     piece.style.setProperty("--left", `${(index * 37) % 100}%`);
-                    piece.style.setProperty("--delay", `${(index % 8) * 0.12}s`);
-                    piece.style.setProperty("--drift", `${((index % 7) - 3) * 18}px`);
+                    piece.style.setProperty("--delay", `${(index % 12) * 0.1}s`);
+                    piece.style.setProperty("--duration", `${2.4 + (index % 5) * 0.28}s`);
+                    piece.style.setProperty("--drift", `${((index % 9) - 4) * 24}px`);
+                    piece.style.setProperty("--piece-width", `${5 + (index % 4)}px`);
+                    piece.style.setProperty("--piece-height", `${10 + (index % 5) * 3}px`);
                     piece.style.setProperty("--color", colors[index % colors.length]);
                     confetti.appendChild(piece);
                 }
+
+                const fireworks = overlay.querySelector(".winner-fireworks");
+                const bursts = [
+                    ["18%", "24%", "0.05s"],
+                    ["82%", "20%", "0.38s"],
+                    ["32%", "42%", "0.82s"],
+                    ["70%", "40%", "1.18s"],
+                    ["12%", "58%", "1.55s"],
+                    ["88%", "56%", "1.92s"],
+                    ["50%", "18%", "2.2s"]
+                ];
+                bursts.forEach((burst, index) => {
+                    const firework = document.createElement("i");
+                    firework.style.setProperty("--x", burst[0]);
+                    firework.style.setProperty("--y", burst[1]);
+                    firework.style.setProperty("--delay", burst[2]);
+                    firework.style.setProperty("--color", colors[index % colors.length]);
+                    fireworks.appendChild(firework);
+                });
                 card.appendChild(overlay);
             }
 
