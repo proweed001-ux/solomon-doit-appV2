@@ -1401,7 +1401,6 @@
                     : (row?.name || row?.adsName || "")
             ).trim();
 
-            if (mode === "ads") return code || name || "-";
             if (!name || name === code) return code || name || "-";
             return name;
         }
