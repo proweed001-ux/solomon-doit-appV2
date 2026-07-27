@@ -589,6 +589,123 @@ test("moves changed and unchanged quantity inputs exactly once", async ({
   expect(runtime.errors).toEqual([]);
 });
 
+test("drops a no-op edit history entry when a quantity returns to its original value", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+  await chooseOnly(page, "receivers", fixtureMeta.receiver);
+
+  const sendInputs = page.locator(
+    '#table input.jdata[data-map="send"]',
+  );
+  const firstSend = sendInputs.nth(0);
+  await firstSend.focus();
+  await firstSend.fill("1");
+  await firstSend.press("Tab");
+  const committed = await quantitySnapshot(page, "send", 0);
+  expect(committed.stateValue).toBe(1);
+  expect(committed.storedValue).toBe(1);
+
+  await firstSend.focus();
+  await firstSend.fill("12");
+  await firstSend.fill("1");
+  await firstSend.press("Tab");
+  const reverted = await quantitySnapshot(page, "send", 0);
+  expect(reverted.dom).toBe("1");
+  expect(reverted.stateValue).toBe(1);
+  expect(reverted.storedValue).toBe(1);
+  expect(reverted.history).toBe(committed.history);
+  expect(reverted.redo).toBe(committed.redo);
+  expect(reverted.activeSendIndex).toBe(1);
+
+  await page.locator("#undo").click();
+  const undone = await quantitySnapshot(page, "send", 0);
+  expect(undone.dom).toBe("");
+  expect(undone.stateValue).toBeNull();
+  expect(undone.redo).toBe(1);
+
+  await firstSend.focus();
+  await firstSend.fill("2");
+  await firstSend.fill("");
+  await firstSend.press("Tab");
+  const secondRevert = await quantitySnapshot(page, "send", 0);
+  expect(secondRevert.dom).toBe("");
+  expect(secondRevert.stateValue).toBe(0);
+  expect(secondRevert.redo).toBe(1);
+
+  await page.locator("#redo").click();
+  const redone = await quantitySnapshot(page, "send", 0);
+  expect(redone.dom).toBe("1");
+  expect(redone.stateValue).toBe(1);
+  expect(redone.redo).toBe(0);
+  expect(runtime.errors).toEqual([]);
+});
+
+test("keeps the directly tapped quantity focused after the previous edit renders", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+  await chooseOnly(page, "receivers", fixtureMeta.receiver);
+
+  const sendInputs = page.locator(
+    '#table input.jdata[data-map="send"]',
+  );
+  const addInputs = page.locator('#table input.jdata[data-map="add"]');
+  const pullInputs = page.locator('#table input.jdata[data-map="pull"]');
+
+  const firstSend = sendInputs.nth(0);
+  await firstSend.focus();
+  const beforeSend = await quantitySnapshot(page, "send", 0);
+  await firstSend.fill("1");
+  const addBox = await addInputs.nth(0).boundingBox();
+  expect(addBox).not.toBeNull();
+  await page.mouse.click(
+    addBox.x + addBox.width / 2,
+    addBox.y + addBox.height / 2,
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        map: document.activeElement?.dataset?.map || "",
+        key: document.activeElement?.dataset?.k || "",
+      })),
+    )
+    .toEqual({
+      map: "add",
+      key: await addInputs.nth(0).getAttribute("data-k"),
+    });
+  const afterSend = await quantitySnapshot(page, "send", 0);
+  expect(afterSend.stateValue).toBe(1);
+  expect(afterSend.storedValue).toBe(1);
+  expect(afterSend.history).toBe(beforeSend.history + 1);
+
+  const firstAdd = addInputs.nth(0);
+  await firstAdd.fill("2");
+  const pullBox = await pullInputs.nth(0).boundingBox();
+  expect(pullBox).not.toBeNull();
+  await page.mouse.click(
+    pullBox.x + pullBox.width / 2,
+    pullBox.y + pullBox.height / 2,
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        map: document.activeElement?.dataset?.map || "",
+        key: document.activeElement?.dataset?.k || "",
+      })),
+    )
+    .toEqual({
+      map: "pull",
+      key: await pullInputs.nth(0).getAttribute("data-k"),
+    });
+  const afterAdd = await quantitySnapshot(page, "add", 0);
+  expect(afterAdd.stateValue).toBe(2);
+  expect(afterAdd.storedValue).toBe(2);
+  expect(runtime.errors).toEqual([]);
+});
+
 test("flushes a focused quantity before autosave and state-changing commands", async ({
   page,
 }) => {

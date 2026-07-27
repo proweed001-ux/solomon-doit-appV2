@@ -103,9 +103,28 @@ export function trimHistory() {
 }
 
 export function push() {
+  const checkpoint = {
+    hist: [...state.hist],
+    redoStack: [...state.redoStack],
+  };
   state.hist.push(snap());
   state.redoStack = [];
   trimHistory();
+  return checkpoint;
+}
+
+export function restoreHistoryCheckpoint(checkpoint) {
+  if (
+    !checkpoint ||
+    !Array.isArray(checkpoint.hist) ||
+    !Array.isArray(checkpoint.redoStack)
+  ) {
+    return false;
+  }
+  state.hist = [...checkpoint.hist];
+  state.redoStack = [...checkpoint.redoStack];
+  trimHistory();
+  return true;
 }
 
 export function restore(snapshot) {

@@ -1,6 +1,8 @@
 const SEND_SELECTOR = '#table input.jdata[data-map="send"]';
 const QUANTITY_SELECTOR = "#table input.jdata[data-map]";
 let editSession = null;
+let pointerTarget = null;
+let pointerTrackingBound = false;
 
 function sendInputs() {
   return [...document.querySelectorAll(SEND_SELECTOR)].filter(
@@ -55,6 +57,27 @@ function focusTarget(target) {
   } catch {}
 }
 
+function ensurePointerTracking() {
+  if (pointerTrackingBound) return;
+  pointerTrackingBound = true;
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      const input = event.target.closest?.(QUANTITY_SELECTOR);
+      pointerTarget =
+        input && !input.disabled ? inputTarget(input) : null;
+    },
+    true,
+  );
+}
+
+function restorePointerTarget() {
+  if (!pointerTarget) return;
+  const target = pointerTarget;
+  pointerTarget = null;
+  queueMicrotask(() => focusTarget(target));
+}
+
 function beginEdit(input, callbacks) {
   if (editSession?.input === input) return editSession;
   if (editSession) commitPendingQuantityEdit({ render: false });
@@ -63,16 +86,20 @@ function beginEdit(input, callbacks) {
     callbacks,
     beforeValue: input.value,
     changed: false,
+    editStarted: false,
+    historyCheckpoint: null,
   };
   return editSession;
 }
 
 function updateEdit(input, callbacks) {
   const session = beginEdit(input, callbacks);
-  if (!session.changed && input.value !== session.beforeValue) {
-    session.callbacks.onEditStart(input);
-    session.changed = true;
+  const changed = input.value !== session.beforeValue;
+  if (changed && !session.editStarted) {
+    session.historyCheckpoint = session.callbacks.onEditStart(input);
+    session.editStarted = true;
   }
+  session.changed = changed;
   session.callbacks.onInput(input);
 }
 
@@ -80,7 +107,15 @@ function finishEdit(input, options = {}) {
   const session = editSession;
   if (!session || session.input !== input) return false;
   editSession = null;
-  if (!session.changed) return false;
+  if (!session.editStarted) return false;
+  if (!session.changed) {
+    session.callbacks.onRevert?.(
+      input,
+      session.historyCheckpoint,
+      options,
+    );
+    return false;
+  }
   session.callbacks.onCommit(input, options);
   return true;
 }
@@ -100,19 +135,25 @@ export function bindQuantityInputs({
   onInput,
   onCommit,
 }) {
+  ensurePointerTracking();
   refreshSendInputs();
   inputs.forEach((input) => {
     const callbacks = { onEditStart, onInput, onCommit };
     input.onfocus = () => {
+      pointerTarget = null;
       beginEdit(input, callbacks);
       if (input.matches(SEND_SELECTOR)) refreshSendInputs();
     };
     input.oninput = () => updateEdit(input, callbacks);
     input.onchange = () => {
-      finishEdit(input, { reason: "change", render: true });
+      if (finishEdit(input, { reason: "change", render: true })) {
+        restorePointerTarget();
+      }
     };
     input.onblur = () => {
-      finishEdit(input, { reason: "blur", render: true });
+      if (finishEdit(input, { reason: "blur", render: true })) {
+        restorePointerTarget();
+      }
     };
     input.onkeydown = (event) => {
       if (event.key !== "Enter" && event.key !== "Tab") return;

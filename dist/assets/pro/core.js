@@ -38,6 +38,7 @@ import {
   currentState,
   historyStats,
   trimHistory,
+  restoreHistoryCheckpoint,
 } from "./state.js";
 import { norm, arr, parseDoitFile } from "./parser-adapter.js";
 import {
@@ -739,6 +740,9 @@ import { preparePrint } from "./print.js";
       bindQuantityInputs({
         inputs: $$(".jdata"),
         onEditStart: () => push(),
+        onRevert: (_input, checkpoint) => {
+          restoreHistoryCheckpoint(checkpoint);
+        },
         onInput: (input) => {
           state[input.dataset.map][input.dataset.k] = N(input.value);
           recalcPickRow(input.closest("tr"));

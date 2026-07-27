@@ -1591,6 +1591,26 @@ assert.doesNotMatch(
   "Quantity navigation must not depend on whether the edit committed",
 );
 assert.match(
+  sendStoreSource,
+  /const changed = input\.value !== session\.beforeValue;[\s\S]*session\.changed = changed;/,
+  "Quantity edit sessions must return to unchanged when the final value equals the original value",
+);
+assert.match(
+  sendStoreSource,
+  /session\.callbacks\.onRevert\?\./,
+  "No-op quantity edits must restore their history checkpoint",
+);
+assert.match(
+  stateSource,
+  /export function restoreHistoryCheckpoint\(checkpoint\)/,
+  "State owner must restore History and Redo after a no-op edit",
+);
+assert.match(
+  sendStoreSource,
+  /pointerdown[\s\S]*restorePointerTarget[\s\S]*queueMicrotask/,
+  "Direct pointer navigation must restore the tapped quantity after render",
+);
+assert.match(
   coreSource,
   /onEditStart:\s*\(\)\s*=>\s*push\(\)/,
   "A quantity edit must snapshot history before its first state mutation",
