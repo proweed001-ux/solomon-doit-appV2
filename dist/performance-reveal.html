@@ -601,9 +601,12 @@
         }
         .winner-photo {
             z-index: 2;
+            inset: 0 0 clamp(92px, 13vmin, 132px);
+            height: auto;
             object-fit: contain;
-            padding: clamp(12px, 2vmin, 28px);
-            filter: brightness(0.9) saturate(1.04) drop-shadow(0 12px 34px rgba(0,0,0,0.72));
+            padding: clamp(10px, 1.6vmin, 24px);
+            padding-bottom: 0;
+            filter: brightness(0.94) saturate(1.04) drop-shadow(0 12px 34px rgba(0,0,0,0.72));
             transform: scale(0.97);
             opacity: 0;
         }
@@ -617,8 +620,9 @@
             position: absolute;
             inset: 0;
             background:
-                linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0.96) 100%),
+                linear-gradient(180deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.08) 68%, rgba(0,0,0,0.76) 100%),
                 radial-gradient(circle at 50% 28%, rgba(250,204,21,0.12), transparent 48%);
+            pointer-events: none;
         }
         .winner-rays {
             position: absolute;
@@ -640,56 +644,57 @@
         .winner-content {
             position: relative;
             z-index: 4;
-            width: min(100%, 720px);
-            padding: clamp(18px, 3vmin, 32px);
-            border: 1px solid rgba(250,204,21,0.5);
-            border-radius: 24px;
-            background: linear-gradient(180deg, rgba(10,10,10,0.58), rgba(5,5,5,0.9));
-            box-shadow: 0 0 50px rgba(250,204,21,0.22);
-            backdrop-filter: blur(12px);
+            width: 100%;
+            min-height: clamp(72px, 11vmin, 108px);
+            padding: 6px clamp(18px, 4vw, 64px) max(4px, env(safe-area-inset-bottom));
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            backdrop-filter: none;
             text-align: center;
-        }
-        .winner-crown {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 36px;
-            padding: 6px 14px;
-            border-radius: 999px;
-            background: linear-gradient(135deg, #fef08a, #eab308);
-            color: #050505;
-            font-weight: 900;
-            letter-spacing: 0.08em;
-            box-shadow: 0 0 26px rgba(250,204,21,0.46);
+            pointer-events: none;
         }
         .winner-title {
-            margin-top: 12px;
+            margin: 0;
             color: #ffffff;
-            font-size: clamp(1.5rem, 4vmin, 3rem);
+            font-size: clamp(1.35rem, 3.4vmin, 2.5rem);
             font-weight: 900;
-            line-height: 1.05;
-            text-shadow: 0 4px 24px rgba(0,0,0,0.9);
+            line-height: 1.08;
+            overflow-wrap: anywhere;
+            text-shadow: 0 3px 18px rgba(0,0,0,0.96);
         }
         .winner-value,
         .winner-percent {
-            display: block;
-            margin-top: 8px;
+            display: inline-block;
+            margin-top: 5px;
             color: #ffffff;
-            font-size: clamp(1rem, 2.2vmin, 1.45rem);
+            font-size: clamp(0.95rem, 2.1vmin, 1.35rem);
             font-weight: 900;
+            text-shadow: 0 2px 14px rgba(0,0,0,0.98);
+        }
+        .winner-percent:not([hidden])::before {
+            content: " • ";
+            color: rgba(255,255,255,0.72);
         }
         .winner-percent[hidden] {
             display: none;
         }
         .winner-back {
-            margin-top: 18px;
-            min-height: 42px;
-            padding: 8px 16px;
-            border: 1px solid rgba(255,255,255,0.44);
-            border-radius: 12px;
-            background: rgba(0,0,0,0.58);
+            position: absolute;
+            top: max(12px, env(safe-area-inset-top));
+            left: max(12px, env(safe-area-inset-left));
+            z-index: 6;
+            width: 42px;
+            height: 42px;
+            padding: 0;
+            border: 1px solid rgba(255,255,255,0.32);
+            border-radius: 999px;
+            background: rgba(0,0,0,0.34);
             color: #ffffff;
+            font-size: 1.25rem;
             font-weight: 800;
+            backdrop-filter: blur(6px);
         }
         .winner-confetti {
             position: absolute;
@@ -1629,12 +1634,11 @@
                     <img class="winner-photo" alt="">
                     <div class="winner-shade" aria-hidden="true"></div>
                     <div class="winner-confetti" aria-hidden="true"></div>
+                    <button class="winner-back" type="button" aria-label="กลับไปดูอันดับ">←</button>
                     <div class="winner-content">
-                        <span class="winner-crown">♛ อันดับ 1</span>
                         <h2 class="winner-title"></h2>
                         <strong class="winner-value"></strong>
                         <strong class="winner-percent"></strong>
-                        <button class="winner-back" type="button">← กลับไปดูอันดับ</button>
                     </div>
                 `;
                 overlay.querySelector(".winner-back").addEventListener("click", event => {
