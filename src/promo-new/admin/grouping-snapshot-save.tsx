@@ -69,7 +69,7 @@ export function GroupingSnapshotSave({
       setSavedSnapshot(result);
       onSaved?.(result);
       setSavedSignature(signature);
-      onMessage(`บันทึก Snapshot revision ${result.revision} แล้ว: ${result.cardCount} การ์ด · ${result.groups.length} กลุ่ม · ${new Date(result.savedAt).toLocaleString('th-TH')}`);
+      onMessage(`บันทึกการจัดกลุ่ม revision ${result.revision} แล้ว: ${result.cardCount} การ์ด · ${result.groups.length} กลุ่ม — ขั้นนี้ยังไม่ขึ้นหน้าลูกค้า ให้กด “2/3 บันทึก Draft หน้าลูกค้า” ต่อ`);
     } catch (error) {
       onError(String((error as Error)?.message || error));
     } finally {
@@ -81,8 +81,8 @@ export function GroupingSnapshotSave({
     <div className="grouping-save-copy">
       <div className="grouping-save-icon"><Database size={20} /></div>
       <div>
-        <h2>บันทึกการจัดกลุ่มลงฐานกลาง</h2>
-        <p>บันทึกได้เมื่อการ์ดครบ ไม่มีรายการรอจัด และทุกกลุ่มผูกกับ Product Master จริง การบันทึกเป็นธุรกรรมเดียวจึงไม่ทิ้งข้อมูลครึ่งชุด</p>
+        <h2>ขั้นที่ 1/3 · บันทึกการจัดกลุ่มลงฐานกลาง</h2>
+        <p>บันทึกได้เมื่อการ์ดครบ ไม่มีรายการรอจัด และทุกกลุ่มผูกกับ Product Master จริง การบันทึกเป็นธุรกรรมเดียวจึงไม่ทิ้งข้อมูลครึ่งชุด ขั้นนี้ยังไม่แสดงหน้าลูกค้า ต้องบันทึก Draft และ Publish ต่อที่แถบล่าง</p>
         <div className="grouping-save-status">
           <span>การ์ด {dataset.cards.length}</span>
           <span>กลุ่ม {dataset.productGroups.length}</span>
@@ -103,7 +103,7 @@ export function GroupingSnapshotSave({
         disabled={!readyToSave || busy || savedSignature === signature}
         title={!readyToSave ? 'ต้องใช้ Dataset กลาง การ์ดครบ โปรโมชั่นครบ และยืนยันพร้อมล็อกทุกกลุ่ม' : ''}
         onClick={save}
-      ><Save size={16} /> {busy ? 'กำลังบันทึก...' : 'บันทึกการจัดกลุ่มทั้งเดือน'}</button>
+      ><Save size={16} /> {busy ? 'กำลังบันทึก...' : '1/3 บันทึกการจัดกลุ่มทั้งเดือน'}</button>
       {readOnly && <small>โหมด Preview/Dry-run ไม่เขียนฐานข้อมูล</small>}
       {!readOnly && sourceNotPersisted && <small>ต้องโหลด Dataset จากฐานทดสอบที่มี Database Card UUID ก่อน</small>}
       {!readOnly && quarantine.length > 0 && <small>ต้องจัดการ์ดที่เหลือให้หมดก่อน</small>}
