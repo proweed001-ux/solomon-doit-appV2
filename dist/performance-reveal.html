@@ -380,10 +380,9 @@
             left: 0;
             width: calc(100% / var(--race-lanes, 5));
             height: 100%;
-            display: grid;
-            grid-template-rows: 34px 34px minmax(80px, 1fr) 62px;
-            justify-items: center;
-            align-items: end;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
             opacity: 0;
             transform: translateX(0);
             transition: opacity 0.28s ease;
@@ -392,107 +391,127 @@
         .race-row.is-top-five {
             opacity: 1;
         }
-        .race-rank {
-            grid-row: 1;
-            width: 34px;
-            height: 34px;
+        .race-bar-lane {
+            width: min(88%, 120px);
+            height: calc(100% - 58px);
             display: flex;
+            align-items: flex-end;
+            overflow: visible;
+            position: relative;
+        }
+        .race-bar {
+            width: 100%;
+            height: 0;
+            min-height: 0;
+            border-top: 3px solid rgba(250, 204, 21, 0.62);
+            border-radius: 18px 18px 3px 3px;
+            background: linear-gradient(180deg, rgba(113,63,18,0.92), rgba(30,24,12,0.98) 58%, rgba(10,10,10,0.99));
+            box-shadow: 0 -10px 28px rgba(234,179,8,0.16), inset 10px 0 18px rgba(255,255,255,0.035), inset -12px 0 20px rgba(0,0,0,0.46);
+            transition: height 0.08s linear;
+            position: relative;
+            overflow: visible;
+        }
+        .race-bar::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: linear-gradient(90deg, rgba(255,255,255,0.045), transparent 38%, rgba(0,0,0,0.2));
+            pointer-events: none;
+        }
+        .race-avatar {
+            position: absolute;
+            top: -43px;
+            left: 50%;
+            width: 68px;
+            height: 68px;
+            transform: translateX(-50%);
+            border: 3px solid #d4a51f;
+            border-radius: 999px;
+            background: radial-gradient(circle at 50% 35%, #2b2311, #050505 72%);
+            box-shadow: 0 0 0 4px rgba(5,5,5,0.9), 0 0 25px rgba(234,179,8,0.28);
+            overflow: hidden;
+            z-index: 3;
+        }
+        .race-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .race-bar-copy {
+            position: absolute;
+            top: 44px;
+            left: 5px;
+            right: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            z-index: 2;
+        }
+        .race-row.race-started .race-bar-copy {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .race-rank {
+            min-height: 22px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            border-radius: 10px;
-            background: #262626;
-            color: #d4d4d8;
+            padding: 3px 7px;
+            border-radius: 5px;
+            background: rgba(0,0,0,0.72);
+            color: #facc15;
+            font-size: 0.64rem;
             font-weight: 900;
+            letter-spacing: 0.08em;
             opacity: 0;
-            transform: scale(0.55);
+            transform: scale(0.6);
             transition: opacity 0.38s ease, transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .race-row.race-finished .race-rank {
             opacity: 1;
             transform: scale(1);
         }
-        .race-row.race-finished[data-rank="1"] .race-rank {
-            background: linear-gradient(135deg, #fef08a, #eab308);
-            color: #050505;
-            box-shadow: 0 0 18px rgba(234, 179, 8, 0.4);
-        }
-        .race-person {
-            grid-row: 4;
+        .race-name {
             width: 100%;
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            gap: 3px;
-        }
-        .race-person img {
-            width: 36px;
-            height: 36px;
-            flex: 0 0 auto;
-            border-radius: 999px;
-            border: 1px solid rgba(250, 204, 21, 0.4);
-            background: #050505;
-            object-fit: cover;
-        }
-        .race-person span {
-            width: 100%;
-            min-width: 0;
             overflow: hidden;
             color: #f4f4f5;
-            font-size: clamp(0.68rem, 1vw, 0.86rem);
+            font-size: clamp(0.58rem, 1vw, 0.8rem);
             font-weight: 800;
-            text-align: center;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        .race-bar-lane {
-            grid-row: 3;
-            width: min(62%, 66px);
-            height: 100%;
-            display: flex;
-            align-items: flex-end;
-            overflow: hidden;
-            padding: 4px;
-            border: 2px solid rgba(250, 204, 21, 0.24);
-            border-radius: 999px 999px 16px 16px;
-            background:
-                repeating-linear-gradient(to top, rgba(255,255,255,0.08) 0 1px, transparent 1px 20%),
-                rgba(255,255,255,0.045);
-            box-shadow: inset 0 0 18px rgba(0,0,0,0.65), 0 0 16px rgba(234,179,8,0.08);
-            position: relative;
-        }
-        .race-bar {
-            width: 100%;
-            height: 0;
-            border-radius: 999px 999px 10px 10px;
-            background: linear-gradient(0deg, #713f12, #d97706 45%, #facc15 82%, #fef08a);
-            box-shadow: 0 0 20px rgba(234,179,8,0.22), inset 8px 0 10px rgba(255,255,255,0.08);
-            transition: height 0.08s linear;
-            position: relative;
-        }
-        .race-bar::after {
-            content: "";
-            position: absolute;
-            top: 6px;
-            bottom: 6px;
-            left: 18%;
-            width: 16%;
-            border-radius: 999px;
-            background: rgba(255,255,255,0.28);
-            filter: blur(1px);
+        .race-percent {
+            color: #facc15;
+            font-size: clamp(0.78rem, 1.45vw, 1.08rem);
+            font-weight: 900;
+            line-height: 1;
+            text-shadow: 0 0 14px rgba(250,204,21,0.2);
         }
         .race-row.race-finished[data-rank="1"] .race-bar {
-            background: linear-gradient(0deg, #a16207, #facc15 70%, #fff7ae);
-            box-shadow: 0 0 28px rgba(250,204,21,0.5), inset 8px 0 10px rgba(255,255,255,0.12);
+            border-top-color: #fde047;
+            background: linear-gradient(180deg, rgba(120,90,12,0.98), rgba(56,45,13,0.98) 48%, rgba(14,13,8,1));
+            box-shadow: 0 -12px 34px rgba(250,204,21,0.38), inset 10px 0 18px rgba(255,255,255,0.055);
         }
-        .race-percent {
-            grid-row: 2;
-            color: #facc15;
-            font-size: clamp(0.88rem, 1.5vw, 1.18rem);
-            font-weight: 900;
-            text-align: center;
+        .race-row.race-finished[data-rank="2"] .race-bar {
+            border-top-color: #cbd5e1;
+            background: linear-gradient(180deg, rgba(51,65,85,0.98), rgba(24,32,44,0.98) 52%, rgba(9,11,15,1));
+            box-shadow: 0 -10px 28px rgba(203,213,225,0.2), inset 10px 0 18px rgba(255,255,255,0.045);
         }
+        .race-row.race-finished[data-rank="3"] .race-bar {
+            border-top-color: #d97706;
+            background: linear-gradient(180deg, rgba(108,45,8,0.98), rgba(55,25,10,0.98) 52%, rgba(15,9,6,1));
+            box-shadow: 0 -10px 28px rgba(217,119,6,0.22), inset 10px 0 18px rgba(255,255,255,0.04);
+        }
+        .race-row.race-finished[data-rank="1"] .race-avatar { border-color: #fde047; box-shadow: 0 0 0 4px #090909, 0 0 28px rgba(250,204,21,0.5); }
+        .race-row.race-finished[data-rank="2"] .race-avatar { border-color: #cbd5e1; box-shadow: 0 0 0 4px #090909, 0 0 24px rgba(203,213,225,0.28); }
+        .race-row.race-finished[data-rank="3"] .race-avatar { border-color: #d97706; box-shadow: 0 0 0 4px #090909, 0 0 24px rgba(217,119,6,0.3); }
+        .race-row.race-finished[data-rank="1"] .race-rank::before { content: "♛ "; }
         .race-footer {
             display: flex;
             align-items: center;
@@ -517,20 +536,33 @@
             .race-card {
                 padding: 16px 12px;
             }
-            .race-row {
-                grid-template-rows: 30px 30px minmax(74px, 1fr) 58px;
+            .race-bar-lane {
+                width: min(92%, 74px);
+                height: calc(100% - 48px);
             }
-            .race-person img {
-                width: 28px;
-                height: 28px;
+            .race-avatar {
+                top: -34px;
+                width: 54px;
+                height: 54px;
+                border-width: 2px;
+                box-shadow: 0 0 0 3px rgba(5,5,5,0.9), 0 0 18px rgba(234,179,8,0.24);
             }
-            .race-person span {
-                font-size: 0.62rem;
+            .race-bar-copy {
+                top: 35px;
+                left: 2px;
+                right: 2px;
+                gap: 4px;
             }
             .race-rank {
-                width: 30px;
-                height: 30px;
-                font-size: 0.78rem;
+                min-height: 18px;
+                padding: 2px 4px;
+                font-size: 0.52rem;
+            }
+            .race-name {
+                font-size: 0.52rem;
+            }
+            .race-percent {
+                font-size: 0.72rem;
             }
             .race-date {
                 max-width: 126px;
@@ -627,7 +659,7 @@
                                 </div>
                                 <div id="race-ps-overall" class="race-track"></div>
                                 <div class="race-footer">
-                                    <span>หลอดเริ่มจาก 0 • แข่งขัน 5 วินาที • เปิดอันดับตอนจบ</span>
+                                    <span>แท่งเริ่มจาก 0 • แข่งขัน 5 วินาที • เปิดอันดับตอนจบ</span>
                                     <button class="race-replay" type="button" onclick="startRace('ps', 'overall', 'race-ps-overall')">↻ แข่งใหม่</button>
                                 </div>
                             </div>
@@ -665,7 +697,7 @@
                                 </div>
                                 <div id="race-ads-overall" class="race-track"></div>
                                 <div class="race-footer">
-                                    <span>หลอดเริ่มจาก 0 • แข่งขัน 5 วินาที • เปิดอันดับตอนจบ</span>
+                                    <span>แท่งเริ่มจาก 0 • แข่งขัน 5 วินาที • เปิดอันดับตอนจบ</span>
                                     <button class="race-replay" type="button" onclick="startRace('ads', 'overall', 'race-ads-overall')">↻ แข่งใหม่</button>
                                 </div>
                             </div>
@@ -1141,15 +1173,21 @@
                     row = document.createElement("div");
                     row.className = "race-row is-top-five";
                     row.innerHTML = `
-                        <span class="race-rank"></span>
-                        <div class="race-person"><img alt=""><span></span></div>
-                        <div class="race-bar-lane"><div class="race-bar"></div></div>
-                        <strong class="race-percent"></strong>
+                        <div class="race-bar-lane">
+                            <div class="race-bar">
+                                <div class="race-avatar"><img alt=""></div>
+                                <div class="race-bar-copy">
+                                    <span class="race-rank"></span>
+                                    <span class="race-name"></span>
+                                    <strong class="race-percent"></strong>
+                                </div>
+                            </div>
+                        </div>
                     `;
                     row._raceParts = {
                         rank: row.querySelector(".race-rank"),
-                        name: row.querySelector(".race-person span"),
-                        image: row.querySelector(".race-person img"),
+                        name: row.querySelector(".race-name"),
+                        image: row.querySelector(".race-avatar img"),
                         bar: row.querySelector(".race-bar"),
                         percent: row.querySelector(".race-percent")
                     };
@@ -1160,6 +1198,7 @@
                 const rank = rankById.get(id) || laneIds.length;
                 const parts = row._raceParts;
                 row.classList.toggle("race-finished", showRanks);
+                row.classList.toggle("race-started", person.value / maximum > 0.3);
                 row.dataset.rank = String(rank);
                 row.style.transform = `translateX(${laneIndex * 100}%)`;
                 parts.rank.textContent = String(rank);
@@ -1323,7 +1362,7 @@
                     </div>
                     <div id="${raceId}" class="race-track"></div>
                     <div class="race-footer">
-                        <span>ตำแหน่งคงที่ • หลอดแซงกัน • เปิดอันดับตอนจบ</span>
+                        <span>ตำแหน่งคงที่ • แท่งแซงกัน • เปิดอันดับตอนจบ</span>
                         <button class="race-replay" type="button" onclick="startRace('${mode}', '${key}', '${raceId}')">↻ แข่งใหม่</button>
                     </div>
                 `;
