@@ -299,7 +299,7 @@ mustContain("dist/performance-reveal.html", "border-radius: 50%");
 mustContain("dist/performance-reveal.html", "object-fit: cover");
 mustContain("dist/performance-reveal.html", "blur(30px)");
 mustContain("dist/performance-reveal.html", "--winner-caption-height");
-mustContain("dist/performance-reveal.html", "inset: 0 0 auto 0");
+mustContain("dist/performance-reveal.html", "border: clamp(5px, 0.8vmin, 10px) solid #d6ad24");
 mustContain("dist/performance-reveal.html", "top: calc((100% - var(--winner-caption-height)) / 2)");
 mustContain("dist/performance-reveal.html", "transform: translate(-50%, -50%) scale(1)");
 mustNotContain("dist/performance-reveal.html", "height: auto;\n            object-fit: contain");
