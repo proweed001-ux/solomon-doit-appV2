@@ -119,11 +119,11 @@ export function bindQuantityInputs({
       const moveTarget = nextTargetFor(input, event.shiftKey);
       event.preventDefault();
       event.stopPropagation();
-      const committed = finishEdit(input, {
+      finishEdit(input, {
         reason: event.key.toLowerCase(),
         render: true,
       });
-      if (committed || input.matches(SEND_SELECTOR)) focusTarget(moveTarget);
+      focusTarget(moveTarget);
     };
   });
 }

@@ -1581,6 +1581,16 @@ assert.match(
   "Blur must explicitly finish the quantity edit session",
 );
 assert.match(
+  sendStoreSource,
+  /input\.onkeydown[\s\S]*event\.preventDefault\(\)[\s\S]*finishEdit\(input,[\s\S]*focusTarget\(moveTarget\)/,
+  "Handled Enter and Tab keys must move focus once even when the value is unchanged",
+);
+assert.doesNotMatch(
+  sendStoreSource,
+  /committed\s*\|\|\s*input\.matches\(SEND_SELECTOR\)/,
+  "Quantity navigation must not depend on whether the edit committed",
+);
+assert.match(
   coreSource,
   /onEditStart:\s*\(\)\s*=>\s*push\(\)/,
   "A quantity edit must snapshot history before its first state mutation",

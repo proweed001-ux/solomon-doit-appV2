@@ -132,6 +132,14 @@ async function quantitySnapshot(page, map, index = 0) {
           '#table input.jdata[data-map="send"]',
         ),
       ];
+      const quantityInputs = [
+        ...document.querySelectorAll("#table input.jdata[data-map]"),
+      ];
+      const activeQuantity = document.activeElement?.matches?.(
+        "#table input.jdata[data-map]",
+      )
+        ? document.activeElement
+        : null;
       return {
         dom: input?.value ?? null,
         key,
@@ -143,6 +151,9 @@ async function quantitySnapshot(page, map, index = 0) {
         redo: stateModule.state.redoStack.length,
         pending: window.DOIT_CORE_APP.health().pendingQuantityEdit,
         activeSendIndex: sendInputs.indexOf(document.activeElement),
+        activeQuantityIndex: quantityInputs.indexOf(document.activeElement),
+        activeQuantityMap: activeQuantity?.dataset.map || null,
+        activeQuantityKey: activeQuantity?.dataset.k || null,
         remaining: input
           ?.closest("tr")
           ?.querySelector(".remainCell")?.textContent,
@@ -443,6 +454,137 @@ test("commits send, add and pull as one authoritative edit session", async ({
   await expect(page.locator('[data-pick="receivers"]')).toContainText(
     fixtureMeta.receiver,
   );
+
+  expect(runtime.errors).toEqual([]);
+});
+
+test("moves changed and unchanged quantity inputs exactly once", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+  await chooseOnly(page, "receivers", fixtureMeta.receiver);
+
+  const sendInputs = page.locator(
+    '#table input.jdata[data-map="send"]',
+  );
+  const addInputs = page.locator('#table input.jdata[data-map="add"]');
+  const pullInputs = page.locator('#table input.jdata[data-map="pull"]');
+  expect(await sendInputs.count()).toBe(fixtureMeta.normalRows);
+  expect(await addInputs.count()).toBe(fixtureMeta.normalRows);
+  expect(await pullInputs.count()).toBe(fixtureMeta.normalRows);
+
+  await sendInputs.nth(0).focus();
+  const beforeSendTab = await quantitySnapshot(page, "send", 0);
+  await sendInputs.nth(0).press("Tab");
+  const afterSendTab = await quantitySnapshot(page, "send", 0);
+  expect(afterSendTab.activeSendIndex).toBe(1);
+  expect(afterSendTab.history).toBe(beforeSendTab.history);
+  expect(afterSendTab.dom).toBe("");
+  expect(afterSendTab.stateValue).toBeNull();
+  expect(afterSendTab.storedValue).toBeNull();
+
+  const beforeSendEnter = await quantitySnapshot(page, "send", 1);
+  await sendInputs.nth(1).press("Enter");
+  const afterSendEnter = await quantitySnapshot(page, "send", 1);
+  expect(afterSendEnter.activeSendIndex).toBe(2);
+  expect(afterSendEnter.history).toBe(beforeSendEnter.history);
+  expect(afterSendEnter.stateValue).toBeNull();
+  expect(afterSendEnter.storedValue).toBeNull();
+
+  const beforeSendBack = await quantitySnapshot(page, "send", 2);
+  await sendInputs.nth(2).press("Shift+Tab");
+  const afterSendBack = await quantitySnapshot(page, "send", 2);
+  expect(afterSendBack.activeSendIndex).toBe(1);
+  expect(afterSendBack.history).toBe(beforeSendBack.history);
+  expect(afterSendBack.stateValue).toBeNull();
+  expect(afterSendBack.storedValue).toBeNull();
+
+  await addInputs.nth(0).focus();
+  const beforeAddTab = await quantitySnapshot(page, "add", 0);
+  await addInputs.nth(0).press("Tab");
+  const afterAddTab = await quantitySnapshot(page, "add", 0);
+  expect(afterAddTab.activeQuantityIndex).toBe(
+    beforeAddTab.activeQuantityIndex + 1,
+  );
+  expect(afterAddTab.activeQuantityMap).toBe("pull");
+  expect(afterAddTab.history).toBe(beforeAddTab.history);
+  expect(afterAddTab.stateValue).toBeNull();
+  expect(afterAddTab.storedValue).toBeNull();
+
+  await pullInputs.nth(0).focus();
+  const beforePullTab = await quantitySnapshot(page, "pull", 0);
+  await pullInputs.nth(0).press("Tab");
+  const afterPullTab = await quantitySnapshot(page, "pull", 0);
+  expect(afterPullTab.activeQuantityIndex).toBe(
+    beforePullTab.activeQuantityIndex + 1,
+  );
+  expect(afterPullTab.activeQuantityMap).toBe("send");
+  expect(afterPullTab.history).toBe(beforePullTab.history);
+  expect(afterPullTab.stateValue).toBeNull();
+  expect(afterPullTab.storedValue).toBeNull();
+
+  await addInputs.nth(1).focus();
+  const beforeChangedAdd = await quantitySnapshot(page, "add", 1);
+  await addInputs.nth(1).fill("2");
+  const duringChangedAdd = await quantitySnapshot(page, "add", 1);
+  expect(duringChangedAdd.stateValue).toBe(2);
+  expect(duringChangedAdd.storedValue).toBeNull();
+  expect(duringChangedAdd.history).toBe(beforeChangedAdd.history + 1);
+  await addInputs.nth(1).press("Tab");
+  const afterChangedAdd = await quantitySnapshot(page, "add", 1);
+  expect(afterChangedAdd.activeQuantityIndex).toBe(
+    beforeChangedAdd.activeQuantityIndex + 1,
+  );
+  expect(afterChangedAdd.activeQuantityMap).toBe("pull");
+  expect(afterChangedAdd.dom).toBe("2");
+  expect(afterChangedAdd.stateValue).toBe(2);
+  expect(afterChangedAdd.storedValue).toBe(2);
+  expect(afterChangedAdd.history).toBe(duringChangedAdd.history);
+
+  await pullInputs.nth(1).focus();
+  const beforeChangedPull = await quantitySnapshot(page, "pull", 1);
+  await pullInputs.nth(1).fill("1");
+  const duringChangedPull = await quantitySnapshot(page, "pull", 1);
+  expect(duringChangedPull.stateValue).toBe(1);
+  expect(duringChangedPull.storedValue).toBeNull();
+  expect(duringChangedPull.history).toBe(beforeChangedPull.history + 1);
+  await pullInputs.nth(1).press("Tab");
+  const afterChangedPull = await quantitySnapshot(page, "pull", 1);
+  expect(afterChangedPull.activeQuantityIndex).toBe(
+    beforeChangedPull.activeQuantityIndex + 1,
+  );
+  expect(afterChangedPull.activeQuantityMap).toBe("send");
+  expect(afterChangedPull.dom).toBe("1");
+  expect(afterChangedPull.stateValue).toBe(1);
+  expect(afterChangedPull.storedValue).toBe(1);
+  expect(afterChangedPull.history).toBe(duringChangedPull.history);
+
+  await addInputs.nth(2).focus();
+  const beforeAddEnter = await quantitySnapshot(page, "add", 2);
+  await addInputs.nth(2).fill("3");
+  const duringAddEnter = await quantitySnapshot(page, "add", 2);
+  await addInputs.nth(2).press("Enter");
+  const afterAddEnter = await quantitySnapshot(page, "add", 2);
+  expect(afterAddEnter.activeQuantityIndex).toBe(
+    beforeAddEnter.activeQuantityIndex + 1,
+  );
+  expect(afterAddEnter.dom).toBe("3");
+  expect(afterAddEnter.stateValue).toBe(3);
+  expect(afterAddEnter.storedValue).toBe(3);
+  expect(afterAddEnter.history).toBe(duringAddEnter.history);
+
+  await pullInputs.nth(2).focus();
+  const beforePullEnter = await quantitySnapshot(page, "pull", 2);
+  await pullInputs.nth(2).press("Enter");
+  const afterPullEnter = await quantitySnapshot(page, "pull", 2);
+  expect(afterPullEnter.activeQuantityIndex).toBe(
+    beforePullEnter.activeQuantityIndex + 1,
+  );
+  expect(afterPullEnter.history).toBe(beforePullEnter.history);
+  expect(afterPullEnter.dom).toBe("");
+  expect(afterPullEnter.stateValue).toBeNull();
+  expect(afterPullEnter.storedValue).toBeNull();
 
   expect(runtime.errors).toEqual([]);
 });
