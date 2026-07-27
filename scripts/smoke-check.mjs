@@ -291,7 +291,11 @@ mustContain("dist/performance-reveal.html", "parts.percent.hidden = hidePercent"
 mustContain("dist/performance-reveal.html", "function showWinnerReveal");
 mustContain("dist/performance-reveal.html", "function handleRaceCardClick");
 mustContain("dist/performance-reveal.html", "winner-photo");
+mustContain("dist/performance-reveal.html", "winner-photo-bg");
 mustContain("dist/performance-reveal.html", "object-fit: cover");
+mustContain("dist/performance-reveal.html", "object-fit: contain");
+mustContain("dist/performance-reveal.html", "blur(30px)");
+mustContain("dist/performance-reveal.html", "font-size: clamp(1.5rem, 4vmin, 3rem)");
 mustContain("dist/performance-reveal.html", "container._raceFinished = Boolean(winner)");
 mustContain("dist/performance-reveal.html", "แตะกรอบเพื่อเปิดผู้ชนะ");
 mustContain("dist/performance-reveal.html", ".race-row .race-rank,");
