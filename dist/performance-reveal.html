@@ -1519,9 +1519,9 @@
                 return {
                     target: directTarget,
                     actual: directActual,
-                    index: directIndex > 0
-                        ? directIndex
-                        : (directTarget > 0 ? (directActual / directTarget) * 100 : 0)
+                    index: directTarget > 0
+                        ? (directActual / directTarget) * 100
+                        : directIndex
                 };
             }
 
@@ -1550,10 +1550,10 @@
             if (key === "cd13") return combinedCd13Metric(row).index;
 
             const metric = row?.[key] || {};
-            const directIndex = numberValue(metric.index);
-            if (directIndex > 0) return directIndex;
             const target = numberValue(metric.target);
-            return target > 0 ? (numberValue(metric.actual) / target) * 100 : 0;
+            const actual = numberValue(metric.actual);
+            if (target > 0) return (actual / target) * 100;
+            return numberValue(metric.index);
         }
 
         function displayName(row, mode) {
@@ -2054,9 +2054,10 @@
         }
 
         function formatRacePercent(value) {
-            return `${numberValue(value).toLocaleString("th-TH", {
-                minimumFractionDigits: 1,
-                maximumFractionDigits: 1
+            const truncated = Math.trunc((numberValue(value) * 100) + 1e-9) / 100;
+            return `${truncated.toLocaleString("th-TH", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
             })}%`;
         }
 
