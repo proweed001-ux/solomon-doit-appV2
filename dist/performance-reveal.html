@@ -1446,7 +1446,6 @@
             let index = sellerIndex || numberValue(direct.index);
 
             if (target && actual) index = (actual / target) * 100;
-            else if (!target && actual && index) target = actual / (index / 100);
             return { target, actual, index };
         }
 
