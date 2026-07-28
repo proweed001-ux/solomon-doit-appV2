@@ -1335,7 +1335,7 @@
         </main>
     </div>
 
-    <script src="/assets/performance-cd-adapter-v1.js?v=4"></script>
+    <script src="/assets/performance-cd-adapter-v1.js?v=5"></script>
     <script>
         const PERFORMANCE_DATA_URL = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/performance/current.min.json";
         const PERFORMANCE_OBJECT_BASE = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/";
@@ -1357,41 +1357,6 @@
         const raceRuns = new Map();
         let pseudoFullscreenHistoryPushed = false;
 
-        let boardData = {
-            ps: {
-                label: "PS",
-                main_podium: [
-                    { rank: 2, name: "นาย นันทภพ ฐิตานุกูล", sales: 361898, color: "text-slate-300" },
-                    { rank: 1, name: "นาย สรายุทธ ภู่หลักแก้ว", sales: 387166, color: "text-yellow-400" },
-                    { rank: 3, name: "นาย ศุกิจ ปิ่นวิเศษ", sales: 352480, color: "text-amber-600" }
-                ],
-                categories: [
-                    { id: "ps-vol", title: "TOP VOLUME", subtitle: "ยอดขายใน DOIT", unit: "บาท", top: [ {rank:1,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"387,166"}, {rank:2,name:"นาย นันทภพ ฐิตานุกูล",value:"361,898"}, {rank:3,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"352,480"}, {rank:4,name:"นางสาว วันเพ็ญ กฤษเพชร์",value:"342,310"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"306,044"} ] },
-                    { id: "ps-moq", title: "TOP DGP", subtitle: "จำนวนรายการ", unit: "รายการ", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"9,665"}, {rank:2,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"8,208"}, {rank:3,name:"นางสาว ปพิชญา ทางาม",value:"7,862"}, {rank:4,name:"นาย มณเฑียร ตะเคียนงาม",value:"7,840"}, {rank:5,name:"นาย นันทภพ ฐิตานุกูล",value:"7,675"} ] },
-                    { id: "ps-cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"468"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"460"}, {rank:3,name:"นาย นันทภพ ฐิตานุกูล",value:"453"}, {rank:4,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"452"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"448"} ] },
-                    { id: "ps-cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"468"}, {rank:2,name:"นางสาว พัทนันธ์ บุญธรรม",value:"415"}, {rank:3,name:"นางสาว วิรัตน์ ซืสเลอร์",value:"385"}, {rank:4,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"382"}, {rank:5,name:"นาย นันทภพ ฐิตานุกูล",value:"368"} ] },
-                    { id: "ps-cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย นันทภพ ฐิตานุกูล",value:"426"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"393"}, {rank:3,name:"นาย พลภัทร มีเอี่ยม",value:"389"}, {rank:4,name:"นางสาว วิรัตน์ ซืสเลอร์",value:"385"}, {rank:5,name:"นาย มณเฑียร ตะเคียนงาม",value:"382"} ] },
-                    { id: "ps-cd123", title: "TOP CD123", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย นันทภพ ฐิตานุกูล",value:"879"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"855"}, {rank:3,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"826"}, {rank:4,name:"นางสาว ชัญญ์ญาณ์ เจี๊ยะจิ๋ว",value:"813"}, {rank:5,name:"นาย มณเฑียร ตะเคียนงาม",value:"806"} ] }
-                ]
-            },
-            ads: {
-                label: "ADS",
-                main_podium: [
-                    { rank: 2, name: "AYAADS02", sales: 1611261, color: "text-slate-300" },
-                    { rank: 1, name: "AYAADS03", sales: 1613303, color: "text-yellow-400" },
-                    { rank: 3, name: "AYAADS01", sales: 1405280, color: "text-amber-600" }
-                ],
-                categories: [
-                    { id: "ads-vol", title: "TOP VOLUME", subtitle: "ยอดขายใน DOIT", unit: "บาท", top: [ {rank:1,name:"AYAADS03",value:"1,613,303"}, {rank:2,name:"AYAADS02",value:"1,611,261"}, {rank:3,name:"AYAADS01",value:"1,405,280"}, {rank:4,name:"AYAADS04",value:"1,168,723"} ] },
-                    { id: "ads-moq", title: "TOP DGP", subtitle: "จำนวนรายการ", unit: "รายการ", top: [ {rank:1,name:"AYAADS02",value:"45,117"}, {rank:2,name:"AYAADS03",value:"39,711"}, {rank:3,name:"AYAADS01",value:"39,240"}, {rank:4,name:"AYAADS04",value:"31,376"} ] },
-                    { id: "ads-cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"2,499"}, {rank:2,name:"AYAADS03",value:"2,374"}, {rank:3,name:"AYAADS01",value:"2,001"}, {rank:4,name:"AYAADS04",value:"1,656"} ] },
-                    { id: "ads-cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS03",value:"2,134"}, {rank:2,name:"AYAADS02",value:"2,080"}, {rank:3,name:"AYAADS01",value:"1,716"}, {rank:4,name:"AYAADS04",value:"1,427"} ] },
-                    { id: "ads-cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"2,000"}, {rank:2,name:"AYAADS03",value:"1,797"}, {rank:3,name:"AYAADS01",value:"1,693"}, {rank:4,name:"AYAADS04",value:"1,376"} ] },
-                    { id: "ads-cd123", title: "TOP CD123", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"4,503"}, {rank:2,name:"AYAADS03",value:"4,177"}, {rank:3,name:"AYAADS01",value:"3,696"}, {rank:4,name:"AYAADS04",value:"3,032"} ] }
-                ]
-            }
-        };
-
         const performanceCategories = [
             { key: "sales", suffix: "vol", title: "TOP VOLUME", subtitle: "ยอดขายใน DOIT", unit: "บาท" },
             { key: "moq", suffix: "moq", title: "TOP DGP", subtitle: "จำนวนรายการ", unit: "รายการ" },
@@ -1400,6 +1365,23 @@
             { key: "dc3", suffix: "cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน" },
             { key: "cd123", suffix: "cd123", title: "TOP CD123", subtitle: "CD1 + CD2 + CD3", unit: "ร้าน" }
         ];
+
+        function emptyModeBoard(mode) {
+            return {
+                label: mode.toUpperCase(),
+                main_podium: [],
+                categories: performanceCategories.map(category => ({
+                    ...category,
+                    id: `${mode}-${category.suffix}`,
+                    top: []
+                }))
+            };
+        }
+
+        let boardData = {
+            ps: emptyModeBoard("ps"),
+            ads: emptyModeBoard("ads")
+        };
 
         function numberValue(value) {
             const number = Number(String(value ?? 0).replace(/,/g, '').replace(/%/g, '').trim());
@@ -1602,25 +1584,25 @@
             const direct = row?.cd123 || {};
             const directTarget = numberValue(direct.target);
             const directActual = numberValue(direct.actual);
-            const directIndex = numberValue(direct.index);
 
-            if (directTarget > 0 || directActual > 0 || directIndex > 0) {
+            if (directTarget > 0) {
                 return {
                     target: directTarget,
                     actual: directActual,
-                    index: directTarget > 0
-                        ? (directActual / directTarget) * 100
-                        : directIndex
+                    index: (directActual / directTarget) * 100,
+                    incomplete: false
                 };
             }
 
             const metrics = ["dc1", "dc2", "dc3"].map(metricKey => row?.[metricKey] || {});
+            const complete = metrics.every(metric => numberValue(metric.target) > 0);
             const target = metrics.reduce((sum, metric) => sum + numberValue(metric.target), 0);
             const actual = metrics.reduce((sum, metric) => sum + numberValue(metric.actual), 0);
             return {
                 target,
                 actual,
-                index: target > 0 ? (actual / target) * 100 : 0
+                index: complete && target > 0 ? (actual / target) * 100 : 0,
+                incomplete: !complete
             };
         }
 
@@ -1695,10 +1677,20 @@
                 .slice(0, limit);
         }
 
+        function metricTieKey(row) {
+            return String(row?.ps || row?.psCode || row?.ads || row?.adsCode || row?.code || "").trim();
+        }
+
+        function compareMetricRows(a, b, key) {
+            return metricPercent(b, key) - metricPercent(a, key)
+                || metricActual(b, key) - metricActual(a, key)
+                || metricTieKey(a).localeCompare(metricTieKey(b), "en");
+        }
+
         function rankByPercent(rows, key, limit) {
             return [...(rows || [])]
                 .filter(row => metricPercent(row, key) > 0)
-                .sort((a, b) => metricPercent(b, key) - metricPercent(a, key))
+                .sort((a, b) => compareMetricRows(a, b, key))
                 .slice(0, limit);
         }
 
@@ -2152,10 +2144,16 @@
             })}%`;
         }
 
+        function compareRaceRows(a, b) {
+            return numberValue(b.value) - numberValue(a.value)
+                || numberValue(b.actual) - numberValue(a.actual)
+                || String(a.code || a.id || "").localeCompare(String(b.code || b.id || ""), "en");
+        }
+
         function latestRaceFinalists(frames) {
             const latestRows = frames.at(-1)?.rows || [];
             return [...latestRows]
-                .sort((a, b) => b.value - a.value)
+                .sort(compareRaceRows)
                 .slice(0, 5)
                 .sort((a, b) => a.name.localeCompare(b.name, "th"));
         }
@@ -2165,7 +2163,7 @@
             const laneIds = container._raceLaneIds || [];
             const profiles = container._raceProfiles || new Map();
             const rowMap = new Map(rows.map(row => [row.id, row]));
-            const ranked = [...rows].sort((a, b) => b.value - a.value);
+            const ranked = [...rows].sort(compareRaceRows);
             const rankById = new Map(ranked.map((row, index) => [row.id, index + 1]));
             const maximum = Math.max(container._raceMaximum || 1, 1);
 
@@ -2411,7 +2409,7 @@
             container._raceProfiles = new Map(finalists.map(row => [row.id, row]));
             container._raceFinalRankById = new Map(
                 [...finalists]
-                    .sort((a, b) => b.value - a.value)
+                    .sort(compareRaceRows)
                     .map((row, index) => [row.id, index + 1])
             );
             container._raceMetricKey = key;
@@ -2427,7 +2425,7 @@
             await new Promise(resolve => setTimeout(resolve, 650));
             if (raceRuns.get(runKey) !== token) return;
             revealRaceRanks(container);
-            const winner = [...frames.at(-1).rows].sort((a, b) => b.value - a.value)[0] || null;
+            const winner = [...frames.at(-1).rows].sort(compareRaceRows)[0] || null;
             container._raceWinner = winner;
             container._raceFinished = Boolean(winner);
             card?.classList.toggle("winner-ready", Boolean(winner));
