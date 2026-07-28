@@ -272,6 +272,7 @@ mustContain("dist/performance-reveal.html", "TOP DGP");
 mustNotContain("dist/performance-reveal.html", "Top Best Volume");
 mustNotContain("dist/performance-reveal.html", "Top MOQ");
 mustNotContain("dist/performance-reveal.html", "ยังไม่มีช่วงย้อนหลังสำหรับการแซง");
+mustNotContain("dist/performance-reveal.html", "ตำแหน่งคงที่ • แท่งแซงกัน • เปิดอันดับตอนจบ");
 mustNotContain("dist/performance-reveal.html", "CHAMPIONS OF JUNE 2026");
 mustContain("dist/performance-reveal.html", "LATEST PERFORMANCE CHAMPIONS");
 mustContain("dist/performance-reveal.html", "function reportPeriodDate");
