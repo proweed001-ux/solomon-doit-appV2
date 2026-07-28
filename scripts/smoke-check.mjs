@@ -316,6 +316,16 @@ mustContain("dist/performance-reveal.html", "/assets/audio/performance-fireworks
 mustContain("dist/performance-reveal.html", "function performanceAudioTrack");
 mustContain("dist/performance-reveal.html", "function stopAllPerformanceAudio");
 mustContain("dist/performance-reveal.html", "function playRaceAudio");
+mustContain("dist/performance-reveal.html", "function playCountdownTone");
+mustContain("dist/performance-reveal.html", "context.createOscillator()");
+check(
+  (read("dist/performance-reveal.html").match(/playCountdownTone\(false\);/g) || []).length === 3,
+  "Performance countdown must play exactly three short beeps",
+);
+check(
+  (read("dist/performance-reveal.html").match(/playCountdownTone\(true\);/g) || []).length === 1,
+  "Performance GO must play exactly one long tone",
+);
 mustContain("dist/performance-reveal.html", "function playWinnerAudio");
 mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"applause\")");
 mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"fireworks\")");
