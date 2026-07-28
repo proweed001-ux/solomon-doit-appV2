@@ -314,6 +314,12 @@ mustContain("dist/performance-reveal.html", 'const salesWinners = rankByPercent(
 mustContain("dist/performance-reveal.html", "top: rankByPercent(rows, category.key, 5)");
 mustContain("dist/performance-reveal.html", "parts.percent.hidden = false");
 mustContain("dist/performance-reveal.html", "percent.hidden = false");
+mustContain("dist/performance-reveal.html", "Math.trunc((numberValue(value) * 100) + 1e-9) / 100");
+mustContain("dist/performance-reveal.html", "minimumFractionDigits: 2");
+mustContain("dist/performance-reveal.html", "maximumFractionDigits: 2");
+mustContain("dist/performance-reveal.html", "if (target > 0) return (actual / target) * 100;");
+mustContain("dist/performance-reveal.html", "index: directTarget > 0");
+mustNotContain("dist/performance-reveal.html", "if (directIndex > 0) return directIndex;");
 mustNotContain("dist/performance-reveal.html", "จัดอันดับตามยอดขายสูงสุด");
 mustNotContain("dist/performance-reveal.html", 'container._raceMetricKey === "sales"');
 mustContain("dist/performance-reveal.html", "/assets/audio/performance-race.mp3");
