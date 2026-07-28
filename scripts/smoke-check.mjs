@@ -19,6 +19,7 @@ const mustNotContain = (p, s) => {
 
 const required = [
   "package.json",
+  "scripts/test-performance-cd123.mjs",
   "README.md",
   "dist/index.html",
   "dist/pro.html",
@@ -319,7 +320,10 @@ mustContain("dist/performance-reveal.html", "Math.trunc((numberValue(value) * 10
 mustContain("dist/performance-reveal.html", "minimumFractionDigits: 2");
 mustContain("dist/performance-reveal.html", "maximumFractionDigits: 2");
 mustContain("dist/performance-reveal.html", "if (target > 0) return (actual / target) * 100;");
-mustContain("dist/performance-reveal.html", "index: directTarget > 0");
+mustContain("dist/performance-reveal.html", "if (directTarget > 0)");
+mustContain("dist/performance-reveal.html", "const complete = metrics.every");
+mustContain("dist/performance-reveal.html", "incomplete: !complete");
+mustNotContain("dist/performance-reveal.html", "const directIndex = numberValue(direct.index);");
 mustNotContain("dist/performance-reveal.html", "if (directIndex > 0) return directIndex;");
 mustContain("dist/performance-reveal.html", "function moqMetric(row)");
 mustContain("dist/assets/admin-performance-active-v2.js", "function moqMetric(o)");
@@ -331,17 +335,34 @@ mustNotContain("dist/performance-reveal.html", "target = actual / (index / 100)"
 mustContain("dist/performance-reveal.html", "เป้าหมายการกระจาย SBD");
 mustContain("dist/performance-reveal.html", "function hydratePerformancePack(pack, fallbackPack = null)");
 mustContain("dist/performance-reveal.html", ".map(result => hydratePerformancePack(result.value, latest))");
-mustContain("dist/performance-reveal.html", "/assets/performance-cd-adapter-v1.js?v=4");
+mustContain("dist/performance-reveal.html", "/assets/performance-cd-adapter-v1.js?v=5");
 mustContain("dist/assets/performance-cd-adapter-v1.js", "function patchMoq(pack)");
 mustContain("dist/assets/performance-cd-adapter-v1.js", "patchMoq(full)");
 mustContain("dist/assets/performance-cd-adapter-v1.js", "function copyMoq(dst,src)");
-mustContain("dist/assets/performance-cd-adapter-v1.js", "performance-cd-adapter-v4-cd-moq");
+mustContain("dist/assets/performance-cd-adapter-v1.js", "performance-cd-adapter-v5-cd123");
 mustContain("dist/assets/performance-cd-adapter-v1.js", "let target=sellerTarget||N(direct.target)");
 mustContain("dist/assets/performance-board-v4.js", "let target=sellerTarget||N(v.target)");
 mustContain("dist/performance-reveal.html", "let target = sellerTarget || numberValue(direct.target);");
-mustContain("dist/performance.html", "performance-cd-adapter-v1.js?v=4");
-mustContain("dist/performance.html", "performance-board-v4.js?v=10");
+mustContain("dist/performance.html", "performance-cd-adapter-v1.js?v=5");
+mustContain("dist/performance.html", "performance-board-v4.js?v=11");
 mustContain("dist/performance-reveal.html", "const metric = performanceMetric(row, key);");
+mustContain("dist/assets/admin-performance-active-v2.js", "function cd123Metric(o)");
+mustContain("dist/assets/admin-performance-active-v2.js", "cd123:cd123Metric(o)");
+mustContain("dist/assets/admin-performance-active-v2.js", "'Target CD1+2+3'");
+mustContain("dist/assets/admin-performance-active-v2.js", "'การกระจาย CD1+2+3'");
+mustContain("dist/assets/admin-performance-active-v2.js", "'Index CD1+2+3'");
+mustContain("dist/assets/admin-performance-active-v2.js", "performance-min-v5");
+mustContain("dist/assets/performance-cd-adapter-v1.js", "function isCd123Name(t)");
+mustContain("dist/assets/performance-cd-adapter-v1.js", "const CD_KEYS=['dc1','dc2','dc3','cd13','cd123']");
+mustContain("dist/assets/performance-board-v4.js", "cd123:'CD1+2+3'");
+mustNotContain("dist/assets/performance-board-v4.js", "cd13:'CD1+CD3'");
+mustContain("dist/admin.html", "admin-performance-active-v2.js?v=2");
+mustContain("dist/performance-reveal.html", "function compareMetricRows");
+mustContain("dist/performance-reveal.html", "function compareRaceRows");
+mustNotContain("dist/performance-reveal.html", "{rank:1,name:");
+mustContain("package.json", "test:performance-cd123");
+mustContain(".github/workflows/web-ci.yml", "Performance CD123 regression");
+
 mustNotContain("dist/performance-reveal.html", "จัดอันดับตามยอดขายสูงสุด");
 mustNotContain("dist/performance-reveal.html", 'container._raceMetricKey === "sales"');
 mustContain("dist/performance-reveal.html", "/assets/audio/performance-race.mp3");
