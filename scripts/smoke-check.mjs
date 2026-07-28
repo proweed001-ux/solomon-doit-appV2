@@ -329,6 +329,11 @@ mustContain("dist/assets/performance-cd-adapter-v1.js", "function patchMoq(pack)
 mustContain("dist/assets/performance-cd-adapter-v1.js", "patchMoq(full)");
 mustContain("dist/assets/performance-cd-adapter-v1.js", "function copyMoq(dst,src)");
 mustContain("dist/assets/performance-cd-adapter-v1.js", "performance-cd-adapter-v4-cd-moq");
+mustContain("dist/assets/performance-cd-adapter-v1.js", "let target=sellerTarget||N(direct.target)");
+mustContain("dist/assets/performance-board-v4.js", "let target=sellerTarget||N(v.target)");
+mustContain("dist/performance-reveal.html", "let target = sellerTarget || numberValue(direct.target);");
+mustContain("dist/performance.html", "performance-cd-adapter-v1.js?v=4");
+mustContain("dist/performance.html", "performance-board-v4.js?v=10");
 mustContain("dist/performance-reveal.html", "const metric = performanceMetric(row, key);");
 mustNotContain("dist/performance-reveal.html", "จัดอันดับตามยอดขายสูงสุด");
 mustNotContain("dist/performance-reveal.html", 'container._raceMetricKey === "sales"');
