@@ -1384,7 +1384,8 @@
 
         const performanceAudioState = {
             tracks: new Map(),
-            fireworksTimer: 0
+            fireworksTimer: 0,
+            countdownContext: null
         };
 
         function performanceAudioTrack(name) {
@@ -1428,6 +1429,41 @@
                 playback.catch(error => console.warn(`[AYA Performance Audio] ${name}`, error));
             }
             return track;
+        }
+
+        function playCountdownTone(isGo = false) {
+            const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextConstructor) return;
+
+            if (!performanceAudioState.countdownContext) {
+                performanceAudioState.countdownContext = new AudioContextConstructor();
+            }
+
+            const context = performanceAudioState.countdownContext;
+            const scheduleTone = () => {
+                const startedAt = context.currentTime + 0.015;
+                const duration = isGo ? 0.72 : 0.14;
+                const oscillator = context.createOscillator();
+                const gain = context.createGain();
+
+                oscillator.type = isGo ? "triangle" : "sine";
+                oscillator.frequency.setValueAtTime(isGo ? 880 : 660, startedAt);
+                gain.gain.setValueAtTime(0.0001, startedAt);
+                gain.gain.exponentialRampToValueAtTime(isGo ? 0.24 : 0.18, startedAt + 0.012);
+                gain.gain.setValueAtTime(isGo ? 0.24 : 0.18, startedAt + duration - 0.045);
+                gain.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
+
+                oscillator.connect(gain);
+                gain.connect(context.destination);
+                oscillator.start(startedAt);
+                oscillator.stop(startedAt + duration + 0.02);
+            };
+
+            if (context.state === "suspended") {
+                context.resume().then(scheduleTone).catch(() => {});
+            } else {
+                scheduleTone();
+            }
         }
 
         function playRaceAudio() {
@@ -2312,10 +2348,18 @@
             `;
 
             const number = cover.querySelector(".suspense-number");
-            setTimeout(() => { if (number) number.textContent = "2"; }, 850);
-            setTimeout(() => { if (number) number.textContent = "1"; }, 1700);
+            playCountdownTone(false);
+            setTimeout(() => {
+                if (number) number.textContent = "2";
+                playCountdownTone(false);
+            }, 850);
+            setTimeout(() => {
+                if (number) number.textContent = "1";
+                playCountdownTone(false);
+            }, 1700);
             setTimeout(() => {
                 if (number) number.textContent = "GO!";
+                playCountdownTone(true);
                 cover.style.boxShadow = "0 0 90px rgba(234,179,8,0.4)";
             }, 2500);
             setTimeout(() => {
