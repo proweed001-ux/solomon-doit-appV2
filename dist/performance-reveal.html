@@ -1371,7 +1371,7 @@
                     { id: "ps-cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"468"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"460"}, {rank:3,name:"นาย นันทภพ ฐิตานุกูล",value:"453"}, {rank:4,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"452"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"448"} ] },
                     { id: "ps-cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"468"}, {rank:2,name:"นางสาว พัทนันธ์ บุญธรรม",value:"415"}, {rank:3,name:"นางสาว วิรัตน์ ซืสเลอร์",value:"385"}, {rank:4,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"382"}, {rank:5,name:"นาย นันทภพ ฐิตานุกูล",value:"368"} ] },
                     { id: "ps-cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย นันทภพ ฐิตานุกูล",value:"426"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"393"}, {rank:3,name:"นาย พลภัทร มีเอี่ยม",value:"389"}, {rank:4,name:"นางสาว วิรัตน์ ซืสเลอร์",value:"385"}, {rank:5,name:"นาย มณเฑียร ตะเคียนงาม",value:"382"} ] },
-                    { id: "ps-cd123", title: "Top CD1-3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย นันทภพ ฐิตานุกูล",value:"879"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"855"}, {rank:3,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"826"}, {rank:4,name:"นางสาว ชัญญ์ญาณ์ เจี๊ยะจิ๋ว",value:"813"}, {rank:5,name:"นาย มณเฑียร ตะเคียนงาม",value:"806"} ] }
+                    { id: "ps-cd123", title: "TOP CD123", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย นันทภพ ฐิตานุกูล",value:"879"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"855"}, {rank:3,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"826"}, {rank:4,name:"นางสาว ชัญญ์ญาณ์ เจี๊ยะจิ๋ว",value:"813"}, {rank:5,name:"นาย มณเฑียร ตะเคียนงาม",value:"806"} ] }
                 ]
             },
             ads: {
@@ -1387,7 +1387,7 @@
                     { id: "ads-cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"2,499"}, {rank:2,name:"AYAADS03",value:"2,374"}, {rank:3,name:"AYAADS01",value:"2,001"}, {rank:4,name:"AYAADS04",value:"1,656"} ] },
                     { id: "ads-cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS03",value:"2,134"}, {rank:2,name:"AYAADS02",value:"2,080"}, {rank:3,name:"AYAADS01",value:"1,716"}, {rank:4,name:"AYAADS04",value:"1,427"} ] },
                     { id: "ads-cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"2,000"}, {rank:2,name:"AYAADS03",value:"1,797"}, {rank:3,name:"AYAADS01",value:"1,693"}, {rank:4,name:"AYAADS04",value:"1,376"} ] },
-                    { id: "ads-cd123", title: "Top CD1-3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"4,503"}, {rank:2,name:"AYAADS03",value:"4,177"}, {rank:3,name:"AYAADS01",value:"3,696"}, {rank:4,name:"AYAADS04",value:"3,032"} ] }
+                    { id: "ads-cd123", title: "TOP CD123", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"4,503"}, {rank:2,name:"AYAADS03",value:"4,177"}, {rank:3,name:"AYAADS01",value:"3,696"}, {rank:4,name:"AYAADS04",value:"3,032"} ] }
                 ]
             }
         };
@@ -1398,7 +1398,7 @@
             { key: "dc1", suffix: "cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน" },
             { key: "dc2", suffix: "cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน" },
             { key: "dc3", suffix: "cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน" },
-            { key: "cd13", suffix: "cd123", title: "Top CD1+CD3", subtitle: "CD1 + CD3 (ไม่รวม CD2)", unit: "ร้าน" }
+            { key: "cd123", suffix: "cd123", title: "TOP CD123", subtitle: "CD1 + CD2 + CD3", unit: "ร้าน" }
         ];
 
         function numberValue(value) {
@@ -1598,8 +1598,8 @@
             if (document.hidden) stopAllPerformanceAudio();
         });
 
-        function combinedCd13Metric(row) {
-            const direct = row?.cd13 || {};
+        function combinedCd123Metric(row) {
+            const direct = row?.cd123 || {};
             const directTarget = numberValue(direct.target);
             const directActual = numberValue(direct.actual);
             const directIndex = numberValue(direct.index);
@@ -1614,7 +1614,7 @@
                 };
             }
 
-            const metrics = ["dc1", "dc3"].map(metricKey => row?.[metricKey] || {});
+            const metrics = ["dc1", "dc2", "dc3"].map(metricKey => row?.[metricKey] || {});
             const target = metrics.reduce((sum, metric) => sum + numberValue(metric.target), 0);
             const actual = metrics.reduce((sum, metric) => sum + numberValue(metric.actual), 0);
             return {
@@ -1625,7 +1625,7 @@
         }
 
         function metricActual(row, key) {
-            if (key === "cd13") return combinedCd13Metric(row).actual;
+            if (key === "cd123") return combinedCd123Metric(row).actual;
             return numberValue(performanceMetric(row, key).actual);
         }
 
@@ -1636,7 +1636,7 @@
                 return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
             }
 
-            if (key === "cd13") return combinedCd13Metric(row).index;
+            if (key === "cd123") return combinedCd123Metric(row).index;
 
             const metric = performanceMetric(row, key);
             const target = numberValue(metric.target);
