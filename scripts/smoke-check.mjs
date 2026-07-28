@@ -310,17 +310,27 @@ mustContain("dist/performance-reveal.html", "parts.percent.hidden = false");
 mustContain("dist/performance-reveal.html", "percent.hidden = false");
 mustNotContain("dist/performance-reveal.html", "จัดอันดับตามยอดขายสูงสุด");
 mustNotContain("dist/performance-reveal.html", 'container._raceMetricKey === "sales"');
-mustContain("dist/performance-reveal.html", "function unlockPerformanceAudio");
-mustContain("dist/performance-reveal.html", "window.AudioContext || window.webkitAudioContext");
-mustContain("dist/performance-reveal.html", "function playRaceSuspense");
-mustContain("dist/performance-reveal.html", "function playNoiseBurst");
-mustContain("dist/performance-reveal.html", "function playFireworkBurst");
-mustContain("dist/performance-reveal.html", "function playApplauseAndFireworks");
-mustContain("dist/performance-reveal.html", "playRaceSuspense(soundCues[soundCueIndex])");
-mustContain("dist/performance-reveal.html", "playApplauseAndFireworks()");
-mustContain("dist/performance-reveal.html", "playFireworkBurst(3.44, 1.18)");
-mustNotContain("dist/performance-reveal.html", "function playRaceTick");
-mustNotContain("dist/performance-reveal.html", "function playWinnerFanfare");
+mustContain("dist/performance-reveal.html", "/assets/audio/performance-race.mp3");
+mustContain("dist/performance-reveal.html", "/assets/audio/performance-applause.mp3");
+mustContain("dist/performance-reveal.html", "/assets/audio/performance-fireworks.mp3");
+mustContain("dist/performance-reveal.html", "function performanceAudioTrack");
+mustContain("dist/performance-reveal.html", "function stopAllPerformanceAudio");
+mustContain("dist/performance-reveal.html", "function playRaceAudio");
+mustContain("dist/performance-reveal.html", "function playWinnerAudio");
+mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"applause\")");
+mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"fireworks\")");
+mustContain("dist/performance-reveal.html", "}, 5000)");
+mustContain("dist/performance-reveal.html", "stopPerformanceTrack(\"race\")");
+mustNotContain("dist/performance-reveal.html", "function unlockPerformanceAudio");
+mustNotContain("dist/performance-reveal.html", "function playRaceSuspense");
+mustNotContain("dist/performance-reveal.html", "function playNoiseBurst");
+mustNotContain("dist/performance-reveal.html", "function playFireworkBurst");
+mustNotContain("dist/performance-reveal.html", "function playApplauseAndFireworks");
+[
+  "dist/assets/audio/performance-race.mp3",
+  "dist/assets/audio/performance-applause.mp3",
+  "dist/assets/audio/performance-fireworks.mp3",
+].forEach((p) => check(exists(p), `Performance audio file must exist: ${p}`));
 mustContain("dist/performance-reveal.html", "function showWinnerReveal");
 mustContain("dist/performance-reveal.html", "function handleRaceCardClick");
 mustContain("dist/performance-reveal.html", "winner-photo");
