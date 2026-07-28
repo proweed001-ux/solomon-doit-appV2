@@ -5,7 +5,7 @@ const CD_KEYS=['dc1','dc2','dc3','cd13','cd123'];
 const N=v=>{if(v==null)return 0;if(typeof v==='number')return Number.isFinite(v)?v:0;const s=String(v).replace(/,/g,'').replace(/%/g,'').replace(/[()]/g,'').trim();const n=Number(s);return Number.isFinite(n)?n:0};
 const norm=s=>String(s??'').replace(/\s+/g,' ').trim();
 const compact=s=>norm(s).replace(/\s+/g,'').toUpperCase();
-function isCd123Name(t){return t.includes('CD1+2+3')||t.includes('CD1+CD2+CD3')||/(^|[^A-Z0-9])CD123([^0-9]|$)/.test(t)}
+function isCd123Name(t){return t.includes('CD1+2+3')||t.includes('CD1+CD2+CD3')||/(^|[^0-9])CD123([^0-9]|$)/.test(t)}
 function hasCdName(text,key){const t=compact(text);if(key==='cd123')return isCd123Name(t);if(key==='cd13')return t.includes('CD1+CD3');const n=key.replace('dc','');if(t.includes('CD1+CD3')||isCd123Name(t))return false;return new RegExp('(^|[^A-Z0-9])CD'+n+'([^0-9]|$)').test(t)||new RegExp('(^|[^A-Z0-9])DC'+n+'([^0-9]|$)').test(t)}
 function findVal(o,key,kind){const keys=Object.keys(o||{});const thai=kind==='target'?'เป้าหมาย':kind==='actual'?'การกระจาย':'INDEX';const eng=kind==='target'?'TARGET':kind==='actual'?'ACTUAL':'INDEX';for(const k of keys){const n=compact(k);if(!hasCdName(k,key))continue;if(n.includes(compact(thai))||n.includes(eng))return N(o[k])}return 0}
 function cdMetric(row,key){const direct=row?.[key]||{};let target=N(direct.target),actual=N(direct.actual),index=N(direct.index);const src=row?.sellerReport||row?.cd||{};if(!target)target=findVal(src,key,'target');if(!actual)actual=findVal(src,key,'actual');if(!index)index=findVal(src,key,'index');if(target&&actual)index=actual/target*100;else if(index&&index<=1.5)index*=100;return{target,actual,index}}
