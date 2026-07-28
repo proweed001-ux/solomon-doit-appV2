@@ -1426,33 +1426,27 @@
         function moqMetric(row) {
             const direct = row?.moq || {};
             const sellerReport = row?.sellerReport || {};
-            let target = numberValue(direct.target);
-            let actual = numberValue(direct.actual);
-            let index = numberValue(direct.index);
+            const sellerTarget = sellerReportNumber(
+                sellerReport,
+                ["เป้าหมายการกระจาย SBD"],
+                ["เป้าหมายการกระจายSBD"]
+            );
+            const sellerActual = sellerReportNumber(
+                sellerReport,
+                ["การกระจาย SBD MOQ"],
+                ["SBD MOQ", "การกระจายSBDMOQ"]
+            );
+            const sellerIndex = sellerReportNumber(
+                sellerReport,
+                ["Index MOQ 75%"],
+                ["Index MOQ", "MOQ 75"]
+            );
+            let target = sellerTarget || numberValue(direct.target);
+            let actual = sellerActual || numberValue(direct.actual);
+            let index = sellerIndex || numberValue(direct.index);
 
-            if (!target) {
-                target = sellerReportNumber(
-                    sellerReport,
-                    ["เป้าหมายการกระจาย SBD"],
-                    ["เป้าหมายการกระจายSBD"]
-                );
-            }
-            if (!actual) {
-                actual = sellerReportNumber(
-                    sellerReport,
-                    ["การกระจาย SBD MOQ"],
-                    ["SBD MOQ", "การกระจายSBDMOQ"]
-                );
-            }
-            if (!index) {
-                index = sellerReportNumber(
-                    sellerReport,
-                    ["Index MOQ 75%"],
-                    ["Index MOQ", "MOQ 75"]
-                );
-            }
-            if (!target && actual && index) target = actual / (index / 100);
-            if (!index && target) index = (actual / target) * 100;
+            if (target && actual) index = (actual / target) * 100;
+            else if (!target && actual && index) target = actual / (index / 100);
             return { target, actual, index };
         }
 
