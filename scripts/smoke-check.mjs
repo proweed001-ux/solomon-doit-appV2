@@ -360,8 +360,8 @@ mustContain("dist/admin.html", "admin-performance-active-v2.js?v=2");
 mustContain("dist/performance-reveal.html", "function compareMetricRows");
 mustContain("dist/performance-reveal.html", "function compareRaceRows");
 mustNotContain("dist/performance-reveal.html", "{rank:1,name:");
-mustContain("package.json", "test:performance-cd123");
 mustContain(".github/workflows/web-ci.yml", "Performance CD123 regression");
+mustContain(".github/workflows/web-ci.yml", "node scripts/test-performance-cd123.mjs");
 
 mustNotContain("dist/performance-reveal.html", "จัดอันดับตามยอดขายสูงสุด");
 mustNotContain("dist/performance-reveal.html", 'container._raceMetricKey === "sales"');
