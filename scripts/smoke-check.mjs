@@ -321,6 +321,12 @@ mustContain("dist/performance-reveal.html", "if (target > 0) return (actual / ta
 mustContain("dist/performance-reveal.html", "index: directTarget > 0");
 mustNotContain("dist/performance-reveal.html", "if (directIndex > 0) return directIndex;");
 mustContain("dist/performance-reveal.html", "function moqMetric(row)");
+mustContain("dist/assets/admin-performance-active-v2.js", "function moqMetric(o)");
+mustContain("dist/assets/admin-performance-active-v2.js", "moq:moqMetric(o)");
+mustNotContain("dist/assets/admin-performance-active-v2.js", "moq:{target:0");
+mustNotContain("dist/assets/performance-board-v4.js", "target=actual/(index/100)");
+mustNotContain("dist/assets/performance-cd-adapter-v1.js", "target=actual/(index/100)");
+mustNotContain("dist/performance-reveal.html", "target = actual / (index / 100)");
 mustContain("dist/performance-reveal.html", "เป้าหมายการกระจาย SBD");
 mustContain("dist/performance-reveal.html", "function hydratePerformancePack(pack, fallbackPack = null)");
 mustContain("dist/performance-reveal.html", ".map(result => hydratePerformancePack(result.value, latest))");
