@@ -1406,6 +1406,89 @@
             return Number.isFinite(number) ? number : 0;
         }
 
+        function normalizedSellerReportKey(value) {
+            return String(value ?? "").replace(/\s+/g, "").toLowerCase();
+        }
+
+        function sellerReportNumber(source, exact = [], contains = []) {
+            const keys = Object.keys(source || {});
+            const exactKeys = exact.map(normalizedSellerReportKey);
+            const containsKeys = contains.map(normalizedSellerReportKey);
+            let key = keys.find(candidate => exactKeys.includes(normalizedSellerReportKey(candidate)));
+            if (!key) {
+                key = keys.find(candidate =>
+                    containsKeys.some(fragment => normalizedSellerReportKey(candidate).includes(fragment))
+                );
+            }
+            return key ? numberValue(source[key]) : 0;
+        }
+
+        function moqMetric(row) {
+            const direct = row?.moq || {};
+            const sellerReport = row?.sellerReport || {};
+            let target = numberValue(direct.target);
+            let actual = numberValue(direct.actual);
+            let index = numberValue(direct.index);
+
+            if (!target) {
+                target = sellerReportNumber(
+                    sellerReport,
+                    ["เป้าหมายการกระจาย SBD"],
+                    ["เป้าหมายการกระจายSBD"]
+                );
+            }
+            if (!actual) {
+                actual = sellerReportNumber(
+                    sellerReport,
+                    ["การกระจาย SBD MOQ"],
+                    ["SBD MOQ", "การกระจายSBDMOQ"]
+                );
+            }
+            if (!index) {
+                index = sellerReportNumber(
+                    sellerReport,
+                    ["Index MOQ 75%"],
+                    ["Index MOQ", "MOQ 75"]
+                );
+            }
+            if (!target && actual && index) target = actual / (index / 100);
+            if (!index && target) index = (actual / target) * 100;
+            return { target, actual, index };
+        }
+
+        function performanceMetric(row, key) {
+            return key === "moq" ? moqMetric(row) : (row?.[key] || {});
+        }
+
+        function aggregateMoq(rows) {
+            const totals = (rows || []).reduce((result, row) => {
+                const metric = moqMetric(row);
+                result.target += numberValue(metric.target);
+                result.actual += numberValue(metric.actual);
+                return result;
+            }, { target: 0, actual: 0 });
+            return {
+                ...totals,
+                index: totals.target > 0 ? (totals.actual / totals.target) * 100 : 0
+            };
+        }
+
+        function hydratePerformancePack(pack) {
+            if (!pack) return pack;
+            const psRows = Array.isArray(pack.ps) ? pack.ps : [];
+            psRows.forEach(row => {
+                row.moq = moqMetric(row);
+            });
+            (Array.isArray(pack.ads) ? pack.ads : []).forEach(adsRow => {
+                const adsCode = String(adsRow?.ads || adsRow?.adsCode || adsRow?.code || "").trim();
+                const matchingPs = psRows.filter(row =>
+                    String(row?.ads || row?.adsCode || "").trim() === adsCode
+                );
+                if (matchingPs.length) adsRow.moq = aggregateMoq(matchingPs);
+            });
+            return pack;
+        }
+
         const performanceAudioState = {
             tracks: new Map(),
             fireworksTimer: 0,
@@ -1537,7 +1620,7 @@
 
         function metricActual(row, key) {
             if (key === "cd13") return combinedCd13Metric(row).actual;
-            return numberValue(row?.[key]?.actual);
+            return numberValue(performanceMetric(row, key).actual);
         }
 
         function metricPercent(row, key) {
@@ -1549,7 +1632,7 @@
 
             if (key === "cd13") return combinedCd13Metric(row).index;
 
-            const metric = row?.[key] || {};
+            const metric = performanceMetric(row, key);
             const target = numberValue(metric.target);
             const actual = numberValue(metric.actual);
             if (target > 0) return (actual / target) * 100;
@@ -1801,7 +1884,7 @@
                 );
                 const history = loaded
                     .filter(result => result.status === "fulfilled")
-                    .map(result => result.value)
+                    .map(result => hydratePerformancePack(result.value))
                     .filter(snapshot => Array.isArray(snapshot?.ps) && Array.isArray(snapshot?.ads));
 
                 performanceCacheStats = stats;
@@ -1817,7 +1900,9 @@
             const status = document.getElementById("performance-data-status");
 
             try {
-                const latest = await fetchPerformanceJson(PERFORMANCE_DATA_URL, 12000);
+                const latest = hydratePerformancePack(
+                    await fetchPerformanceJson(PERFORMANCE_DATA_URL, 12000)
+                );
                 if (!Array.isArray(latest?.ps) || !Array.isArray(latest?.ads)) {
                     throw new Error("รูปแบบข้อมูล Performance ไม่ครบ");
                 }
