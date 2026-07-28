@@ -206,6 +206,26 @@ async function settleAnimationFrames(page) {
   );
 }
 
+async function activateRealBillTabMeasured(page) {
+  return page.evaluate(() => {
+    const tab = [...document.querySelectorAll(".tabs .tab")].find(
+      (item) => item.textContent?.trim() === "บิลจริง",
+    );
+    if (!tab) throw new Error("Real Bill tab not found");
+    tab.scrollIntoView({ block: "center", inline: "nearest" });
+    const started = performance.now();
+    tab.click();
+    const eventHandlerMs = performance.now() - started;
+    const metrics =
+      window.DOIT_CORE_APP.health().realBillPerformance;
+    return {
+      eventHandlerMs,
+      lastFullRenderMs: metrics.lastFullRenderMs,
+      mode: window.DOIT_CORE_APP.currentState().mode,
+    };
+  });
+}
+
 async function openOrderMode(page) {
   await page.locator(".orderTab").click();
   await expect(page.locator("#tableCount")).toContainText(
@@ -1284,14 +1304,15 @@ test("keeps large real-bill tabs, pickers and pagination responsive", async ({
   const beforeTab = await page.evaluate(
     () => window.DOIT_CORE_APP.health().realBillPerformance,
   );
-  const tabStart = Date.now();
-  await page.locator(".tabs .tab").nth(2).click();
+  const tabTiming = await activateRealBillTabMeasured(page);
   await expect(page.locator("#modeHeading")).toHaveText("บิลจริง");
   await expect(page.locator("#realBills")).toContainText(
     "เลือกร้านหรือพิมพ์ชื่อร้าน เพื่อดูบิลจริง",
   );
-  const tabElapsed = Date.now() - tabStart;
+  const tabElapsed = tabTiming.eventHandlerMs;
   expect(tabElapsed).toBeLessThan(500);
+  expect(tabTiming.lastFullRenderMs).toBeLessThan(500);
+  expect(tabTiming.mode).toBe("ship");
   let metrics = await page.evaluate(
     () => window.DOIT_CORE_APP.health().realBillPerformance,
   );
@@ -1564,12 +1585,14 @@ test("bounds the production-scale store picker and keeps whole-set actions", asy
     });
   }, { rows: rowCount, stores: storeCount });
   await expect(page.locator("#msg")).toContainText("โหลดสำเร็จ 93,328 แถว");
-  const tabStart = Date.now();
-  await page.locator(".tabs .tab").nth(2).click();
+  const tabTiming = await activateRealBillTabMeasured(page);
   await expect(page.locator("#realBills")).toContainText(
     "เลือกร้านหรือพิมพ์ชื่อร้าน เพื่อดูบิลจริง",
   );
-  const tabElapsed = Date.now() - tabStart;
+  const tabElapsed = tabTiming.eventHandlerMs;
+  expect(tabElapsed).toBeLessThan(500);
+  expect(tabTiming.lastFullRenderMs).toBeLessThan(500);
+  expect(tabTiming.mode).toBe("ship");
   const beforePopup = await page.evaluate(
     () => window.DOIT_CORE_APP.health().realBillPerformance,
   );
