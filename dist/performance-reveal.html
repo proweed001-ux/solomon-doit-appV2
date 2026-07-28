@@ -880,7 +880,7 @@
         .race-footer {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 12px;
             min-height: 42px;
             color: #71717a;
@@ -1262,7 +1262,7 @@
                 AYA TOP PERFORMANCE
             </h1>
             <p class="text-lg text-yellow-500/80 mt-2 font-medium tracking-[0.3em]">
-                <span id="performance-period">CHAMPIONS OF JUNE 2026</span>
+                <span id="performance-period">LATEST PERFORMANCE CHAMPIONS</span>
             </p>
             <p id="performance-data-status" class="text-[11px] text-gray-500 mt-3 tracking-wider">
                 กำลังดึงข้อมูล Performance ล่าสุด...
@@ -1318,6 +1318,11 @@
         const PERFORMANCE_HISTORY_INDEX = "performance/history-index.json";
         const PERFORMANCE_HISTORY_CACHE = "aya-performance-history-v1";
         const IMAGEKIT_PROFILE_URL = "https://ik.imagekit.io/AYAPS";
+        const PERFORMANCE_AUDIO_URLS = Object.freeze({
+            race: "/assets/audio/performance-race.mp3",
+            applause: "/assets/audio/performance-applause.mp3",
+            fireworks: "/assets/audio/performance-fireworks.mp3"
+        });
         const RACE_DURATION_MS = 10000;
         const PERFORMANCE_PUBLIC_KEY = String.fromCharCode(115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,74,84,104,89,119,65,108,95,45,97,115,107,107,95,99,73,97,67,100,55,53,119,95,84,67,87,75,50,66,84,84);
         let performanceReady = false;
@@ -1337,8 +1342,8 @@
                     { rank: 3, name: "นาย ศุกิจ ปิ่นวิเศษ", sales: 352480, color: "text-amber-600" }
                 ],
                 categories: [
-                    { id: "ps-vol", title: "Top Best Volume", subtitle: "ยอดขายใน DOIT", unit: "บาท", top: [ {rank:1,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"387,166"}, {rank:2,name:"นาย นันทภพ ฐิตานุกูล",value:"361,898"}, {rank:3,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"352,480"}, {rank:4,name:"นางสาว วันเพ็ญ กฤษเพชร์",value:"342,310"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"306,044"} ] },
-                    { id: "ps-moq", title: "Top MOQ", subtitle: "จำนวนรายการ", unit: "รายการ", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"9,665"}, {rank:2,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"8,208"}, {rank:3,name:"นางสาว ปพิชญา ทางาม",value:"7,862"}, {rank:4,name:"นาย มณเฑียร ตะเคียนงาม",value:"7,840"}, {rank:5,name:"นาย นันทภพ ฐิตานุกูล",value:"7,675"} ] },
+                    { id: "ps-vol", title: "TOP VOLUME", subtitle: "ยอดขายใน DOIT", unit: "บาท", top: [ {rank:1,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"387,166"}, {rank:2,name:"นาย นันทภพ ฐิตานุกูล",value:"361,898"}, {rank:3,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"352,480"}, {rank:4,name:"นางสาว วันเพ็ญ กฤษเพชร์",value:"342,310"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"306,044"} ] },
+                    { id: "ps-moq", title: "TOP DGP", subtitle: "จำนวนรายการ", unit: "รายการ", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"9,665"}, {rank:2,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"8,208"}, {rank:3,name:"นางสาว ปพิชญา ทางาม",value:"7,862"}, {rank:4,name:"นาย มณเฑียร ตะเคียนงาม",value:"7,840"}, {rank:5,name:"นาย นันทภพ ฐิตานุกูล",value:"7,675"} ] },
                     { id: "ps-cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"468"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"460"}, {rank:3,name:"นาย นันทภพ ฐิตานุกูล",value:"453"}, {rank:4,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"452"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"448"} ] },
                     { id: "ps-cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"468"}, {rank:2,name:"นางสาว พัทนันธ์ บุญธรรม",value:"415"}, {rank:3,name:"นางสาว วิรัตน์ ซืสเลอร์",value:"385"}, {rank:4,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"382"}, {rank:5,name:"นาย นันทภพ ฐิตานุกูล",value:"368"} ] },
                     { id: "ps-cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย นันทภพ ฐิตานุกูล",value:"426"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"393"}, {rank:3,name:"นาย พลภัทร มีเอี่ยม",value:"389"}, {rank:4,name:"นางสาว วิรัตน์ ซืสเลอร์",value:"385"}, {rank:5,name:"นาย มณเฑียร ตะเคียนงาม",value:"382"} ] },
@@ -1353,8 +1358,8 @@
                     { rank: 3, name: "AYAADS01", sales: 1405280, color: "text-amber-600" }
                 ],
                 categories: [
-                    { id: "ads-vol", title: "Top Best Volume", subtitle: "ยอดขายใน DOIT", unit: "บาท", top: [ {rank:1,name:"AYAADS03",value:"1,613,303"}, {rank:2,name:"AYAADS02",value:"1,611,261"}, {rank:3,name:"AYAADS01",value:"1,405,280"}, {rank:4,name:"AYAADS04",value:"1,168,723"} ] },
-                    { id: "ads-moq", title: "Top MOQ", subtitle: "จำนวนรายการ", unit: "รายการ", top: [ {rank:1,name:"AYAADS02",value:"45,117"}, {rank:2,name:"AYAADS03",value:"39,711"}, {rank:3,name:"AYAADS01",value:"39,240"}, {rank:4,name:"AYAADS04",value:"31,376"} ] },
+                    { id: "ads-vol", title: "TOP VOLUME", subtitle: "ยอดขายใน DOIT", unit: "บาท", top: [ {rank:1,name:"AYAADS03",value:"1,613,303"}, {rank:2,name:"AYAADS02",value:"1,611,261"}, {rank:3,name:"AYAADS01",value:"1,405,280"}, {rank:4,name:"AYAADS04",value:"1,168,723"} ] },
+                    { id: "ads-moq", title: "TOP DGP", subtitle: "จำนวนรายการ", unit: "รายการ", top: [ {rank:1,name:"AYAADS02",value:"45,117"}, {rank:2,name:"AYAADS03",value:"39,711"}, {rank:3,name:"AYAADS01",value:"39,240"}, {rank:4,name:"AYAADS04",value:"31,376"} ] },
                     { id: "ads-cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"2,499"}, {rank:2,name:"AYAADS03",value:"2,374"}, {rank:3,name:"AYAADS01",value:"2,001"}, {rank:4,name:"AYAADS04",value:"1,656"} ] },
                     { id: "ads-cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS03",value:"2,134"}, {rank:2,name:"AYAADS02",value:"2,080"}, {rank:3,name:"AYAADS01",value:"1,716"}, {rank:4,name:"AYAADS04",value:"1,427"} ] },
                     { id: "ads-cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"2,000"}, {rank:2,name:"AYAADS03",value:"1,797"}, {rank:3,name:"AYAADS01",value:"1,693"}, {rank:4,name:"AYAADS04",value:"1,376"} ] },
@@ -1364,8 +1369,8 @@
         };
 
         const performanceCategories = [
-            { key: "sales", suffix: "vol", title: "Top Best Volume", subtitle: "ยอดขายใน DOIT", unit: "บาท" },
-            { key: "moq", suffix: "moq", title: "Top MOQ", subtitle: "จำนวนรายการ", unit: "รายการ" },
+            { key: "sales", suffix: "vol", title: "TOP VOLUME", subtitle: "ยอดขายใน DOIT", unit: "บาท" },
+            { key: "moq", suffix: "moq", title: "TOP DGP", subtitle: "จำนวนรายการ", unit: "รายการ" },
             { key: "dc1", suffix: "cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน" },
             { key: "dc2", suffix: "cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน" },
             { key: "dc3", suffix: "cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน" },
@@ -1376,6 +1381,109 @@
             const number = Number(String(value ?? 0).replace(/,/g, '').replace(/%/g, '').trim());
             return Number.isFinite(number) ? number : 0;
         }
+
+        const performanceAudioState = {
+            tracks: new Map(),
+            fireworksTimer: 0,
+            countdownContext: null
+        };
+
+        function performanceAudioTrack(name) {
+            if (performanceAudioState.tracks.has(name)) {
+                return performanceAudioState.tracks.get(name);
+            }
+
+            const track = new Audio(PERFORMANCE_AUDIO_URLS[name]);
+            track.preload = name === "fireworks" ? "metadata" : "auto";
+            track.playsInline = true;
+            track.volume = name === "race" ? 0.78 : name === "applause" ? 0.88 : 0.82;
+            performanceAudioState.tracks.set(name, track);
+            return track;
+        }
+
+        function stopPerformanceTrack(name) {
+            const track = performanceAudioState.tracks.get(name);
+            if (!track) return;
+            track.pause();
+            try {
+                track.currentTime = 0;
+            } catch (error) {}
+        }
+
+        function stopAllPerformanceAudio() {
+            if (performanceAudioState.fireworksTimer) {
+                clearTimeout(performanceAudioState.fireworksTimer);
+                performanceAudioState.fireworksTimer = 0;
+            }
+            ["race", "applause", "fireworks"].forEach(stopPerformanceTrack);
+        }
+
+        function playPerformanceTrack(name) {
+            const track = performanceAudioTrack(name);
+            track.pause();
+            try {
+                track.currentTime = 0;
+            } catch (error) {}
+            const playback = track.play();
+            if (playback?.catch) {
+                playback.catch(error => console.warn(`[AYA Performance Audio] ${name}`, error));
+            }
+            return track;
+        }
+
+        function playCountdownTone(isGo = false) {
+            const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextConstructor) return;
+
+            if (!performanceAudioState.countdownContext) {
+                performanceAudioState.countdownContext = new AudioContextConstructor();
+            }
+
+            const context = performanceAudioState.countdownContext;
+            const scheduleTone = () => {
+                const startedAt = context.currentTime + 0.015;
+                const duration = isGo ? 0.72 : 0.14;
+                const oscillator = context.createOscillator();
+                const gain = context.createGain();
+
+                oscillator.type = isGo ? "triangle" : "sine";
+                oscillator.frequency.setValueAtTime(isGo ? 880 : 660, startedAt);
+                gain.gain.setValueAtTime(0.0001, startedAt);
+                gain.gain.exponentialRampToValueAtTime(isGo ? 0.24 : 0.18, startedAt + 0.012);
+                gain.gain.setValueAtTime(isGo ? 0.24 : 0.18, startedAt + duration - 0.045);
+                gain.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration);
+
+                oscillator.connect(gain);
+                gain.connect(context.destination);
+                oscillator.start(startedAt);
+                oscillator.stop(startedAt + duration + 0.02);
+            };
+
+            if (context.state === "suspended") {
+                context.resume().then(scheduleTone).catch(() => {});
+            } else {
+                scheduleTone();
+            }
+        }
+
+        function playRaceAudio() {
+            stopAllPerformanceAudio();
+            playPerformanceTrack("race");
+        }
+
+        function playWinnerAudio() {
+            stopAllPerformanceAudio();
+            playPerformanceTrack("applause");
+            performanceAudioTrack("fireworks").load();
+            performanceAudioState.fireworksTimer = window.setTimeout(() => {
+                performanceAudioState.fireworksTimer = 0;
+                playPerformanceTrack("fireworks");
+            }, 5000);
+        }
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) stopAllPerformanceAudio();
+        });
 
         function combinedCd13Metric(row) {
             const direct = row?.cd13 || {};
@@ -1474,8 +1582,15 @@
                 .slice(0, limit);
         }
 
+        function rankByPercent(rows, key, limit) {
+            return [...(rows || [])]
+                .filter(row => metricPercent(row, key) > 0)
+                .sort((a, b) => metricPercent(b, key) - metricPercent(a, key))
+                .slice(0, limit);
+        }
+
         function buildModeBoard(mode, rows) {
-            const salesWinners = rankByActual(rows, "sales", 3);
+            const salesWinners = rankByPercent(rows, "sales", 3);
             const rankMap = salesWinners.map((row, index) => ({
                 rank: index + 1,
                 name: displayName(row, mode),
@@ -1491,7 +1606,7 @@
                 title: category.title,
                 subtitle: category.subtitle,
                 unit: category.unit,
-                top: rankByActual(rows, category.key, 5).map((row, index) => ({
+                top: rankByPercent(rows, category.key, 5).map((row, index) => ({
                     rank: index + 1,
                     name: displayName(row, mode),
                     photoKey: profileKey(row, mode),
@@ -1506,18 +1621,56 @@
             };
         }
 
+        function reportPeriodDate(meta) {
+            const candidates = [
+                meta?.reportDate,
+                meta?.reportKey,
+                meta?.dataDate,
+                meta?.periodDate,
+                meta?.uploadedAt
+            ];
+
+            const makeDate = (yearValue, monthValue, dayValue = 1) => {
+                let year = Number(yearValue);
+                const month = Number(monthValue);
+                const day = Number(dayValue || 1);
+                if (year > 2400) year -= 543;
+                if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return null;
+                if (!Number.isInteger(day) || day < 1 || day > 31) return null;
+                return new Date(Date.UTC(year, month - 1, day));
+            };
+
+            for (const candidate of candidates) {
+                const raw = String(candidate || "").trim();
+                if (!raw) continue;
+
+                const yearFirst = raw.match(/(?:^|\D)(\d{4})[-/](\d{1,2})(?:[-/](\d{1,2}))?(?:\D|$)/);
+                if (yearFirst) return makeDate(yearFirst[1], yearFirst[2], yearFirst[3]);
+
+                const compact = raw.match(/(?:^|\D)(\d{4})(\d{2})(\d{2})?(?:\D|$)/);
+                if (compact) return makeDate(compact[1], compact[2], compact[3]);
+
+                const dayFirst = raw.match(/(?:^|\D)(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:\D|$)/);
+                if (dayFirst) return makeDate(dayFirst[3], dayFirst[2], dayFirst[1]);
+
+                const timestamp = Date.parse(raw);
+                if (Number.isFinite(timestamp)) return new Date(timestamp);
+            }
+
+            return null;
+        }
+
         function updatePerformancePeriod(meta) {
             const period = document.getElementById("performance-period");
             if (!period) return;
 
             const rawDate = String(meta?.reportDate || meta?.reportKey || "").trim();
-            const dateMatch = rawDate.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-            if (!dateMatch) {
+            const date = reportPeriodDate(meta);
+            if (!date) {
                 period.textContent = rawDate ? `CHAMPIONS • ${rawDate}` : "LATEST PERFORMANCE CHAMPIONS";
                 return;
             }
 
-            const date = new Date(Date.UTC(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3])));
             const monthYear = new Intl.DateTimeFormat("en-US", {
                 month: "long",
                 year: "numeric",
@@ -1660,10 +1813,8 @@
                 const historyCount = Math.max(performanceTimeline.length - 1, 0);
                 status.textContent = historyCount
                     ? `ข้อมูลล่าสุด • ${reportLabel} • ${performanceTimeline.length} ช่วงจริง • จำไว้แล้ว ${performanceCacheStats.remembered} • โหลดใหม่ ${performanceCacheStats.downloaded}`
-                    : `ข้อมูลล่าสุด • ${reportLabel} • ยังไม่มีช่วงย้อนหลังสำหรับการแซง`;
-                status.className = historyCount
-                    ? "text-[11px] text-emerald-400/80 mt-3 tracking-wider"
-                    : "text-[11px] text-amber-500/80 mt-3 tracking-wider";
+                    : `ข้อมูลล่าสุด • ${reportLabel}`;
+                status.className = "text-[11px] text-emerald-400/80 mt-3 tracking-wider";
             } catch (error) {
                 performanceLoadFailed = true;
                 performanceTimeline = [];
@@ -1765,6 +1916,7 @@
         }
 
         function showAward(mode, index, shouldScroll = false) {
+            stopAllPerformanceAudio();
             const slides = getAwardSlides(mode);
             if (!slides.length) return;
 
@@ -1833,9 +1985,7 @@
         }
 
         function raceRankingValue(row, key) {
-            return key === "sales"
-                ? raceActualValue(row, key)
-                : metricPercent(row, key);
+            return metricPercent(row, key);
         }
 
         function raceFrame(snapshot, mode, key) {
@@ -1958,9 +2108,8 @@
                     ? `${Math.max((person.value / maximum) * 100, 1.5)}%`
                     : "0%";
                 parts.actual.textContent = formatRaceActual(person.actual, container._raceMetricKey);
-                const hidePercent = container._raceMetricKey === "sales";
-                parts.percent.hidden = hidePercent;
-                parts.percent.textContent = hidePercent ? "" : formatRacePercent(person.percent);
+                parts.percent.hidden = false;
+                parts.percent.textContent = formatRacePercent(person.percent);
             });
         }
 
@@ -1971,6 +2120,7 @@
         }
 
         function closeWinnerReveal(card) {
+            stopAllPerformanceAudio();
             const overlay = card?.querySelector(".winner-reveal");
             if (!overlay) return;
             overlay.classList.remove("is-visible");
@@ -2061,10 +2211,10 @@
             overlay.querySelector(".winner-value").textContent =
                 formatRaceActual(winner.actual, container._raceMetricKey);
             const percent = overlay.querySelector(".winner-percent");
-            const hidePercent = container._raceMetricKey === "sales";
-            percent.hidden = hidePercent;
-            percent.textContent = hidePercent ? "" : formatRacePercent(winner.percent);
+            percent.hidden = false;
+            percent.textContent = formatRacePercent(winner.percent);
 
+            playWinnerAudio();
             card.classList.add("winner-open");
             document.body.classList.add("winner-overlay-open");
             overlay.setAttribute("aria-hidden", "false");
@@ -2131,6 +2281,7 @@
             const rawFrames = performanceTimeline.map(snapshot => raceFrame(snapshot, mode, key));
             const finalists = latestRaceFinalists(rawFrames);
             if (!finalists.length) return;
+            playRaceAudio();
             const finalistIds = new Set(finalists.map(row => row.id));
             const frames = rawFrames.map(frame => {
                 const frameRows = new Map(frame.rows.filter(row => finalistIds.has(row.id)).map(row => [row.id, row]));
@@ -2154,6 +2305,7 @@
             const dateLabel = document.getElementById(`race-date-${mode}-${key}`);
             renderRaceRows(container, finalists.map(row => ({ ...row, value: 0, actual: 0, percent: 0 })), false);
             const completed = await animateRaceTimeline(container, frames, RACE_DURATION_MS, dateLabel, runKey, token);
+            stopPerformanceTrack("race");
             if (!completed || raceRuns.get(runKey) !== token) return;
 
             await new Promise(resolve => setTimeout(resolve, 650));
@@ -2196,10 +2348,18 @@
             `;
 
             const number = cover.querySelector(".suspense-number");
-            setTimeout(() => { if (number) number.textContent = "2"; }, 850);
-            setTimeout(() => { if (number) number.textContent = "1"; }, 1700);
+            playCountdownTone(false);
+            setTimeout(() => {
+                if (number) number.textContent = "2";
+                playCountdownTone(false);
+            }, 850);
+            setTimeout(() => {
+                if (number) number.textContent = "1";
+                playCountdownTone(false);
+            }, 1700);
             setTimeout(() => {
                 if (number) number.textContent = "GO!";
+                playCountdownTone(true);
                 cover.style.boxShadow = "0 0 90px rgba(234,179,8,0.4)";
             }, 2500);
             setTimeout(() => {
@@ -2240,13 +2400,12 @@
                     <div class="race-header">
                         <div>
                             <h3>${cat.title}</h3>
-                            <p>${cat.subtitle || ""} • ${key === "sales" ? "จัดอันดับตามยอดขายสูงสุด" : "แข่งขันด้วย % Index เทียบเป้า"}</p>
+                            <p>${cat.subtitle || ""} • แข่งขันด้วย % Index เทียบเป้า</p>
                         </div>
                         <span id="race-date-${mode}-${key}" class="race-date">พร้อมเริ่ม</span>
                     </div>
                     <div id="${raceId}" class="race-track"></div>
                     <div class="race-footer">
-                        <span>ตำแหน่งคงที่ • แท่งแซงกัน • เปิดอันดับตอนจบ</span>
                         <button class="race-replay" type="button" onclick="startRace('${mode}', '${key}', '${raceId}')">↻ แข่งใหม่</button>
                     </div>
                 `;

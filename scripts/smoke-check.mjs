@@ -267,6 +267,17 @@ mustContain("dist/performance-reveal.html", "loadPerformanceData()");
 mustContain("dist/performance-reveal.html", "performance/history-index.json");
 mustContain("dist/performance-reveal.html", "function loadPerformanceTimeline");
 mustContain("dist/performance-reveal.html", "function metricPercent");
+mustContain("dist/performance-reveal.html", "TOP VOLUME");
+mustContain("dist/performance-reveal.html", "TOP DGP");
+mustNotContain("dist/performance-reveal.html", "Top Best Volume");
+mustNotContain("dist/performance-reveal.html", "Top MOQ");
+mustNotContain("dist/performance-reveal.html", "ยังไม่มีช่วงย้อนหลังสำหรับการแซง");
+mustNotContain("dist/performance-reveal.html", "ตำแหน่งคงที่ • แท่งแซงกัน • เปิดอันดับตอนจบ");
+mustNotContain("dist/performance-reveal.html", "CHAMPIONS OF JUNE 2026");
+mustContain("dist/performance-reveal.html", "LATEST PERFORMANCE CHAMPIONS");
+mustContain("dist/performance-reveal.html", "function reportPeriodDate");
+mustContain("dist/performance-reveal.html", "updatePerformancePeriod(latest.meta || {})");
+mustContain("dist/performance-reveal.html", "CHAMPIONS OF ${monthYear.toUpperCase()}");
 mustContain("dist/performance-reveal.html", "function combinedCd13Metric");
 mustContain("dist/performance-reveal.html", 'title: "Top CD1+CD3"');
 mustContain("dist/performance-reveal.html", 'subtitle: "CD1 + CD3 (ไม่รวม CD2)"');
@@ -292,9 +303,47 @@ mustContain("dist/performance-reveal.html", "function revealRace");
 mustNotContain("dist/performance-reveal.html", "function animateRaceTransition");
 mustContain("dist/performance-reveal.html", "function raceActualValue");
 mustContain("dist/performance-reveal.html", "function raceRankingValue");
-mustContain("dist/performance-reveal.html", 'key === "sales"');
-mustContain("dist/performance-reveal.html", "จัดอันดับตามยอดขายสูงสุด");
-mustContain("dist/performance-reveal.html", "parts.percent.hidden = hidePercent");
+mustContain("dist/performance-reveal.html", "function rankByPercent");
+mustContain("dist/performance-reveal.html", 'const salesWinners = rankByPercent(rows, "sales", 3)');
+mustContain("dist/performance-reveal.html", "top: rankByPercent(rows, category.key, 5)");
+mustContain("dist/performance-reveal.html", "parts.percent.hidden = false");
+mustContain("dist/performance-reveal.html", "percent.hidden = false");
+mustNotContain("dist/performance-reveal.html", "จัดอันดับตามยอดขายสูงสุด");
+mustNotContain("dist/performance-reveal.html", 'container._raceMetricKey === "sales"');
+mustContain("dist/performance-reveal.html", "/assets/audio/performance-race.mp3");
+mustContain("dist/performance-reveal.html", "/assets/audio/performance-applause.mp3");
+mustContain("dist/performance-reveal.html", "/assets/audio/performance-fireworks.mp3");
+mustContain("dist/performance-reveal.html", "function performanceAudioTrack");
+mustContain("dist/performance-reveal.html", "function stopAllPerformanceAudio");
+mustContain("dist/performance-reveal.html", "function playRaceAudio");
+mustContain("dist/performance-reveal.html", "function playCountdownTone");
+mustContain("dist/performance-reveal.html", "context.createOscillator()");
+check(
+  (read("dist/performance-reveal.html").match(/playCountdownTone\(false\);/g) || []).length === 3,
+  "Performance countdown must play exactly three short beeps",
+);
+check(
+  (read("dist/performance-reveal.html").match(/playCountdownTone\(true\);/g) || []).length === 1,
+  "Performance GO must play exactly one long tone",
+);
+mustContain("dist/performance-reveal.html", "function playWinnerAudio");
+mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"applause\")");
+mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"fireworks\")");
+mustContain("dist/performance-reveal.html", "}, 5000)");
+mustContain("dist/performance-reveal.html", "stopPerformanceTrack(\"race\")");
+mustNotContain("dist/performance-reveal.html", "function unlockPerformanceAudio");
+mustNotContain("dist/performance-reveal.html", "function playRaceSuspense");
+mustNotContain("dist/performance-reveal.html", "playRaceSuspense(");
+mustNotContain("dist/performance-reveal.html", "soundCueIndex");
+mustNotContain("dist/performance-reveal.html", "soundCues");
+mustNotContain("dist/performance-reveal.html", "function playNoiseBurst");
+mustNotContain("dist/performance-reveal.html", "function playFireworkBurst");
+mustNotContain("dist/performance-reveal.html", "function playApplauseAndFireworks");
+[
+  "dist/assets/audio/performance-race.mp3",
+  "dist/assets/audio/performance-applause.mp3",
+  "dist/assets/audio/performance-fireworks.mp3",
+].forEach((p) => check(exists(p), `Performance audio file must exist: ${p}`));
 mustContain("dist/performance-reveal.html", "function showWinnerReveal");
 mustContain("dist/performance-reveal.html", "function handleRaceCardClick");
 mustContain("dist/performance-reveal.html", "winner-photo");
@@ -376,7 +425,6 @@ mustContain("dist/performance-reveal.html", "winnerCode.textContent = code");
 mustNotContain("dist/performance-reveal.html", 'if (mode === "ads") return code || name || "-";');
 mustContain("dist/performance-reveal.html", "race-started");
 mustNotContain("dist/performance-reveal.html", "race-person");
-mustContain("dist/performance-reveal.html", "ตำแหน่งคงที่ • แท่งแซงกัน • เปิดอันดับตอนจบ");
 mustContain("dist/performance-reveal.html", "แข่งขันด้วย % Index เทียบเป้า");
 mustNotContain("dist/performance-reveal.html", ".slice(-6)");
 mustContain("dist/performance-reveal.html", "PERFORMANCE_HISTORY_CACHE");
