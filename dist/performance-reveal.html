@@ -1318,6 +1318,11 @@
         const PERFORMANCE_HISTORY_INDEX = "performance/history-index.json";
         const PERFORMANCE_HISTORY_CACHE = "aya-performance-history-v1";
         const IMAGEKIT_PROFILE_URL = "https://ik.imagekit.io/AYAPS";
+        const PERFORMANCE_AUDIO_URLS = Object.freeze({
+            race: "/assets/audio/performance-race.mp3",
+            applause: "/assets/audio/performance-applause.mp3",
+            fireworks: "/assets/audio/performance-fireworks.mp3"
+        });
         const RACE_DURATION_MS = 10000;
         const PERFORMANCE_PUBLIC_KEY = String.fromCharCode(115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,74,84,104,89,119,65,108,95,45,97,115,107,107,95,99,73,97,67,100,55,53,119,95,84,67,87,75,50,66,84,84);
         let performanceReady = false;
@@ -1377,117 +1382,72 @@
             return Number.isFinite(number) ? number : 0;
         }
 
-        let performanceAudioContext = null;
+        const performanceAudioState = {
+            tracks: new Map(),
+            fireworksTimer: 0
+        };
 
-        function unlockPerformanceAudio() {
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContextClass) return null;
-            if (!performanceAudioContext) performanceAudioContext = new AudioContextClass();
-            if (performanceAudioContext.state === "suspended") {
-                performanceAudioContext.resume().catch(() => {});
-            }
-            return performanceAudioContext;
-        }
-
-        function playPerformanceTone(frequency, duration = 0.08, volume = 0.035, type = "sine", delay = 0) {
-            const context = unlockPerformanceAudio();
-            if (!context || context.state !== "running") return;
-
-            const start = context.currentTime + delay;
-            const oscillator = context.createOscillator();
-            const gain = context.createGain();
-            oscillator.type = type;
-            oscillator.frequency.setValueAtTime(frequency, start);
-            gain.gain.setValueAtTime(0.0001, start);
-            gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
-            gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-            oscillator.connect(gain);
-            gain.connect(context.destination);
-            oscillator.start(start);
-            oscillator.stop(start + duration + 0.03);
-        }
-
-        function playRaceSuspense(progress) {
-            const intensity = Math.max(0, Math.min(progress, 1));
-            const heartbeat = 74 + (intensity * 42);
-            playPerformanceTone(heartbeat, 0.16, 0.05, "sine");
-            playPerformanceTone(heartbeat * 2, 0.09, 0.032, "triangle", 0.075);
-            if (intensity > 0.5) {
-                playPerformanceTone(420 + (intensity * 520), 0.065, 0.02, "square", 0.13);
-            }
-        }
-
-        function playNoiseBurst(delay, duration, volume, filterType = "bandpass", frequency = 1400) {
-            const context = unlockPerformanceAudio();
-            if (!context || context.state !== "running") return;
-
-            const length = Math.max(1, Math.floor(context.sampleRate * duration));
-            const buffer = context.createBuffer(1, length, context.sampleRate);
-            const channel = buffer.getChannelData(0);
-            for (let index = 0; index < length; index += 1) {
-                const envelope = Math.pow(1 - (index / length), 1.8);
-                channel[index] = ((Math.random() * 2) - 1) * envelope;
+        function performanceAudioTrack(name) {
+            if (performanceAudioState.tracks.has(name)) {
+                return performanceAudioState.tracks.get(name);
             }
 
-            const source = context.createBufferSource();
-            const filter = context.createBiquadFilter();
-            const gain = context.createGain();
-            const start = context.currentTime + delay;
-            source.buffer = buffer;
-            filter.type = filterType;
-            filter.frequency.setValueAtTime(frequency, start);
-            filter.Q.setValueAtTime(1.2, start);
-            gain.gain.setValueAtTime(0.0001, start);
-            gain.gain.exponentialRampToValueAtTime(volume, start + 0.008);
-            gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-            source.connect(filter);
-            filter.connect(gain);
-            gain.connect(context.destination);
-            source.start(start);
+            const track = new Audio(PERFORMANCE_AUDIO_URLS[name]);
+            track.preload = name === "fireworks" ? "metadata" : "auto";
+            track.playsInline = true;
+            track.volume = name === "race" ? 0.78 : name === "applause" ? 0.88 : 0.82;
+            performanceAudioState.tracks.set(name, track);
+            return track;
         }
 
-        function playFireworkBurst(delay, scale = 1) {
-            const context = unlockPerformanceAudio();
-            if (!context || context.state !== "running") return;
+        function stopPerformanceTrack(name) {
+            const track = performanceAudioState.tracks.get(name);
+            if (!track) return;
+            track.pause();
+            try {
+                track.currentTime = 0;
+            } catch (error) {}
+        }
 
-            const start = context.currentTime + delay;
-            const boom = context.createOscillator();
-            const boomGain = context.createGain();
-            boom.type = "sine";
-            boom.frequency.setValueAtTime(150, start);
-            boom.frequency.exponentialRampToValueAtTime(42, start + 0.72);
-            boomGain.gain.setValueAtTime(0.0001, start);
-            boomGain.gain.exponentialRampToValueAtTime(0.12 * scale, start + 0.012);
-            boomGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.8);
-            boom.connect(boomGain);
-            boomGain.connect(context.destination);
-            boom.start(start);
-            boom.stop(start + 0.84);
-
-            playNoiseBurst(delay, 0.62, 0.075 * scale, "lowpass", 820);
-            for (let index = 0; index < 10; index += 1) {
-                const crackleDelay = delay + 0.12 + (index * 0.048) + ((index % 3) * 0.012);
-                playNoiseBurst(crackleDelay, 0.075, 0.028 * scale, "highpass", 1700 + (index * 90));
+        function stopAllPerformanceAudio() {
+            if (performanceAudioState.fireworksTimer) {
+                clearTimeout(performanceAudioState.fireworksTimer);
+                performanceAudioState.fireworksTimer = 0;
             }
+            ["race", "applause", "fireworks"].forEach(stopPerformanceTrack);
         }
 
-        function playApplauseAndFireworks() {
-            for (let index = 0; index < 38; index += 1) {
-                const delay = (index * 0.045) + ((index % 5) * 0.012);
-                const duration = 0.055 + ((index % 4) * 0.012);
-                const frequency = 1150 + ((index % 7) * 130);
-                playNoiseBurst(delay, duration, 0.026 + ((index % 3) * 0.006), "bandpass", frequency);
+        function playPerformanceTrack(name) {
+            const track = performanceAudioTrack(name);
+            track.pause();
+            try {
+                track.currentTime = 0;
+            } catch (error) {}
+            const playback = track.play();
+            if (playback?.catch) {
+                playback.catch(error => console.warn(`[AYA Performance Audio] ${name}`, error));
             }
-
-            playFireworkBurst(1.85, 1);
-            playFireworkBurst(2.38, 0.88);
-            playFireworkBurst(2.86, 1.12);
-            playFireworkBurst(3.28, 0.82);
-            playFireworkBurst(3.44, 1.18);
+            return track;
         }
 
-        document.addEventListener("pointerdown", unlockPerformanceAudio, { passive: true });
-        document.addEventListener("keydown", unlockPerformanceAudio);
+        function playRaceAudio() {
+            stopAllPerformanceAudio();
+            playPerformanceTrack("race");
+        }
+
+        function playWinnerAudio() {
+            stopAllPerformanceAudio();
+            playPerformanceTrack("applause");
+            performanceAudioTrack("fireworks").load();
+            performanceAudioState.fireworksTimer = window.setTimeout(() => {
+                performanceAudioState.fireworksTimer = 0;
+                playPerformanceTrack("fireworks");
+            }, 5000);
+        }
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) stopAllPerformanceAudio();
+        });
 
         function combinedCd13Metric(row) {
             const direct = row?.cd13 || {};
@@ -1920,6 +1880,7 @@
         }
 
         function showAward(mode, index, shouldScroll = false) {
+            stopAllPerformanceAudio();
             const slides = getAwardSlides(mode);
             if (!slides.length) return;
 
@@ -2123,6 +2084,7 @@
         }
 
         function closeWinnerReveal(card) {
+            stopAllPerformanceAudio();
             const overlay = card?.querySelector(".winner-reveal");
             if (!overlay) return;
             overlay.classList.remove("is-visible");
@@ -2216,7 +2178,7 @@
             percent.hidden = false;
             percent.textContent = formatRacePercent(winner.percent);
 
-            playApplauseAndFireworks();
+            playWinnerAudio();
             card.classList.add("winner-open");
             document.body.classList.add("winner-overlay-open");
             overlay.setAttribute("aria-hidden", "false");
@@ -2289,6 +2251,7 @@
             const rawFrames = performanceTimeline.map(snapshot => raceFrame(snapshot, mode, key));
             const finalists = latestRaceFinalists(rawFrames);
             if (!finalists.length) return;
+            playRaceAudio();
             const finalistIds = new Set(finalists.map(row => row.id));
             const frames = rawFrames.map(frame => {
                 const frameRows = new Map(frame.rows.filter(row => finalistIds.has(row.id)).map(row => [row.id, row]));
@@ -2312,6 +2275,7 @@
             const dateLabel = document.getElementById(`race-date-${mode}-${key}`);
             renderRaceRows(container, finalists.map(row => ({ ...row, value: 0, actual: 0, percent: 0 })), false);
             const completed = await animateRaceTimeline(container, frames, RACE_DURATION_MS, dateLabel, runKey, token);
+            stopPerformanceTrack("race");
             if (!completed || raceRuns.get(runKey) !== token) return;
 
             await new Promise(resolve => setTimeout(resolve, 650));
