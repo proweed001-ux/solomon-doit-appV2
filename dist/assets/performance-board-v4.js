@@ -1,6 +1,6 @@
 (()=>{'use strict';
 const app=document.getElementById('app'),SB='https://saodmeoilixfdqentofp.supabase.co',B='doit-files',STORE='perf-v4';
-const C={sales:'volume NIP',giv:'volume GIV',moq:'MOQ',dc1:'CD1 RJ SH RH JJ 70ML',dc2:'DC2 / CD2',dc3:'DC3 / CD3',cd13:'CD1+CD3',bills:'Productivity 50',gps:'GPS',dgp:'Golden Point'};
+const C={sales:'volume NIP',giv:'volume GIV',moq:'MOQ',dc1:'CD1 RJ SH RH JJ 70ML',dc2:'DC2 / CD2',dc3:'DC3 / CD3',cd123:'CD1+2+3',bills:'Productivity 50',gps:'GPS',dgp:'Golden Point'};
 let data=null,state=readState(),seq=0;
 const K=()=>Object.keys(C),N=x=>Number.isFinite(+x)?+x:0,M=x=>N(x).toLocaleString('th-TH',{maximumFractionDigits:0}),P=x=>N(x).toLocaleString('th-TH',{maximumFractionDigits:1,minimumFractionDigits:1})+'%',E=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll(String.fromCharCode(34),'&quot;');function rawMetric(k){const v=data?.labels?.[k];if(v)return v;const m=String(k||'').match(/^dc([1-9][0-9]*)$/);if(m){const cd='CD'+m[1],fs=data?.sellerReportFields||[];for(const x of fs){const t=String(x||'').replace(/\s+/g,' ').trim(),r=new RegExp('(?:Index\\s*)?'+cd+'\\s+(.+)$','i').exec(t);if(r&&r[1])return cd+' '+r[1].trim()}}return C[k]||k}function metric(k){return E(rawMetric(k))}
 function label(x){const a=String(x?.ps||x?.psCode||x?.ads||x?.adsCode||x?.code||'').trim(),b=String(x?.name||x?.psName||x?.adsName||'').trim();return E(!b||b===a?a:(a+' · '+b))}
