@@ -1377,6 +1377,56 @@
             return Number.isFinite(number) ? number : 0;
         }
 
+        let performanceAudioContext = null;
+
+        function unlockPerformanceAudio() {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return null;
+            if (!performanceAudioContext) performanceAudioContext = new AudioContextClass();
+            if (performanceAudioContext.state === "suspended") {
+                performanceAudioContext.resume().catch(() => {});
+            }
+            return performanceAudioContext;
+        }
+
+        function playPerformanceTone(frequency, duration = 0.08, volume = 0.035, type = "sine", delay = 0) {
+            const context = unlockPerformanceAudio();
+            if (!context || context.state !== "running") return;
+
+            const start = context.currentTime + delay;
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(frequency, start);
+            gain.gain.setValueAtTime(0.0001, start);
+            gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            oscillator.start(start);
+            oscillator.stop(start + duration + 0.03);
+        }
+
+        function playRaceTick(progress) {
+            const frequency = 240 + (Math.max(0, Math.min(progress, 1)) * 620);
+            playPerformanceTone(frequency, 0.07, 0.028, "square");
+        }
+
+        function playWinnerFanfare() {
+            playPerformanceTone(130.81, 0.55, 0.045, "sine", 0);
+            [
+                [523.25, 0],
+                [659.25, 0.14],
+                [783.99, 0.28],
+                [1046.5, 0.46]
+            ].forEach(([frequency, delay]) => {
+                playPerformanceTone(frequency, 0.42, 0.065, "triangle", delay);
+            });
+        }
+
+        document.addEventListener("pointerdown", unlockPerformanceAudio, { passive: true });
+        document.addEventListener("keydown", unlockPerformanceAudio);
+
         function combinedCd13Metric(row) {
             const direct = row?.cd13 || {};
             const directTarget = numberValue(direct.target);
@@ -1474,8 +1524,15 @@
                 .slice(0, limit);
         }
 
+        function rankByPercent(rows, key, limit) {
+            return [...(rows || [])]
+                .filter(row => metricPercent(row, key) > 0)
+                .sort((a, b) => metricPercent(b, key) - metricPercent(a, key))
+                .slice(0, limit);
+        }
+
         function buildModeBoard(mode, rows) {
-            const salesWinners = rankByActual(rows, "sales", 3);
+            const salesWinners = rankByPercent(rows, "sales", 3);
             const rankMap = salesWinners.map((row, index) => ({
                 rank: index + 1,
                 name: displayName(row, mode),
@@ -1491,7 +1548,7 @@
                 title: category.title,
                 subtitle: category.subtitle,
                 unit: category.unit,
-                top: rankByActual(rows, category.key, 5).map((row, index) => ({
+                top: rankByPercent(rows, category.key, 5).map((row, index) => ({
                     rank: index + 1,
                     name: displayName(row, mode),
                     photoKey: profileKey(row, mode),
@@ -1869,9 +1926,7 @@
         }
 
         function raceRankingValue(row, key) {
-            return key === "sales"
-                ? raceActualValue(row, key)
-                : metricPercent(row, key);
+            return metricPercent(row, key);
         }
 
         function raceFrame(snapshot, mode, key) {
@@ -1994,9 +2049,8 @@
                     ? `${Math.max((person.value / maximum) * 100, 1.5)}%`
                     : "0%";
                 parts.actual.textContent = formatRaceActual(person.actual, container._raceMetricKey);
-                const hidePercent = container._raceMetricKey === "sales";
-                parts.percent.hidden = hidePercent;
-                parts.percent.textContent = hidePercent ? "" : formatRacePercent(person.percent);
+                parts.percent.hidden = false;
+                parts.percent.textContent = formatRacePercent(person.percent);
             });
         }
 
@@ -2097,10 +2151,10 @@
             overlay.querySelector(".winner-value").textContent =
                 formatRaceActual(winner.actual, container._raceMetricKey);
             const percent = overlay.querySelector(".winner-percent");
-            const hidePercent = container._raceMetricKey === "sales";
-            percent.hidden = hidePercent;
-            percent.textContent = hidePercent ? "" : formatRacePercent(winner.percent);
+            percent.hidden = false;
+            percent.textContent = formatRacePercent(winner.percent);
 
+            playWinnerFanfare();
             card.classList.add("winner-open");
             document.body.classList.add("winner-overlay-open");
             overlay.setAttribute("aria-hidden", "false");
@@ -2123,6 +2177,7 @@
                     rows: [...(container._raceProfiles?.values() || [])].map(row => ({ ...row, value: 0, actual: 0, percent: 0 }))
                 };
                 let startedAt = 0;
+                let lastSoundStep = -1;
                 const step = timestamp => {
                     if (raceRuns.get(runKey) !== token) {
                         resolve(false);
@@ -2130,6 +2185,11 @@
                     }
                     if (!startedAt) startedAt = timestamp;
                     const progress = Math.min((timestamp - startedAt) / duration, 1);
+                    const soundStep = Math.min(Math.floor(progress * 16), 15);
+                    if (soundStep !== lastSoundStep) {
+                        lastSoundStep = soundStep;
+                        playRaceTick(soundStep / 15);
+                    }
                     const scaled = progress * frames.length;
                     const frameIndex = Math.min(Math.floor(scaled), frames.length - 1);
                     const localProgress = progress >= 1 ? 1 : scaled - frameIndex;
@@ -2276,7 +2336,7 @@
                     <div class="race-header">
                         <div>
                             <h3>${cat.title}</h3>
-                            <p>${cat.subtitle || ""} • ${key === "sales" ? "จัดอันดับตามยอดขายสูงสุด" : "แข่งขันด้วย % Index เทียบเป้า"}</p>
+                            <p>${cat.subtitle || ""} • แข่งขันด้วย % Index เทียบเป้า</p>
                         </div>
                         <span id="race-date-${mode}-${key}" class="race-date">พร้อมเริ่ม</span>
                     </div>
