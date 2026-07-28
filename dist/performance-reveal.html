@@ -332,6 +332,30 @@
             }
         }
 
+        .race-award-badge {
+            display: grid;
+            place-items: center;
+            width: max-content;
+            min-width: clamp(160px, 22vw, 210px);
+            max-width: min(88vw, 360px);
+            aspect-ratio: 1;
+            margin-bottom: 24px;
+            padding: clamp(28px, 3.5vw, 44px);
+            border-radius: 50%;
+            background: linear-gradient(to top right, #ca8a04, #fde047);
+            box-shadow: 0 0 46px rgba(234, 179, 8, 0.58);
+        }
+        .race-award-badge-label {
+            color: #050505;
+            font-size: clamp(1.35rem, 3.2vw, 2.5rem);
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: -0.04em;
+            text-align: center;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
         .race-card {
             width: 100%;
             max-width: 1280px;
@@ -2391,11 +2415,10 @@
                 card.innerHTML = `
                     <div class="race-cover absolute inset-0 bg-[#070707] z-30 flex flex-col items-center justify-center cursor-pointer transition-all duration-700 hover:bg-[#111]"
                          onclick="revealRace(this, '${mode}', '${key}', '${safeTitle}', '${raceId}')">
-                        <div class="w-24 h-24 bg-gradient-to-tr from-yellow-600 to-yellow-300 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-pulse">
-                            <span class="text-4xl font-black text-black">TOP 5</span>
+                        <div class="race-award-badge animate-pulse">
+                            <span class="race-award-badge-label">${cat.title}</span>
                         </div>
                         <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">START THE RACE</h2>
-                        <p class="text-gray-400 tracking-widest text-sm uppercase text-center">${cat.title}</p>
                     </div>
                     <div class="race-header">
                         <div>
