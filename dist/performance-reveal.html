@@ -111,6 +111,62 @@
             text-shadow: 0 0 24px rgba(250,204,21,0.7);
             animation: countdownPop 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
+        .suspense-countdown-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.28s ease, transform 0.28s ease;
+        }
+        .suspense-go-stage {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.18s ease;
+        }
+        .suspense-go-image {
+            width: min(78vw, 760px);
+            max-width: 90%;
+            max-height: 82%;
+            object-fit: contain;
+            opacity: 0;
+            transform: scale(0.24);
+            transform-origin: center;
+            filter: drop-shadow(0 0 22px rgba(250,204,21,0.35)) drop-shadow(0 0 58px rgba(239,68,68,0.2));
+            will-change: transform, opacity;
+        }
+        .race-cover.show-go-image .suspense-countdown-content {
+            opacity: 0;
+            transform: scale(0.82);
+            pointer-events: none;
+        }
+        .race-cover.show-go-image .suspense-go-stage {
+            opacity: 1;
+            visibility: visible;
+        }
+        .race-cover.show-go-image .suspense-go-image {
+            animation: suspenseGoZoom var(--go-reveal-duration, 3700ms) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes suspenseGoZoom {
+            0% { opacity: 0; transform: scale(0.24); }
+            12% { opacity: 1; transform: scale(0.52); }
+            78% { opacity: 1; transform: scale(1); }
+            100% { opacity: 1; transform: scale(1.12); }
+        }
+        @media (max-width: 640px) {
+            .suspense-go-image {
+                width: min(94vw, 560px);
+                max-width: 96%;
+                max-height: 76%;
+            }
+        }
         .suspense-dots {
             display: flex;
             gap: 8px;
@@ -890,6 +946,7 @@
             }
         }
         @media (prefers-reduced-motion: reduce) {
+            .suspense-go-image,
             .winner-photo-bg,
             .winner-photo,
             .winner-rays,
@@ -1335,19 +1392,23 @@
         </main>
     </div>
 
-    <script src="/assets/performance-cd-adapter-v1.js?v=4"></script>
+    <script src="/assets/performance-go-media-v1.js?v=1"></script>
+    <script src="/assets/performance-cd-adapter-v1.js?v=5"></script>
     <script>
         const PERFORMANCE_DATA_URL = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/performance/current.min.json";
         const PERFORMANCE_OBJECT_BASE = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/";
         const PERFORMANCE_HISTORY_INDEX = "performance/history-index.json";
         const PERFORMANCE_HISTORY_CACHE = "aya-performance-history-v1";
         const IMAGEKIT_PROFILE_URL = "https://ik.imagekit.io/AYAPS";
+        const PERFORMANCE_GO_MEDIA = window.__AYA_PERFORMANCE_GO_MEDIA__ || {};
         const PERFORMANCE_AUDIO_URLS = Object.freeze({
+            go: PERFORMANCE_GO_MEDIA.audio || "",
             race: "/assets/audio/performance-race.mp3",
             applause: "/assets/audio/performance-applause.mp3",
             fireworks: "/assets/audio/performance-fireworks.mp3"
         });
         const RACE_DURATION_MS = 10000;
+        const GO_REVEAL_DURATION_MS = Math.max(1200, Number(PERFORMANCE_GO_MEDIA.durationMs) || 3700);
         const PERFORMANCE_PUBLIC_KEY = String.fromCharCode(115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,74,84,104,89,119,65,108,95,45,97,115,107,107,95,99,73,97,67,100,55,53,119,95,84,67,87,75,50,66,84,84);
         let performanceReady = false;
         let performanceLoadFailed = false;
@@ -1357,49 +1418,31 @@
         const raceRuns = new Map();
         let pseudoFullscreenHistoryPushed = false;
 
-        let boardData = {
-            ps: {
-                label: "PS",
-                main_podium: [
-                    { rank: 2, name: "นาย นันทภพ ฐิตานุกูล", sales: 361898, color: "text-slate-300" },
-                    { rank: 1, name: "นาย สรายุทธ ภู่หลักแก้ว", sales: 387166, color: "text-yellow-400" },
-                    { rank: 3, name: "นาย ศุกิจ ปิ่นวิเศษ", sales: 352480, color: "text-amber-600" }
-                ],
-                categories: [
-                    { id: "ps-vol", title: "TOP VOLUME", subtitle: "ยอดขายใน DOIT", unit: "บาท", top: [ {rank:1,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"387,166"}, {rank:2,name:"นาย นันทภพ ฐิตานุกูล",value:"361,898"}, {rank:3,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"352,480"}, {rank:4,name:"นางสาว วันเพ็ญ กฤษเพชร์",value:"342,310"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"306,044"} ] },
-                    { id: "ps-moq", title: "TOP DGP", subtitle: "จำนวนรายการ", unit: "รายการ", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"9,665"}, {rank:2,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"8,208"}, {rank:3,name:"นางสาว ปพิชญา ทางาม",value:"7,862"}, {rank:4,name:"นาย มณเฑียร ตะเคียนงาม",value:"7,840"}, {rank:5,name:"นาย นันทภพ ฐิตานุกูล",value:"7,675"} ] },
-                    { id: "ps-cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"468"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"460"}, {rank:3,name:"นาย นันทภพ ฐิตานุกูล",value:"453"}, {rank:4,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"452"}, {rank:5,name:"นางสาว พัทนันธ์ บุญธรรม",value:"448"} ] },
-                    { id: "ps-cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"468"}, {rank:2,name:"นางสาว พัทนันธ์ บุญธรรม",value:"415"}, {rank:3,name:"นางสาว วิรัตน์ ซืสเลอร์",value:"385"}, {rank:4,name:"นาย สรายุทธ ภู่หลักแก้ว",value:"382"}, {rank:5,name:"นาย นันทภพ ฐิตานุกูล",value:"368"} ] },
-                    { id: "ps-cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย นันทภพ ฐิตานุกูล",value:"426"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"393"}, {rank:3,name:"นาย พลภัทร มีเอี่ยม",value:"389"}, {rank:4,name:"นางสาว วิรัตน์ ซืสเลอร์",value:"385"}, {rank:5,name:"นาย มณเฑียร ตะเคียนงาม",value:"382"} ] },
-                    { id: "ps-cd123", title: "Top CD1-3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"นาย นันทภพ ฐิตานุกูล",value:"879"}, {rank:2,name:"นาย จารึก จัดกลาง",value:"855"}, {rank:3,name:"นาย ศุกิจ ปิ่นวิเศษ",value:"826"}, {rank:4,name:"นางสาว ชัญญ์ญาณ์ เจี๊ยะจิ๋ว",value:"813"}, {rank:5,name:"นาย มณเฑียร ตะเคียนงาม",value:"806"} ] }
-                ]
-            },
-            ads: {
-                label: "ADS",
-                main_podium: [
-                    { rank: 2, name: "AYAADS02", sales: 1611261, color: "text-slate-300" },
-                    { rank: 1, name: "AYAADS03", sales: 1613303, color: "text-yellow-400" },
-                    { rank: 3, name: "AYAADS01", sales: 1405280, color: "text-amber-600" }
-                ],
-                categories: [
-                    { id: "ads-vol", title: "TOP VOLUME", subtitle: "ยอดขายใน DOIT", unit: "บาท", top: [ {rank:1,name:"AYAADS03",value:"1,613,303"}, {rank:2,name:"AYAADS02",value:"1,611,261"}, {rank:3,name:"AYAADS01",value:"1,405,280"}, {rank:4,name:"AYAADS04",value:"1,168,723"} ] },
-                    { id: "ads-moq", title: "TOP DGP", subtitle: "จำนวนรายการ", unit: "รายการ", top: [ {rank:1,name:"AYAADS02",value:"45,117"}, {rank:2,name:"AYAADS03",value:"39,711"}, {rank:3,name:"AYAADS01",value:"39,240"}, {rank:4,name:"AYAADS04",value:"31,376"} ] },
-                    { id: "ads-cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"2,499"}, {rank:2,name:"AYAADS03",value:"2,374"}, {rank:3,name:"AYAADS01",value:"2,001"}, {rank:4,name:"AYAADS04",value:"1,656"} ] },
-                    { id: "ads-cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS03",value:"2,134"}, {rank:2,name:"AYAADS02",value:"2,080"}, {rank:3,name:"AYAADS01",value:"1,716"}, {rank:4,name:"AYAADS04",value:"1,427"} ] },
-                    { id: "ads-cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"2,000"}, {rank:2,name:"AYAADS03",value:"1,797"}, {rank:3,name:"AYAADS01",value:"1,693"}, {rank:4,name:"AYAADS04",value:"1,376"} ] },
-                    { id: "ads-cd123", title: "Top CD1-3", subtitle: "ร้าน", unit: "ร้าน", top: [ {rank:1,name:"AYAADS02",value:"4,503"}, {rank:2,name:"AYAADS03",value:"4,177"}, {rank:3,name:"AYAADS01",value:"3,696"}, {rank:4,name:"AYAADS04",value:"3,032"} ] }
-                ]
-            }
-        };
-
         const performanceCategories = [
             { key: "sales", suffix: "vol", title: "TOP VOLUME", subtitle: "ยอดขายใน DOIT", unit: "บาท" },
             { key: "moq", suffix: "moq", title: "TOP DGP", subtitle: "จำนวนรายการ", unit: "รายการ" },
             { key: "dc1", suffix: "cd1", title: "Top CD1", subtitle: "ร้าน", unit: "ร้าน" },
             { key: "dc2", suffix: "cd2", title: "Top CD2", subtitle: "ร้าน", unit: "ร้าน" },
             { key: "dc3", suffix: "cd3", title: "Top CD3", subtitle: "ร้าน", unit: "ร้าน" },
-            { key: "cd13", suffix: "cd123", title: "Top CD1+CD3", subtitle: "CD1 + CD3 (ไม่รวม CD2)", unit: "ร้าน" }
+            { key: "cd123", suffix: "cd123", title: "TOP CD123", subtitle: "CD1 + CD2 + CD3", unit: "ร้าน" }
         ];
+
+        function emptyModeBoard(mode) {
+            return {
+                label: mode.toUpperCase(),
+                main_podium: [],
+                categories: performanceCategories.map(category => ({
+                    ...category,
+                    id: `${mode}-${category.suffix}`,
+                    top: []
+                }))
+            };
+        }
+
+        let boardData = {
+            ps: emptyModeBoard("ps"),
+            ads: emptyModeBoard("ads")
+        };
 
         function numberValue(value) {
             const number = Number(String(value ?? 0).replace(/,/g, '').replace(/%/g, '').trim());
@@ -1509,7 +1552,7 @@
             const track = new Audio(PERFORMANCE_AUDIO_URLS[name]);
             track.preload = name === "fireworks" ? "metadata" : "auto";
             track.playsInline = true;
-            track.volume = name === "race" ? 0.78 : name === "applause" ? 0.88 : 0.82;
+            track.volume = name === "race" ? 0.78 : name === "applause" ? 0.88 : name === "go" ? 1 : 0.82;
             performanceAudioState.tracks.set(name, track);
             return track;
         }
@@ -1528,7 +1571,7 @@
                 clearTimeout(performanceAudioState.fireworksTimer);
                 performanceAudioState.fireworksTimer = 0;
             }
-            ["race", "applause", "fireworks"].forEach(stopPerformanceTrack);
+            ["go", "race", "applause", "fireworks"].forEach(stopPerformanceTrack);
         }
 
         function playPerformanceTrack(name) {
@@ -1598,34 +1641,34 @@
             if (document.hidden) stopAllPerformanceAudio();
         });
 
-        function combinedCd13Metric(row) {
-            const direct = row?.cd13 || {};
+        function combinedCd123Metric(row) {
+            const direct = row?.cd123 || {};
             const directTarget = numberValue(direct.target);
             const directActual = numberValue(direct.actual);
-            const directIndex = numberValue(direct.index);
 
-            if (directTarget > 0 || directActual > 0 || directIndex > 0) {
+            if (directTarget > 0) {
                 return {
                     target: directTarget,
                     actual: directActual,
-                    index: directTarget > 0
-                        ? (directActual / directTarget) * 100
-                        : directIndex
+                    index: (directActual / directTarget) * 100,
+                    incomplete: false
                 };
             }
 
-            const metrics = ["dc1", "dc3"].map(metricKey => row?.[metricKey] || {});
+            const metrics = ["dc1", "dc2", "dc3"].map(metricKey => row?.[metricKey] || {});
+            const complete = metrics.every(metric => numberValue(metric.target) > 0);
             const target = metrics.reduce((sum, metric) => sum + numberValue(metric.target), 0);
             const actual = metrics.reduce((sum, metric) => sum + numberValue(metric.actual), 0);
             return {
                 target,
                 actual,
-                index: target > 0 ? (actual / target) * 100 : 0
+                index: complete && target > 0 ? (actual / target) * 100 : 0,
+                incomplete: !complete
             };
         }
 
         function metricActual(row, key) {
-            if (key === "cd13") return combinedCd13Metric(row).actual;
+            if (key === "cd123") return combinedCd123Metric(row).actual;
             return numberValue(performanceMetric(row, key).actual);
         }
 
@@ -1636,7 +1679,7 @@
                 return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
             }
 
-            if (key === "cd13") return combinedCd13Metric(row).index;
+            if (key === "cd123") return combinedCd123Metric(row).index;
 
             const metric = performanceMetric(row, key);
             const target = numberValue(metric.target);
@@ -1695,10 +1738,20 @@
                 .slice(0, limit);
         }
 
+        function metricTieKey(row) {
+            return String(row?.ps || row?.psCode || row?.ads || row?.adsCode || row?.code || "").trim();
+        }
+
+        function compareMetricRows(a, b, key) {
+            return metricPercent(b, key) - metricPercent(a, key)
+                || metricActual(b, key) - metricActual(a, key)
+                || metricTieKey(a).localeCompare(metricTieKey(b), "en");
+        }
+
         function rankByPercent(rows, key, limit) {
             return [...(rows || [])]
                 .filter(row => metricPercent(row, key) > 0)
-                .sort((a, b) => metricPercent(b, key) - metricPercent(a, key))
+                .sort((a, b) => compareMetricRows(a, b, key))
                 .slice(0, limit);
         }
 
@@ -2152,10 +2205,16 @@
             })}%`;
         }
 
+        function compareRaceRows(a, b) {
+            return numberValue(b.value) - numberValue(a.value)
+                || numberValue(b.actual) - numberValue(a.actual)
+                || String(a.code || a.id || "").localeCompare(String(b.code || b.id || ""), "en");
+        }
+
         function latestRaceFinalists(frames) {
             const latestRows = frames.at(-1)?.rows || [];
             return [...latestRows]
-                .sort((a, b) => b.value - a.value)
+                .sort(compareRaceRows)
                 .slice(0, 5)
                 .sort((a, b) => a.name.localeCompare(b.name, "th"));
         }
@@ -2165,7 +2224,7 @@
             const laneIds = container._raceLaneIds || [];
             const profiles = container._raceProfiles || new Map();
             const rowMap = new Map(rows.map(row => [row.id, row]));
-            const ranked = [...rows].sort((a, b) => b.value - a.value);
+            const ranked = [...rows].sort(compareRaceRows);
             const rankById = new Map(ranked.map((row, index) => [row.id, index + 1]));
             const maximum = Math.max(container._raceMaximum || 1, 1);
 
@@ -2411,7 +2470,7 @@
             container._raceProfiles = new Map(finalists.map(row => [row.id, row]));
             container._raceFinalRankById = new Map(
                 [...finalists]
-                    .sort((a, b) => b.value - a.value)
+                    .sort(compareRaceRows)
                     .map((row, index) => [row.id, index + 1])
             );
             container._raceMetricKey = key;
@@ -2427,7 +2486,7 @@
             await new Promise(resolve => setTimeout(resolve, 650));
             if (raceRuns.get(runKey) !== token) return;
             revealRaceRanks(container);
-            const winner = [...frames.at(-1).rows].sort((a, b) => b.value - a.value)[0] || null;
+            const winner = [...frames.at(-1).rows].sort(compareRaceRows)[0] || null;
             container._raceWinner = winner;
             container._raceFinished = Boolean(winner);
             card?.classList.toggle("winner-ready", Boolean(winner));
@@ -2454,16 +2513,25 @@
             cover.dataset.revealing = "true";
             cover.style.pointerEvents = "none";
             cover.innerHTML = `
-                <div class="suspense-ring mb-7">
-                    <div class="suspense-ring-inner">
-                        <span class="suspense-number">3</span>
+                <div class="suspense-countdown-content">
+                    <div class="suspense-ring mb-7">
+                        <div class="suspense-ring-inner">
+                            <span class="suspense-number">3</span>
+                        </div>
                     </div>
+                    <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">เตรียมการแข่งขัน</h2>
+                    <p class="text-gray-400 tracking-widest text-xs md:text-sm uppercase">${title} • TOP 5</p>
                 </div>
-                <h2 class="text-2xl md:text-3xl font-black gold-text tracking-widest uppercase mb-2">เตรียมการแข่งขัน</h2>
-                <p class="text-gray-400 tracking-widest text-xs md:text-sm uppercase">${title} • TOP 5</p>
+                <div class="suspense-go-stage">
+                    <img class="suspense-go-image" alt="ผลงานล่ะ?">
+                </div>
             `;
 
             const number = cover.querySelector(".suspense-number");
+            const goImage = cover.querySelector(".suspense-go-image");
+            if (goImage && PERFORMANCE_GO_MEDIA.image) goImage.src = PERFORMANCE_GO_MEDIA.image;
+            cover.style.setProperty("--go-reveal-duration", `${GO_REVEAL_DURATION_MS}ms`);
+            performanceAudioTrack("go").load();
             playCountdownTone(false);
             setTimeout(() => {
                 if (number) number.textContent = "2";
@@ -2474,18 +2542,18 @@
                 playCountdownTone(false);
             }, 1700);
             setTimeout(() => {
-                if (number) number.textContent = "GO!";
-                playCountdownTone(true);
-                cover.style.boxShadow = "0 0 90px rgba(234,179,8,0.4)";
+                cover.classList.add("show-go-image");
+                playPerformanceTrack("go");
+                cover.style.boxShadow = "0 0 110px rgba(234,179,8,0.48)";
             }, 2500);
             setTimeout(() => {
                 cover.style.opacity = "0";
-                cover.style.transform = "scale(1.06)";
-            }, 3100);
+                cover.style.transform = "scale(1.04)";
+            }, 2500 + Math.max(GO_REVEAL_DURATION_MS - 450, 700));
             setTimeout(() => {
                 cover.style.display = "none";
                 startRace(mode, key, containerId);
-            }, 3650);
+            }, 2500 + GO_REVEAL_DURATION_MS);
         }
 
         function renderCategories(mode) {

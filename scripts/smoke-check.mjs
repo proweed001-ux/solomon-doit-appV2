@@ -19,6 +19,7 @@ const mustNotContain = (p, s) => {
 
 const required = [
   "package.json",
+  "scripts/test-performance-cd123.mjs",
   "README.md",
   "dist/index.html",
   "dist/pro.html",
@@ -26,6 +27,7 @@ const required = [
   "dist/admin-login.html",
   "dist/performance.html",
   "dist/performance-reveal.html",
+  "dist/assets/performance-go-media-v1.js",
   "dist/assets/pro/app.js",
   "dist/assets/pro/core.js",
   "dist/assets/pro/state.js",
@@ -278,13 +280,14 @@ mustContain("dist/performance-reveal.html", "LATEST PERFORMANCE CHAMPIONS");
 mustContain("dist/performance-reveal.html", "function reportPeriodDate");
 mustContain("dist/performance-reveal.html", "updatePerformancePeriod(latest.meta || {})");
 mustContain("dist/performance-reveal.html", "CHAMPIONS OF ${monthYear.toUpperCase()}");
-mustContain("dist/performance-reveal.html", "function combinedCd13Metric");
-mustContain("dist/performance-reveal.html", 'title: "Top CD1+CD3"');
-mustContain("dist/performance-reveal.html", 'subtitle: "CD1 + CD3 (ไม่รวม CD2)"');
-mustContain("dist/performance-reveal.html", 'const metrics = ["dc1", "dc3"].map');
-mustContain("dist/performance-reveal.html", 'if (key === "cd13") return combinedCd13Metric(row).actual');
-mustContain("dist/performance-reveal.html", 'if (key === "cd13") return combinedCd13Metric(row).index');
-mustNotContain("dist/performance-reveal.html", 'const metrics = ["dc1", "dc2", "dc3"].map');
+mustContain("dist/performance-reveal.html", "function combinedCd123Metric");
+mustContain("dist/performance-reveal.html", 'title: "TOP CD123"');
+mustContain("dist/performance-reveal.html", 'subtitle: "CD1 + CD2 + CD3"');
+mustContain("dist/performance-reveal.html", 'const metrics = ["dc1", "dc2", "dc3"].map');
+mustContain("dist/performance-reveal.html", 'if (key === "cd123") return combinedCd123Metric(row).actual');
+mustContain("dist/performance-reveal.html", 'if (key === "cd123") return combinedCd123Metric(row).index');
+mustNotContain("dist/performance-reveal.html", "combinedCd13Metric");
+mustNotContain("dist/performance-reveal.html", "CD1 + CD3 (ไม่รวม CD2)");
 mustContain("dist/performance-reveal.html", "function startRace");
 mustContain("dist/performance-reveal.html", "performance/compare/");
 mustContain("dist/performance-reveal.html", "compactHistory");
@@ -318,7 +321,10 @@ mustContain("dist/performance-reveal.html", "Math.trunc((numberValue(value) * 10
 mustContain("dist/performance-reveal.html", "minimumFractionDigits: 2");
 mustContain("dist/performance-reveal.html", "maximumFractionDigits: 2");
 mustContain("dist/performance-reveal.html", "if (target > 0) return (actual / target) * 100;");
-mustContain("dist/performance-reveal.html", "index: directTarget > 0");
+mustContain("dist/performance-reveal.html", "if (directTarget > 0)");
+mustContain("dist/performance-reveal.html", "const complete = metrics.every");
+mustContain("dist/performance-reveal.html", "incomplete: !complete");
+mustNotContain("dist/performance-reveal.html", "const directIndex = numberValue(direct.index);");
 mustNotContain("dist/performance-reveal.html", "if (directIndex > 0) return directIndex;");
 mustContain("dist/performance-reveal.html", "function moqMetric(row)");
 mustContain("dist/assets/admin-performance-active-v2.js", "function moqMetric(o)");
@@ -330,17 +336,34 @@ mustNotContain("dist/performance-reveal.html", "target = actual / (index / 100)"
 mustContain("dist/performance-reveal.html", "เป้าหมายการกระจาย SBD");
 mustContain("dist/performance-reveal.html", "function hydratePerformancePack(pack, fallbackPack = null)");
 mustContain("dist/performance-reveal.html", ".map(result => hydratePerformancePack(result.value, latest))");
-mustContain("dist/performance-reveal.html", "/assets/performance-cd-adapter-v1.js?v=4");
+mustContain("dist/performance-reveal.html", "/assets/performance-cd-adapter-v1.js?v=5");
 mustContain("dist/assets/performance-cd-adapter-v1.js", "function patchMoq(pack)");
 mustContain("dist/assets/performance-cd-adapter-v1.js", "patchMoq(full)");
 mustContain("dist/assets/performance-cd-adapter-v1.js", "function copyMoq(dst,src)");
-mustContain("dist/assets/performance-cd-adapter-v1.js", "performance-cd-adapter-v4-cd-moq");
+mustContain("dist/assets/performance-cd-adapter-v1.js", "performance-cd-adapter-v5-cd123");
 mustContain("dist/assets/performance-cd-adapter-v1.js", "let target=sellerTarget||N(direct.target)");
 mustContain("dist/assets/performance-board-v4.js", "let target=sellerTarget||N(v.target)");
 mustContain("dist/performance-reveal.html", "let target = sellerTarget || numberValue(direct.target);");
-mustContain("dist/performance.html", "performance-cd-adapter-v1.js?v=4");
-mustContain("dist/performance.html", "performance-board-v4.js?v=10");
+mustContain("dist/performance.html", "performance-cd-adapter-v1.js?v=5");
+mustContain("dist/performance.html", "performance-board-v4.js?v=11");
 mustContain("dist/performance-reveal.html", "const metric = performanceMetric(row, key);");
+mustContain("dist/assets/admin-performance-active-v2.js", "function cd123Metric(o)");
+mustContain("dist/assets/admin-performance-active-v2.js", "cd123:cd123Metric(o)");
+mustContain("dist/assets/admin-performance-active-v2.js", "'Target CD1+2+3'");
+mustContain("dist/assets/admin-performance-active-v2.js", "'การกระจาย CD1+2+3'");
+mustContain("dist/assets/admin-performance-active-v2.js", "'Index CD1+2+3'");
+mustContain("dist/assets/admin-performance-active-v2.js", "performance-min-v5");
+mustContain("dist/assets/performance-cd-adapter-v1.js", "function isCd123Name(t)");
+mustContain("dist/assets/performance-cd-adapter-v1.js", "const CD_KEYS=['dc1','dc2','dc3','cd13','cd123']");
+mustContain("dist/assets/performance-board-v4.js", "cd123:'CD1+2+3'");
+mustNotContain("dist/assets/performance-board-v4.js", "cd13:'CD1+CD3'");
+mustContain("dist/admin.html", "admin-performance-active-v2.js?v=2");
+mustContain("dist/performance-reveal.html", "function compareMetricRows");
+mustContain("dist/performance-reveal.html", "function compareRaceRows");
+mustNotContain("dist/performance-reveal.html", "{rank:1,name:");
+mustContain(".github/workflows/web-ci.yml", "Performance CD123 regression");
+mustContain(".github/workflows/web-ci.yml", "node scripts/test-performance-cd123.mjs");
+
 mustNotContain("dist/performance-reveal.html", "จัดอันดับตามยอดขายสูงสุด");
 mustNotContain("dist/performance-reveal.html", 'container._raceMetricKey === "sales"');
 mustContain("dist/performance-reveal.html", "/assets/audio/performance-race.mp3");
@@ -356,9 +379,12 @@ check(
   "Performance countdown must play exactly three short beeps",
 );
 check(
-  (read("dist/performance-reveal.html").match(/playCountdownTone\(true\);/g) || []).length === 1,
-  "Performance GO must play exactly one long tone",
+  (read("dist/performance-reveal.html").match(/playCountdownTone\(true\);/g) || []).length === 0,
+  "Performance GO must use the supplied audio instead of a synthesized long tone",
 );
+mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"go\")");
+mustContain("dist/assets/performance-go-media-v1.js", "data:image/webp;base64,");
+mustContain("dist/assets/performance-go-media-v1.js", "data:audio/mpeg;base64,");
 mustContain("dist/performance-reveal.html", "function playWinnerAudio");
 mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"applause\")");
 mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"fireworks\")");

@@ -80,6 +80,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Foundation smoke check
         run: npm run smoke
+      - name: Performance CD123 regression
+        run: node scripts/test-performance-cd123.mjs
       - name: Pro change-scope guard tests
         run: npm run test:pro-scope
       - name: Pro module regression
