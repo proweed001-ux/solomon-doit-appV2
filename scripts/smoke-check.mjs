@@ -300,6 +300,12 @@ mustContain("dist/performance-reveal.html", "เปิดอันดับแ�
 mustNotContain("dist/performance-reveal.html", "translateX(${visible ? rank * 100 : 520}%)");
 mustNotContain("dist/performance-reveal.html", "parts.bar.style.width");
 mustContain("dist/performance-reveal.html", "function revealRace");
+mustContain("dist/performance-reveal.html", "race-award-badge");
+mustContain("dist/performance-reveal.html", "race-award-badge-label");
+mustContain("dist/performance-reveal.html", '<span class="race-award-badge-label">${cat.title}</span>');
+mustContain("dist/performance-reveal.html", "width: max-content");
+mustContain("dist/performance-reveal.html", "aspect-ratio: 1");
+mustNotContain("dist/performance-reveal.html", '<span class="text-4xl font-black text-black">TOP 5</span>');
 mustNotContain("dist/performance-reveal.html", "function animateRaceTransition");
 mustContain("dist/performance-reveal.html", "function raceActualValue");
 mustContain("dist/performance-reveal.html", "function raceRankingValue");
