@@ -27,6 +27,7 @@ const required = [
   "dist/admin-login.html",
   "dist/performance.html",
   "dist/performance-reveal.html",
+  "dist/assets/performance-go-media-v1.js",
   "dist/assets/pro/app.js",
   "dist/assets/pro/core.js",
   "dist/assets/pro/state.js",
@@ -378,9 +379,12 @@ check(
   "Performance countdown must play exactly three short beeps",
 );
 check(
-  (read("dist/performance-reveal.html").match(/playCountdownTone\(true\);/g) || []).length === 1,
-  "Performance GO must play exactly one long tone",
+  (read("dist/performance-reveal.html").match(/playCountdownTone\(true\);/g) || []).length === 0,
+  "Performance GO must use the supplied audio instead of a synthesized long tone",
 );
+mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"go\")");
+mustContain("dist/assets/performance-go-media-v1.js", "data:image/webp;base64,");
+mustContain("dist/assets/performance-go-media-v1.js", "data:audio/mpeg;base64,");
 mustContain("dist/performance-reveal.html", "function playWinnerAudio");
 mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"applause\")");
 mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"fireworks\")");
