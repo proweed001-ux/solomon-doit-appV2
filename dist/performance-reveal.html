@@ -1335,7 +1335,7 @@
         </main>
     </div>
 
-    <script src="/assets/performance-cd-adapter-v1.js?v=3"></script>
+    <script src="/assets/performance-cd-adapter-v1.js?v=4"></script>
     <script>
         const PERFORMANCE_DATA_URL = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/performance/current.min.json";
         const PERFORMANCE_OBJECT_BASE = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/";
@@ -1473,11 +1473,24 @@
             };
         }
 
-        function hydratePerformancePack(pack) {
+        function hydratePerformancePack(pack, fallbackPack = null) {
             if (!pack) return pack;
+            const codeOf = row =>
+                String(row?.ps || row?.psCode || row?.ads || row?.adsCode || row?.code || "").trim();
+            const fallbackTargets = new Map(
+                (Array.isArray(fallbackPack?.ps) ? fallbackPack.ps : [])
+                    .map(row => [codeOf(row), numberValue(moqMetric(row).target)])
+                    .filter(([code, target]) => code && target > 0)
+            );
             const psRows = Array.isArray(pack.ps) ? pack.ps : [];
             psRows.forEach(row => {
-                row.moq = moqMetric(row);
+                const metric = moqMetric(row);
+                const fallbackTarget = fallbackTargets.get(codeOf(row)) || 0;
+                if (!metric.target && fallbackTarget > 0) {
+                    metric.target = fallbackTarget;
+                    metric.index = (metric.actual / fallbackTarget) * 100;
+                }
+                row.moq = metric;
             });
             (Array.isArray(pack.ads) ? pack.ads : []).forEach(adsRow => {
                 const adsCode = String(adsRow?.ads || adsRow?.adsCode || adsRow?.code || "").trim();
@@ -1884,7 +1897,7 @@
                 );
                 const history = loaded
                     .filter(result => result.status === "fulfilled")
-                    .map(result => hydratePerformancePack(result.value))
+                    .map(result => hydratePerformancePack(result.value, latest))
                     .filter(snapshot => Array.isArray(snapshot?.ps) && Array.isArray(snapshot?.ads));
 
                 performanceCacheStats = stats;
