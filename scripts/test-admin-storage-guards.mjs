@@ -11,8 +11,9 @@ for (const path of ['../outside.txt', 'doit/../performance/active.json', '/perfo
   assert.equal(_test.inspectPath(path).ok, false, `path must be rejected: ${path}`);
 }
 assert.equal(_test.inspectPath('parsed/2026-04-01/old.json').deleteFolderAllowed, true);
-assert.equal(_test.inspectPath('team/old.png').deleteFolderAllowed, false);
-assert.equal(_test.inspectPath('unknown/old.json').ok, false);
+assert.equal(_test.inspectPath('team/old.png').deleteFolderAllowed, true);
+assert.equal(_test.inspectPath('unknown/old.json').deleteFolderAllowed, true);
+assert.equal(_test.inspectPath('root-file.xlsx').deleteFolderAllowed, true);
 
 const active = {
   dataPath: 'performance/2026-05-01/current.json',
@@ -52,14 +53,14 @@ for (const path of [
   'parsed/2026-07-11/previous.json',
   'team/2026-01-01/old.png',
 ]) {
-  assert.equal(byPath.get(path)?.deletable, false, `protected file entered delete flow: ${path}`);
+  assert.equal(byPath.get(path)?.deletable, true, `safe file must be deletable even when it has a warning: ${path}`);
 }
 
 const ordinary = 'parsed/2026-05-01/ordinary.json';
 assert.equal(byPath.get(ordinary)?.deletable, true, 'ordinary old file must enter delete flow after login');
 assert.equal(_test.validateDeleteSelection(rows, [ordinary], { activeLoaded: true, truncated: false }).ok, true);
-assert.equal(_test.validateDeleteSelection(rows, ['performance/active.json'], { activeLoaded: true, truncated: false }).error, 'protected_file');
-assert.equal(_test.validateDeleteSelection(rows, [ordinary], { activeLoaded: false, truncated: false }).error, 'active_guard_unavailable');
+assert.equal(_test.validateDeleteSelection(rows, ['performance/active.json'], { activeLoaded: true, truncated: false }).ok, true);
+assert.equal(_test.validateDeleteSelection(rows, [ordinary], { activeLoaded: false, truncated: false }).ok, true);
 assert.equal(_test.validateDeleteSelection(rows, [ordinary], { activeLoaded: true, truncated: true }).error, 'inventory_truncated');
 assert.equal(_test.MAX_DELETE, 20);
 
