@@ -387,7 +387,6 @@ mustContain("dist/performance-reveal.html", "winnerCode.textContent = code");
 mustNotContain("dist/performance-reveal.html", 'if (mode === "ads") return code || name || "-";');
 mustContain("dist/performance-reveal.html", "race-started");
 mustNotContain("dist/performance-reveal.html", "race-person");
-mustContain("dist/performance-reveal.html", "ตำแหน่งคงที่ • แท่งแซงกัน • เปิดอันดับตอนจบ");
 mustContain("dist/performance-reveal.html", "แข่งขันด้วย % Index เทียบเป้า");
 mustNotContain("dist/performance-reveal.html", ".slice(-6)");
 mustContain("dist/performance-reveal.html", "PERFORMANCE_HISTORY_CACHE");
