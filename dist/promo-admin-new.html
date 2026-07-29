@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <title>หลังบ้านโปรโมชั่นใหม่</title>
+  <link rel="stylesheet" href="/assets/promo-new/style.css">
+  <style>
+    .footer-actions .btn.primary,
+    .footer-actions .btn.dark {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="promo-admin-new-root"></div>
+  <script>
+    (() => {
+      const root = document.getElementById('promo-admin-new-root');
+      const sessionKey = 'promo-new-admin-session-v1';
+      const params = new URLSearchParams(location.search);
+      const demo = params.get('demo') === '1';
+      const dryRun = params.get('dryrun') === '1';
+      if (demo || dryRun) document.body.dataset.promoReadonly = '1';
+
+      const readSession = () => {
+        try { return JSON.parse(sessionStorage.getItem(sessionKey) || 'null'); } catch { return null; }
+      };
+      const loadApp = () => {
+        if (document.getElementById('promo-new-admin-module')) return;
+        const script = document.createElement('script');
+        script.id = 'promo-new-admin-module';
+        script.type = 'module';
+        script.src = '/assets/promo-new/admin.js';
+        document.body.appendChild(script);
+      };
+      const showLogin = () => {
+        root.innerHTML = `<main class="login-page"><section class="login-card">
+          <div class="eyebrow">PROMO SYSTEM</div>
+          <h1>${dryRun ? 'ทดสอบไฟล์แบบอ่านอย่างเดียว' : 'หลังบ้านโปรโมชั่น Preview'}</h1>
+          <p>ใช้รหัสอัปโหลดเพื่อโหลด Product Master จริง โดย Preview นี้ปิด Draft และ Publish จนกว่าจะมี revision staging แยก</p>
+          <div id="legacy-login-error" class="notice error" style="display:none"></div>
+          <form id="legacy-login-form">
+            <label class="field">รหัสอัปโหลด<input id="legacy-admin-key" type="password" autocomplete="current-password" required autofocus></label>
+            <button id="legacy-login-button" class="btn primary">เข้าสู่ระบบ</button>
+          </form>
+          <div class="audit-note">รหัสเก็บเฉพาะในแท็บนี้ และส่งไปตรวจผ่านระบบเดิม</div>
+        </section></main>`;
+        const form = document.getElementById('legacy-login-form');
+        const button = document.getElementById('legacy-login-button');
+        const error = document.getElementById('legacy-login-error');
+        form.addEventListener('submit', async event => {
+          event.preventDefault();
+          button.disabled = true;
+          button.textContent = 'กำลังตรวจรหัส...';
+          error.style.display = 'none';
+          try {
+            const adminKey = document.getElementById('legacy-admin-key').value.trim();
+            const response = await fetch('/api/promo-legacy-auth?action=login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ adminKey }),
+            });
+            const data = await response.json().catch(() => ({ ok: false, error: `http_${response.status}` }));
+            if (!response.ok || data.ok === false || !data.session?.accessToken) throw new Error(data.error || `http_${response.status}`);
+            sessionStorage.setItem(sessionKey, JSON.stringify(data.session));
+            root.innerHTML = '';
+            loadApp();
+          } catch (caught) {
+            error.textContent = `รหัสไม่ถูกต้องหรือระบบตรวจรหัสไม่พร้อม: ${caught.message || caught}`;
+            error.style.display = 'block';
+          } finally {
+            button.disabled = false;
+            button.textContent = 'เข้าสู่ระบบ';
+          }
+        });
+      };
+      const start = async () => {
+        if (demo) {
+          loadApp();
+          return;
+        }
+        const session = readSession();
+        if (!session?.accessToken) {
+          showLogin();
+          return;
+        }
+        try {
+          const response = await fetch('/api/promo-legacy-auth?action=session', {
+            headers: { 'x-promo-admin-key': session.accessToken },
+          });
+          const data = await response.json().catch(() => ({ ok: false }));
+          if (!response.ok || data.ok === false) throw new Error('session_invalid');
+          loadApp();
+        } catch {
+          sessionStorage.removeItem(sessionKey);
+          showLogin();
+        }
+      };
+      start();
+    })();
+  </script>
+</body>
+</html>

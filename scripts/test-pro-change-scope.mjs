@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   assertProOnlyChanges,
   forbiddenProScopeFiles,
+  proScopeFiles,
   resolveComparisonBase,
 } from "./pro-change-scope.mjs";
 
@@ -18,6 +19,8 @@ const forbiddenFiles = [
   "docs/Promo-v2.md",
 ];
 
+assert.deepEqual(proScopeFiles(proOnlyFiles), ["dist/pro.html", "dist/assets/pro/core.js"]);
+assert.deepEqual(proScopeFiles(["src/promo-new/admin/main.tsx", "package.json"]), []);
 assert.deepEqual(forbiddenProScopeFiles(proOnlyFiles), []);
 assert.doesNotThrow(() => assertProOnlyChanges(proOnlyFiles));
 assert.deepEqual(forbiddenProScopeFiles(forbiddenFiles), [

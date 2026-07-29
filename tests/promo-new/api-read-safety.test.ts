@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+
+const read = (path: string) => readFileSync(path, 'utf8');
+
+test('published API quarantines legacy price conflicts before returning the catalog', () => {
+  const source = read('api/promo-new.js');
+  assert.match(source, /export function quarantinePublishedPriceConflicts/u);
+  assert.match(source, /legacy_price_conflict_blocked/u);
+  assert.match(source, /status: 'blocked'/u);
+  assert.match(source, /status: 'need_review'/u);
+  assert.match(source, /quarantinePublishedPriceConflicts\(await getPublishedCatalog/u);
+});
+
+test('upload-key auth limits request size and returns generic errors', () => {
+  const source = read('api/promo-legacy-auth.js');
+  assert.match(source, /MAX_LOGIN_BODY_BYTES = 4_096/u);
+  assert.match(source, /MAX_UPLOAD_KEY_LENGTH = 200/u);
+  assert.match(source, /request_body_too_large/u);
+  assert.match(source, /invalid_upload_key/u);
+  assert.match(source, /promo_auth_unavailable/u);
+  assert.doesNotMatch(source, /detail:\s*message/u);
+  assert.doesNotMatch(source, /error:\s*message\s*\}/u);
+});
+
+test('all legacy Draft and Publish network calls remain disabled in the rebuild Preview', () => {
+  const source = read('src/promo-new/shared/api.ts');
+  assert.match(source, /const LEGACY_WRITES_ENABLED = false/u);
+  assert.match(source, /legacy_write_disabled_pending_atomic_revision_staging/u);
+  assert.match(source, /export async function saveDraft[\s\S]*?assertWritableRuntime\(\)/u);
+  assert.match(source, /export async function publishVersion[\s\S]*?assertWritableRuntime\(\)/u);
+});
