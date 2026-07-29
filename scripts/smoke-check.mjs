@@ -27,7 +27,6 @@ const required = [
   "dist/admin-login.html",
   "dist/performance.html",
   "dist/performance-reveal.html",
-  "dist/assets/performance-go-media-v1.js",
   "dist/assets/pro/app.js",
   "dist/assets/pro/core.js",
   "dist/assets/pro/state.js",
@@ -383,8 +382,10 @@ check(
   "Performance GO must play exactly one synthesized long tone",
 );
 mustNotContain("dist/performance-reveal.html", "playPerformanceTrack(\"go\")");
-mustContain("dist/assets/performance-go-media-v1.js", "data:image/webp;base64,");
-mustContain("dist/assets/performance-go-media-v1.js", "data:audio/mpeg;base64,");
+check(!exists("dist/assets/performance-go-media-v1.js"), "Performance GO media asset must be removed");
+mustNotContain("dist/performance-reveal.html", "performance-go-media-v1.js");
+mustNotContain("dist/performance-reveal.html", "suspense-go-image");
+mustContain("dist/performance-reveal.html", 'number.textContent = "GO!"');
 mustContain("dist/performance-reveal.html", "function playWinnerAudio");
 mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"applause\")");
 mustContain("dist/performance-reveal.html", "playPerformanceTrack(\"fireworks\")");
