@@ -66,7 +66,6 @@ const builderSource = read("dist/assets/admin-performance-active-v2.js");
 const boardSource = read("dist/assets/performance-board-v4.js");
 const performanceHtml = read("dist/performance.html");
 const adminHtml = read("dist/admin.html");
-const goMediaSource = read("dist/assets/performance-go-media-v1.js");
 
 const combinedCd123Metric = new Function(`
   ${extractFunction(revealSource, "numberValue")}
@@ -165,15 +164,13 @@ assert.ok(revealSource.includes("performance-cd-adapter-v1.js?v=5"));
 assert.ok(performanceHtml.includes("performance-cd-adapter-v1.js?v=5"));
 assert.ok(performanceHtml.includes("performance-board-v4.js?v=11"));
 assert.ok(adminHtml.includes("admin-performance-active-v2.js?v=2"));
-assert.ok(revealSource.includes("performance-go-media-v1.js?v=1"));
-assert.ok(revealSource.includes('class="suspense-go-image"'));
-assert.ok(revealSource.includes('cover.classList.add("show-go-image")'));
+assert.ok(!fs.existsSync("dist/assets/performance-go-media-v1.js"));
+assert.ok(!revealSource.includes("performance-go-media-v1.js"));
+assert.ok(!revealSource.includes('class="suspense-go-image"'));
+assert.ok(!revealSource.includes("show-go-image"));
+assert.ok(revealSource.includes('number.textContent = "GO!"'));
 assert.ok(revealSource.includes("playCountdownTone(true);"));
 assert.ok(!revealSource.includes('playPerformanceTrack("go")'));
-assert.ok(revealSource.includes("2500 + GO_REVEAL_DURATION_MS"));
-assert.ok(!revealSource.includes('number.textContent = "GO!"'));
-assert.ok(goMediaSource.includes("data:image/webp;base64,"));
-assert.ok(goMediaSource.includes("data:audio/mpeg;base64,"));
-assert.ok(goMediaSource.includes("durationMs:3700"));
+assert.ok(revealSource.includes("}, 3650);"));
 
 console.log("Performance CD123 regression: PASS");
