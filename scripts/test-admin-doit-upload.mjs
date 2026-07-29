@@ -17,6 +17,16 @@ assert.ok(
   "the source ArrayBuffer must be released before JSON construction",
 );
 assert.ok(
+  uploadSource.includes("internalStream('string')") &&
+    uploadSource.includes("stream.pause()") &&
+    uploadSource.includes("await nextTask()"),
+  "pivot records must be streamed in yielding chunks on memory-constrained phones",
+);
+assert.ok(
+  !uploadSource.includes("recordsFile.async('string')"),
+  "pivot record XML must never be expanded into one giant in-memory string",
+);
+assert.ok(
   uploadSource.includes("source_file_stored:false"),
   "the payload must record that the original Excel file was not stored",
 );
@@ -80,6 +90,57 @@ vm.runInThisContext(uploadSource, { filename: uploadPath });
 
 const core = globalThis.AdminDoitUploadCore;
 assert.equal(typeof core?.buildPayloadBlob, "function");
+assert.equal(typeof core?.streamPivotRecords, "function");
+
+class ChunkStream {
+  constructor(chunks) {
+    this.chunks = [...chunks];
+    this.handlers = {};
+    this.scheduled = false;
+  }
+  on(name, handler) {
+    this.handlers[name] = handler;
+    return this;
+  }
+  pause() {
+    return this;
+  }
+  resume() {
+    if (this.scheduled) return this;
+    this.scheduled = true;
+    queueMicrotask(() => {
+      this.scheduled = false;
+      if (this.chunks.length) this.handlers.data?.(this.chunks.shift());
+      else this.handlers.end?.();
+    });
+    return this;
+  }
+}
+
+const pivotXml =
+  '<pivotCacheRecords count="2"><r><n v="2"/><n v="100"/><s v="SKU-A"/></r>' +
+  '<r><n v="3"/><n v="0"/><s v="SKU-B"/></r></pivotCacheRecords>';
+const pivotChunks = [
+  pivotXml.slice(0, 39),
+  pivotXml.slice(39, 77),
+  pivotXml.slice(77, 111),
+  pivotXml.slice(111),
+];
+const pivotRows = await core.streamPivotRecords(
+  { internalStream: () => new ChunkStream(pivotChunks) },
+  [
+    { name: "ShipQtyPCS", shared: [] },
+    { name: "TotInvc", shared: [] },
+    { name: "SKU_Code", shared: [] },
+  ],
+  2,
+);
+assert.equal(pivotRows.length, 2, "streamed Pivot rows must survive chunk boundaries");
+assert.equal(pivotRows[0].qty, 2);
+assert.equal(pivotRows[0].amt, 100);
+assert.equal(pivotRows[1].qty, 3);
+assert.equal(pivotRows[1].amt, 0, "explicit zero must survive streamed Pivot parsing");
+assert.equal(pivotRows[1].code, "SKU-B");
 
 const rows = Array.from({ length: 12_345 }, (_, index) => ({
   inv: `INV-${index}`,
