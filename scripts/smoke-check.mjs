@@ -252,16 +252,21 @@ mustNotContain("dist/assets/admin-json-v265.js", "uploadJsonActive");
 mustContain("dist/assets/admin-json-v265.js", "$('#uploadCloud')");
 mustContain("dist/assets/admin-json-v265.js", "setActiveRpc(c,id)");
 mustContain("dist/assets/admin-json-v265.js", "AbortController");
-mustContain("dist/assets/admin-json-v265.js", "storage_path:jPath");
-mustContain("dist/assets/admin-json-v265.js", "source_file:{name:f.name,size:f.size,stored:false}");
+mustContain("dist/assets/admin-json-v265.js", "storage_path:dataPath");
+mustContain("dist/assets/admin-json-v265.js", "source_file:{name:file.name,size:file.size,stored:false}");
 mustNotContain("dist/assets/admin-json-v265.js", "อัปโหลด Excel ต้นฉบับ");
 mustNotContain("dist/assets/admin-json-v265.js", "xPath");
-mustContain("dist/admin.html", "/assets/admin-json-v265.js?v=333");
+mustContain("dist/admin.html", "/assets/admin-upload-v001.js?v=301");
+mustContain("dist/admin.html", "/assets/admin-json-v265.js?v=334");
 mustContain("dist/assets/admin-json-v265.js", "old.disabled=true");
 mustContain(
   "dist/assets/admin-upload-v001.js",
   "ปุ่มนี้ถูกโอนให้ admin-json-v265.js จัดการแล้ว",
 );
+mustNotContain("dist/assets/admin-upload-v001.js", "FileReader");
+mustNotContain("dist/assets/admin-upload-v001.js", "XLSX.read");
+mustContain("dist/assets/admin-json-v265.js", "internalStream('string')");
+mustContain("dist/assets/admin-json-v265.js", "CHUNK_ROWS=500");
 mustNotContain("dist/assets/admin-progress-popup-v1.js", "btn.click()");
 mustNotContain("dist/assets/admin-progress-popup-v1.js", "lastAutoActive");
 
