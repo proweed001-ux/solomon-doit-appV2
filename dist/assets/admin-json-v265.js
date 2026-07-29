@@ -264,7 +264,7 @@ async function buildPayloadBlob(metadata,rows,options={}){
     if((start/chunkSize)%8===0)await nextTask();
   }
   rows.length=0;
-  parts.push(new Blob(['}'],{type:JSON_MIME}));
+  parts.push(new Blob([']}'],{type:JSON_MIME}));
   return new Blob(parts,{type:JSON_MIME});
 }
 
