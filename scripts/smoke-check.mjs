@@ -532,7 +532,7 @@ mustNotContain("dist/assets/admin-storage-manager-v1.js", 'method:"DELETE"');
 });
 mustContain("dist/assets/admin-storage-manager-v1.js", "api('delete'");
 mustContain("api/admin-storage.js", "const MAX_DELETE = 20");
-mustContain("api/admin-storage.js", "deleteAllFilesEnabled: true");
+mustContain("api/admin-storage.js", "active_guard_unavailable");
 mustContain("api/admin-storage.js", "path_traversal");
 mustContain("api/admin-storage.js", "method: 'DELETE'");
 mustNotContain("api/admin-storage.js", "SUPABASE_SERVICE_ROLE_KEY");
