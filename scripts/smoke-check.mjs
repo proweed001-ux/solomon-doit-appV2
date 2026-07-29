@@ -251,6 +251,12 @@ mustContain("scripts/qa-doit-file.mjs", "return Math.round(safeNum(value))");
 mustNotContain("dist/assets/admin-json-v265.js", "uploadJsonActive");
 mustContain("dist/assets/admin-json-v265.js", "$('#uploadCloud')");
 mustContain("dist/assets/admin-json-v265.js", "setActiveRpc(c,id)");
+mustContain("dist/assets/admin-json-v265.js", "AbortController");
+mustContain("dist/assets/admin-json-v265.js", "storage_path:jPath");
+mustContain("dist/assets/admin-json-v265.js", "source_file:{name:f.name,size:f.size,stored:false}");
+mustNotContain("dist/assets/admin-json-v265.js", "อัปโหลด Excel ต้นฉบับ");
+mustNotContain("dist/assets/admin-json-v265.js", "xPath");
+mustContain("dist/admin.html", "/assets/admin-json-v265.js?v=333");
 mustContain("dist/assets/admin-json-v265.js", "old.disabled=true");
 mustContain(
   "dist/assets/admin-upload-v001.js",
