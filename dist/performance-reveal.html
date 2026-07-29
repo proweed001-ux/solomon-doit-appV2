@@ -2531,7 +2531,6 @@
             const goImage = cover.querySelector(".suspense-go-image");
             if (goImage && PERFORMANCE_GO_MEDIA.image) goImage.src = PERFORMANCE_GO_MEDIA.image;
             cover.style.setProperty("--go-reveal-duration", `${GO_REVEAL_DURATION_MS}ms`);
-            performanceAudioTrack("go").load();
             playCountdownTone(false);
             setTimeout(() => {
                 if (number) number.textContent = "2";
@@ -2543,7 +2542,7 @@
             }, 1700);
             setTimeout(() => {
                 cover.classList.add("show-go-image");
-                playPerformanceTrack("go");
+                playCountdownTone(true);
                 cover.style.boxShadow = "0 0 110px rgba(234,179,8,0.48)";
             }, 2500);
             setTimeout(() => {
