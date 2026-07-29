@@ -177,6 +177,79 @@ function readCacheFields(documentNode){
   });
 }
 
+function readFileBuffer(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onprogress=event=>{
+      if(!event.lengthComputable)return;
+      const percent=5+Math.round((event.loaded/Math.max(1,event.total))*5);
+      stat(percent,`อ่าน Excel ${(event.loaded/1024/1024).toFixed(1)} / ${(event.total/1024/1024).toFixed(1)} MB`);
+    };
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(reader.error||Error('อ่านไฟล์ Excel ไม่สำเร็จ'));
+    reader.onabort=()=>reject(Error('การอ่านไฟล์ Excel ถูกยกเลิก'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function normalizePivotRecord(body,fields,recordIndex){
+  const entryPattern=/<(x|n|s|d|b|m)(?:\s+[^>]*?v="([^"]*)")?[^>]*\/>/g;
+  let entryMatch,fieldIndex=0,source={};
+  while((entryMatch=entryPattern.exec(body))){
+    const key=fields[fieldIndex]?.name;
+    if(key){
+      const tag=entryMatch[1],value=entryMatch[2];
+      source[key]=tag==='x'
+        ?(fields[fieldIndex]?.shared[N(value)]??'')
+        :(tag==='n'?N(value):(tag==='m'?'':T(value)));
+    }
+    fieldIndex++;
+  }
+  return normalizeRow(source,recordIndex);
+}
+
+async function streamPivotRecords(recordsFile,fields,rowCount){
+  const rows=[];
+  let carry='',recordIndex=0;
+  const stream=recordsFile.internalStream('string');
+  let processing=Promise.resolve();
+
+  await new Promise((resolve,reject)=>{
+    stream.on('data',chunk=>{
+      stream.pause();
+      processing=processing.then(async()=>{
+        carry+=chunk;
+        let closeIndex=carry.indexOf('</r>');
+        while(closeIndex>=0){
+          const openIndex=carry.indexOf('<r');
+          if(openIndex<0||openIndex>closeIndex){
+            carry=carry.slice(closeIndex+4);
+            closeIndex=carry.indexOf('</r>');
+            continue;
+          }
+          const bodyStart=carry.indexOf('>',openIndex);
+          if(bodyStart<0||bodyStart>closeIndex)break;
+          const body=carry.slice(bodyStart+1,closeIndex);
+          carry=carry.slice(closeIndex+4);
+          const normalized=normalizePivotRecord(body,fields,recordIndex++);
+          if(normalized.qty||normalized.amt||normalized.sku)rows.push(normalized);
+          if(recordIndex%1000===0){
+            const ratio=rowCount?recordIndex/rowCount:Math.min(1,recordIndex/120000);
+            stat(16+Math.min(17,Math.round(ratio*17)),`อ่าน Pivot ${F(recordIndex)}${rowCount?' / '+F(rowCount):''} แถว`);
+            await nextTask();
+          }
+          closeIndex=carry.indexOf('</r>');
+        }
+        stream.resume();
+      }).catch(reject);
+    });
+    stream.on('error',reject);
+    stream.on('end',()=>processing.then(resolve,reject));
+    stream.resume();
+  });
+  return rows;
+}
+
 async function pivot(buffer){
   const zip=await JSZip.loadAsync(buffer);
   const definitions=Object.keys(zip.files)
@@ -191,36 +264,13 @@ async function pivot(buffer){
     const documentNode=new DOMParser().parseFromString(xml,'text/xml');
     const fields=readCacheFields(documentNode);
     const rowCount=N(documentNode.documentElement?.getAttribute('recordCount'));
-    const candidate={fields,recordsPath,score:scorePivot(fields.map(field=>field.name),rowCount)};
+    const candidate={fields,recordsPath,rowCount,score:scorePivot(fields.map(field=>field.name),rowCount)};
     if(!best||candidate.score>best.score)best=candidate;
   }
   if(!best)return[];
 
   const recordsFile=zip.file(best.recordsPath);
-  const recordsXml=await recordsFile.async('string');
-  const rows=[];
-  const rowPattern=/<r>([\s\S]*?)<\/r>/g;
-  const entryPattern=/<(x|n|s|d|b|m)(?:\s+[^>]*?v="([^"]*)")?[^>]*\/>/g;
-  let rowMatch,recordIndex=0;
-  while((rowMatch=rowPattern.exec(recordsXml))){
-    const body=rowMatch[1];
-    let entryMatch,fieldIndex=0,source={};
-    entryPattern.lastIndex=0;
-    while((entryMatch=entryPattern.exec(body))){
-      const key=best.fields[fieldIndex]?.name;
-      if(key){
-        const tag=entryMatch[1],value=entryMatch[2];
-        source[key]=tag==='x'
-          ?(best.fields[fieldIndex]?.shared[N(value)]??'')
-          :(tag==='n'?N(value):(tag==='m'?'':T(value)));
-      }
-      fieldIndex++;
-    }
-    const normalized=normalizeRow(source,recordIndex++);
-    if(normalized.qty||normalized.amt||normalized.sku)rows.push(normalized);
-    if(recordIndex%7000===0)stat(18+Math.min(14,recordIndex/9000),'อ่านข้อมูล '+F(recordIndex)+' แถว');
-  }
-  return rows;
+  return await streamPivotRecords(recordsFile,best.fields,best.rowCount);
 }
 
 function sheets(buffer){
@@ -322,8 +372,9 @@ async function run(){
     c=cfg();
     if(!c.k)throw Error('ยังไม่ได้ตั้งค่า anon key');
 
-    stat(5,'อ่านไฟล์ DOIT เพียงรอบเดียว');
-    let buffer=await file.arrayBuffer();
+    stat(5,'เริ่มอ่านไฟล์ DOIT');
+    let buffer=await readFileBuffer(file);
+    await nextTask();
     stat(12,'ค้นหา Pivot Cache ที่เป็นข้อมูล DOIT');
     let rows=await pivot(buffer).catch(()=>[]);
     if(!rows.length){
@@ -448,6 +499,6 @@ function ui(){
   }
 }
 
-window.AdminDoitUploadCore={buildPayloadBlob};
+window.AdminDoitUploadCore={buildPayloadBlob,streamPivotRecords};
 document.addEventListener('DOMContentLoaded',()=>{ui();setTimeout(ui,500);setTimeout(ui,1200)});
 })();
