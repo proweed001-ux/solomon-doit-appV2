@@ -62,6 +62,8 @@ const required = [
   "scripts/test-pro-change-scope.mjs",
   "scripts/test-pro-architecture.mjs",
   "scripts/test-pro-module-syntax.mjs",
+  "scripts/test-pro-cloud-data-source.mjs",
+  "supabase/functions/doit-active/index.ts",
   "scripts/fixtures/pro-browser-fixture.mjs",
   "tests/pro/pro-browser.spec.mjs",
   "playwright.pro.config.mjs",
@@ -78,6 +80,7 @@ const pkg = JSON.parse(read("package.json"));
   "verify:react",
   "test:pro-scope",
   "test:pro-regression",
+  "test:pro-cloud",
   "test:pro-lazy",
   "test:local-xlsx",
   "test:qa-doit",
@@ -93,6 +96,7 @@ check(
     "npm run smoke",
     "npm run test:pro-scope",
     "npm run test:pro-regression",
+    "npm run test:pro-cloud",
     "npm run test:pro-lazy",
     "npm run test:local-xlsx",
     "npm run test:qa-doit",
@@ -109,6 +113,7 @@ check(
   "npm ci",
   "npm run smoke",
   "npm run test:pro-regression",
+  "npm run test:pro-cloud",
   "npm run test:pro-lazy",
   "npm run test:local-xlsx",
   "npm run test:qa-doit",
@@ -143,6 +148,9 @@ mustNotContain("dist/assets/pro/app.js", "pro-print-mode-fixes.js");
 mustNotContain("dist/assets/pro/app.js", "pro-print-column-widths.js");
 mustNotContain("dist/assets/pro/app.js", "pro-print-a4-pro-fix.js");
 mustContain("dist/assets/pro/core.js", 'currentStateSource: "state-module"');
+mustContain("dist/assets/pro/data-source.js", 'response?.mode === "json_parts"');
+mustContain("dist/assets/pro/data-source.js", '"doit-json-part-v1"');
+mustContain("supabase/functions/doit-active/index.ts", 'mode: "json_parts"');
 mustNotContain("dist/assets/pro/core.js", "MutationObserver");
 mustNotContain("dist/assets/pro/core.js", "setInterval");
 mustContain("dist/assets/pro/state.js", '"doit-core-unified-v1:" + state.key');
