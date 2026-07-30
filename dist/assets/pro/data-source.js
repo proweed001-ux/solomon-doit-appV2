@@ -80,7 +80,12 @@ async function resolveMultipartPayload(response, onProgress) {
 
   for (let index = 0; index < parts.length; index += 1) {
     const descriptor = parts[index] || {};
-    const partIndex = positiveInt(descriptor.part_index, "part_index");
+    const storagePartIndex = positiveInt(
+      descriptor.part_index,
+      "part_index",
+      true,
+    );
+    const displayPartIndex = index + 1;
     const descriptorStart = positiveInt(
       descriptor.row_start,
       "row_start",
@@ -88,46 +93,63 @@ async function resolveMultipartPayload(response, onProgress) {
     );
     const descriptorCount = positiveInt(descriptor.row_count, "part row_count");
 
-    if (partIndex !== index + 1) {
-      throw new Error("ข้อมูล Cloud ผิดลำดับที่ส่วน " + (index + 1));
+    if (storagePartIndex !== index) {
+      throw new Error("ข้อมูล Cloud ผิดลำดับที่ส่วน " + displayPartIndex);
     }
     if (descriptorStart !== nextRowStart) {
-      throw new Error("ข้อมูล Cloud มีช่วงแถวขาดหรือซ้ำที่ส่วน " + partIndex);
+      throw new Error(
+        "ข้อมูล Cloud มีช่วงแถวขาดหรือซ้ำที่ส่วน " + displayPartIndex,
+      );
     }
 
     const payload = await fetchJson(
       descriptor.url,
-      "JSON ส่วน " + partIndex + "/" + partCount,
+      "JSON ส่วน " + displayPartIndex + "/" + partCount,
     );
     if (payload?.schema !== "doit-json-part-v1") {
-      throw new Error("JSON ส่วน " + partIndex + " ใช้ schema ไม่ถูกต้อง");
+      throw new Error(
+        "JSON ส่วน " + displayPartIndex + " ใช้ schema ไม่ถูกต้อง",
+      );
     }
     if (String(payload.version_id || "") !== versionId) {
-      throw new Error("JSON ส่วน " + partIndex + " เป็นคนละเวอร์ชัน");
+      throw new Error("JSON ส่วน " + displayPartIndex + " เป็นคนละเวอร์ชัน");
     }
-    if (positiveInt(payload.part_index, "payload part_index") !== partIndex) {
-      throw new Error("JSON ส่วน " + partIndex + " มีเลขส่วนไม่ตรงกัน");
+    if (
+      positiveInt(payload.part_index, "payload part_index", true) !==
+      storagePartIndex
+    ) {
+      throw new Error(
+        "JSON ส่วน " + displayPartIndex + " มีเลขส่วนไม่ตรงกัน",
+      );
     }
     if (
       positiveInt(payload.row_start, "payload row_start", true) !==
       descriptorStart
     ) {
-      throw new Error("JSON ส่วน " + partIndex + " มีตำแหน่งแถวไม่ตรงกัน");
+      throw new Error(
+        "JSON ส่วน " + displayPartIndex + " มีตำแหน่งแถวไม่ตรงกัน",
+      );
     }
     if (!Array.isArray(payload.rows)) {
-      throw new Error("JSON ส่วน " + partIndex + " ไม่มี rows");
+      throw new Error("JSON ส่วน " + displayPartIndex + " ไม่มี rows");
     }
+    const payloadCount =
+      payload.row_count == null
+        ? descriptorCount
+        : positiveInt(payload.row_count, "payload row_count");
     if (
       payload.rows.length !== descriptorCount ||
-      positiveInt(payload.row_count, "payload row_count") !== descriptorCount
+      payloadCount !== descriptorCount
     ) {
-      throw new Error("JSON ส่วน " + partIndex + " มีจำนวนแถวไม่ครบ");
+      throw new Error(
+        "JSON ส่วน " + displayPartIndex + " มีจำนวนแถวไม่ครบ",
+      );
     }
 
     rows.push(...payload.rows);
     nextRowStart += descriptorCount;
     onProgress({
-      partIndex,
+      partIndex: displayPartIndex,
       partCount,
       rowsLoaded: rows.length,
       rowCount,
