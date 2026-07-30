@@ -29,9 +29,10 @@ const FOLDER_INFO={
   performance:{title:'ข้อมูล Performance',note:'ประวัติรายวัน ไฟล์เปรียบเทียบ และไฟล์ควบคุมล่าสุด'},
   team:{title:'รูปและข้อมูลทีมพัฒนา',note:'รูปภาพ QR และไฟล์ตั้งค่าทีม'},
   uploads:{title:'ไฟล์อัปโหลดชั่วคราว',note:'ไฟล์ที่รอประมวลผล'},
-  raw:{title:'ข้อมูลต้นฉบับชั่วคราว',note:'ไฟล์ Raw จากกระบวนการเก่า'}
+  raw:{title:'ข้อมูลต้นฉบับชั่วคราว',note:'ไฟล์ Raw จากกระบวนการเก่า'},
+  root:{title:'ไฟล์ระดับหลักของ Storage',note:'ไฟล์ที่ไม่ได้อยู่ภายในโฟลเดอร์'}
 };
-function folderOf(path){return String(path||'').split('/')[0].toLowerCase()||'other'}
+function folderOf(path){const value=String(path||'');return value.includes('/')?(value.split('/')[0].toLowerCase()||'other'):'root'}
 function folderInfo(folder){return FOLDER_INFO[folder]||{title:'โฟลเดอร์ '+folder,note:'ไฟล์ข้อมูลใน Storage'}}
 function statusOf(file){
   if(file.deletable)return activeGuardLoaded?{type:'deletable',label:'ลบได้'}:{type:'waiting',label:'รอตรวจ Active'};
