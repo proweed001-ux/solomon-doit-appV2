@@ -11,8 +11,8 @@ for (const path of ['../outside.txt', 'doit/../performance/active.json', '/perfo
   assert.equal(_test.inspectPath(path).ok, false, `path must be rejected: ${path}`);
 }
 assert.equal(_test.inspectPath('parsed/2026-04-01/old.json').deleteFolderAllowed, true);
-assert.equal(_test.inspectPath('team/old.png').deleteFolderAllowed, false);
-assert.equal(_test.inspectPath('unknown/old.json').ok, false);
+assert.equal(_test.inspectPath('team/old.png').deleteFolderAllowed, true);
+assert.equal(_test.inspectPath('future-folder/old.json').deleteFolderAllowed, true);
 
 const active = {
   dataPath: 'performance/2026-05-01/current.json',
@@ -35,8 +35,14 @@ const fixtures = [
   make('parsed/2026-07-11/previous.json', '2026-07-11T00:00:00Z'),
   make('parsed/2026-05-01/ordinary.json', '2026-05-01T00:00:00Z'),
   make('team/2026-01-01/old.png', '2026-01-01T00:00:00Z'),
+  make('parsed/2026-07-12/active-manifest.json', '2026-07-12T00:00:00Z'),
+  make('parsed/2026-07-12/active-bundle/part-0001.json', '2026-07-12T00:00:00Z'),
 ];
-const rows = _test.classifyFiles(fixtures, active, 30, new Date('2026-07-12T12:00:00Z'));
+const activeDoitPaths = new Set([
+  'parsed/2026-07-12/active-manifest.json',
+  'parsed/2026-07-12/active-bundle/part-0001.json',
+]);
+const rows = _test.classifyFiles(fixtures, active, 30, new Date('2026-07-12T12:00:00Z'), activeDoitPaths);
 const byPath = new Map(rows.map(row => [row.path, row]));
 
 for (const path of [
@@ -46,17 +52,19 @@ for (const path of [
   'performance/history-index.json',
   'parsed/2025-01-01/previous.json',
   'performance/2026-05-01/current.json',
-  'performance/2026-07-01/month.json',
   'performance/2026-04-01/history.json',
   'parsed/2026-07-12/latest.json',
   'parsed/2026-07-11/previous.json',
-  'team/2026-01-01/old.png',
+  'parsed/2026-07-12/active-manifest.json',
+  'parsed/2026-07-12/active-bundle/part-0001.json',
 ]) {
   assert.equal(byPath.get(path)?.deletable, false, `protected file entered delete flow: ${path}`);
 }
 
 const ordinary = 'parsed/2026-05-01/ordinary.json';
-assert.equal(byPath.get(ordinary)?.deletable, true, 'ordinary old file must enter delete flow after login');
+assert.equal(byPath.get(ordinary)?.deletable, true, 'ordinary file must enter delete flow after login');
+assert.equal(byPath.get('performance/2026-07-01/month.json')?.deletable, true, 'inactive current-month performance file must be deletable');
+assert.equal(byPath.get('team/2026-01-01/old.png')?.deletable, true, 'team file must be deletable');
 assert.equal(_test.validateDeleteSelection(rows, [ordinary], { activeLoaded: true, truncated: false }).ok, true);
 assert.equal(_test.validateDeleteSelection(rows, ['performance/active.json'], { activeLoaded: true, truncated: false }).error, 'protected_file');
 assert.equal(_test.validateDeleteSelection(rows, [ordinary], { activeLoaded: false, truncated: false }).error, 'active_guard_unavailable');
