@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { _test } from '../api/admin-storage.js';
 
 const basic = (id, password) => `Basic ${Buffer.from(`${id}:${password}`).toString('base64')}`;
@@ -80,5 +81,15 @@ assert.equal(_test.validAnonKey(fakeJwt({ iss: 'supabase', role: 'anon', ref: 's
 assert.equal(_test.validAnonKey(fakeJwt({ iss: 'supabase', role: 'service_role', ref: 'saodmeoilixfdqentofp' })), false);
 assert.equal(_test.validAnonKey('sb_publishable_abcdefghijklmnopqrstuvwxyz1234567890'), true);
 assert.equal(_test.validAnonKey('sb_secret_abcdefghijklmnopqrstuvwxyz1234567890'), false);
+
+
+const storageUi = fs.readFileSync(new URL('../dist/assets/admin-storage-manager-v1.js', import.meta.url), 'utf8');
+const adminHtml = fs.readFileSync(new URL('../dist/admin.html', import.meta.url), 'utf8');
+assert.match(storageUi, /const collapsedFolders=new Set\(\)/, 'folder collapse state must exist');
+assert.match(storageUi, /class="storageFolderToggle"/, 'folder header must be a toggle button');
+assert.match(storageUi, /aria-expanded=/, 'folder toggle must expose expanded state');
+assert.match(storageUi, /collapsedFolders\.has\(folder\)/, 'folder rows must support collapse and expand');
+assert.match(adminHtml, /admin-storage-manager-v1\.js\?v=7/, 'admin must load the current storage UI asset');
+assert.match(adminHtml, /แตะชื่อโฟลเดอร์เพื่อพับ\/ขยาย/, 'admin must explain folder collapse control');
 
 console.log('admin storage guard regression: PASS');
