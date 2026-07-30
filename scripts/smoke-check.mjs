@@ -257,7 +257,7 @@ mustContain("dist/assets/admin-json-v265.js", "source_file:{name:file.name,size:
 mustNotContain("dist/assets/admin-json-v265.js", "อัปโหลด Excel ต้นฉบับ");
 mustNotContain("dist/assets/admin-json-v265.js", "xPath");
 mustContain("dist/admin.html", "/assets/admin-upload-v001.js?v=301");
-mustContain("dist/admin.html", "/assets/admin-json-v265.js?v=336");
+mustContain("dist/admin.html", "/assets/admin-json-v265.js?v=337");
 mustContain("dist/assets/admin-json-v265.js", "old.disabled=true");
 mustContain(
   "dist/assets/admin-upload-v001.js",
