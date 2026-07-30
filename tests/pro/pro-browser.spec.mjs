@@ -999,6 +999,9 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
   const runtime = await preparePage(page);
   for (const file of [fixtureFiles.xlsx, fixtureFiles.xlsm]) {
     await uploadFixture(page, file);
+    await expect(page.locator("#tableCount")).toHaveText(
+      `ถอดของ Pro ${fixtureMeta.normalRows.toLocaleString("th-TH")} รายการ`,
+    );
     await chooseOnly(page, "dates", fixtureMeta.date);
     await chooseOnly(page, "ps", fixtureMeta.ps);
     await chooseOnly(page, "receivers", fixtureMeta.receiver);
@@ -1024,6 +1027,7 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     await expect(page.locator(".summary")).toBeHidden();
     await expect(page.locator("#amount")).toBeHidden();
     await expect(page.locator("#table")).toBeHidden();
+    await expect(page.locator("#pager")).toBeHidden();
     for (const [kind, expectedText] of [
       ["ps", fixtureMeta.ps],
       ["orderStores", fixtureMeta.receiver],
@@ -1228,6 +1232,10 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     await page.locator(".tabs .tab").first().click();
     await expect(page.locator(".summaryHead")).toBeVisible();
     await expect(page.locator(".summary")).toBeVisible();
+    await expect(page.locator("#pager")).toBeVisible();
+    await expect(page.locator("#tableCount")).toHaveText(
+      `ถอดของ Pro ${fixtureMeta.normalRows.toLocaleString("th-TH")} รายการ`,
+    );
     await expect(page.locator("#amount")).toHaveText(legacyAmount || "");
     await expect(page.locator("#sendLabelText")).toHaveText("ส่งให้ร้าน:");
     await expect(page.locator('[data-pick="receivers"]')).toContainText(

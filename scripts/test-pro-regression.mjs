@@ -86,6 +86,7 @@ const realBillSource = fs.readFileSync(
 );
 const printSource = fs.readFileSync("dist/assets/pro/print.js", "utf8");
 const proHtmlSource = fs.readFileSync("dist/pro.html", "utf8");
+const proCssSource = fs.readFileSync("dist/assets/pro/pro.css", "utf8");
 
 state.rows = fixture.rows.map((row) => ({ ...row }));
 state.key = "fixture-active";
@@ -1681,6 +1682,16 @@ assert.match(
   coreRenderSource,
   /summaryCards\.hidden = shipMode/,
   "Ship mode must hide legacy amount/done/remain cards",
+);
+assert.match(
+  proCssSource,
+  /\.pagination\[hidden\]\s*\{[\s\S]*?display:\s*none\s*!important/,
+  "Ship mode must hide the legacy Pick pagination even though .pagination uses display:flex",
+);
+assert.match(
+  coreSource,
+  /state\.mode === "pick"[\s\S]*?#tableCount"\)\.textContent\s*=[\s\S]*?ถอดของ Pro[\s\S]*?pool\.length/,
+  "Pick mode must replace the pre-load placeholder with the rendered item count",
 );
 assert.equal(
   (coreRenderSource.match(/\.reduce\(/g) || []).length,

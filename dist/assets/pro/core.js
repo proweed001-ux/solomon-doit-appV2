@@ -775,6 +775,9 @@ import { preparePrint } from "./print.js";
       showRealBillSurface(false);
     }
     if (state.mode === "pick") {
+      $("#tableCount").textContent = state.rows.length
+        ? "ถอดของ Pro " + F(pool.length) + " รายการ"
+        : "โหลดไฟล์เพื่อแสดงข้อมูล";
       $("#table").innerHTML = pickTable(pool);
       bindQuantityInputs({
         inputs: $$(".jdata"),
