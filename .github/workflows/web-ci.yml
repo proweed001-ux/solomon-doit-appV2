@@ -6,6 +6,7 @@ on:
     paths:
       - "src/**"
       - "scripts/**"
+      - "supabase/functions/**"
       - "tests/**"
       - "docs/**"
       - "dist/*.html"
@@ -23,6 +24,7 @@ on:
     paths:
       - "src/**"
       - "scripts/**"
+      - "supabase/functions/**"
       - "tests/**"
       - "docs/**"
       - "dist/*.html"
@@ -88,6 +90,8 @@ jobs:
         run: npm run test:pro-scope
       - name: Pro module regression
         run: npm run test:pro-regression
+      - name: Pro Cloud old and multipart data
+        run: npm run test:pro-cloud
       - name: Pro Telesale lazy pagination
         run: npm run test:pro-lazy
       - name: Local XLSX dependency
