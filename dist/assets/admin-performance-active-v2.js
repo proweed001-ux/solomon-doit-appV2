@@ -2,7 +2,6 @@
 {'use strict';
 if(window.__ADMIN_PERFORMANCE_ACTIVE_V2__)return;window.__ADMIN_PERFORMANCE_ACTIVE_V2__=true;
 const nativeFetch=window.fetch.bind(window);let lastPayload=null;
-if(window.XLSX&&!window.__PERF_XLSX_PATCH__){window.__PERF_XLSX_PATCH__=true;const old=window.XLSX.read;window.XLSX.read=function(){const wb=old.apply(this,arguments);try{window.__PERF_LAST_WB=wb}catch{}return wb}}
 const T=v=>String(v??'').trim(),K=v=>T(v).replace(/\s+/g,'').toLowerCase(),N=v=>typeof v==='number'?(isFinite(v)?v:0):(Number(T(v).replace(/,/g,'').replace(/%/g,'').replace(/[^0-9.\-]/g,''))||0),P=v=>{v=N(v);return v&&v<=1.5?v*100:v};
 const MKEYS=['sales','giv','moq','dc1','dc2','dc3','cd13','cd123','bills','gps','dgp'];
 function monthNo(v){const s=K(v),m=String(v||'').match(/(?:20)?(\d{2})[-_\/ ]?(0[1-9]|1[0-2])/);if(m)return m[2];const th=[['มกราคม','01'],['มกรา','01'],['jan','01'],['กุมภาพันธ์','02'],['กุมภา','02'],['feb','02'],['มีนาคม','03'],['มีนา','03'],['mar','03'],['เมษายน','04'],['เมษา','04'],['apr','04'],['พฤษภาคม','05'],['พฤษภา','05'],['may','05'],['มิถุนายน','06'],['มิถุนา','06'],['jun','06'],['กรกฎาคม','07'],['กรกฎา','07'],['jul','07'],['สิงหาคม','08'],['สิงหา','08'],['aug','08'],['กันยายน','09'],['กันยา','09'],['sep','09'],['ตุลาคม','10'],['ตุลา','10'],['oct','10'],['พฤศจิกายน','11'],['พฤศจิกา','11'],['nov','11'],['ธันวาคม','12'],['ธันวา','12'],['dec','12']];return (th.find(([k])=>s.includes(K(k)))||[])[1]||''}
