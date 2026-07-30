@@ -5,6 +5,10 @@ const BUCKET='doit-files';
 const JSON_MIME='application/json;charset=utf-8';
 const CHUNK_ROWS=500;
 const UPLOAD_TIMEOUT_MS=600000;
+const RESUMABLE_THRESHOLD_BYTES=6*1024*1024;
+const TUS_CHUNK_BYTES=6*1024*1024;
+const TUS_CHUNK_TIMEOUT_MS=180000;
+const TUS_RETRY_DELAYS=[0,3000,5000,10000,20000];
 const BUSY_CONTROL_IDS=['uploadCloud','choose','file','clear','testCloud'];
 const $=s=>document.querySelector(s);
 const T=v=>String(v??'').trim();
@@ -215,7 +219,14 @@ function readFileBuffer(file){
       stat(percent,`อ่าน Excel ${(event.loaded/1024/1024).toFixed(1)} / ${(event.total/1024/1024).toFixed(1)} MB`);
     };
     reader.onload=()=>resolve(reader.result);
-    reader.onerror=()=>reject(reader.error||Error('อ่านไฟล์ Excel ไม่สำเร็จ'));
+    reader.onerror=()=>{
+      const original=reader.error;
+      if(original?.name==='NotFoundError'){
+        reject(Error('ไม่พบไฟล์ต้นฉบับในเครื่องแล้ว กรุณาดาวน์โหลดไฟล์ลงโฟลเดอร์ Download แล้วเลือกใหม่'));
+        return;
+      }
+      reject(original||Error('อ่านไฟล์ Excel ไม่สำเร็จ'));
+    };
     reader.onabort=()=>reject(Error('การอ่านไฟล์ Excel ถูกยกเลิก'));
     reader.readAsArrayBuffer(file);
   });
@@ -406,6 +417,160 @@ function uploadJson(c,path,body,type,timeoutMs=UPLOAD_TIMEOUT_MS,onProgress=()=>
     xhr.send(body);
   });
 }
+
+function wait(ms){return new Promise(resolve=>setTimeout(resolve,ms))}
+function directResumableEndpoint(c){
+  const parsed=new URL(c.u);
+  const projectRef=T(parsed.hostname.split('.')[0]);
+  if(!projectRef)throw Error('Supabase URL ไม่ถูกต้อง');
+  return `${parsed.protocol}//${projectRef}.storage.supabase.co/storage/v1/upload/resumable`;
+}
+function base64Metadata(value){
+  const bytes=new TextEncoder().encode(T(value));
+  let binary='';
+  for(const byte of bytes)binary+=String.fromCharCode(byte);
+  return btoa(binary);
+}
+function tusHeaders(c,extra={}){
+  return headers(c,{'Tus-Resumable':'1.0.0',...extra});
+}
+async function createTusUpload(c,path,body,type){
+  const endpoint=directResumableEndpoint(c);
+  const response=await request(
+    'เริ่มอัปโหลด JSON แบบต่อเนื่อง',
+    endpoint,
+    {
+      method:'POST',
+      headers:tusHeaders(c,{
+        'Upload-Length':String(body.size),
+        'Upload-Metadata':[
+          'bucketName '+base64Metadata(BUCKET),
+          'objectName '+base64Metadata(path),
+          'contentType '+base64Metadata(type),
+          'cacheControl '+base64Metadata('3600'),
+        ].join(','),
+        'x-upsert':'true',
+      }),
+    },
+    30000,
+  );
+  const text=await response.text();
+  if(!response.ok)throw Error(`เริ่ม Resumable upload ไม่สำเร็จ ${response.status}: ${text}`);
+  const location=response.headers.get('Location');
+  if(!location)throw Error('Supabase ไม่ส่งตำแหน่ง Resumable upload กลับมา');
+  return new URL(location,endpoint).href;
+}
+async function readTusOffset(c,uploadUrl){
+  const response=await request(
+    'ตรวจตำแหน่งอัปโหลด JSON',
+    uploadUrl,
+    {method:'HEAD',headers:tusHeaders(c)},
+    20000,
+  );
+  if(response.status===404||response.status===410)return null;
+  if(!response.ok)throw Error(`ตรวจ Resumable upload ไม่สำเร็จ ${response.status}`);
+  const offset=Number(response.headers.get('Upload-Offset'));
+  if(!Number.isFinite(offset)||offset<0)throw Error('Supabase ส่งตำแหน่งอัปโหลดไม่ถูกต้อง');
+  return offset;
+}
+function patchTusChunk(c,uploadUrl,chunk,offset,total,startedAt,onProgress){
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();
+    let settled=false;
+    const finish=(callback,value)=>{
+      if(settled)return;
+      settled=true;
+      callback(value);
+    };
+    const failure=(text,retryable=true)=>{
+      const error=Error(text);
+      error.uploadUncertain=true;
+      error.retryable=retryable;
+      return error;
+    };
+    xhr.open('PATCH',uploadUrl,true);
+    xhr.timeout=TUS_CHUNK_TIMEOUT_MS;
+    xhr.setRequestHeader('apikey',c.k);
+    xhr.setRequestHeader('authorization','Bearer '+c.k);
+    xhr.setRequestHeader('Tus-Resumable','1.0.0');
+    xhr.setRequestHeader('Upload-Offset',String(offset));
+    xhr.setRequestHeader('Content-Type','application/offset+octet-stream');
+    xhr.upload.onprogress=event=>{
+      const sent=Math.min(chunk.size,event.loaded||0);
+      onProgress({
+        loaded:Math.min(total,offset+sent),
+        total,
+        elapsedMs:Date.now()-startedAt,
+        stalled:false,
+      });
+    };
+    xhr.onload=()=>{
+      const nextOffset=Number(xhr.getResponseHeader('Upload-Offset'));
+      if(xhr.status>=200&&xhr.status<300&&Number.isFinite(nextOffset)&&nextOffset>offset){
+        onProgress({loaded:Math.min(total,nextOffset),total,elapsedMs:Date.now()-startedAt,stalled:false});
+        finish(resolve,nextOffset);
+        return;
+      }
+      const retryable=xhr.status===409||xhr.status===423||xhr.status===429||xhr.status>=500;
+      finish(reject,failure(`ส่ง JSON ต่อไม่สำเร็จ ${xhr.status}: ${xhr.responseText||'TUS PATCH failed'}`,retryable));
+    };
+    xhr.onerror=()=>finish(reject,failure('เครือข่ายสะดุดระหว่างส่ง JSON กำลังเตรียมส่งต่อ'));
+    xhr.ontimeout=()=>finish(reject,failure('การส่ง JSON หนึ่งส่วนใช้เวลานานเกินไป กำลังเตรียมส่งต่อ'));
+    xhr.onabort=()=>finish(reject,failure('การส่ง JSON ถูกยกเลิก',false));
+    xhr.send(chunk);
+  });
+}
+async function patchTusChunkWithRetry(c,uploadUrl,body,offset,startedAt,onProgress){
+  let lastError=Error('ส่ง JSON ไม่สำเร็จ');
+  for(let attempt=0;attempt<TUS_RETRY_DELAYS.length;attempt++){
+    const delayMs=TUS_RETRY_DELAYS[attempt];
+    if(delayMs){
+      onProgress({loaded:offset,total:body.size,elapsedMs:Date.now()-startedAt,stalled:true});
+      await wait(delayMs);
+    }
+    const chunk=body.slice(offset,Math.min(body.size,offset+TUS_CHUNK_BYTES),JSON_MIME);
+    try{
+      return await patchTusChunk(c,uploadUrl,chunk,offset,body.size,startedAt,onProgress);
+    }catch(error){
+      lastError=error;
+      try{
+        const remoteOffset=await readTusOffset(c,uploadUrl);
+        if(remoteOffset===body.size)return remoteOffset;
+        if(remoteOffset!==null&&remoteOffset>offset)return remoteOffset;
+      }catch{}
+      if(error?.retryable===false)throw error;
+    }
+  }
+  const error=Error('เครือข่ายยังไม่พร้อมหลังลองส่งต่ออัตโนมัติครบแล้ว: '+T(lastError?.message||lastError));
+  error.uploadUncertain=true;
+  throw error;
+}
+async function uploadJsonResumable(c,path,body,type,onProgress=()=>{}){
+  const startedAt=Date.now();
+  const uploadUrl=await createTusUpload(c,path,body,type);
+  let offset=0;
+  onProgress({loaded:0,total:body.size,elapsedMs:0,stalled:false});
+  while(offset<body.size){
+    const nextOffset=await patchTusChunkWithRetry(c,uploadUrl,body,offset,startedAt,onProgress);
+    if(!Number.isFinite(nextOffset)||nextOffset<=offset||nextOffset>body.size){
+      const error=Error('ตำแหน่ง Resumable upload ไม่ถูกต้อง');
+      error.stateUnknown=true;
+      throw error;
+    }
+    offset=nextOffset;
+    await nextTask();
+  }
+  for(const delayMs of [0,500,1500,3000]){
+    if(delayMs)await wait(delayMs);
+    try{
+      if(await verifyUploadedObject(c,path,body.size))return'resumable-upload-complete';
+    }catch{}
+  }
+  const error=Error('ส่ง JSON ครบแล้ว แต่ยังยืนยันไฟล์ใน Storage ไม่ได้ กรุณาอย่าอัปโหลดซ้ำ');
+  error.stateUnknown=true;
+  throw error;
+}
+
 async function verifyUploadedObject(c,path,expectedSize){
   const response=await request(
     'ตรวจไฟล์ JSON หลังการเชื่อมต่อขาด',
@@ -421,7 +586,12 @@ async function verifyUploadedObject(c,path,expectedSize){
   return actualSize===N(expectedSize)&&actualSize>0;
 }
 async function uploadJsonWithVerification(c,path,body,type,timeoutMs=UPLOAD_TIMEOUT_MS,onProgress=()=>{}){
-  try{return await uploadJson(c,path,body,type,timeoutMs,onProgress)}
+  const useResumable=body.size>RESUMABLE_THRESHOLD_BYTES;
+  try{
+    return await (useResumable
+      ?uploadJsonResumable(c,path,body,type,onProgress)
+      :uploadJson(c,path,body,type,timeoutMs,onProgress));
+  }
   catch(originalError){
     if(!originalError?.uploadUncertain)throw originalError;
     stat(80,'การเชื่อมต่อขาด กำลังตรวจว่า JSON ขึ้น Storage แล้วหรือยัง');
@@ -593,7 +763,10 @@ async function run(){
     });
     await nextTask();
 
-    stat(62,`เตรียมอัปโหลด JSON ${(payload.size/1024/1024).toFixed(1)} MB (ไม่เก็บ Excel ต้นฉบับ)`);
+    const uploadMode=payload.size>RESUMABLE_THRESHOLD_BYTES
+      ?'แบ่งส่งทีละ 6 MB พร้อมส่งต่ออัตโนมัติเมื่อเน็ตสะดุด'
+      :'อัปโหลดแบบปกติ';
+    stat(62,`เตรียมอัปโหลด JSON ${(payload.size/1024/1024).toFixed(1)} MB · ${uploadMode} (ไม่เก็บ Excel ต้นฉบับ)`);
     await uploadJsonWithVerification(c,dataPath,payload,JSON_MIME,UPLOAD_TIMEOUT_MS,progress=>{
       const ratio=Math.max(0,Math.min(1,N(progress.loaded)/Math.max(1,N(progress.total))));
       stat(62+Math.round(ratio*18),formatUploadProgress(progress.loaded,progress.total,progress.elapsedMs,progress.stalled));
@@ -666,7 +839,7 @@ function ui(){
   }
 }
 
-window.AdminDoitUploadCore={buildPayloadBlob,streamPivotRecords,formatUploadProgress,verifyUploadedObject};
+window.AdminDoitUploadCore={buildPayloadBlob,streamPivotRecords,formatUploadProgress,verifyUploadedObject,directResumableEndpoint};
 window.addEventListener?.('beforeunload',event=>{
   if(!busy)return;
   event.preventDefault();
