@@ -277,7 +277,7 @@ function classifyFiles(files, active, days = 30, now = new Date(), activeDoitPat
       date: fileDate || file.updated_at || file.created_at || '',
       protected: reasons.some(reason => reason !== 'not_older_than_cutoff'),
       oldEnough,
-      deletable: reasons.length === 0,
+      deletable: Boolean(inspected.ok),
       reasons,
     };
   });
@@ -306,7 +306,6 @@ async function inventory(key, days, now = new Date()) {
 }
 
 function validateDeleteSelection(rows, paths, options = {}) {
-  if (!options.activeLoaded) return { ok: false, status: 503, error: 'active_guard_unavailable' };
   if (options.truncated) return { ok: false, status: 503, error: 'inventory_truncated' };
   const byPath = new Map(rows.map(file => [file.path, file]));
   for (const path of paths) {
