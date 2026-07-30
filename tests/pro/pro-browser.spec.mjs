@@ -2107,7 +2107,15 @@ test("shows a multipart Cloud error and restores the load button", async ({
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
+    if (message.type() !== "error") return;
+    const text = message.text();
+    if (
+      text.includes("Failed to load resource") &&
+      text.includes("500 (Internal Server Error)")
+    ) {
+      return;
+    }
+    errors.push(text);
   });
 
   const active = {
