@@ -417,3 +417,104 @@ test("keeps the active Pro flow, state, mobile layout and print contract", async
   expect(["auto", "scroll"]).toContain(layout.tableOverflow);
   expect(runtime.errors).toEqual([]);
 });
+
+
+test("loads legacy-compatible multipart Cloud data through the Pro UI", async ({
+  page,
+}) => {
+  const errors = [];
+  const partRequests = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+
+  const active = {
+    id: "cloud-version",
+    file_name: "cloud-multipart.xlsx",
+    row_count: 3,
+    store_count: 3,
+    ps_count: 1,
+    telesale_bill_count: 0,
+  };
+  const rows = [
+    { date: "2026-07-30", ps: "PS1", store: "S1", sku: "SKU-1", qty: 1 },
+    { date: "2026-07-30", ps: "PS1", store: "S2", sku: "SKU-2", qty: 2 },
+    { date: "2026-07-30", ps: "PS1", store: "S3", sku: "SKU-3", qty: 3 },
+  ];
+
+  await page.route("https://parts.example/**", async (route) => {
+    const partIndex = route.request().url().endsWith("part-1.json") ? 1 : 2;
+    partRequests.push(partIndex);
+    const partRows = partIndex === 1 ? rows.slice(0, 2) : rows.slice(2);
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        schema: "doit-json-part-v1",
+        version_id: active.id,
+        part_index: partIndex - 1,
+        row_start: partIndex === 1 ? 0 : 2,
+        rows: partRows,
+      }),
+    });
+  });
+  await page.route("https://saodmeoilixfdqentofp.supabase.co/**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.includes("/doit-active")) {
+      const mode = url.searchParams.get("mode");
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(
+          mode === "data"
+            ? {
+                active,
+                mode: "json_parts",
+                schema: "doit-json-manifest-v1",
+                payload_schema: "doit-json-v1",
+                data_schema_version: 4,
+                version_id: active.id,
+                row_count: 3,
+                part_count: 2,
+                parts: [
+                  {
+                    part_index: 0,
+                    row_start: 0,
+                    row_count: 2,
+                    url: "https://parts.example/part-1.json",
+                  },
+                  {
+                    part_index: 1,
+                    row_start: 2,
+                    row_count: 1,
+                    url: "https://parts.example/part-2.json",
+                  },
+                ],
+              }
+            : { active, mode: "json_url" },
+        ),
+      });
+      return;
+    }
+    if (url.pathname.includes("/dev-qr") && url.searchParams.get("action") === "config") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ enabled: false }),
+      });
+      return;
+    }
+    await route.fulfill({ contentType: "image/png", body: transparentPng });
+  });
+
+  await page.goto("/pro.html?t=1028");
+  await page.locator("#devTeamModal .devClose").click();
+  await expect(page.locator("#cloudState")).toHaveText("พร้อม");
+  await page.locator("#cloudLoadBtn").click();
+
+  await expect(page.locator("#msg")).toContainText("โหลดสำเร็จ 3 แถว");
+  await expect(page.locator("#cloudMsg")).toContainText("โหลด Cloud สำเร็จ 3 แถว");
+  await expect(page.locator("#fileLabel")).toHaveText("cloud-multipart.xlsx");
+  await expect(page.locator("#cloudLoadBtn")).toBeEnabled();
+  await expect(page.locator("#cloudLoadBtn")).toHaveText("โหลดไฟล์ล่าสุดจาก Cloud");
+  expect(partRequests).toEqual([1, 2]);
+  expect(errors).toEqual([]);
+});

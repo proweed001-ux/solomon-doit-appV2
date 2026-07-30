@@ -3,8 +3,6 @@ import crypto from 'node:crypto';
 const SUPABASE_URL = 'https://saodmeoilixfdqentofp.supabase.co';
 const PROJECT_REF = 'saodmeoilixfdqentofp';
 const BUCKET = 'doit-files';
-const LIST_PREFIXES = ['performance', 'doit', 'uploads', 'raw', 'parsed', 'team'];
-const DELETE_PREFIXES = new Set(['performance', 'doit', 'uploads', 'raw', 'parsed']);
 const SYSTEM_PATHS = new Set([
   'performance/active.json',
   'performance/index.json',
@@ -14,7 +12,7 @@ const SYSTEM_PATHS = new Set([
 const SYSTEM_BASENAMES = new Set(['active.json', 'index.json', 'current.min.json', 'history-index.json']);
 const MAX_DELETE = 20;
 const PAGE_SIZE = 1000;
-const MAX_DEPTH = 6;
+const MAX_DEPTH = 10;
 const MAX_OBJECTS = 20000;
 const PASSWORD_HASH = '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918';
 const ALLOWED_IDS = new Set(['AYAADS01', 'AYAPS062']);
@@ -110,13 +108,17 @@ function inspectPath(value) {
   }
   if (decoded.startsWith('/') || decoded.includes('\\') || decoded.includes('\0')) return { ok: false, reason: 'invalid_path' };
   const segments = decoded.split('/');
-  if (segments.length < 2 || segments.some(segment => !segment || segment === '.' || segment === '..')) {
+  if (segments.some(segment => !segment || segment === '.' || segment === '..')) {
     return { ok: false, reason: 'path_traversal' };
   }
   if (decoded !== original) return { ok: false, reason: 'encoded_path_not_allowed' };
   const prefix = segments[0].toLowerCase();
-  if (!LIST_PREFIXES.includes(prefix)) return { ok: false, reason: 'folder_not_allowed' };
-  return { ok: true, path: decoded, prefix, deleteFolderAllowed: DELETE_PREFIXES.has(prefix) };
+  return { ok: true, path: decoded, prefix, deleteFolderAllowed: true };
+}
+
+function validFolderPath(value) {
+  const folder = text(value);
+  return Boolean(folder) && inspectPath(folder + '/__folder__').ok;
 }
 
 function dateFrom(value) {
@@ -160,12 +162,13 @@ async function listFolder(key, prefix, depth, output, visited) {
     for (const item of rows) {
       const name = text(item?.name);
       if (!name) continue;
-      const path = name.startsWith(`${prefix}/`) ? name : `${prefix}/${name}`;
-      const inspected = inspectPath(path);
-      if (!inspected.ok) continue;
+      const path = prefix ? (name.startsWith(prefix + '/') ? name : prefix + '/' + name) : name;
       if (isFolderEntry(item)) {
-        await listFolder(key, inspected.path, depth + 1, output, visited);
+        if (!validFolderPath(path)) continue;
+        await listFolder(key, path, depth + 1, output, visited);
       } else {
+        const inspected = inspectPath(path);
+        if (!inspected.ok) continue;
         output.push({
           path: inspected.path,
           size: Number(item?.metadata?.size || item?.size || 0) || 0,
@@ -179,13 +182,54 @@ async function listFolder(key, prefix, depth, output, visited) {
   }
 }
 
-async function readActive(key) {
-  const response = await storageRequest(key, `/storage/v1/object/${BUCKET}/performance/active.json`);
-  if (!response.ok) return null;
+async function readPerformanceActive(key) {
+  const response = await storageRequest(key, '/storage/v1/object/' + BUCKET + '/performance/active.json');
+  if (response.status === 404 || response.status === 400) return { loaded: true, value: null };
+  if (!response.ok) return { loaded: false, value: null };
   try {
-    return await response.json();
+    return { loaded: true, value: await response.json() };
   } catch {
-    return null;
+    return { loaded: false, value: null };
+  }
+}
+
+async function readDoitActive(key) {
+  const query = '/rest/v1/doit_versions?select=id,storage_path,data_path&is_active=eq.true&order=uploaded_at.desc&limit=1';
+  const response = await storageRequest(key, query, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) return { loaded: false, value: null };
+  try {
+    const rows = await response.json();
+    return { loaded: true, value: Array.isArray(rows) ? (rows[0] || null) : null };
+  } catch {
+    return { loaded: false, value: null };
+  }
+}
+
+async function collectDoitActivePaths(key, active, files) {
+  const paths = new Set();
+  for (const value of [active?.storage_path, active?.data_path]) {
+    const inspected = inspectPath(value);
+    if (inspected.ok) paths.add(inspected.path);
+  }
+  const dataPath = text(active?.data_path);
+  if (!dataPath) return { loaded: true, paths };
+  const metadata = files.find(file => file.path === dataPath);
+  if (!metadata || Number(metadata.size || 0) > 512 * 1024) return { loaded: true, paths };
+  const response = await storageRequest(key, '/storage/v1/object/' + BUCKET + '/' + storagePath(dataPath));
+  if (!response.ok) return { loaded: false, paths };
+  try {
+    const manifest = await response.json();
+    if (Array.isArray(manifest?.parts)) {
+      for (const part of manifest.parts) {
+        const inspected = inspectPath(part?.path);
+        if (inspected.ok) paths.add(inspected.path);
+      }
+    }
+    return { loaded: true, paths };
+  } catch {
+    return { loaded: false, paths };
   }
 }
 
@@ -212,16 +256,9 @@ function collectActivePaths(active) {
   return paths;
 }
 
-function classifyFiles(files, active, days = 30, now = new Date()) {
+function classifyFiles(files, active, days = 30, now = new Date(), activeDoitPaths = new Set()) {
   const activePaths = collectActivePaths(active);
-  const doitDates = [...new Set(files
-    .filter(file => /^(doit|uploads|raw|parsed)\//i.test(file.path))
-    .map(dateOf)
-    .filter(Boolean))]
-    .sort((a, b) => b.localeCompare(a))
-    .slice(0, 2);
-  const protectedDoitDates = new Set(doitDates);
-  const currentMonth = now.toISOString().slice(0, 7);
+  for (const path of activeDoitPaths || []) activePaths.add(path);
   const cutoffMs = now.getTime() - Math.max(1, Math.min(3650, Number(days) || 30)) * 86400000;
 
   return files.map(file => {
@@ -232,19 +269,15 @@ function classifyFiles(files, active, days = 30, now = new Date()) {
     const timestamp = Date.parse(file.updated_at || file.created_at || fileDate || '');
     const oldEnough = Number.isFinite(timestamp) && timestamp < cutoffMs;
     if (!inspected.ok) reasons.push(inspected.reason);
-    if (inspected.ok && !inspected.deleteFolderAllowed) reasons.push('folder_locked');
     if (SYSTEM_PATHS.has(file.path) || SYSTEM_BASENAMES.has(basename)) reasons.push('system_file');
     if (/(^|[-_.])(current|latest|previous|prev)([-_.]|$)/i.test(basename)) reasons.push('reserved_current_path');
     if (activePaths.has(file.path)) reasons.push('active_reference');
-    if (/^(doit|uploads|raw|parsed)\//i.test(file.path) && protectedDoitDates.has(fileDate)) reasons.push('latest_two_doit_dates');
-    if (/^performance\//i.test(file.path) && fileDate.slice(0, 7) === currentMonth) reasons.push('current_performance_month');
-    if (!oldEnough) reasons.push('not_older_than_cutoff');
     return {
       ...file,
       date: fileDate || file.updated_at || file.created_at || '',
       protected: reasons.some(reason => reason !== 'not_older_than_cutoff'),
       oldEnough,
-      deletable: reasons.length === 0,
+      deletable: Boolean(inspected.ok),
       reasons,
     };
   });
@@ -253,20 +286,26 @@ function classifyFiles(files, active, days = 30, now = new Date()) {
 async function inventory(key, days, now = new Date()) {
   const files = [];
   const visited = new Set();
-  const activePromise = readActive(key);
-  for (const prefix of LIST_PREFIXES) await listFolder(key, prefix, 0, files, visited);
-  const active = await activePromise;
-  const rows = classifyFiles(files, active, days, now).sort((a, b) => String(b.updated_at || b.path).localeCompare(String(a.updated_at || a.path)));
+  const performancePromise = readPerformanceActive(key);
+  const doitPromise = readDoitActive(key);
+  await listFolder(key, '', 0, files, visited);
+  const [performance, doit] = await Promise.all([performancePromise, doitPromise]);
+  const doitPaths = doit.loaded
+    ? await collectDoitActivePaths(key, doit.value, files)
+    : { loaded: false, paths: new Set() };
+  const rows = classifyFiles(files, performance.value, days, now, doitPaths.paths)
+    .sort((a, b) => String(b.updated_at || b.path).localeCompare(String(a.updated_at || a.path)));
   return {
     rows,
-    activeLoaded: Boolean(active),
+    activeLoaded: performance.loaded && doit.loaded && doitPaths.loaded,
+    performanceGuardLoaded: performance.loaded,
+    doitGuardLoaded: doit.loaded && doitPaths.loaded,
     truncated: files.length >= MAX_OBJECTS,
     deleteLimit: MAX_DELETE,
   };
 }
 
 function validateDeleteSelection(rows, paths, options = {}) {
-  if (!options.activeLoaded) return { ok: false, status: 503, error: 'active_guard_unavailable' };
   if (options.truncated) return { ok: false, status: 503, error: 'inventory_truncated' };
   const byPath = new Map(rows.map(file => [file.path, file]));
   for (const path of paths) {
@@ -283,8 +322,8 @@ async function deletePaths(key, paths, days) {
   if (uniquePaths.length > MAX_DELETE) return { status: 400, body: { ok: false, error: 'too_many_paths', count: uniquePaths.length, max: MAX_DELETE } };
   for (const path of uniquePaths) {
     const inspected = inspectPath(path);
-    if (!inspected.ok || !inspected.deleteFolderAllowed) {
-      return { status: 400, body: { ok: false, error: 'protected_or_invalid_path', path, reason: inspected.reason || 'folder_locked' } };
+    if (!inspected.ok) {
+      return { status: 400, body: { ok: false, error: 'protected_or_invalid_path', path, reason: inspected.reason } };
     }
   }
 
@@ -343,6 +382,8 @@ export default async function handler(req, res) {
         protectedCount: result.rows.filter(file => file.protected).length,
         deleteLimit: result.deleteLimit,
         activeGuardLoaded: result.activeLoaded,
+        performanceGuardLoaded: result.performanceGuardLoaded,
+        doitGuardLoaded: result.doitGuardLoaded,
         truncated: result.truncated,
         files: result.rows,
       });
@@ -374,8 +415,10 @@ export default async function handler(req, res) {
 export const _test = {
   authenticate,
   collectActivePaths,
+  collectDoitActivePaths,
   classifyFiles,
   inspectPath,
+  validFolderPath,
   parseBasic,
   validateDeleteSelection,
   validAnonKey,

@@ -574,6 +574,16 @@ import { preparePrint } from "./print.js";
   }
   function loadData(p, m = {}) {
     state.rows = arr(p).map(norm);
+    const expectedRows = Number(m.row_count);
+    if (
+      Number.isInteger(expectedRows) &&
+      expectedRows > 0 &&
+      state.rows.length !== expectedRows
+    ) {
+      throw new Error(
+        "จำนวนแถวไม่ครบ: ได้ " + state.rows.length + " จาก " + expectedRows,
+      );
+    }
     state.key = m.id || p?.version_id || m.file_name || "active";
     state.send = {};
     state.add = {};
@@ -627,17 +637,36 @@ import { preparePrint } from "./print.js";
     }
   }
   async function loadCloud() {
+    const button = $("#cloudLoadBtn");
     try {
-      $("#cloudLoadBtn").textContent = "กำลังโหลด...";
+      button.disabled = true;
+      button.textContent = "กำลังโหลด...";
       if (!state.active) await check();
       const p = await publicFetch("data");
-      const data = await resolveCloudPayload(p);
+      const data = await resolveCloudPayload(p, {
+        onProgress(progress) {
+          button.textContent =
+            "กำลังโหลด " + progress.partIndex + "/" + progress.partCount;
+          cloud(
+            "กำลังโหลดส่วน " +
+              progress.partIndex +
+              "/" +
+              progress.partCount +
+              " · " +
+              F(progress.rowsLoaded) +
+              "/" +
+              F(progress.rowCount) +
+              " แถว",
+          );
+        },
+      });
       loadData(data, p.active || state.active);
-      cloud("โหลด JSON/index สำเร็จ");
+      cloud("โหลด Cloud สำเร็จ " + F(state.rows.length) + " แถว");
     } catch (e) {
       cloud("โหลด Cloud ไม่สำเร็จ: " + E(e.message));
     } finally {
-      $("#cloudLoadBtn").textContent = "โหลดไฟล์ล่าสุดจาก Cloud";
+      button.disabled = false;
+      button.textContent = "โหลดไฟล์ล่าสุดจาก Cloud";
     }
   }
   async function loadFile(file) {
