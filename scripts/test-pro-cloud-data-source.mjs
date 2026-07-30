@@ -190,10 +190,12 @@ function testEdgeFunctionContract() {
     "manifest_row_gap",
     "manifest_total_row_count",
     "MAX_MANIFEST_BYTES",
+    ".list(folder",
     "legacyResponse(active",
   ].forEach((token) => {
     assert.ok(source.includes(token), "Edge contract missing: " + token);
   });
+  assert.ok(!source.includes('.schema("storage")'));
 }
 
 try {
