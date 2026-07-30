@@ -255,7 +255,7 @@ assert.ok(uploadSource.includes("STORAGE_PART_MAX_BYTES=5*1024*1024"), "stored J
 assert.ok(uploadSource.includes("doit-json-manifest-v1"), "multi-part uploads must publish a manifest only after all parts");
 assert.ok(uploadSource.includes("payload_schema:'doit-json-v1'"), "the manifest must preserve the existing payload contract");
 assert.ok(uploadSource.includes("part_count:parts.length"), "the manifest must declare the exact number of parts");
-assert.ok(uploadSource.includes("batch.body.size>RESUMABLE_THRESHOLD_BYTES"), "an unexpectedly oversized single row must fail before Storage returns 413");
+assert.ok(uploadSource.includes("body.size>RESUMABLE_THRESHOLD_BYTES"), "an unexpectedly oversized single row must fail before Storage returns 413");
 assert.ok(uploadSource.includes("TUS_RETRY_DELAYS=[0,3000,5000,10000,20000]"), "resumable fallback must retain mobile retry support");
 assert.ok(uploadSource.includes("ไม่พบไฟล์ต้นฉบับในเครื่องแล้ว"), "Android file-provider loss must show an actionable local-file message");
 assert.ok(popupSource.includes("pct.textContent=isError?'ไม่สำเร็จ'"), "terminal errors must not keep displaying a green numeric percentage");
