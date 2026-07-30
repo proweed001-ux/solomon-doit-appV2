@@ -3,6 +3,7 @@
 const MAX_DELETE=20;
 const $=selector=>document.querySelector(selector);
 const selected=new Set();
+const collapsedFolders=new Set();
 let files=[],modalFilter='all',activeGuardLoaded=false;
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const number=value=>Number(value||0)||0;
@@ -56,10 +57,11 @@ function render(){
   rows.forEach(file=>{const folder=folderOf(file.path);if(!groups.has(folder))groups.set(folder,[]);groups.get(folder).push(file)});
   body.innerHTML=[...groups].map(([folder,items])=>{
     const info=folderInfo(folder),total=items.reduce((sum,file)=>sum+number(file.size),0);
-    const header=`<tr class="storageFolderHead"><td colspan="7"><div><b>📁 ${esc(info.title)}</b><span>${items.length.toLocaleString('th-TH')} ไฟล์ · ${size(total)}</span></div><small>${esc(info.note)} · Path: ${esc(folder)}/</small></td></tr>`;
-    const fileRows=items.map(file=>{const status=statusOf(file),can=status.type==='deletable'&&activeGuardLoaded,relative=file.path.split('/').slice(1).join('/');return`<tr class="storageFileRow" data-folder="${esc(folder)}"><td><input class="storagePick" type="checkbox" data-path="${esc(file.path)}" ${selected.has(file.path)?'checked':''} ${can?'':'disabled'}></td><td><b class="${can?'storageCanDelete':'storageProtected'}">${esc(status.label)}</b></td><td><div class="storagePathMain">${esc(relative||file.path)}</div><small class="muted">${esc(file.path)}</small></td><td>${size(file.size)}</td><td>${esc(file.date||file.updated_at||file.created_at||'')}</td><td>${esc((file.reasons||[]).map(reasonLabel).join(', ')||(can?'ไฟล์ข้อมูล ไม่ได้ถูกใช้งาน':'กำลังตรวจ'))}</td><td><div class="row"><button class="btn2 storageDownload" data-path="${esc(file.path)}">ดาวน์โหลด</button>${can?`<button class="btn2 danger storageDeleteOne" data-path="${esc(file.path)}">ลบ</button>`:''}</div></td></tr>`}).join('');
+    const collapsed=collapsedFolders.has(folder),header=`<tr class="storageFolderHead"><td colspan="7"><button type="button" class="storageFolderToggle" data-folder="${esc(folder)}" aria-expanded="${collapsed?'false':'true'}"><span class="storageFolderArrow" aria-hidden="true">${collapsed?'▶':'▼'}</span><span class="storageFolderTitle"><b>📁 ${esc(info.title)}</b><small>${esc(info.note)} · Path: ${esc(folder)}/</small></span><span class="storageFolderStats">${items.length.toLocaleString('th-TH')} ไฟล์ · ${size(total)}<small>${collapsed?'แตะเพื่อขยาย':'แตะเพื่อพับ'}</small></span></button></td></tr>`;
+    const fileRows=collapsed?'':items.map(file=>{const status=statusOf(file),can=status.type==='deletable'&&activeGuardLoaded,relative=file.path.split('/').slice(1).join('/');return`<tr class="storageFileRow" data-folder="${esc(folder)}"><td><input class="storagePick" type="checkbox" data-path="${esc(file.path)}" ${selected.has(file.path)?'checked':''} ${can?'':'disabled'}></td><td><b class="${can?'storageCanDelete':'storageProtected'}">${esc(status.label)}</b></td><td><div class="storagePathMain">${esc(relative||file.path)}</div><small class="muted">${esc(file.path)}</small></td><td>${size(file.size)}</td><td>${esc(file.date||file.updated_at||file.created_at||'')}</td><td>${esc((file.reasons||[]).map(reasonLabel).join(', ')||(can?'ไฟล์ข้อมูล ไม่ได้ถูกใช้งาน':'กำลังตรวจ'))}</td><td><div class="row"><button class="btn2 storageDownload" data-path="${esc(file.path)}">ดาวน์โหลด</button>${can?`<button class="btn2 danger storageDeleteOne" data-path="${esc(file.path)}">ลบ</button>`:''}</div></td></tr>`}).join('');
     return header+fileRows;
   }).join('')||'<tr><td colspan="7" class="muted">ไม่พบไฟล์ตามตัวกรอง</td></tr>';
+  document.querySelectorAll('.storageFolderToggle').forEach(button=>button.onclick=()=>{const folder=button.dataset.folder;if(collapsedFolders.has(folder))collapsedFolders.delete(folder);else collapsedFolders.add(folder);render()});
   document.querySelectorAll('.storagePick').forEach(input=>input.onchange=event=>{
     const path=event.target.dataset.path;
     if(event.target.checked){if(selected.size>=MAX_DELETE){event.target.checked=false;log({ok:false,error:'delete_limit',max:MAX_DELETE,note:'เลือกได้สูงสุด 20 ไฟล์ต่อครั้ง'});return}selected.add(path)}else selected.delete(path);
