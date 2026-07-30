@@ -1335,25 +1335,22 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     await chooseOnly(page, "brands", "Fixture Tele Brand");
     await page.locator(".tabs .tab").first().click();
     await page.locator('[data-pick="brands"]').click();
-    const hiddenFilterOption = page.locator(
-      '.pickItem[data-v="Fixture Tele Brand"]',
-    );
-    await expect(hiddenFilterOption).toContainText(
-      "เลือกอยู่ — ไม่มีในชุดปัจจุบัน",
-    );
-    await page.locator("#pickAll").click();
+    await expect(
+      page.locator('.pickItem[data-v="Fixture Tele Brand"]'),
+    ).toHaveCount(0);
     expect(
       await page.evaluate(() =>
         window.DOIT_CORE_APP.currentState().sel.brands.includes(
           "Fixture Tele Brand",
         ),
       ),
-    ).toBe(true);
+    ).toBe(false);
+    await page.locator("#pickAll").click();
     expect(
       await page.evaluate(() =>
-        document
-          .querySelector('.pickItem[data-v="Fixture Tele Brand"]')
-          .classList.contains("on"),
+        window.DOIT_CORE_APP.currentState().sel.brands.includes(
+          "Fixture Tele Brand",
+        ),
       ),
     ).toBe(false);
     await page.locator("#pickClear").click();
@@ -1363,8 +1360,12 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
     );
     expect(selectedState.sel.brands).toEqual([]);
     expect(selectedState.sel.receivers).toEqual([fixtureMeta.receiver]);
-
     await realBillTab.click();
+    selectedState = await page.evaluate(() =>
+      window.DOIT_CORE_APP.currentState(),
+    );
+    expect(selectedState.sel.brands).toEqual(["Fixture Tele Brand"]);
+
     await page.locator("#q").fill("");
     await page.locator("#searchBtn").click();
     await page.locator('[data-pick="receivers"]').click();
