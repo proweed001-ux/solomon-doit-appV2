@@ -8,7 +8,7 @@ function css(){
   if($('#adminProgressPopupCss'))return;
   const style=document.createElement('style');
   style.id='adminProgressPopupCss';
-  style.textContent=`.adminPopMask{position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.58);backdrop-filter:blur(8px);display:none;place-items:center;padding:18px}.adminPopMask.on{display:grid}.adminPop{width:min(440px,100%);background:#fff;border-radius:22px;border:1px solid #d1fae5;box-shadow:0 28px 100px rgba(2,6,23,.28);padding:20px;color:#111827;text-align:center}.adminPopIcon{width:62px;height:62px;border-radius:20px;margin:0 auto 12px;display:grid;place-items:center;background:linear-gradient(135deg,#087b34,#22c55e);color:#fff;font-weight:950;font-size:28px}.adminPop h3{margin:0;font-size:20px;letter-spacing:-.03em;color:#064e3b}.adminPop p{margin:8px 0 14px;color:#4b5563;line-height:1.45;word-break:break-word}.adminPopHead{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:950;color:#087b34;margin-bottom:7px}.adminPopTrack{height:14px;border-radius:999px;background:#e5e7eb;overflow:hidden;border:1px solid #d1d5db}.adminPopFill{height:100%;width:0;background:linear-gradient(90deg,#087b34,#22c55e);transition:.18s ease}.adminPopNote{margin-top:10px;font-size:12px;color:#6b7280;line-height:1.45}.adminPopClose{width:100%;height:42px;margin-top:14px;border:1px solid #d1d5db;border-radius:10px;background:#fff;color:#374151;font-weight:950}.adminLatestBadge{margin-top:10px;display:inline-block;border-radius:999px;padding:7px 11px;background:#dcfce7;color:#166534;font-size:12px;font-weight:950;border:1px solid #bbf7d0}`;
+  style.textContent=`.adminPopMask{position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.58);backdrop-filter:blur(8px);display:none;place-items:center;padding:18px}.adminPopMask.on{display:grid}.adminPop{width:min(440px,100%);background:#fff;border-radius:22px;border:1px solid #d1fae5;box-shadow:0 28px 100px rgba(2,6,23,.28);padding:20px;color:#111827;text-align:center}.adminPopIcon{width:62px;height:62px;border-radius:20px;margin:0 auto 12px;display:grid;place-items:center;background:linear-gradient(135deg,#087b34,#22c55e);color:#fff;font-weight:950;font-size:28px}.adminPop h3{margin:0;font-size:20px;letter-spacing:-.03em;color:#064e3b}.adminPop p{margin:8px 0 14px;color:#4b5563;line-height:1.45;word-break:break-word}.adminPopHead{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:950;color:#087b34;margin-bottom:7px}.adminPopTrack{height:14px;border-radius:999px;background:#e5e7eb;overflow:hidden;border:1px solid #d1d5db}.adminPopFill{height:100%;width:0;background:linear-gradient(90deg,#087b34,#22c55e);transition:.18s ease}.adminPopFill.error{background:linear-gradient(90deg,#dc2626,#ef4444)}.adminPopNote{margin-top:10px;font-size:12px;color:#6b7280;line-height:1.45}.adminPopClose{width:100%;height:42px;margin-top:14px;border:1px solid #d1d5db;border-radius:10px;background:#fff;color:#374151;font-weight:950}.adminLatestBadge{margin-top:10px;display:inline-block;border-radius:999px;padding:7px 11px;background:#dcfce7;color:#166534;font-size:12px;font-weight:950;border:1px solid #bbf7d0}`;
   document.head.appendChild(style);
 }
 function ensure(){
@@ -42,7 +42,8 @@ function render(message='',forceOpen=false){
   const isSuccess=percent>=100&&/เสร็จ:s*Cloud JSON active|Cloud JSON active/i.test(text+' '+latestCloudMessage);
   if(isError||isSuccess)running=false;
   fill.style.width=percent+'%';
-  pct.textContent=percent+'%';
+  fill.classList.toggle('error',isError);
+  pct.textContent=isError?'ไม่สำเร็จ':percent+'%';
   detail.textContent=text;
   if(isError){
     title.textContent='อัปโหลดหรือแปลงไฟล์ไม่สำเร็จ';
