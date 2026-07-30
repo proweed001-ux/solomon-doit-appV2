@@ -95,6 +95,11 @@ vm.runInThisContext(uploadSource, { filename: uploadPath });
 const core = globalThis.AdminDoitUploadCore;
 assert.equal(typeof core?.buildPayloadBlob, "function");
 assert.equal(typeof core?.streamPivotRecords, "function");
+assert.equal(
+  core.directResumableEndpoint({ u: "https://saodmeoilixfdqentofp.supabase.co" }),
+  "https://saodmeoilixfdqentofp.storage.supabase.co/storage/v1/upload/resumable",
+  "large uploads must use the direct Storage TUS endpoint",
+);
 
 class ChunkStream {
   constructor(chunks) {
@@ -210,8 +215,8 @@ assert.ok(popupSource.includes("percent>=100") && popupSource.includes("Cloud JS
 assert.ok(storageSource.includes("ยังไม่สแกน Storage อัตโนมัติ"), "Storage inventory must be user-triggered to avoid competing with DOIT processing");
 assert.ok(!performanceSource.includes("window.XLSX.read=function"), "Performance must not retain workbooks from unrelated DOIT reads");
 assert.ok(adminHtml.includes("window.__PERF_LAST_WB=wb"), "Performance may retain only the workbook it explicitly loaded");
-assert.ok(adminHtml.includes("admin-json-v265.js?v=335"));
-assert.ok(adminHtml.includes("admin-progress-popup-v1.js?v=2"));
+assert.ok(adminHtml.includes("admin-json-v265.js?v=336"));
+assert.ok(adminHtml.includes("admin-progress-popup-v1.js?v=3"));
 assert.ok(adminHtml.includes("admin-storage-manager-v1.js?v=4"));
 assert.ok(adminHtml.includes("admin-performance-active-v2.js?v=3"));
 
@@ -219,3 +224,15 @@ const progressText = core.formatUploadProgress(5 * 1024 * 1024, 20 * 1024 * 1024
 assert.match(progressText, /5\.00 \/ 20\.0 MB · 25% · 27 วินาที/);
 const stalledText = core.formatUploadProgress(0, 20 * 1024 * 1024, 16_000, true);
 assert.match(stalledText, /ระบบยังรออยู่/);
+
+
+assert.ok(uploadSource.includes("RESUMABLE_THRESHOLD_BYTES=6*1024*1024"), "JSON above 6 MB must use resumable upload");
+assert.ok(uploadSource.includes("TUS_CHUNK_BYTES=6*1024*1024"), "TUS uploads must use 6 MB chunks");
+assert.ok(uploadSource.includes(".storage.supabase.co/storage/v1/upload/resumable"), "large uploads must use the direct Supabase Storage hostname");
+assert.ok(uploadSource.includes("Tus-Resumable") && uploadSource.includes("application/offset+octet-stream"), "TUS create/HEAD/PATCH protocol headers are required");
+assert.ok(uploadSource.includes("TUS_RETRY_DELAYS=[0,3000,5000,10000,20000]"), "mobile network interruptions must retry automatically");
+assert.ok(uploadSource.includes("readTusOffset") && uploadSource.includes("patchTusChunkWithRetry"), "an uncertain chunk must resume from the server-confirmed offset");
+assert.ok(uploadSource.includes("?uploadJsonResumable") && uploadSource.includes(":uploadJson("), "large JSON must use TUS while small JSON keeps standard upload");
+assert.ok(uploadSource.includes("ไม่พบไฟล์ต้นฉบับในเครื่องแล้ว"), "Android file-provider loss must show an actionable local-file message");
+assert.ok(popupSource.includes("pct.textContent=isError?'ไม่สำเร็จ'"), "terminal errors must not keep displaying a green numeric percentage");
+assert.ok(popupSource.includes("adminPopFill.error"), "terminal upload errors must use an error progress color");
