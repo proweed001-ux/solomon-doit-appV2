@@ -6,6 +6,7 @@ const JSON_MIME='application/json;charset=utf-8';
 const CHUNK_ROWS=500;
 const UPLOAD_TIMEOUT_MS=600000;
 const RESUMABLE_THRESHOLD_BYTES=6*1024*1024;
+const STORAGE_PART_MAX_BYTES=5*1024*1024;
 const TUS_CHUNK_BYTES=6*1024*1024;
 const TUS_CHUNK_TIMEOUT_MS=180000;
 const TUS_RETRY_DELAYS=[0,3000,5000,10000,20000];
@@ -358,6 +359,114 @@ async function buildPayloadBlob(metadata,rows,options={}){
   return new Blob(parts,{type:JSON_MIME});
 }
 
+function buildStorageBatch(metadata,rows,start,partIndex,targetBytes=STORAGE_PART_MAX_BYTES){
+  if(!Array.isArray(rows))throw Error('rows ต้องเป็น array');
+  const limit=Math.max(256*1024,N(targetBytes)||STORAGE_PART_MAX_BYTES);
+  const header={
+    schema:'doit-json-part-v1',
+    data_schema_version:metadata.data_schema_version,
+    version_id:metadata.version_id,
+    part_index:partIndex,
+    row_start:start,
+  };
+  const prefix=JSON.stringify(header).slice(0,-1)+',"rows":[';
+  const encoder=new TextEncoder();
+  const rowParts=[];
+  let size=encoder.encode(prefix).byteLength+2;
+  let end=start;
+  while(end<rows.length){
+    const json=JSON.stringify(rows[end]);
+    const separator=end>start?',':'';
+    const bytes=encoder.encode(separator+json).byteLength;
+    if(end>start&&size+bytes>limit)break;
+    rowParts.push(separator,json);
+    size+=bytes;
+    end++;
+  }
+  if(end===start)throw Error('สร้างส่วน JSON ไม่สำเร็จ');
+  const body=new Blob([prefix,...rowParts,']}'],{type:JSON_MIME});
+  if(body.size>RESUMABLE_THRESHOLD_BYTES){
+    throw Error('พบข้อมูลหนึ่งแถวใหญ่เกิน 6 MB จึงไม่สามารถแบ่งไฟล์ให้อยู่ใต้เพดาน Storage ได้');
+  }
+  return{start,end,rowCount:end-start,rowParts,body};
+}
+
+async function uploadPayloadPackage(c,dataPath,metadata,rows,onProgress=()=>{}){
+  const totalRows=rows.length;
+  const uploadedPaths=[];
+  const parts=[];
+  let totalBytes=0;
+  let start=0;
+  let partIndex=0;
+  let batch=buildStorageBatch(metadata,rows,0,0);
+
+  try{
+    if(batch.end===totalRows){
+      const prefix=JSON.stringify(metadata).slice(0,-1)+',"rows":[';
+      const payload=new Blob([prefix,...batch.rowParts,']}'],{type:JSON_MIME});
+      onProgress({ratio:0,text:`เตรียมอัปโหลด JSON ${formatBytes(payload.size)} MB (ไม่เก็บ Excel ต้นฉบับ)`});
+      await uploadJsonWithVerification(c,dataPath,payload,JSON_MIME,UPLOAD_TIMEOUT_MS,progress=>{
+        const ratio=Math.max(0,Math.min(1,N(progress.loaded)/Math.max(1,N(progress.total))));
+        onProgress({ratio,text:formatUploadProgress(progress.loaded,progress.total,progress.elapsedMs,progress.stalled)});
+      });
+      uploadedPaths.push(dataPath);
+      totalBytes=payload.size;
+      for(let index=0;index<totalRows;index++)rows[index]=null;
+      rows.length=0;
+      return{mode:'single',partCount:1,totalBytes,uploadedPaths};
+    }
+
+    while(start<totalRows){
+      if(batch.start!==start)batch=buildStorageBatch(metadata,rows,start,partIndex);
+      const partPath=dataPath.replace(/\.json$/,'')+`/part-${String(partIndex+1).padStart(4,'0')}.json`;
+      const rowSpan=batch.end-batch.start;
+      await uploadJsonWithVerification(c,partPath,batch.body,JSON_MIME,UPLOAD_TIMEOUT_MS,progress=>{
+        const within=Math.max(0,Math.min(1,N(progress.loaded)/Math.max(1,N(progress.total))));
+        const ratio=(batch.start+(rowSpan*within))/Math.max(1,totalRows);
+        onProgress({
+          ratio,
+          text:`กำลังอัปโหลดส่วนที่ ${partIndex+1} · ${formatBytes(progress.loaded)} / ${formatBytes(progress.total)} MB · ${Math.round(within*100)}% · แถว ${F(batch.start+Math.round(rowSpan*within))} / ${F(totalRows)}`,
+        });
+      });
+      uploadedPaths.push(partPath);
+      parts.push({
+        path:partPath,
+        part_index:partIndex,
+        row_start:batch.start,
+        row_count:batch.rowCount,
+        size_bytes:batch.body.size,
+      });
+      totalBytes+=batch.body.size;
+      for(let index=batch.start;index<batch.end;index++)rows[index]=null;
+      start=batch.end;
+      partIndex++;
+      batch=start<totalRows?buildStorageBatch(metadata,rows,start,partIndex):null;
+      await nextTask();
+    }
+    rows.length=0;
+
+    const manifest={
+      ...metadata,
+      schema:'doit-json-manifest-v1',
+      payload_schema:'doit-json-v1',
+      storage_format:'json-parts-v1',
+      row_count:totalRows,
+      part_count:parts.length,
+      parts,
+    };
+    const manifestBody=new Blob([JSON.stringify(manifest)],{type:JSON_MIME});
+    onProgress({ratio:0.98,text:`อัปโหลดครบ ${parts.length} ส่วนแล้ว กำลังบันทึก manifest`});
+    await uploadJsonWithVerification(c,dataPath,manifestBody,JSON_MIME,UPLOAD_TIMEOUT_MS);
+    uploadedPaths.push(dataPath);
+    totalBytes+=manifestBody.size;
+    onProgress({ratio:1,text:`อัปโหลด JSON ครบ ${parts.length} ส่วน และยืนยัน manifest แล้ว`});
+    return{mode:'parts',partCount:parts.length,totalBytes,uploadedPaths};
+  }catch(error){
+    error.uploadedPaths=[...uploadedPaths];
+    throw error;
+  }
+}
+
 async function request(label,url,options={},timeoutMs=30000){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeoutMs);
@@ -691,7 +800,7 @@ async function run(){
   if(busy)return;
   busy=true;
   setBusyState(true);
-  let c=null,id='',dataPath='',metadataInserted=false,dataUploaded=false,activeConfirmed=false,payload=null;
+  let c=null,id='',dataPath='',metadataInserted=false,activeConfirmed=false,uploadResult=null,uploadedPaths=[];
   try{
     const file=$('#file')?.files?.[0];
     if(!file)throw Error('ต้องเลือกไฟล์ก่อน');
@@ -758,20 +867,10 @@ async function run(){
         negative_values:'preserved',
       },
     };
-    payload=await buildPayloadBlob(metadata,rows,{
-      onProgress:(done,total)=>stat(35+Math.round((done/Math.max(1,total))*22),`สร้าง JSON ${F(done)} / ${F(total)} แถว`),
+    uploadResult=await uploadPayloadPackage(c,dataPath,metadata,rows,progress=>{
+      stat(35+Math.round(Math.max(0,Math.min(1,N(progress.ratio)))*45),progress.text);
     });
-    await nextTask();
-
-    const uploadMode=payload.size>RESUMABLE_THRESHOLD_BYTES
-      ?'แบ่งส่งทีละ 6 MB พร้อมส่งต่ออัตโนมัติเมื่อเน็ตสะดุด'
-      :'อัปโหลดแบบปกติ';
-    stat(62,`เตรียมอัปโหลด JSON ${(payload.size/1024/1024).toFixed(1)} MB · ${uploadMode} (ไม่เก็บ Excel ต้นฉบับ)`);
-    await uploadJsonWithVerification(c,dataPath,payload,JSON_MIME,UPLOAD_TIMEOUT_MS,progress=>{
-      const ratio=Math.max(0,Math.min(1,N(progress.loaded)/Math.max(1,N(progress.total))));
-      stat(62+Math.round(ratio*18),formatUploadProgress(progress.loaded,progress.total,progress.elapsedMs,progress.stalled));
-    });
-    dataUploaded=true;
+    uploadedPaths=uploadResult.uploadedPaths;
 
     stat(82,'บันทึก metadata หลัง JSON สำเร็จ');
     await insertMetadata(c,{
@@ -805,7 +904,7 @@ async function run(){
       `สำเร็จ: แปลงและอัปโหลด JSON พร้อมตั้งเป็นข้อมูลล่าสุดแล้ว โดยไม่เก็บ Excel ต้นฉบับ<br>`+
       `แถว ${F(rowCount)} · ร้าน ${F(stores.size)} · PS ${F(people.size)} · Telesale bills ${F(telesaleBills.size)}<br>`+
       `ยอดดิบ ${F(rawAmount)} · ยอดสุทธิ ${F(netAmount)}<br>`+
-      `JSON ${(payload.size/1024/1024).toFixed(1)} MB · สูตรยอดใช้ field แรกที่มีค่า แม้ค่านั้นเป็น 0`,
+      `JSON ${formatBytes(uploadResult.totalBytes)} MB · ${uploadResult.mode==='parts'?`แบ่งเก็บ ${uploadResult.partCount} ส่วน (แต่ละส่วนไม่เกิน 5 MB)`: 'ไฟล์เดียว'} · สูตรยอดใช้ field แรกที่มีค่า แม้ค่านั้นเป็น 0`,
       true,
     );
   }catch(error){
@@ -814,11 +913,14 @@ async function run(){
     failStat('อัปโหลด DOIT ไม่สำเร็จ: '+T(error?.message||error));
     message('อัปโหลด DOIT ไม่สำเร็จ: '+detail);
     if(!stateUnknown&&c&&id&&metadataInserted&&!activeConfirmed)await markFailed(c,id);
-    if(!stateUnknown&&c&&dataPath&&dataUploaded&&!activeConfirmed){
-      await removeObject(c,dataPath).catch(cleanupError=>console.error('[DOIT cleanup]',cleanupError));
+    const cleanupPaths=Array.isArray(error?.uploadedPaths)?error.uploadedPaths:uploadedPaths;
+    if(c&&!activeConfirmed&&cleanupPaths.length){
+      for(const path of [...cleanupPaths].reverse()){
+        await removeObject(c,path).catch(cleanupError=>console.error('[DOIT cleanup]',cleanupError));
+      }
     }
   }finally{
-    payload=null;
+    uploadResult=null;
     busy=false;
     setBusyState(false);
   }
@@ -839,7 +941,7 @@ function ui(){
   }
 }
 
-window.AdminDoitUploadCore={buildPayloadBlob,streamPivotRecords,formatUploadProgress,verifyUploadedObject,directResumableEndpoint};
+window.AdminDoitUploadCore={buildPayloadBlob,buildStorageBatch,streamPivotRecords,formatUploadProgress,verifyUploadedObject,directResumableEndpoint};
 window.addEventListener?.('beforeunload',event=>{
   if(!busy)return;
   event.preventDefault();
