@@ -15,17 +15,16 @@ async function fetchJson(url, label) {
   const response = await fetch(url, {
     headers: { Accept: "application/json" },
   });
-  const text = await response.text();
-
   if (!response.ok) {
+    const errorText = await response.text();
     throw new Error(
       label + " โหลดไม่สำเร็จ (HTTP " + response.status + ")" +
-        (text ? ": " + text.slice(0, 180) : ""),
+        (errorText ? ": " + errorText.slice(0, 180) : ""),
     );
   }
 
   try {
-    return JSON.parse(text);
+    return await response.json();
   } catch {
     throw new Error(label + " ไม่ใช่ JSON ที่สมบูรณ์");
   }
