@@ -163,14 +163,14 @@ Deno.serve(async (req: Request) => {
     let nextRowStart = 0;
     const paths = parts.map((rawPart: unknown, index: number) => {
       const part = (rawPart || {}) as Record<string, unknown>;
-      const partIndex = integer(part.part_index, "part_index");
+      const partIndex = integer(part.part_index, "part_index", true);
       const rowStart = integer(part.row_start, "row_start", true);
       const partRows = integer(part.row_count, "part_row_count");
       const path = String(part.path || "");
       const expectedPath =
         prefix + "part-" + String(index + 1).padStart(4, "0") + ".json";
 
-      if (partIndex !== index + 1) throw new Error("manifest_part_order");
+      if (partIndex !== index) throw new Error("manifest_part_order");
       if (rowStart !== nextRowStart) throw new Error("manifest_row_gap");
       if (path !== expectedPath) throw new Error("manifest_part_path");
       nextRowStart += partRows;
