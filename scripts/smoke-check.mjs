@@ -257,7 +257,7 @@ mustContain("dist/assets/admin-json-v265.js", "source_file:{name:file.name,size:
 mustNotContain("dist/assets/admin-json-v265.js", "อัปโหลด Excel ต้นฉบับ");
 mustNotContain("dist/assets/admin-json-v265.js", "xPath");
 mustContain("dist/admin.html", "/assets/admin-upload-v001.js?v=301");
-mustContain("dist/admin.html", "/assets/admin-json-v265.js?v=334");
+mustContain("dist/admin.html", "/assets/admin-json-v265.js?v=335");
 mustContain("dist/assets/admin-json-v265.js", "old.disabled=true");
 mustContain(
   "dist/assets/admin-upload-v001.js",
@@ -269,6 +269,12 @@ mustContain("dist/assets/admin-json-v265.js", "internalStream('string')");
 mustContain("dist/assets/admin-json-v265.js", "CHUNK_ROWS=500");
 mustNotContain("dist/assets/admin-progress-popup-v1.js", "btn.click()");
 mustNotContain("dist/assets/admin-progress-popup-v1.js", "lastAutoActive");
+mustNotContain("dist/assets/admin-progress-popup-v1.js", "file.addEventListener('change'");
+mustContain("dist/assets/admin-progress-popup-v1.js", "adminPopClose");
+mustContain("dist/assets/admin-json-v265.js", "xhr.upload.onprogress");
+mustContain("dist/assets/admin-json-v265.js", "verifyUploadedObject");
+mustContain("dist/assets/admin-storage-manager-v1.js", "ยังไม่สแกน Storage อัตโนมัติ");
+mustNotContain("dist/assets/admin-performance-active-v2.js", "window.XLSX.read=function");
 
 // Performance dashboard and active metadata guardrails.
 mustContain("dist/performance.html", "/assets/performance-board-v4.js");
@@ -367,7 +373,7 @@ mustContain("dist/assets/performance-cd-adapter-v1.js", "function isCd123Name(t)
 mustContain("dist/assets/performance-cd-adapter-v1.js", "const CD_KEYS=['dc1','dc2','dc3','cd13','cd123']");
 mustContain("dist/assets/performance-board-v4.js", "cd123:'CD1+2+3'");
 mustNotContain("dist/assets/performance-board-v4.js", "cd13:'CD1+CD3'");
-mustContain("dist/admin.html", "admin-performance-active-v2.js?v=2");
+mustContain("dist/admin.html", "admin-performance-active-v2.js?v=3");
 mustContain("dist/performance-reveal.html", "function compareMetricRows");
 mustContain("dist/performance-reveal.html", "function compareRaceRows");
 mustNotContain("dist/performance-reveal.html", "{rank:1,name:");
