@@ -1,24 +1,54 @@
 import { B, E, F, N } from "./utils.js";
 
-export function renderOrderMode(groups, simpleTable) {
+function orderTotals(groups) {
   let qty = 0;
   let raw = 0;
   let net = 0;
   let vat = 0;
-  const body = groups
+  groups.forEach((group) => {
+    const lineVat = (N(group.netAmt) || N(group.rawAmt)) * 1.07;
+    qty += N(F(group.qty));
+    raw += N(B(group.rawAmt));
+    net += N(B(group.netAmt));
+    vat += N(B(lineVat));
+  });
+  return { qty, raw, net, vat };
+}
+
+export function buildOrderPrintPayload(groups) {
+  const totals = orderTotals(groups);
+  return {
+    heads: ["สินค้า", "จำนวนรวม", "สุทธิ+7%"],
+    rows: groups.map((group) => [
+      group.sku,
+      F(group.qty),
+      B((N(group.netAmt) || N(group.rawAmt)) * 1.07),
+    ]),
+    total: totals.vat,
+  };
+}
+
+export function renderOrderMode(groups, simpleTable, options = {}) {
+  const requestedSize = Math.floor(N(options.pageSize));
+  const pageSize = requestedSize > 0 ? requestedSize : Math.max(1, groups.length);
+  const pageCount = Math.max(1, Math.ceil(groups.length / pageSize));
+  const currentPage = Math.min(
+    pageCount,
+    Math.max(1, Math.floor(N(options.page)) || 1),
+  );
+  const offset = (currentPage - 1) * pageSize;
+  const visibleGroups = groups.slice(offset, offset + pageSize);
+  const totals = orderTotals(groups);
+  const body = visibleGroups
     .map((group, index) => {
       const lineVat = (N(group.netAmt) || N(group.rawAmt)) * 1.07;
       const code =
         group.code && group.code !== group.sku
           ? "<small>" + E(group.code) + "</small>"
           : "";
-      qty += N(F(group.qty));
-      raw += N(B(group.rawAmt));
-      net += N(B(group.netAmt));
-      vat += N(B(lineVat));
       return (
         "<tr><td>" +
-        (index + 1) +
+        (offset + index + 1) +
         '</td><td class="p" data-print-value="' +
         E(group.sku) +
         '"><b>' +
@@ -39,17 +69,24 @@ export function renderOrderMode(groups, simpleTable) {
     .join("");
   const total =
     '<tr class="totalRow nativeOrderTotal"><td colspan="2" class="r">รวมทั้งหมด</td><td>' +
-    F(qty) +
+    F(totals.qty) +
     "</td><td>" +
-    B(raw) +
+    B(totals.raw) +
     "</td><td>" +
-    B(net) +
+    B(totals.net) +
     "</td><td>" +
-    B(vat) +
+    B(totals.vat) +
     "</td></tr>";
   simpleTable(
     "รวม order PS + Telesale " + F(groups.length) + " รายการ",
     ["#", "สินค้า", "จำนวนรวม", "ยอดดิบ", "ยอดสุทธิ", "รวม VAT"],
     body + total,
   );
+  return {
+    currentPage,
+    pageCount,
+    pageSize,
+    totalGroups: groups.length,
+    visibleGroups: visibleGroups.length,
+  };
 }

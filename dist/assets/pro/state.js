@@ -13,6 +13,46 @@ export const createSelection = () => ({
   types: [],
 });
 
+const FILTER_SELECTION_KEYS = [
+  "dates",
+  "ps",
+  "orderStores",
+  "brands",
+  "types",
+];
+
+export const createFilterContext = () => ({
+  dates: [],
+  ps: [],
+  orderStores: [],
+  brands: [],
+  types: [],
+  q: "",
+});
+
+export const createFilterContexts = () => ({
+  pro: null,
+  ship: null,
+});
+
+function mergeFilterContext(saved) {
+  if (!saved || typeof saved !== "object") return null;
+  const merged = createFilterContext();
+  FILTER_SELECTION_KEYS.forEach((key) => {
+    merged[key] = Array.isArray(saved[key]) ? [...saved[key]] : [];
+  });
+  merged.q = T(saved.q);
+  return merged;
+}
+
+function mergeFilterContexts(saved) {
+  const source = saved && typeof saved === "object" ? saved : {};
+  return {
+    pro: mergeFilterContext(source.pro),
+    ship: mergeFilterContext(source.ship),
+  };
+}
+
 export function mergeSelection(saved) {
   const defaults = createSelection();
   const source = saved && typeof saved === "object" ? saved : {};
@@ -39,6 +79,7 @@ export const state = {
   remainView: "all",
   telePage: 1,
   sel: createSelection(),
+  filterContexts: createFilterContexts(),
   send: {},
   add: {},
   pull: {},
@@ -47,9 +88,53 @@ export const state = {
   redoStack: [],
 };
 
+export function filterContextKey(mode = state.mode) {
+  return mode === "ship" ? "ship" : "pro";
+}
+
+export function captureFilterContext() {
+  const context = createFilterContext();
+  FILTER_SELECTION_KEYS.forEach((key) => {
+    context[key] = [...(state.sel[key] || [])];
+  });
+  context.q = T(state.q);
+  return context;
+}
+
+export function applyFilterContext(context) {
+  const merged = mergeFilterContext(context);
+  if (!merged) return false;
+  FILTER_SELECTION_KEYS.forEach((key) => {
+    state.sel[key] = [...merged[key]];
+  });
+  state.q = merged.q;
+  return true;
+}
+
+export function syncCurrentFilterContext() {
+  state.filterContexts = mergeFilterContexts(state.filterContexts);
+  const key = filterContextKey();
+  state.filterContexts[key] = captureFilterContext();
+  return state.filterContexts[key];
+}
+
+export function switchFilterContext(nextMode) {
+  const currentKey = filterContextKey();
+  const nextKey = filterContextKey(nextMode);
+  const current = syncCurrentFilterContext();
+  if (currentKey === nextKey) return false;
+  if (!state.filterContexts[nextKey]) {
+    state.filterContexts[nextKey] = mergeFilterContext(current);
+  }
+  applyFilterContext(state.filterContexts[nextKey]);
+  return true;
+}
+
 export function snap() {
+  syncCurrentFilterContext();
   return JSON.stringify({
     sel: state.sel,
+    filterContexts: state.filterContexts,
     q: state.q,
     send: state.send,
     add: state.add,
@@ -139,6 +224,10 @@ export function restore(snapshot) {
     state.page = saved.page || 1;
     state.pageSize = saved.pageSize || 80;
     state.mode = saved.mode || "pick";
+    state.filterContexts = mergeFilterContexts(saved.filterContexts);
+    if (!applyFilterContext(state.filterContexts[filterContextKey()])) {
+      syncCurrentFilterContext();
+    }
     state.showDetails = Boolean(saved.showDetails);
     state.remainView = saved.remainView || state.remainView || "all";
     return true;
@@ -152,10 +241,12 @@ export function sk() {
 }
 
 export function save() {
+  syncCurrentFilterContext();
   localStorage.setItem(
     sk(),
     JSON.stringify({
       sel: state.sel,
+      filterContexts: state.filterContexts,
       q: state.q,
       send: state.send,
       add: state.add,
@@ -179,6 +270,10 @@ export function loadState() {
     state.pull = saved.pull || {};
     state.ins = saved.ins || [];
     state.mode = saved.mode || state.mode;
+    state.filterContexts = mergeFilterContexts(saved.filterContexts);
+    if (!applyFilterContext(state.filterContexts[filterContextKey()])) {
+      syncCurrentFilterContext();
+    }
     state.pageSize = saved.pageSize || state.pageSize;
     state.showDetails = Boolean(saved.showDetails);
     state.remainView = saved.remainView || state.remainView || "all";

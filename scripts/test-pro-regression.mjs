@@ -13,7 +13,10 @@ import {
   teleRows,
 } from "../dist/assets/pro/filters.js";
 import { norm } from "../dist/assets/pro/parser-adapter.js";
-import { renderOrderMode } from "../dist/assets/pro/order.js";
+import {
+  buildOrderPrintPayload,
+  renderOrderMode,
+} from "../dist/assets/pro/order.js";
 import {
   browserFixtureRows,
   fixtureMeta,
@@ -51,6 +54,7 @@ import {
 } from "../dist/assets/pro/real-bills.js";
 import {
   createSelection,
+  createFilterContexts,
   HISTORY_MAX_BYTES,
   historyStats,
   loadState,
@@ -64,6 +68,7 @@ import {
   snap,
   state,
   sumMap,
+  switchFilterContext,
   trimHistory,
 } from "../dist/assets/pro/state.js";
 
@@ -293,6 +298,45 @@ assert.match(
   renderedOrderBody,
   new RegExp(`<small>${fixtureMeta.numericProductCode}</small>`),
   "Combined Order screen must keep the separate numeric product code visible",
+);
+let pagedOrderBody = "";
+const pagedOrder = renderOrderMode(
+  orderGroups,
+  (_title, _heads, body) => {
+    pagedOrderBody = body;
+  },
+  { page: 2, pageSize: 12 },
+);
+assert.deepEqual(
+  {
+    currentPage: pagedOrder.currentPage,
+    pageCount: pagedOrder.pageCount,
+    visibleGroups: pagedOrder.visibleGroups,
+  },
+  { currentPage: 2, pageCount: 4, visibleGroups: 12 },
+  "Combined Order must render only the requested page",
+);
+assert.equal(
+  (pagedOrderBody.match(/<tr>/g) || []).length,
+  12,
+  "Combined Order page must not render off-page product rows",
+);
+assert.match(
+  pagedOrderBody,
+  /<tr><td>13<\/td>/,
+  "Combined Order numbering must continue across pages",
+);
+const orderPrintPayload = buildOrderPrintPayload(orderGroups);
+assert.equal(
+  orderPrintPayload.rows.length,
+  orderGroups.length,
+  "Combined Order print must retain every group even when the screen is paginated",
+);
+assert.ok(
+  orderPrintPayload.rows.some(
+    (row) => row[0] === "สินค้า Telesale 001",
+  ),
+  "Combined Order print payload must retain off-page Telesale products",
 );
 
 state.sel.dates = [fixtureMeta.date];
@@ -1492,6 +1536,7 @@ globalThis.localStorage = {
   clear: () => memory.clear(),
 };
 state.key = "legacy-state";
+state.filterContexts = createFilterContexts();
 assert.equal(
   restore(
     JSON.stringify({
@@ -1513,6 +1558,41 @@ state.sel = createSelection();
 loadState();
 assert.deepEqual(state.sel.billStores, ["ร้าน TS"], "Autosave/reload must retain billStores");
 assert.equal(sk(), "doit-core-unified-v1:legacy-state");
+
+state.mode = "pick";
+state.sel = createSelection();
+state.sel.receivers = ["ร้าน Pro"];
+state.sel.brands = ["Brand Pro"];
+state.q = "ค้นหา Pro";
+state.filterContexts = createFilterContexts();
+switchFilterContext("ship");
+state.mode = "ship";
+state.sel.billStores = ["ร้านบิลจริง"];
+state.sel.brands = ["Brand Ship"];
+state.q = "ค้นหาบิลจริง";
+switchFilterContext("pick");
+state.mode = "pick";
+assert.equal(state.q, "ค้นหา Pro");
+assert.deepEqual(state.sel.brands, ["Brand Pro"]);
+assert.deepEqual(state.sel.receivers, ["ร้าน Pro"]);
+assert.deepEqual(
+  state.sel.billStores,
+  ["ร้านบิลจริง"],
+  "Switching filter contexts must preserve the other mode's store selection",
+);
+save();
+state.sel = createSelection();
+state.filterContexts = createFilterContexts();
+state.q = "";
+loadState();
+assert.equal(state.mode, "pick");
+assert.equal(state.q, "ค้นหา Pro");
+assert.deepEqual(state.sel.brands, ["Brand Pro"]);
+switchFilterContext("ship");
+state.mode = "ship";
+assert.equal(state.q, "ค้นหาบิลจริง");
+assert.deepEqual(state.sel.brands, ["Brand Ship"]);
+assert.deepEqual(state.sel.billStores, ["ร้านบิลจริง"]);
 
 state.hist = [];
 state.redoStack = [];

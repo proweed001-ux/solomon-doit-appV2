@@ -993,6 +993,90 @@ test("combines PS and Telesale in the real Combined Order tab for XLSX and XLSM"
   expect(runtime.errors).toEqual([]);
 });
 
+test("paginates Combined Order while printing every filtered product", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+  await page.evaluate(async () => {
+    const stateModule = await import("/assets/pro/state.js");
+    stateModule.state.pageSize = 10;
+    stateModule.state.page = 1;
+  });
+  await openOrderMode(page);
+  const productRows = page.locator(
+    "#table tbody tr:not(.nativeOrderTotal)",
+  );
+  await expect(productRows).toHaveCount(10);
+  await expect(page.locator("#pager")).toContainText("1/5");
+  const firstPageProduct = await productRows
+    .first()
+    .locator("[data-print-value]")
+    .getAttribute("data-print-value");
+
+  await page.locator('#pager [data-p="2"]').click();
+  await expect(page.locator("#pager")).toContainText("2/5");
+  await expect(productRows).toHaveCount(10);
+  expect(
+    await productRows
+      .first()
+      .locator("[data-print-value]")
+      .getAttribute("data-print-value"),
+  ).not.toBe(firstPageProduct);
+
+  await page.locator("#prepPrint").click();
+  const overlay = page.locator(".printOverlay.orderPrint");
+  await expect(overlay).toBeVisible();
+  await expect(
+    overlay.locator(".receiptTable tbody tr:not(.totalRow)"),
+  ).toHaveCount(fixtureMeta.orderGroups);
+  await expect(overlay).toContainText("สินค้า Telesale 001");
+  await expect(overlay).toContainText(fixtureMeta.numericProductName);
+  await overlay.locator("[data-print-close]").click();
+  expect(runtime.errors).toEqual([]);
+});
+
+test("restores Pro filters and quantities after Real Bill search", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+  await chooseOnly(page, "receivers", fixtureMeta.receiver);
+  await chooseOnly(page, "brands", "Fixture Brand");
+  const firstSend = page
+    .locator('#table input.jdata[data-map="send"]')
+    .first();
+  await firstSend.fill("1");
+  await firstSend.press("Tab");
+  const originalAmount = await page.locator("#amount").textContent();
+  const originalCount = await page.locator("#tableCount").textContent();
+
+  await page.locator(".tabs .tab").nth(2).click();
+  await page.locator("#clearFilter").click();
+  await page.locator("#q").fill(fixtureMeta.realTsStore);
+  await page.locator("#searchBtn").click();
+  await expect(page.locator("#realBills .realBill")).toHaveCount(2);
+
+  await page.locator(".tabs .tab").first().click();
+  await expect(page.locator("#q")).toHaveValue("");
+  await expect(page.locator('[data-pick="brands"]')).toContainText(
+    "Fixture Brand",
+  );
+  await expect(page.locator('[data-pick="receivers"]')).toContainText(
+    fixtureMeta.receiver,
+  );
+  await expect(page.locator("#tableCount")).toHaveText(originalCount);
+  await expect(page.locator("#amount")).toHaveText(originalAmount);
+  await expect(
+    page.locator('#table input.jdata[data-map="send"]').first(),
+  ).toHaveValue("1");
+
+  await page.locator(".tabs .tab").nth(2).click();
+  await expect(page.locator("#q")).toHaveValue(fixtureMeta.realTsStore);
+  await expect(page.locator("#realBills .realBill")).toHaveCount(2);
+  expect(runtime.errors).toEqual([]);
+});
+
 test("shows and prints real PS and Telesale bills without changing send-to-store state", async ({
   page,
 }) => {

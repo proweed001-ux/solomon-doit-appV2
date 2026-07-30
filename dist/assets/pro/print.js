@@ -469,6 +469,7 @@ export function preparePrint({
   title,
   realBills = [],
   realBillPrint = null,
+  orderPrint = null,
 }) {
   if (mode === "pick") {
     const bills = buildBills();
@@ -518,8 +519,14 @@ export function preparePrint({
       stats,
     };
   }
-  let heads = tableHeadsFromDom();
-  let rows = tableRowsFromDom();
+  let heads =
+    mode === "order" && Array.isArray(orderPrint?.heads)
+      ? [...orderPrint.heads]
+      : tableHeadsFromDom();
+  let rows =
+    mode === "order" && Array.isArray(orderPrint?.rows)
+      ? orderPrint.rows.map((row) => [...row])
+      : tableRowsFromDom();
   if (!rows.length) {
     alert("ไม่มีข้อมูลสำหรับปริ้นในหน้า " + title);
     return { ok: false, reason: "empty-table" };
@@ -528,10 +535,14 @@ export function preparePrint({
   let finalTitle = title;
   let printClass = "";
   if (mode === "order") {
-    const order = orderPrintShape(heads, rows);
-    heads = order.heads;
-    rows = order.rows;
-    total = order.total;
+    if (orderPrint && Array.isArray(orderPrint.rows)) {
+      total = orderPrint.total;
+    } else {
+      const order = orderPrintShape(heads, rows);
+      heads = order.heads;
+      rows = order.rows;
+      total = order.total;
+    }
     finalTitle = "รวมออเดอร์";
     printClass = "orderPrint";
   }

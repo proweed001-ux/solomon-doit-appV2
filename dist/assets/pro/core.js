@@ -3,7 +3,7 @@ import {
   commitPendingQuantityEdit,
   pendingQuantityEdit,
 } from "./send-store.js";
-import { renderOrderMode } from "./order.js";
+import { buildOrderPrintPayload, renderOrderMode } from "./order.js";
 import { renderDoneMode } from "./done.js";
 import {
   buildTelesaleBills,
@@ -24,6 +24,7 @@ import {
 } from "./utils.js";
 import {
   createSelection,
+  createFilterContexts,
   state,
   snap,
   push,
@@ -39,6 +40,7 @@ import {
   historyStats,
   trimHistory,
   restoreHistoryCheckpoint,
+  switchFilterContext,
 } from "./state.js";
 import { norm, arr, parseDoitFile } from "./parser-adapter.js";
 import {
@@ -76,6 +78,7 @@ import { preparePrint } from "./print.js";
   };
   let realBillPickerSession = null;
   let realBillPickerToken = 0;
+  let currentOrderGroups = [];
   const realBillUiMetrics = {
     pickerOptionsCalls: 0,
     pickerListRenders: 0,
@@ -263,6 +266,8 @@ import { preparePrint } from "./print.js";
     }
     const heading = $("#modeHeading");
     if (heading) heading.textContent = modeName();
+    const search = $("#q");
+    if (search && search.value !== state.q) search.value = state.q;
   }
   function openPick(requestedKind) {
     commitPendingQuantityEdit({ render: false, reason: "open-picker" });
@@ -821,7 +826,13 @@ import { preparePrint } from "./print.js";
             okQ(row),
         ),
       );
-      renderOrderMode(grouped, simpleTable);
+      currentOrderGroups = grouped;
+      const orderPage = renderOrderMode(grouped, simpleTable, {
+        page: state.page,
+        pageSize: state.pageSize,
+      });
+      state.page = orderPage.currentPage;
+      pager(grouped.length);
       return;
     }
     if (state.mode === "dist") {
@@ -1092,6 +1103,7 @@ import { preparePrint } from "./print.js";
     state.pull = {};
     state.ins = [];
     state.sel = createSelection();
+    state.filterContexts = createFilterContexts();
     state.q = "";
     state.page = 1;
     state.mode = "pick";
@@ -1348,7 +1360,14 @@ import { preparePrint } from "./print.js";
       });
       closePick();
       push();
+      const preservedReceivers = [...state.sel.receivers];
+      const preservedBillStores = [...state.sel.billStores];
       state.sel = createSelection();
+      if (state.mode === "ship") {
+        state.sel.receivers = preservedReceivers;
+      } else {
+        state.sel.billStores = preservedBillStores;
+      }
       state.q = "";
       state.page = 1;
       realBillPage = 1;
@@ -1387,6 +1406,10 @@ import { preparePrint } from "./print.js";
         realBillPrint:
           state.mode === "ship"
             ? realBillSelector.printPayload(realBillResult)
+            : undefined,
+        orderPrint:
+          state.mode === "order"
+            ? buildOrderPrintPayload(currentOrderGroups)
             : undefined,
       });
     };
@@ -1429,8 +1452,10 @@ import { preparePrint } from "./print.js";
           });
           closePick();
           push();
-          state.mode =
+          const nextMode =
             ["pick", "dist", "ship", "done", "raw", "order"][i] || "pick";
+          switchFilterContext(nextMode);
+          state.mode = nextMode;
           state.page = 1;
           if (state.mode === "ship") realBillPage = 1;
           render(startedAt);
