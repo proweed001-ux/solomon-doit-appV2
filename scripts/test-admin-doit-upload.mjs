@@ -47,15 +47,16 @@ assert.ok(
   "the browser upload flow must not create raw DOIT storage paths",
 );
 assert.ok(
-  uploadSource.includes("removeObject(c,dataPath)"),
-  "a failed publish must clean up an uploaded JSON object",
+  uploadSource.includes("for(const path of [...cleanupPaths].reverse())") &&
+    uploadSource.includes("removeObject(c,path)"),
+  "a failed publish must clean up every confirmed JSON part",
 );
 
-const jsonUpload = uploadSource.indexOf("await uploadJsonWithVerification(c,dataPath,payload,JSON_MIME,UPLOAD_TIMEOUT_MS");
+const jsonUpload = uploadSource.indexOf("uploadResult=await uploadPayloadPackage(c,dataPath,metadata,rows");
 const metadataInsert = uploadSource.indexOf("await insertMetadata(c,{");
 const activate = uploadSource.indexOf("await setActiveRpc(c,id)");
-assert.ok(jsonUpload >= 0, "JSON upload step is missing");
-assert.ok(metadataInsert > jsonUpload, "metadata must be inserted only after JSON upload");
+assert.ok(jsonUpload >= 0, "JSON package upload step is missing");
+assert.ok(metadataInsert > jsonUpload, "metadata must be inserted only after every part and manifest upload");
 assert.ok(activate > metadataInsert, "the version must become active only after metadata insert");
 
 assert.ok(
@@ -94,6 +95,7 @@ vm.runInThisContext(uploadSource, { filename: uploadPath });
 
 const core = globalThis.AdminDoitUploadCore;
 assert.equal(typeof core?.buildPayloadBlob, "function");
+assert.equal(typeof core?.buildStorageBatch, "function");
 assert.equal(typeof core?.streamPivotRecords, "function");
 assert.equal(
   core.directResumableEndpoint({ u: "https://saodmeoilixfdqentofp.supabase.co" }),
@@ -168,6 +170,29 @@ const metadata = {
   source_file: { name: "fixture.xlsx", size: 123, stored: false },
 };
 
+
+const storageRows = Array.from({ length: 4_000 }, (_, index) => ({
+  inv: `INV-${index}`,
+  store: `ร้าน-${index % 17}-${"ก".repeat(1_500)}`,
+  qty: index % 11,
+  amt: index * 1.25,
+}));
+const storageBatch = core.buildStorageBatch(
+  { data_schema_version: 4, version_id: "fixture-version" },
+  storageRows,
+  0,
+  0,
+);
+const storagePart = JSON.parse(await storageBatch.body.text());
+assert.equal(storagePart.schema, "doit-json-part-v1");
+assert.equal(storagePart.data_schema_version, 4);
+assert.equal(storagePart.version_id, "fixture-version");
+assert.equal(storagePart.row_start, 0);
+assert.equal(storagePart.rows.length, storageBatch.rowCount);
+assert.ok(storageBatch.end < storageRows.length, "oversized data must be split into multiple objects");
+assert.ok(storageBatch.body.size <= 5 * 1024 * 1024, "each stored object must stay at or below 5 MB");
+assert.deepEqual(storagePart.rows[0], storageRows[0], "part encoding must preserve row values exactly");
+
 const blob = await core.buildPayloadBlob(metadata, rows, {
   chunkSize: 500,
   onProgress(done, total) {
@@ -215,7 +240,7 @@ assert.ok(popupSource.includes("percent>=100") && popupSource.includes("Cloud JS
 assert.ok(storageSource.includes("ยังไม่สแกน Storage อัตโนมัติ"), "Storage inventory must be user-triggered to avoid competing with DOIT processing");
 assert.ok(!performanceSource.includes("window.XLSX.read=function"), "Performance must not retain workbooks from unrelated DOIT reads");
 assert.ok(adminHtml.includes("window.__PERF_LAST_WB=wb"), "Performance may retain only the workbook it explicitly loaded");
-assert.ok(adminHtml.includes("admin-json-v265.js?v=336"));
+assert.ok(adminHtml.includes("admin-json-v265.js?v=337"));
 assert.ok(adminHtml.includes("admin-progress-popup-v1.js?v=3"));
 assert.ok(adminHtml.includes("admin-storage-manager-v1.js?v=4"));
 assert.ok(adminHtml.includes("admin-performance-active-v2.js?v=3"));
@@ -226,13 +251,12 @@ const stalledText = core.formatUploadProgress(0, 20 * 1024 * 1024, 16_000, true)
 assert.match(stalledText, /ระบบยังรออยู่/);
 
 
-assert.ok(uploadSource.includes("RESUMABLE_THRESHOLD_BYTES=6*1024*1024"), "JSON above 6 MB must use resumable upload");
-assert.ok(uploadSource.includes("TUS_CHUNK_BYTES=6*1024*1024"), "TUS uploads must use 6 MB chunks");
-assert.ok(uploadSource.includes(".storage.supabase.co/storage/v1/upload/resumable"), "large uploads must use the direct Supabase Storage hostname");
-assert.ok(uploadSource.includes("Tus-Resumable") && uploadSource.includes("application/offset+octet-stream"), "TUS create/HEAD/PATCH protocol headers are required");
-assert.ok(uploadSource.includes("TUS_RETRY_DELAYS=[0,3000,5000,10000,20000]"), "mobile network interruptions must retry automatically");
-assert.ok(uploadSource.includes("readTusOffset") && uploadSource.includes("patchTusChunkWithRetry"), "an uncertain chunk must resume from the server-confirmed offset");
-assert.ok(uploadSource.includes("?uploadJsonResumable") && uploadSource.includes(":uploadJson("), "large JSON must use TUS while small JSON keeps standard upload");
+assert.ok(uploadSource.includes("STORAGE_PART_MAX_BYTES=5*1024*1024"), "stored JSON parts must stay below the Supabase project file limit");
+assert.ok(uploadSource.includes("doit-json-manifest-v1"), "multi-part uploads must publish a manifest only after all parts");
+assert.ok(uploadSource.includes("payload_schema:'doit-json-v1'"), "the manifest must preserve the existing payload contract");
+assert.ok(uploadSource.includes("part_count:parts.length"), "the manifest must declare the exact number of parts");
+assert.ok(uploadSource.includes("batch.body.size>RESUMABLE_THRESHOLD_BYTES"), "an unexpectedly oversized single row must fail before Storage returns 413");
+assert.ok(uploadSource.includes("TUS_RETRY_DELAYS=[0,3000,5000,10000,20000]"), "resumable fallback must retain mobile retry support");
 assert.ok(uploadSource.includes("ไม่พบไฟล์ต้นฉบับในเครื่องแล้ว"), "Android file-provider loss must show an actionable local-file message");
 assert.ok(popupSource.includes("pct.textContent=isError?'ไม่สำเร็จ'"), "terminal errors must not keep displaying a green numeric percentage");
 assert.ok(popupSource.includes("adminPopFill.error"), "terminal upload errors must use an error progress color");
