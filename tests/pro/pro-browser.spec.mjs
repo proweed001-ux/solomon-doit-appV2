@@ -1989,3 +1989,195 @@ test("keeps the active Pro flow, state, mobile layout and print contract", async
   expect(["auto", "scroll"]).toContain(layout.tableOverflow);
   expect(runtime.errors).toEqual([]);
 });
+
+test("loads v7 multipart Cloud data in order and restores the load button", async ({
+  page,
+}) => {
+  const errors = [];
+  const partRequests = [];
+  let releaseSecondPart;
+  const secondPartGate = new Promise((resolve) => {
+    releaseSecondPart = resolve;
+  });
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+
+  const active = {
+    id: "cloud-version",
+    file_name: "cloud-multipart.xlsx",
+    row_count: 3,
+    store_count: 3,
+    ps_count: 1,
+    telesale_bill_count: 0,
+  };
+  const rows = [
+    { date: "2026-07-30", ps: "PS1", store: "S1", sku: "SKU-1", qty: 1 },
+    { date: "2026-07-30", ps: "PS1", store: "S2", sku: "SKU-2", qty: 2 },
+    { date: "2026-07-30", ps: "PS1", store: "S3", sku: "SKU-3", qty: 3 },
+  ];
+
+  await page.route("https://parts.example/**", async (route) => {
+    const partIndex = route.request().url().endsWith("part-0.json") ? 0 : 1;
+    partRequests.push(partIndex);
+    if (partIndex === 1) await secondPartGate;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        schema: "doit-json-part-v1",
+        version_id: active.id,
+        part_index: partIndex,
+        row_start: partIndex === 0 ? 0 : 2,
+        rows: partIndex === 0 ? rows.slice(0, 2) : rows.slice(2),
+      }),
+    });
+  });
+  await page.route(
+    "https://saodmeoilixfdqentofp.supabase.co/**",
+    async (route) => {
+      expect(route.request().method()).toBe("GET");
+      const url = new URL(route.request().url());
+      if (url.pathname.includes("/doit-active")) {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify(
+            url.searchParams.get("mode") === "data"
+              ? {
+                  active,
+                  mode: "json_parts",
+                  schema: "doit-json-manifest-v1",
+                  payload_schema: "doit-json-v1",
+                  data_schema_version: 4,
+                  version_id: active.id,
+                  row_count: 3,
+                  part_count: 2,
+                  parts: [
+                    {
+                      part_index: 0,
+                      row_start: 0,
+                      row_count: 2,
+                      url: "https://parts.example/part-0.json",
+                    },
+                    {
+                      part_index: 1,
+                      row_start: 2,
+                      row_count: 1,
+                      url: "https://parts.example/part-1.json",
+                    },
+                  ],
+                }
+              : { active },
+          ),
+        });
+        return;
+      }
+      await route.fulfill({ contentType: "image/png", body: transparentPng });
+    },
+  );
+
+  await page.goto("/pro.html?t=1028");
+  await expect(page.locator("#devTeamModal")).toHaveClass(/on/);
+  await page.locator("#devTeamModal .devClose").click();
+  await expect(page.locator("#cloudState")).toHaveText("พร้อม");
+
+  await page.locator("#cloudLoadBtn").click();
+  await expect.poll(() => partRequests.length).toBe(2);
+  await expect(page.locator("#cloudLoadBtn")).toBeDisabled();
+  await expect(page.locator("#cloudLoadBtn")).toHaveText("กำลังโหลด 1/2");
+  await expect(page.locator("#cloudMsg")).toContainText("กำลังโหลดส่วน 1/2");
+
+  releaseSecondPart();
+  await expect(page.locator("#msg")).toContainText("โหลดสำเร็จ 3 แถว");
+  await expect(page.locator("#cloudMsg")).toContainText(
+    "โหลด Cloud สำเร็จ 3 แถว",
+  );
+  await expect(page.locator("#fileLabel")).toHaveText("cloud-multipart.xlsx");
+  await expect(page.locator("#cloudLoadBtn")).toBeEnabled();
+  await expect(page.locator("#cloudLoadBtn")).toHaveText(
+    "โหลดไฟล์ล่าสุดจาก Cloud",
+  );
+  expect(partRequests).toEqual([0, 1]);
+  expect(errors).toEqual([]);
+});
+
+test("shows a multipart Cloud error and restores the load button", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+
+  const active = {
+    id: "cloud-broken",
+    file_name: "cloud-broken.xlsx",
+    row_count: 2,
+    store_count: 2,
+    ps_count: 1,
+    telesale_bill_count: 0,
+  };
+  await page.route("https://parts.example/broken.json", async (route) => {
+    await route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "fixture_part_failure" }),
+    });
+  });
+  await page.route(
+    "https://saodmeoilixfdqentofp.supabase.co/**",
+    async (route) => {
+      expect(route.request().method()).toBe("GET");
+      const url = new URL(route.request().url());
+      if (url.pathname.includes("/doit-active")) {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify(
+            url.searchParams.get("mode") === "data"
+              ? {
+                  active,
+                  mode: "json_parts",
+                  schema: "doit-json-manifest-v1",
+                  payload_schema: "doit-json-v1",
+                  data_schema_version: 4,
+                  version_id: active.id,
+                  row_count: 2,
+                  part_count: 1,
+                  parts: [
+                    {
+                      part_index: 0,
+                      row_start: 0,
+                      row_count: 2,
+                      url: "https://parts.example/broken.json",
+                    },
+                  ],
+                }
+              : { active },
+          ),
+        });
+        return;
+      }
+      await route.fulfill({ contentType: "image/png", body: transparentPng });
+    },
+  );
+
+  await page.goto("/pro.html?t=1028");
+  await expect(page.locator("#devTeamModal")).toHaveClass(/on/);
+  await page.locator("#devTeamModal .devClose").click();
+  await expect(page.locator("#cloudState")).toHaveText("พร้อม");
+  await page.locator("#cloudLoadBtn").click();
+
+  await expect(page.locator("#cloudMsg")).toContainText(
+    "โหลด Cloud ไม่สำเร็จ: JSON ส่วน 1/1 โหลดไม่สำเร็จ (HTTP 500)",
+  );
+  await expect(page.locator("#cloudMsg")).toContainText(
+    "fixture_part_failure",
+  );
+  await expect(page.locator("#cloudLoadBtn")).toBeEnabled();
+  await expect(page.locator("#cloudLoadBtn")).toHaveText(
+    "โหลดไฟล์ล่าสุดจาก Cloud",
+  );
+  await expect(page.locator("#msg")).toHaveText("พร้อมใช้งาน");
+  expect(errors).toEqual([]);
+});

@@ -86,6 +86,8 @@ jobs:
         run: npm run test:pro-scope
       - name: Pro module regression
         run: npm run test:pro-regression
+      - name: Pro Cloud old and multipart data
+        run: npm run test:pro-cloud
       - name: Pro Telesale lazy pagination
         run: npm run test:pro-lazy
       - name: Local XLSX dependency
