@@ -6,6 +6,10 @@ const uploadPath = "dist/assets/admin-json-v265.js";
 const pickerPath = "dist/assets/admin-upload-v001.js";
 const uploadSource = fs.readFileSync(uploadPath, "utf8");
 const pickerSource = fs.readFileSync(pickerPath, "utf8");
+const popupSource = fs.readFileSync("dist/assets/admin-progress-popup-v1.js", "utf8");
+const storageSource = fs.readFileSync("dist/assets/admin-storage-manager-v1.js", "utf8");
+const performanceSource = fs.readFileSync("dist/assets/admin-performance-active-v2.js", "utf8");
+const adminHtml = fs.readFileSync("dist/admin.html", "utf8");
 
 assert.equal(
   (uploadSource.match(/await pivot\(buffer\)/g) || []).length,
@@ -47,7 +51,7 @@ assert.ok(
   "a failed publish must clean up an uploaded JSON object",
 );
 
-const jsonUpload = uploadSource.indexOf("await put(c,dataPath,payload,JSON_MIME,180000)");
+const jsonUpload = uploadSource.indexOf("await uploadJsonWithVerification(c,dataPath,payload,JSON_MIME,UPLOAD_TIMEOUT_MS");
 const metadataInsert = uploadSource.indexOf("await insertMetadata(c,{");
 const activate = uploadSource.indexOf("await setActiveRpc(c,id)");
 assert.ok(jsonUpload >= 0, "JSON upload step is missing");
@@ -189,3 +193,29 @@ assert.ok(uploadSource.includes("AbortController"), "all cloud writes must have 
 assert.ok(uploadSource.includes("insertMetadata(c,{"), "metadata insert must have post-timeout verification");
 assert.ok(uploadSource.includes("stateUnknown"), "unknown cloud state must not trigger destructive cleanup");
 assert.ok(pickerSource.includes("แปลง JSON และอัปโหลด"), "the Admin must expose one clear upload button");
+
+
+assert.ok(uploadSource.includes("new XMLHttpRequest()"), "Storage upload must use XHR for real byte progress");
+assert.ok(uploadSource.includes("xhr.upload.onprogress"), "real upload progress events are required");
+assert.ok(uploadSource.includes("formatUploadProgress"), "upload MB, percent, and elapsed time must be visible");
+assert.ok(uploadSource.includes("verifyUploadedObject"), "uncertain uploads must be verified by Storage object info");
+assert.ok(uploadSource.includes("info?.metadata?.size"), "post-timeout verification must compare the stored byte size");
+assert.ok(uploadSource.includes("beforeunload"), "leaving the page during upload must trigger a browser warning");
+assert.ok(uploadSource.includes("setBusyState(true)") && uploadSource.includes("setBusyState(false)"), "file and upload controls must be locked only while busy");
+assert.ok(!uploadSource.includes("await pivot(buffer).catch(()=>[])"), "Pivot parser failures must not be silently converted to a full-workbook fallback");
+assert.ok(!popupSource.includes("file.addEventListener('change'"), "selecting a file must never open a blocking popup");
+assert.ok(popupSource.includes("adminPopClose"), "the progress popup must always provide a close control");
+assert.ok(!popupSource.includes("/เสร็จ|สำเร็จ|active|ล่าสุด|พร้อมใช้งาน/i"), "the popup must not claim success from broad words before Active is confirmed");
+assert.ok(popupSource.includes("percent>=100") && popupSource.includes("Cloud JSON active"), "popup success requires the confirmed terminal status");
+assert.ok(storageSource.includes("ยังไม่สแกน Storage อัตโนมัติ"), "Storage inventory must be user-triggered to avoid competing with DOIT processing");
+assert.ok(!performanceSource.includes("window.XLSX.read=function"), "Performance must not retain workbooks from unrelated DOIT reads");
+assert.ok(adminHtml.includes("window.__PERF_LAST_WB=wb"), "Performance may retain only the workbook it explicitly loaded");
+assert.ok(adminHtml.includes("admin-json-v265.js?v=335"));
+assert.ok(adminHtml.includes("admin-progress-popup-v1.js?v=2"));
+assert.ok(adminHtml.includes("admin-storage-manager-v1.js?v=4"));
+assert.ok(adminHtml.includes("admin-performance-active-v2.js?v=3"));
+
+const progressText = core.formatUploadProgress(5 * 1024 * 1024, 20 * 1024 * 1024, 27_000, false);
+assert.match(progressText, /5\.00 \/ 20\.0 MB · 25% · 27 วินาที/);
+const stalledText = core.formatUploadProgress(0, 20 * 1024 * 1024, 16_000, true);
+assert.match(stalledText, /ระบบยังรออยู่/);
