@@ -108,7 +108,7 @@ function inspectPath(value) {
   }
   if (decoded.startsWith('/') || decoded.includes('\\') || decoded.includes('\0')) return { ok: false, reason: 'invalid_path' };
   const segments = decoded.split('/');
-  if (segments.length < 2 || segments.some(segment => !segment || segment === '.' || segment === '..')) {
+  if (segments.some(segment => !segment || segment === '.' || segment === '..')) {
     return { ok: false, reason: 'path_traversal' };
   }
   if (decoded !== original) return { ok: false, reason: 'encoded_path_not_allowed' };
