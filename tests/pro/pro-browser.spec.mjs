@@ -452,9 +452,8 @@ test("loads legacy-compatible multipart Cloud data through the Pro UI", async ({
       body: JSON.stringify({
         schema: "doit-json-part-v1",
         version_id: active.id,
-        part_index: partIndex,
+        part_index: partIndex - 1,
         row_start: partIndex === 1 ? 0 : 2,
-        row_count: partRows.length,
         rows: partRows,
       }),
     });
@@ -478,13 +477,13 @@ test("loads legacy-compatible multipart Cloud data through the Pro UI", async ({
                 part_count: 2,
                 parts: [
                   {
-                    part_index: 1,
+                    part_index: 0,
                     row_start: 0,
                     row_count: 2,
                     url: "https://parts.example/part-1.json",
                   },
                   {
-                    part_index: 2,
+                    part_index: 1,
                     row_start: 2,
                     row_count: 1,
                     url: "https://parts.example/part-2.json",
