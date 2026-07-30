@@ -223,6 +223,16 @@ assert.equal(sk(), "doit-core-unified-v1:fixture-active");
 assert.match(appSource, /import "\.\/core\.js";/);
 assert.doesNotMatch(appSource, /pro-native-core\.js/);
 assert.match(coreSource, /currentStateSource: "state-module"/);
+assert.match(
+  coreSource,
+  /switchFilterContext\(nextMode\);\s*state\.mode = nextMode/,
+  "Mode changes must restore the correct Pro or Real Bill filter context",
+);
+assert.match(
+  coreSource,
+  /buildOrderPrintPayload\(currentOrderGroups\)/,
+  "Combined Order print must receive every group instead of the current DOM page",
+);
 assert.doesNotMatch(appSource, /pro-native-core-overrides\.js/);
 assert.doesNotMatch(appSource, /pro-print-(?:store-bills|mode-fixes|column-widths|a4-pro-fix)\.js/);
 
