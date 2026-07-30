@@ -6,6 +6,7 @@ on:
     paths:
       - "src/**"
       - "scripts/**"
+      - "supabase/functions/**"
       - "tests/**"
       - "docs/**"
       - "dist/*.html"
@@ -23,6 +24,7 @@ on:
     paths:
       - "src/**"
       - "scripts/**"
+      - "supabase/functions/**"
       - "tests/**"
       - "docs/**"
       - "dist/*.html"
@@ -80,6 +82,10 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Foundation smoke check
         run: npm run smoke
+      - name: Admin storage deletion and folder guards
+        run: npm run test:admin-storage
+      - name: Admin DOIT one-click upload regression
+        run: npm run test:admin-doit-upload
       - name: Performance CD123 regression
         run: node scripts/test-performance-cd123.mjs
       - name: Pro change-scope guard tests

@@ -163,7 +163,7 @@ assert.ok(!revealSource.includes("{rank:1,name:"), "Reveal must not contain hard
 assert.ok(revealSource.includes("performance-cd-adapter-v1.js?v=5"));
 assert.ok(performanceHtml.includes("performance-cd-adapter-v1.js?v=5"));
 assert.ok(performanceHtml.includes("performance-board-v4.js?v=11"));
-assert.ok(adminHtml.includes("admin-performance-active-v2.js?v=2"));
+assert.ok(adminHtml.includes("admin-performance-active-v2.js?v=3"));
 assert.ok(!fs.existsSync("dist/assets/performance-go-media-v1.js"));
 assert.ok(!revealSource.includes("performance-go-media-v1.js"));
 assert.ok(!revealSource.includes('class="suspense-go-image"'));

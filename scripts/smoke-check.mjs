@@ -62,6 +62,8 @@ const required = [
   "scripts/test-pro-change-scope.mjs",
   "scripts/test-pro-architecture.mjs",
   "scripts/test-pro-module-syntax.mjs",
+  "scripts/test-pro-cloud-data-source.mjs",
+  "supabase/functions/doit-active/index.ts",
   "scripts/fixtures/pro-browser-fixture.mjs",
   "tests/pro/pro-browser.spec.mjs",
   "playwright.pro.config.mjs",
@@ -78,6 +80,7 @@ const pkg = JSON.parse(read("package.json"));
   "verify:react",
   "test:pro-scope",
   "test:pro-regression",
+  "test:pro-cloud",
   "test:pro-lazy",
   "test:local-xlsx",
   "test:qa-doit",
@@ -93,6 +96,7 @@ check(
     "npm run smoke",
     "npm run test:pro-scope",
     "npm run test:pro-regression",
+    "npm run test:pro-cloud",
     "npm run test:pro-lazy",
     "npm run test:local-xlsx",
     "npm run test:qa-doit",
@@ -109,6 +113,7 @@ check(
   "npm ci",
   "npm run smoke",
   "npm run test:pro-regression",
+  "npm run test:pro-cloud",
   "npm run test:pro-lazy",
   "npm run test:local-xlsx",
   "npm run test:qa-doit",
@@ -143,6 +148,9 @@ mustNotContain("dist/assets/pro/app.js", "pro-print-mode-fixes.js");
 mustNotContain("dist/assets/pro/app.js", "pro-print-column-widths.js");
 mustNotContain("dist/assets/pro/app.js", "pro-print-a4-pro-fix.js");
 mustContain("dist/assets/pro/core.js", 'currentStateSource: "state-module"');
+mustContain("dist/assets/pro/data-source.js", 'response?.mode === "json_parts"');
+mustContain("dist/assets/pro/data-source.js", '"doit-json-part-v1"');
+mustContain("supabase/functions/doit-active/index.ts", 'mode: "json_parts"');
 mustNotContain("dist/assets/pro/core.js", "MutationObserver");
 mustNotContain("dist/assets/pro/core.js", "setInterval");
 mustContain("dist/assets/pro/state.js", '"doit-core-unified-v1:" + state.key');
@@ -252,18 +260,29 @@ mustNotContain("dist/assets/admin-json-v265.js", "uploadJsonActive");
 mustContain("dist/assets/admin-json-v265.js", "$('#uploadCloud')");
 mustContain("dist/assets/admin-json-v265.js", "setActiveRpc(c,id)");
 mustContain("dist/assets/admin-json-v265.js", "AbortController");
-mustContain("dist/assets/admin-json-v265.js", "storage_path:jPath");
-mustContain("dist/assets/admin-json-v265.js", "source_file:{name:f.name,size:f.size,stored:false}");
+mustContain("dist/assets/admin-json-v265.js", "storage_path:dataPath");
+mustContain("dist/assets/admin-json-v265.js", "source_file:{name:file.name,size:file.size,stored:false}");
 mustNotContain("dist/assets/admin-json-v265.js", "อัปโหลด Excel ต้นฉบับ");
 mustNotContain("dist/assets/admin-json-v265.js", "xPath");
-mustContain("dist/admin.html", "/assets/admin-json-v265.js?v=333");
+mustContain("dist/admin.html", "/assets/admin-upload-v001.js?v=301");
+mustContain("dist/admin.html", "/assets/admin-json-v265.js?v=337");
 mustContain("dist/assets/admin-json-v265.js", "old.disabled=true");
 mustContain(
   "dist/assets/admin-upload-v001.js",
   "ปุ่มนี้ถูกโอนให้ admin-json-v265.js จัดการแล้ว",
 );
+mustNotContain("dist/assets/admin-upload-v001.js", "FileReader");
+mustNotContain("dist/assets/admin-upload-v001.js", "XLSX.read");
+mustContain("dist/assets/admin-json-v265.js", "internalStream('string')");
+mustContain("dist/assets/admin-json-v265.js", "CHUNK_ROWS=500");
 mustNotContain("dist/assets/admin-progress-popup-v1.js", "btn.click()");
 mustNotContain("dist/assets/admin-progress-popup-v1.js", "lastAutoActive");
+mustNotContain("dist/assets/admin-progress-popup-v1.js", "file.addEventListener('change'");
+mustContain("dist/assets/admin-progress-popup-v1.js", "adminPopClose");
+mustContain("dist/assets/admin-json-v265.js", "xhr.upload.onprogress");
+mustContain("dist/assets/admin-json-v265.js", "verifyUploadedObject");
+mustContain("dist/assets/admin-storage-manager-v1.js", "ยังไม่สแกน Storage อัตโนมัติ");
+mustNotContain("dist/assets/admin-performance-active-v2.js", "window.XLSX.read=function");
 
 // Performance dashboard and active metadata guardrails.
 mustContain("dist/performance.html", "/assets/performance-board-v4.js");
@@ -362,7 +381,7 @@ mustContain("dist/assets/performance-cd-adapter-v1.js", "function isCd123Name(t)
 mustContain("dist/assets/performance-cd-adapter-v1.js", "const CD_KEYS=['dc1','dc2','dc3','cd13','cd123']");
 mustContain("dist/assets/performance-board-v4.js", "cd123:'CD1+2+3'");
 mustNotContain("dist/assets/performance-board-v4.js", "cd13:'CD1+CD3'");
-mustContain("dist/admin.html", "admin-performance-active-v2.js?v=2");
+mustContain("dist/admin.html", "admin-performance-active-v2.js?v=3");
 mustContain("dist/performance-reveal.html", "function compareMetricRows");
 mustContain("dist/performance-reveal.html", "function compareRaceRows");
 mustNotContain("dist/performance-reveal.html", "{rank:1,name:");
@@ -538,7 +557,8 @@ mustNotContain("dist/assets/admin-storage-manager-v1.js", 'method:"DELETE"');
 });
 mustContain("dist/assets/admin-storage-manager-v1.js", "api('delete'");
 mustContain("api/admin-storage.js", "const MAX_DELETE = 20");
-mustContain("api/admin-storage.js", "active_guard_unavailable");
+mustNotContain("api/admin-storage.js", "active_guard_unavailable");
+mustContain("api/admin-storage.js", "deletable: Boolean(inspected.ok)");
 mustContain("api/admin-storage.js", "path_traversal");
 mustContain("api/admin-storage.js", "method: 'DELETE'");
 mustNotContain("api/admin-storage.js", "SUPABASE_SERVICE_ROLE_KEY");

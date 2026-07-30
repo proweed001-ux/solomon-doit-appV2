@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import ts from "typescript";
 import { resolveCloudPayload } from "../dist/assets/pro/data-source.js";
 
 const originalFetch = globalThis.fetch;
@@ -253,6 +255,42 @@ async function testOldBackendManifestFailsClearly() {
   );
 }
 
+function testEdgeFunctionContract() {
+  const source = fs.readFileSync(
+    "supabase/functions/doit-active/index.ts",
+    "utf8",
+  );
+  [
+    'mode: "json_parts"',
+    '"doit-json-manifest-v1"',
+    "createSignedUrls(paths",
+    "manifest_version_mismatch",
+    "manifest_row_gap",
+    "manifest_total_row_count",
+    "MAX_MANIFEST_BYTES",
+    ".list(folder",
+    "legacyResponse(active",
+  ].forEach((token) => {
+    assert.ok(source.includes(token), "Edge contract missing: " + token);
+  });
+  assert.ok(!source.includes('.schema("storage")'));
+  const transpiled = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.ESNext,
+    },
+    reportDiagnostics: true,
+  });
+  const syntaxErrors = (transpiled.diagnostics || []).filter(
+    (diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error,
+  );
+  assert.deepEqual(
+    syntaxErrors.map((diagnostic) => diagnostic.messageText),
+    [],
+    "Edge Function must have valid TypeScript syntax",
+  );
+}
+
 try {
   await testLegacyArray();
   await testLegacyRowsObject();
@@ -269,8 +307,9 @@ try {
   await testPartRowCountMismatchFails();
   await testIncompleteTotalFails();
   await testOldBackendManifestFailsClearly();
+  testEdgeFunctionContract();
   console.log(
-    "Pro Cloud data source passed: legacy Array/{rows}, v7 multipart, zero-based order, progress, and corruption guards.",
+    "Pro Cloud data source passed: legacy Array/{rows}, v7 multipart, zero-based order, progress, corruption guards, and Edge contract.",
   );
 } finally {
   globalThis.fetch = originalFetch;

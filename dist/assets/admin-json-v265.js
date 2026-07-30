@@ -1,34 +1,951 @@
-(()=>{'use strict';
-const URL0='https://saodmeoilixfdqentofp.supabase.co',$=s=>document.querySelector(s),T=v=>String(v??'').trim();
-function N(v){if(v==null)return 0;if(typeof v==='number')return Number.isFinite(v)?v:0;const raw=T(v),neg=/^\(.*\)$/.test(raw),clean=raw.replace(/,/g,'').replace(/[฿$]/g,'').replace(/[()]/g,'').trim();if(!clean||clean==='-'||clean==='—')return 0;const n=Number(clean);return Number.isFinite(n)?(neg?-Math.abs(n):n):0}
-function hasValue(v){if(v==null)return false;const s=T(v);return s!==''&&s!=='-'&&s!=='—'}
+(()=>{
+'use strict';
+const URL0='https://saodmeoilixfdqentofp.supabase.co';
+const BUCKET='doit-files';
+const JSON_MIME='application/json;charset=utf-8';
+const CHUNK_ROWS=500;
+const UPLOAD_TIMEOUT_MS=600000;
+const RESUMABLE_THRESHOLD_BYTES=6*1024*1024;
+const STORAGE_PART_MAX_BYTES=5*1024*1024;
+const TUS_CHUNK_BYTES=6*1024*1024;
+const TUS_CHUNK_TIMEOUT_MS=180000;
+const TUS_RETRY_DELAYS=[0,3000,5000,10000,20000];
+const BUSY_CONTROL_IDS=['uploadCloud','choose','file','clear','testCloud'];
+const $=s=>document.querySelector(s);
+const T=v=>String(v??'').trim();
 let busy=false;
+
+function N(v){
+  if(v==null)return 0;
+  if(typeof v==='number')return Number.isFinite(v)?v:0;
+  const raw=T(v),negative=/^\(.*\)$/.test(raw);
+  const clean=raw.replace(/,/g,'').replace(/[฿$]/g,'').replace(/[()]/g,'').trim();
+  if(!clean||clean==='-'||clean==='—')return 0;
+  const number=Number(clean);
+  return Number.isFinite(number)?(negative?-Math.abs(number):number):0;
+}
+function hasValue(v){if(v==null)return false;const s=T(v);return s!==''&&s!=='-'&&s!=='—'}
 function F(n){return N(n).toLocaleString('th-TH')}
-function cfg(){let c={};try{c=JSON.parse(localStorage.getItem('doit-cloud-cfg')||'{}')}catch{}let u=T($('#sbUrl')?.value||c.url).replace(/\/$/,'')||URL0;let k=T($('#sbKey')?.value||c.key);return{u,k}}
-function H(c,x={}){const h={...x};h['api'+'key']=c.k;h['author'+'ization']='Bearer '+c.k;return h}
-function msg(s,ok=false){const el=$('#cloudStatus');if(el)el.innerHTML=`<div class="${ok?'ok':'muted'}">${s}</div>`;console.log('[ADMIN JSON v266 preserve-zero]',s)}
-function stat(p,s,done=false){const bar=$('#bar'),pct=$('#pct'),status=$('#status');if(bar&&typeof p==='number')bar.style.width=Math.max(0,Math.min(100,p))+'%';if(pct)pct.textContent=done?'100%':'กำลังทำงาน';if(status)status.textContent=s}
-function failStat(s){const pct=$('#pct'),status=$('#status');if(pct)pct.textContent='ผิดพลาด';if(status)status.textContent=s}
+function E(v){return T(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function nextTask(){return new Promise(resolve=>setTimeout(resolve,0))}
+function setBusyState(active){
+  BUSY_CONTROL_IDS.forEach(id=>{const element=$('#'+id);if(element)element.disabled=Boolean(active)});
+  document.body?.classList?.toggle('doit-upload-busy',Boolean(active));
+}
+function stepForPercent(percent){
+  if(percent>=100)return'ready';
+  if(percent>=62)return'upload';
+  if(percent>=35)return'index';
+  if(percent>=12)return'parse';
+  if(percent>5)return'read';
+  return'pick';
+}
+function formatBytes(bytes){
+  const mb=Math.max(0,N(bytes))/1024/1024;
+  return mb>=10?mb.toFixed(1):mb.toFixed(2);
+}
+function formatUploadProgress(loaded,total,elapsedMs,stalled=false){
+  const safeTotal=Math.max(1,N(total));
+  const percent=Math.max(0,Math.min(100,Math.round((N(loaded)/safeTotal)*100)));
+  const seconds=Math.max(0,Math.round(N(elapsedMs)/1000));
+  const heartbeat=stalled?' · เครือข่ายยังไม่ส่งข้อมูลเพิ่ม แต่ระบบยังรออยู่':'';
+  return `กำลังอัปโหลด JSON ${formatBytes(loaded)} / ${formatBytes(total)} MB · ${percent}% · ${seconds} วินาที${heartbeat}`;
+}
+
+function cfg(){
+  let saved={};
+  try{saved=JSON.parse(localStorage.getItem('doit-cloud-cfg')||'{}')}catch{}
+  const url=T($('#sbUrl')?.value||saved.url).replace(/\/$/,'')||URL0;
+  const key=T($('#sbKey')?.value||saved.key||window.__ADMIN_SUPABASE_KEY__);
+  return{u:url,k:key};
+}
+function headers(c,extra={}){
+  return{...extra,apikey:c.k,authorization:'Bearer '+c.k};
+}
+function message(text,ok=false){
+  const el=$('#cloudStatus');
+  const plain=T(text).replace(/<[^>]+>/g,' ');
+  const className=ok?'ok':(/ผิดพลาด|ไม่สำเร็จ|timeout|error/i.test(plain)?'warn':'muted');
+  if(el)el.innerHTML=`<div class="${className}">${text}</div>`;
+  console.log('[ADMIN JSON v269 progress-safe]',plain);
+}
+function stat(percent,text,done=false){
+  const bar=$('#bar'),pct=$('#pct'),status=$('#status');
+  const safePercent=typeof percent==='number'?Math.max(0,Math.min(100,percent)):null;
+  if(bar&&safePercent!==null)bar.style.width=safePercent+'%';
+  if(pct&&safePercent!==null)pct.textContent=(done?100:Math.round(safePercent))+'%';
+  if(status)status.textContent=text;
+  if(safePercent!==null)document.querySelectorAll('.step').forEach(node=>node.classList.toggle('on',node.dataset.s===stepForPercent(safePercent)));
+}
+function failStat(text){
+  const pct=$('#pct'),status=$('#status');
+  if(pct)pct.textContent='ผิดพลาด';
+  if(status)status.textContent=text;
+}
 function norm(s){return T(s).toLowerCase().replace(/[\s_\-./()[\]:]+/g,'')}
-function realTele(tele,ps){tele=T(tele);ps=T(ps);if(!tele)return false;const kt=norm(tele),kp=norm(ps);if(kt&&kp&&(kt===kp||kp.includes(kt)||kt.includes(kp)))return false;return true}
-function col(o,a){const ks=Object.keys(o||{}),m=new Map(ks.map(k=>[norm(k),k]));for(const n of a){const k=m.get(norm(n));if(k)return k}for(const k of ks)for(const n of a)if(norm(k).includes(norm(n))||norm(n).includes(norm(k)))return k;return''}
-function val(o,a,d=''){const k=col(o,a);return k?T(o[k])||d:d}
-function num(o,a){const k=col(o,a);return k?N(o[k]):0}
-function iso(v){if(v==null||v==='')return'';if(typeof v==='number'&&v>30000&&window.XLSX){const d=XLSX.SSF.parse_date_code(v);if(d)return`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`}const s=T(v);if(/^\d{4}-\d{1,2}-\d{1,2}/.test(s)){const p=s.split(/[ T]/)[0].split('-');return`${p[0]}-${p[1].padStart(2,'0')}-${p[2].padStart(2,'0')}`}const m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);if(m){const y=m[3].length===2?'20'+m[3]:m[3];return`${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`}const d=new Date(s);return isNaN(d)?s.slice(0,10):d.toISOString().slice(0,10)}
-const AMT=[['TotInvc',['TotInvc','TotalInvoice','Total Invoice']],['Correct Amount',['Correct Amount','CorrectAmount','LineAmount','Line Amount','LineAmt']],['LineAmtBeforeDisc',['LineAmtBeforeDisc','Line Amount Before Disc']],['detailAmt',['detailAmt','DetailAmt']],['row.amt',['row.amt','row_amt']],['Amt',['Amt','amt']],['Amount',['NetAmount','Net Amount','Amount']],['InvoiceAmt',['InvoiceAmt','Invoice Amount','InvAmt']]];
-function pickAmount(o){for(const [src,a] of AMT){const k=col(o,a);if(!k)continue;if(!hasValue(o[k]))continue;return{amount:N(o[k]),src,k}}return{amount:0,src:'missing',k:''}}
-function row(o,i){const tid=val(o,['TelesaleId','TelesalesID','TeleSaleID','TeleSaleCode']),tn=val(o,['TelesaleName','TelesalesName','TeleSaleName']);const sid=val(o,['SO_SalespersonID','SalespersonID','PS','PS Code']),sn=val(o,['Salesperson_Name','Salesperson Name','SalesName','PSName']);const qty=Math.round(num(o,['ShipQtyPCS','ShipQtyPC','QtyShipPCS','Qty PCS','Qty','Quantity','PCS']));const u0=num(o,['SO_UnitPrice','UnitPrice','Unit Price','Price']);const picked=pickAmount(o);const rawAmt=num(o,['LineAmtBeforeDisc','Line Amount Before Disc','GrossAmount','Gross Amount','RawAmount','Raw Amount'])||picked.amount;const netAmt=picked.amount;const amt=netAmt!==0?netAmt:(picked.src==='missing'?u0*qty:0);const unit=picked.src==='missing'?(u0||(qty&&amt?amt/qty:0)):(qty&&amt?amt/qty:0);const rawUnit=qty&&rawAmt?rawAmt/qty:unit;const netUnit=qty&&netAmt?netAmt/qty:unit;const code=val(o,['SKU_Code','SKUCode','SKU Code','ItemCode','ProductCode']);const sku=val(o,['TAS_THName','SKU_Desc','SKU Desc','ProductName','Product','ItemName','Description'])||code||'ไม่ระบุสินค้า';const ps=[sid,sn].filter(Boolean).join(' ')||[tid,tn].filter(Boolean).join(' ')||'ไม่ระบุ PS';const tele=[tid,tn].filter(Boolean).join(' ');return{date:iso(val(o,['InvcDate','InvoiceDate','ShipDateAct','ShipDate','SO_Date','OrderDate','Date'])),inv:val(o,['InvcNbr','InvoiceNo','BillNo','DocNo','OrderNo','SONo'])||('NO-BILL-'+(i+1)),type:val(o,['SOTypeID','SO Type ID','Type','DocType'],'INVC'),ps,store:val(o,['Customer Name','CustomerName','ShipName','Ship To Name','c_Name','Store','BranchName'])||'ไม่ระบุร้าน',tele,isTele:realTele(tele,ps),code,sku,brand:val(o,['TAS_Brand','Brand','GroupBrand'],'ไม่ระบุแบรนด์'),size:val(o,['TAS_SizeGroup','SizeGroup','Size Group','SKU_Size','Size'],'ไม่ระบุไซซ์'),qty,unit,amt,rawAmt,netAmt,rawUnit,netUnit,amountSource:picked.src,amountField:picked.k}}
-function score(fields,rows){const fs=fields.map(norm),has=a=>a.some(x=>fs.includes(norm(x)));let s=0;[['ShipQtyPCS','QtyPCS'],['TotInvc'],['SOTypeID','Type'],['SalespersonID','SO_SalespersonID','Salesperson_Name'],['Customer Name','CustomerName','ShipName'],['SKU_Code','TAS_THName','SKU_Desc']].forEach(a=>{if(has(a))s+=10});if(has(['TotInvc']))s+=15;else if(has(['Correct Amount','LineAmount','LineAmtBeforeDisc']))s+=10;return s+Math.min(rows.length,2000)/100}
-async function pivot(buf){const zip=await JSZip.loadAsync(buf),defs=Object.keys(zip.files).filter(k=>/^xl\/pivotCache\/pivotCacheDefinition\d+\.xml$/.test(k)).sort(),cands=[];for(const def of defs){const recPath=def.replace('pivotCacheDefinition','pivotCacheRecords'),df=zip.file(def),rf=zip.file(recPath);if(!df||!rf)continue;const doc=new DOMParser().parseFromString(await df.async('string'),'text/xml'),fields=[...doc.getElementsByTagName('cacheField')].map(cf=>{let shared=[],si=[...cf.childNodes].find(n=>n.nodeType===1&&n.localName==='sharedItems');if(si)[...si.childNodes].forEach(ch=>{if(ch.nodeType!==1)return;let v=ch.getAttribute('v')??'';if(ch.localName==='n')v=N(v);if(ch.localName==='d')v=T(v).slice(0,10);if(ch.localName==='m')v='';shared.push(v)});return{name:cf.getAttribute('name')||'',shared}});const xml=await rf.async('string'),out=[];let rr=/<r>([\s\S]*?)<\/r>/g,er=/<(x|n|s|d|b|m)(?:\s+[^>]*?v="([^"]*)")?[^>]*\/>/g,m,rec=0;while((m=rr.exec(xml))){let body=m[1],em,i=0,o={};er.lastIndex=0;while((em=er.exec(body))){const k=fields[i]?.name;if(k){const tag=em[1],v=em[2];o[k]=tag==='x'?(fields[i]?.shared[N(v)]??''):(tag==='n'?N(v):(tag==='m'?'':T(v)))}i++}const r=row(o,rec++);if(r.qty||r.amt||r.sku)out.push(r);if(rec%7000===0)stat(35,'สร้าง JSON '+F(rec)+' แถว')}if(out.length)cands.push({rows:out,score:score(fields.map(f=>f.name),out),def})}return cands.sort((a,b)=>b.score-a.score)[0]?.rows||[]}
-function sheets(buf){const wb=XLSX.read(buf,{type:'array',cellDates:true,raw:false});let best=[];for(const name of wb.SheetNames){const aoa=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:'',raw:false});for(let i=0;i<Math.min(100,aoa.length);i++){const h=(aoa[i]||[]).map(T),sc=h.filter(x=>/sku|qty|pcs|ship|customer|sales|tele|invc|invoice|brand|สินค้า|ร้าน|totinvc/i.test(x)).length;if(sc>=3){const rows=aoa.slice(i+1).map(r=>Object.fromEntries(h.map((k,j)=>[k||('c'+j),r[j]]))).map(row).filter(r=>r.qty||r.amt||r.sku);if(rows.length>best.length)best=rows}}}return best}
-async function request(label,url,opt={},ms=30000){const ac=new AbortController(),timer=setTimeout(()=>ac.abort(),ms);try{return await fetch(url,{...opt,signal:ac.signal,cache:'no-store'})}catch(e){if(e?.name==='AbortError')throw Error(label+' timeout หลัง '+Math.round(ms/1000)+' วินาที');throw e}finally{clearTimeout(timer)}}
-async function put(c,path,blob,type,ms=120000){const r=await request('อัปโหลด JSON',c.u+'/storage/v1/object/doit-files/'+encodeURIComponent(path).replace(/%2F/g,'/'),{method:'POST',headers:H(c,{'Content-Type':type,'x-upsert':'true'}),body:blob},ms);const t=await r.text();if(!r.ok)throw Error('Storage '+r.status+': '+t);return t}
-async function remove(c,path){try{const r=await request('ล้าง JSON ที่อัปโหลดไม่สำเร็จ',c.u+'/storage/v1/object/doit-files/'+encodeURIComponent(path).replace(/%2F/g,'/'),{method:'DELETE',headers:H(c)},20000);return r.ok||r.status===404||r.status===400}catch{return false}}
-async function rest(c,path,opt={},ms=30000,label='Cloud request'){const r=await request(label,c.u+path,{...opt,headers:H(c,opt.headers||{})},ms);const t=await r.text();if(!r.ok)throw Error('API '+r.status+': '+t);try{return JSON.parse(t)}catch{return t}}
-async function markFailed(c,id){try{await rest(c,'/rest/v1/doit_versions?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({status:'failed',data_status:'failed',is_active:false})},20000,'บันทึกสถานะล้มเหลว')}catch{}}
-async function insertMetadata(c,payload){try{return await rest(c,'/rest/v1/doit_versions',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(payload)},30000,'บันทึก metadata')}catch(e){const rows=await rest(c,'/rest/v1/doit_versions?id=eq.'+payload.id+'&select=id',{headers:{Accept:'application/json'}},20000,'ตรวจ metadata').catch(()=>[]);if(Array.isArray(rows)&&rows.some(r=>r.id===payload.id))return rows;throw e}}
-async function setActiveRpc(c,id){try{return await rest(c,'/rest/v1/rpc/set_doit_active_version',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_version_id:id})},30000,'ตั้งเวอร์ชันล่าสุด')}catch(e){const rows=await rest(c,'/rest/v1/doit_versions?id=eq.'+id+'&select=id,is_active,status,data_status',{headers:{Accept:'application/json'}},20000,'ตรวจเวอร์ชันล่าสุด').catch(()=>[]);if(Array.isArray(rows)&&rows.some(r=>r.id===id&&r.is_active===true&&r.data_status==='ready'))return rows;throw e}}
-async function run(){if(busy)return;busy=true;let c=null,id='',jPath='',metadataInserted=false,activationStarted=false;try{const f=$('#file')?.files?.[0];if(!f)throw Error('ต้องเลือกไฟล์ก่อน');c=cfg();if(!c.k)throw Error('ยังไม่ได้ใส่ anon key');localStorage.setItem('doit-cloud-cfg',JSON.stringify({url:c.u,key:c.k}));stat(5,'อ่านไฟล์เพื่อสร้าง JSON');const buf=await f.arrayBuffer();stat(18,'แปลง Excel เป็น JSON/index ตามค่า DOIT จริง');let rows=await pivot(buf).catch(()=>[]);if(!rows.length)rows=sheets(buf);if(!rows.length)throw Error('ไม่พบข้อมูล DOIT');id=crypto.randomUUID();const day=new Date().toISOString().slice(0,10);jPath='parsed/'+day+'/'+id+'.json';const stores=new Set(rows.map(r=>r.store)),ps=new Set(rows.map(r=>r.ps)),tele=new Set(rows.filter(r=>r.isTele).map(r=>[r.inv,r.store,r.tele].join('|'))),qty=rows.reduce((s,r)=>s+N(r.qty),0),amt=rows.reduce((s,r)=>s+N(r.amt),0),rawAmt=rows.reduce((s,r)=>s+N(r.rawAmt),0),netAmt=rows.reduce((s,r)=>s+N(r.netAmt),0),createdAt=new Date().toISOString();const data={schema:'doit-json-v1',data_schema_version:4,version_id:id,created_at:createdAt,source_file:{name:f.name,size:f.size,stored:false},amount_fields:{priority:'first non-empty source: TotInvc > Correct Amount/LineAmount > LineAmtBeforeDisc > detailAmt > row.amt > Amt > Amount > InvoiceAmt',zero_values:'preserved_from_source',negative_values:'preserved'},rows};stat(62,'อัปโหลด JSON/index (ไม่เก็บ Excel ต้นฉบับ)');await put(c,jPath,new Blob([JSON.stringify(data)],{type:'application/json;charset=utf-8'}),'application/json;charset=utf-8',120000);stat(80,'บันทึก metadata');await insertMetadata(c,{id,file_name:f.name,file_size:f.size,storage_path:jPath,data_path:jPath,data_status:'ready',data_schema_version:4,row_count:rows.length,store_count:stores.size,ps_count:ps.size,telesale_bill_count:tele.size,total_qty:qty,total_amount:amt,status:'uploaded',is_active:false,uploaded_at:createdAt});metadataInserted=true;stat(92,'ตั้ง version ใหม่เป็น active');activationStarted=true;await setActiveRpc(c,id);stat(100,'เสร็จ: Cloud JSON active',true);msg('สำเร็จ: อ่าน Excel ในเครื่อง อัปโหลดเฉพาะ JSON และตั้งเป็นไฟล์ล่าสุดแล้ว<br>แถว '+F(rows.length)+' · ร้าน '+F(stores.size)+' · PS '+F(ps.size)+' · Telesale bills '+F(tele.size)+'<br>ยอดดิบ '+F(rawAmt)+' · ยอดสุทธิ '+F(netAmt)+'<br>สูตรยอด: ใช้ field แรกที่มีค่า แม้ค่านั้นเป็น 0',true)}catch(e){failStat('JSON upload error');if(c&&id&&metadataInserted)await markFailed(c,id);if(c&&jPath&&!activationStarted)await remove(c,jPath);msg('JSON upload error: '+(e.message||e))}finally{busy=false}}
-function ui(){const up=$('#uploadCloud');if(up){up.textContent='อัปโหลด JSON + ตั้งล่าสุด';up.onclick=run;up.title='ใช้ค่า DOIT จริง: field แรกที่มีค่า แม้เป็น 0'}const old=$('#setActive');if(old){old.textContent='ตั้งล่าสุดรวมในปุ่มอัปโหลดแล้ว';old.disabled=true;old.title='กันชนกับ JSON upload'}}
+function realTele(tele,ps){
+  tele=T(tele);ps=T(ps);
+  if(!tele)return false;
+  const kt=norm(tele),kp=norm(ps);
+  if(kt&&kp&&(kt===kp||kp.includes(kt)||kt.includes(kp)))return false;
+  return true;
+}
+function col(object,aliases){
+  const keys=Object.keys(object||{}),map=new Map(keys.map(key=>[norm(key),key]));
+  for(const alias of aliases){const key=map.get(norm(alias));if(key)return key}
+  for(const key of keys)for(const alias of aliases){
+    if(norm(key).includes(norm(alias))||norm(alias).includes(norm(key)))return key;
+  }
+  return'';
+}
+function val(object,aliases,fallback=''){const key=col(object,aliases);return key?T(object[key])||fallback:fallback}
+function num(object,aliases){const key=col(object,aliases);return key?N(object[key]):0}
+function iso(v){
+  if(v==null||v==='')return'';
+  if(typeof v==='number'&&v>30000&&window.XLSX){
+    const date=XLSX.SSF.parse_date_code(v);
+    if(date)return`${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`;
+  }
+  const text=T(v);
+  if(/^\d{4}-\d{1,2}-\d{1,2}/.test(text)){
+    const parts=text.split(/[ T]/)[0].split('-');
+    return`${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`;
+  }
+  const match=text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if(match){
+    const year=match[3].length===2?'20'+match[3]:match[3];
+    return`${year}-${match[2].padStart(2,'0')}-${match[1].padStart(2,'0')}`;
+  }
+  const date=new Date(text);
+  return isNaN(date)?text.slice(0,10):date.toISOString().slice(0,10);
+}
+
+const AMT=[
+  ['TotInvc',['TotInvc','TotalInvoice','Total Invoice']],
+  ['Correct Amount',['Correct Amount','CorrectAmount','LineAmount','Line Amount','LineAmt']],
+  ['LineAmtBeforeDisc',['LineAmtBeforeDisc','Line Amount Before Disc']],
+  ['detailAmt',['detailAmt','DetailAmt']],
+  ['row.amt',['row.amt','row_amt']],
+  ['Amt',['Amt','amt']],
+  ['Amount',['NetAmount','Net Amount','Amount']],
+  ['InvoiceAmt',['InvoiceAmt','Invoice Amount','InvAmt']],
+];
+function pickAmount(object){
+  for(const [source,aliases] of AMT){
+    const key=col(object,aliases);
+    if(!key||!hasValue(object[key]))continue;
+    return{amount:N(object[key]),source,key};
+  }
+  return{amount:0,source:'missing',key:''};
+}
+function normalizeRow(object,index){
+  const teleId=val(object,['TelesaleId','TelesalesID','TeleSaleID','TeleSaleCode']);
+  const teleName=val(object,['TelesaleName','TelesalesName','TeleSaleName']);
+  const psId=val(object,['SO_SalespersonID','SalespersonID','PS','PS Code']);
+  const psName=val(object,['Salesperson_Name','Salesperson Name','SalesName','PSName']);
+  const qty=Math.round(num(object,['ShipQtyPCS','ShipQtyPC','QtyShipPCS','Qty PCS','Qty','Quantity','PCS']));
+  const sourceUnit=num(object,['SO_UnitPrice','UnitPrice','Unit Price','Price']);
+  const picked=pickAmount(object);
+  const rawAmount=num(object,['LineAmtBeforeDisc','Line Amount Before Disc','GrossAmount','Gross Amount','RawAmount','Raw Amount'])||picked.amount;
+  const netAmount=picked.amount;
+  const amount=netAmount!==0?netAmount:(picked.source==='missing'?sourceUnit*qty:0);
+  const unit=picked.source==='missing'?(sourceUnit||(qty&&amount?amount/qty:0)):(qty&&amount?amount/qty:0);
+  const rawUnit=qty&&rawAmount?rawAmount/qty:unit;
+  const netUnit=qty&&netAmount?netAmount/qty:unit;
+  const code=val(object,['SKU_Code','SKUCode','SKU Code','ItemCode','ProductCode']);
+  const sku=val(object,['TAS_THName','SKU_Desc','SKU Desc','ProductName','Product','ItemName','Description'])||code||'ไม่ระบุสินค้า';
+  const ps=[psId,psName].filter(Boolean).join(' ')||[teleId,teleName].filter(Boolean).join(' ')||'ไม่ระบุ PS';
+  const tele=[teleId,teleName].filter(Boolean).join(' ');
+  return{
+    date:iso(val(object,['InvcDate','InvoiceDate','ShipDateAct','ShipDate','SO_Date','OrderDate','Date'])),
+    inv:val(object,['InvcNbr','InvoiceNo','BillNo','DocNo','OrderNo','SONo'])||('NO-BILL-'+(index+1)),
+    type:val(object,['SOTypeID','SO Type ID','Type','DocType'],'INVC'),
+    ps,
+    store:val(object,['Customer Name','CustomerName','ShipName','Ship To Name','c_Name','Store','BranchName'])||'ไม่ระบุร้าน',
+    tele,
+    isTele:realTele(tele,ps),
+    code,
+    sku,
+    brand:val(object,['TAS_Brand','Brand','GroupBrand'],'ไม่ระบุแบรนด์'),
+    size:val(object,['TAS_SizeGroup','SizeGroup','Size Group','SKU_Size','Size'],'ไม่ระบุไซซ์'),
+    qty,
+    unit,
+    amt:amount,
+    rawAmt:rawAmount,
+    netAmt:netAmount,
+    rawUnit,
+    netUnit,
+    amountSource:picked.source,
+    amountField:picked.key,
+  };
+}
+function scorePivot(fields,rowCount){
+  const normalized=fields.map(norm),has=aliases=>aliases.some(alias=>normalized.includes(norm(alias)));
+  let score=0;
+  [
+    ['ShipQtyPCS','QtyPCS'],
+    ['TotInvc'],
+    ['SOTypeID','Type'],
+    ['SalespersonID','SO_SalespersonID','Salesperson_Name'],
+    ['Customer Name','CustomerName','ShipName'],
+    ['SKU_Code','TAS_THName','SKU_Desc'],
+  ].forEach(aliases=>{if(has(aliases))score+=10});
+  if(has(['TotInvc']))score+=15;
+  else if(has(['Correct Amount','LineAmount','LineAmtBeforeDisc']))score+=10;
+  return score+Math.min(N(rowCount),2000)/100;
+}
+
+function readCacheFields(documentNode){
+  return[...documentNode.getElementsByTagName('cacheField')].map(field=>{
+    const shared=[];
+    const items=[...field.childNodes].find(node=>node.nodeType===1&&node.localName==='sharedItems');
+    if(items)[...items.childNodes].forEach(child=>{
+      if(child.nodeType!==1)return;
+      let value=child.getAttribute('v')??'';
+      if(child.localName==='n')value=N(value);
+      if(child.localName==='d')value=T(value).slice(0,10);
+      if(child.localName==='m')value='';
+      shared.push(value);
+    });
+    return{name:field.getAttribute('name')||'',shared};
+  });
+}
+
+function readFileBuffer(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onprogress=event=>{
+      if(!event.lengthComputable)return;
+      const percent=5+Math.round((event.loaded/Math.max(1,event.total))*5);
+      stat(percent,`อ่าน Excel ${(event.loaded/1024/1024).toFixed(1)} / ${(event.total/1024/1024).toFixed(1)} MB`);
+    };
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>{
+      const original=reader.error;
+      if(original?.name==='NotFoundError'){
+        reject(Error('ไม่พบไฟล์ต้นฉบับในเครื่องแล้ว กรุณาดาวน์โหลดไฟล์ลงโฟลเดอร์ Download แล้วเลือกใหม่'));
+        return;
+      }
+      reject(original||Error('อ่านไฟล์ Excel ไม่สำเร็จ'));
+    };
+    reader.onabort=()=>reject(Error('การอ่านไฟล์ Excel ถูกยกเลิก'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function normalizePivotRecord(body,fields,recordIndex){
+  const entryPattern=/<(x|n|s|d|b|m)(?:\s+[^>]*?v="([^"]*)")?[^>]*\/>/g;
+  let entryMatch,fieldIndex=0,source={};
+  while((entryMatch=entryPattern.exec(body))){
+    const key=fields[fieldIndex]?.name;
+    if(key){
+      const tag=entryMatch[1],value=entryMatch[2];
+      source[key]=tag==='x'
+        ?(fields[fieldIndex]?.shared[N(value)]??'')
+        :(tag==='n'?N(value):(tag==='m'?'':T(value)));
+    }
+    fieldIndex++;
+  }
+  return normalizeRow(source,recordIndex);
+}
+
+async function streamPivotRecords(recordsFile,fields,rowCount){
+  const rows=[];
+  let carry='',recordIndex=0;
+  const stream=recordsFile.internalStream('string');
+  let processing=Promise.resolve();
+
+  await new Promise((resolve,reject)=>{
+    stream.on('data',chunk=>{
+      stream.pause();
+      processing=processing.then(async()=>{
+        carry+=chunk;
+        let closeIndex=carry.indexOf('</r>');
+        while(closeIndex>=0){
+          const openIndex=carry.indexOf('<r');
+          if(openIndex<0||openIndex>closeIndex){
+            carry=carry.slice(closeIndex+4);
+            closeIndex=carry.indexOf('</r>');
+            continue;
+          }
+          const bodyStart=carry.indexOf('>',openIndex);
+          if(bodyStart<0||bodyStart>closeIndex)break;
+          const body=carry.slice(bodyStart+1,closeIndex);
+          carry=carry.slice(closeIndex+4);
+          const normalized=normalizePivotRecord(body,fields,recordIndex++);
+          if(normalized.qty||normalized.amt||normalized.sku)rows.push(normalized);
+          if(recordIndex%1000===0){
+            const ratio=rowCount?recordIndex/rowCount:Math.min(1,recordIndex/120000);
+            stat(16+Math.min(17,Math.round(ratio*17)),`อ่าน Pivot ${F(recordIndex)}${rowCount?' / '+F(rowCount):''} แถว`);
+            await nextTask();
+          }
+          closeIndex=carry.indexOf('</r>');
+        }
+        stream.resume();
+      }).catch(reject);
+    });
+    stream.on('error',reject);
+    stream.on('end',()=>processing.then(resolve,reject));
+    stream.resume();
+  });
+  return rows;
+}
+
+async function pivot(buffer){
+  const zip=await JSZip.loadAsync(buffer);
+  const definitions=Object.keys(zip.files)
+    .filter(path=>/^xl\/pivotCache\/pivotCacheDefinition\d+\.xml$/.test(path))
+    .sort();
+  let best=null;
+  for(const definitionPath of definitions){
+    const definitionFile=zip.file(definitionPath);
+    const recordsPath=definitionPath.replace('pivotCacheDefinition','pivotCacheRecords');
+    if(!definitionFile||!zip.file(recordsPath))continue;
+    const xml=await definitionFile.async('string');
+    const documentNode=new DOMParser().parseFromString(xml,'text/xml');
+    const fields=readCacheFields(documentNode);
+    const rowCount=N(documentNode.documentElement?.getAttribute('recordCount'));
+    const candidate={fields,recordsPath,rowCount,score:scorePivot(fields.map(field=>field.name),rowCount)};
+    if(!best||candidate.score>best.score)best=candidate;
+  }
+  if(!best)return[];
+
+  const recordsFile=zip.file(best.recordsPath);
+  return await streamPivotRecords(recordsFile,best.fields,best.rowCount);
+}
+
+function sheets(buffer){
+  const workbook=XLSX.read(buffer,{type:'array',cellDates:true,raw:false});
+  let best=[];
+  for(const name of workbook.SheetNames){
+    const aoa=XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,defval:'',raw:false});
+    for(let index=0;index<Math.min(100,aoa.length);index++){
+      const header=(aoa[index]||[]).map(T);
+      const headerScore=header.filter(value=>/sku|qty|pcs|ship|customer|sales|tele|invc|invoice|brand|สินค้า|ร้าน|totinvc/i.test(value)).length;
+      if(headerScore<3)continue;
+      const rows=aoa.slice(index+1)
+        .map(values=>Object.fromEntries(header.map((key,column)=>[key||('c'+column),values[column]])))
+        .map(normalizeRow)
+        .filter(row=>row.qty||row.amt||row.sku);
+      if(rows.length>best.length)best=rows;
+    }
+  }
+  return best;
+}
+
+async function buildPayloadBlob(metadata,rows,options={}){
+  if(!Array.isArray(rows))throw Error('rows ต้องเป็น array');
+  const chunkSize=Math.max(50,Math.min(2000,N(options.chunkSize)||CHUNK_ROWS));
+  const onProgress=typeof options.onProgress==='function'?options.onProgress:()=>{};
+  const total=rows.length;
+  const metadataJson=JSON.stringify(metadata);
+  const parts=[new Blob([metadataJson.slice(0,-1)+',"rows":['],{type:JSON_MIME})];
+  let wrote=false;
+  for(let start=0;start<total;start+=chunkSize){
+    const end=Math.min(total,start+chunkSize);
+    const chunk=rows.slice(start,end);
+    const json=JSON.stringify(chunk).slice(1,-1);
+    if(json){
+      parts.push(new Blob([wrote?',':'',json],{type:JSON_MIME}));
+      wrote=true;
+    }
+    for(let index=start;index<end;index++)rows[index]=null;
+    chunk.length=0;
+    onProgress(end,total);
+    if((start/chunkSize)%8===0)await nextTask();
+  }
+  rows.length=0;
+  parts.push(new Blob([']}'],{type:JSON_MIME}));
+  return new Blob(parts,{type:JSON_MIME});
+}
+
+function buildStorageBatch(metadata,rows,start,partIndex,targetBytes=STORAGE_PART_MAX_BYTES){
+  if(!Array.isArray(rows))throw Error('rows ต้องเป็น array');
+  const limit=Math.max(256*1024,N(targetBytes)||STORAGE_PART_MAX_BYTES);
+  const header={
+    schema:'doit-json-part-v1',
+    data_schema_version:metadata.data_schema_version,
+    version_id:metadata.version_id,
+    part_index:partIndex,
+    row_start:start,
+  };
+  const prefix=JSON.stringify(header).slice(0,-1)+',"rows":[';
+  const encoder=new TextEncoder();
+  const rowParts=[];
+  let size=encoder.encode(prefix).byteLength+2;
+  let end=start;
+  while(end<rows.length){
+    const json=JSON.stringify(rows[end]);
+    const separator=end>start?',':'';
+    const bytes=encoder.encode(separator+json).byteLength;
+    if(end>start&&size+bytes>limit)break;
+    rowParts.push(separator,json);
+    size+=bytes;
+    end++;
+  }
+  if(end===start)throw Error('สร้างส่วน JSON ไม่สำเร็จ');
+  const body=new Blob([prefix,...rowParts,']}'],{type:JSON_MIME});
+  if(body.size>RESUMABLE_THRESHOLD_BYTES){
+    throw Error('พบข้อมูลหนึ่งแถวใหญ่เกิน 6 MB จึงไม่สามารถแบ่งไฟล์ให้อยู่ใต้เพดาน Storage ได้');
+  }
+  return{start,end,rowCount:end-start,rowParts,body};
+}
+
+async function uploadPayloadPackage(c,dataPath,metadata,rows,onProgress=()=>{}){
+  const totalRows=rows.length;
+  const uploadedPaths=[];
+  const parts=[];
+  let totalBytes=0;
+  let start=0;
+  let partIndex=0;
+  let batch=buildStorageBatch(metadata,rows,0,0);
+
+  try{
+    if(batch.end===totalRows){
+      const prefix=JSON.stringify(metadata).slice(0,-1)+',"rows":[';
+      const payload=new Blob([prefix,...batch.rowParts,']}'],{type:JSON_MIME});
+      onProgress({ratio:0,text:`เตรียมอัปโหลด JSON ${formatBytes(payload.size)} MB (ไม่เก็บ Excel ต้นฉบับ)`});
+      await uploadJsonWithVerification(c,dataPath,payload,JSON_MIME,UPLOAD_TIMEOUT_MS,progress=>{
+        const ratio=Math.max(0,Math.min(1,N(progress.loaded)/Math.max(1,N(progress.total))));
+        onProgress({ratio,text:formatUploadProgress(progress.loaded,progress.total,progress.elapsedMs,progress.stalled)});
+      });
+      uploadedPaths.push(dataPath);
+      totalBytes=payload.size;
+      for(let index=0;index<totalRows;index++)rows[index]=null;
+      rows.length=0;
+      return{mode:'single',partCount:1,totalBytes,uploadedPaths};
+    }
+
+    while(start<totalRows){
+      if(batch.start!==start)batch=buildStorageBatch(metadata,rows,start,partIndex);
+      const partPath=dataPath.replace(/\.json$/,'')+`/part-${String(partIndex+1).padStart(4,'0')}.json`;
+      const rowSpan=batch.end-batch.start;
+      await uploadJsonWithVerification(c,partPath,batch.body,JSON_MIME,UPLOAD_TIMEOUT_MS,progress=>{
+        const within=Math.max(0,Math.min(1,N(progress.loaded)/Math.max(1,N(progress.total))));
+        const ratio=(batch.start+(rowSpan*within))/Math.max(1,totalRows);
+        onProgress({
+          ratio,
+          text:`กำลังอัปโหลดส่วนที่ ${partIndex+1} · ${formatBytes(progress.loaded)} / ${formatBytes(progress.total)} MB · ${Math.round(within*100)}% · แถว ${F(batch.start+Math.round(rowSpan*within))} / ${F(totalRows)}`,
+        });
+      });
+      uploadedPaths.push(partPath);
+      parts.push({
+        path:partPath,
+        part_index:partIndex,
+        row_start:batch.start,
+        row_count:batch.rowCount,
+        size_bytes:batch.body.size,
+      });
+      totalBytes+=batch.body.size;
+      for(let index=batch.start;index<batch.end;index++)rows[index]=null;
+      start=batch.end;
+      partIndex++;
+      batch=start<totalRows?buildStorageBatch(metadata,rows,start,partIndex):null;
+      await nextTask();
+    }
+    rows.length=0;
+
+    const manifest={
+      ...metadata,
+      schema:'doit-json-manifest-v1',
+      payload_schema:'doit-json-v1',
+      storage_format:'json-parts-v1',
+      row_count:totalRows,
+      part_count:parts.length,
+      parts,
+    };
+    const manifestBody=new Blob([JSON.stringify(manifest)],{type:JSON_MIME});
+    onProgress({ratio:0.98,text:`อัปโหลดครบ ${parts.length} ส่วนแล้ว กำลังบันทึก manifest`});
+    await uploadJsonWithVerification(c,dataPath,manifestBody,JSON_MIME,UPLOAD_TIMEOUT_MS);
+    uploadedPaths.push(dataPath);
+    totalBytes+=manifestBody.size;
+    onProgress({ratio:1,text:`อัปโหลด JSON ครบ ${parts.length} ส่วน และยืนยัน manifest แล้ว`});
+    return{mode:'parts',partCount:parts.length,totalBytes,uploadedPaths};
+  }catch(error){
+    error.uploadedPaths=[...uploadedPaths];
+    throw error;
+  }
+}
+
+async function request(label,url,options={},timeoutMs=30000){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{
+    return await fetch(url,{...options,signal:controller.signal,cache:'no-store'});
+  }catch(error){
+    if(error?.name==='AbortError')throw Error(label+' timeout หลัง '+Math.round(timeoutMs/1000)+' วินาที');
+    throw error;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+function uploadJson(c,path,body,type,timeoutMs=UPLOAD_TIMEOUT_MS,onProgress=()=>{}){
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();
+    const startedAt=Date.now();
+    let loaded=0,total=Math.max(1,N(body?.size)),lastProgressAt=startedAt,settled=false;
+    const finish=(callback,value)=>{
+      if(settled)return;
+      settled=true;
+      clearInterval(heartbeat);
+      callback(value);
+    };
+    const uncertainError=message=>{
+      const error=Error(message);
+      error.uploadUncertain=true;
+      return error;
+    };
+    const report=()=>{
+      const now=Date.now();
+      onProgress({loaded,total,elapsedMs:now-startedAt,stalled:now-lastProgressAt>=15000});
+    };
+    const heartbeat=setInterval(report,1000);
+    xhr.open('POST',`${c.u}/storage/v1/object/${BUCKET}/${encodeURIComponent(path).replace(/%2F/g,'/')}`,true);
+    xhr.timeout=timeoutMs;
+    xhr.setRequestHeader('apikey',c.k);
+    xhr.setRequestHeader('authorization','Bearer '+c.k);
+    xhr.setRequestHeader('Content-Type',type);
+    xhr.setRequestHeader('x-upsert','true');
+    xhr.upload.onprogress=event=>{
+      if(event.lengthComputable)total=Math.max(1,event.total);
+      loaded=Math.max(loaded,event.loaded||0);
+      lastProgressAt=Date.now();
+      report();
+    };
+    xhr.onload=()=>{
+      if(xhr.status>=200&&xhr.status<300){
+        loaded=total;
+        report();
+        finish(resolve,xhr.responseText);
+      }else finish(reject,Error(`Storage ${xhr.status}: ${xhr.responseText||'upload failed'}`));
+    };
+    xhr.onerror=()=>finish(reject,uncertainError('การเชื่อมต่อขาดระหว่างอัปโหลด JSON'));
+    xhr.ontimeout=()=>finish(reject,uncertainError('อัปโหลด JSON timeout หลัง '+Math.round(timeoutMs/1000)+' วินาที'));
+    xhr.onabort=()=>finish(reject,uncertainError('การอัปโหลด JSON ถูกยกเลิก'));
+    report();
+    xhr.send(body);
+  });
+}
+
+function wait(ms){return new Promise(resolve=>setTimeout(resolve,ms))}
+function directResumableEndpoint(c){
+  const parsed=new URL(c.u);
+  const projectRef=T(parsed.hostname.split('.')[0]);
+  if(!projectRef)throw Error('Supabase URL ไม่ถูกต้อง');
+  return `${parsed.protocol}//${projectRef}.storage.supabase.co/storage/v1/upload/resumable`;
+}
+function base64Metadata(value){
+  const bytes=new TextEncoder().encode(T(value));
+  let binary='';
+  for(const byte of bytes)binary+=String.fromCharCode(byte);
+  return btoa(binary);
+}
+function tusHeaders(c,extra={}){
+  return headers(c,{'Tus-Resumable':'1.0.0',...extra});
+}
+async function createTusUpload(c,path,body,type){
+  const endpoint=directResumableEndpoint(c);
+  const response=await request(
+    'เริ่มอัปโหลด JSON แบบต่อเนื่อง',
+    endpoint,
+    {
+      method:'POST',
+      headers:tusHeaders(c,{
+        'Upload-Length':String(body.size),
+        'Upload-Metadata':[
+          'bucketName '+base64Metadata(BUCKET),
+          'objectName '+base64Metadata(path),
+          'contentType '+base64Metadata(type),
+          'cacheControl '+base64Metadata('3600'),
+        ].join(','),
+        'x-upsert':'true',
+      }),
+    },
+    30000,
+  );
+  const text=await response.text();
+  if(!response.ok)throw Error(`เริ่ม Resumable upload ไม่สำเร็จ ${response.status}: ${text}`);
+  const location=response.headers.get('Location');
+  if(!location)throw Error('Supabase ไม่ส่งตำแหน่ง Resumable upload กลับมา');
+  return new URL(location,endpoint).href;
+}
+async function readTusOffset(c,uploadUrl){
+  const response=await request(
+    'ตรวจตำแหน่งอัปโหลด JSON',
+    uploadUrl,
+    {method:'HEAD',headers:tusHeaders(c)},
+    20000,
+  );
+  if(response.status===404||response.status===410)return null;
+  if(!response.ok)throw Error(`ตรวจ Resumable upload ไม่สำเร็จ ${response.status}`);
+  const offset=Number(response.headers.get('Upload-Offset'));
+  if(!Number.isFinite(offset)||offset<0)throw Error('Supabase ส่งตำแหน่งอัปโหลดไม่ถูกต้อง');
+  return offset;
+}
+function patchTusChunk(c,uploadUrl,chunk,offset,total,startedAt,onProgress){
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();
+    let settled=false;
+    const finish=(callback,value)=>{
+      if(settled)return;
+      settled=true;
+      callback(value);
+    };
+    const failure=(text,retryable=true)=>{
+      const error=Error(text);
+      error.uploadUncertain=true;
+      error.retryable=retryable;
+      return error;
+    };
+    xhr.open('PATCH',uploadUrl,true);
+    xhr.timeout=TUS_CHUNK_TIMEOUT_MS;
+    xhr.setRequestHeader('apikey',c.k);
+    xhr.setRequestHeader('authorization','Bearer '+c.k);
+    xhr.setRequestHeader('Tus-Resumable','1.0.0');
+    xhr.setRequestHeader('Upload-Offset',String(offset));
+    xhr.setRequestHeader('Content-Type','application/offset+octet-stream');
+    xhr.upload.onprogress=event=>{
+      const sent=Math.min(chunk.size,event.loaded||0);
+      onProgress({
+        loaded:Math.min(total,offset+sent),
+        total,
+        elapsedMs:Date.now()-startedAt,
+        stalled:false,
+      });
+    };
+    xhr.onload=()=>{
+      const nextOffset=Number(xhr.getResponseHeader('Upload-Offset'));
+      if(xhr.status>=200&&xhr.status<300&&Number.isFinite(nextOffset)&&nextOffset>offset){
+        onProgress({loaded:Math.min(total,nextOffset),total,elapsedMs:Date.now()-startedAt,stalled:false});
+        finish(resolve,nextOffset);
+        return;
+      }
+      const retryable=xhr.status===409||xhr.status===423||xhr.status===429||xhr.status>=500;
+      finish(reject,failure(`ส่ง JSON ต่อไม่สำเร็จ ${xhr.status}: ${xhr.responseText||'TUS PATCH failed'}`,retryable));
+    };
+    xhr.onerror=()=>finish(reject,failure('เครือข่ายสะดุดระหว่างส่ง JSON กำลังเตรียมส่งต่อ'));
+    xhr.ontimeout=()=>finish(reject,failure('การส่ง JSON หนึ่งส่วนใช้เวลานานเกินไป กำลังเตรียมส่งต่อ'));
+    xhr.onabort=()=>finish(reject,failure('การส่ง JSON ถูกยกเลิก',false));
+    xhr.send(chunk);
+  });
+}
+async function patchTusChunkWithRetry(c,uploadUrl,body,offset,startedAt,onProgress){
+  let lastError=Error('ส่ง JSON ไม่สำเร็จ');
+  for(let attempt=0;attempt<TUS_RETRY_DELAYS.length;attempt++){
+    const delayMs=TUS_RETRY_DELAYS[attempt];
+    if(delayMs){
+      onProgress({loaded:offset,total:body.size,elapsedMs:Date.now()-startedAt,stalled:true});
+      await wait(delayMs);
+    }
+    const chunk=body.slice(offset,Math.min(body.size,offset+TUS_CHUNK_BYTES),JSON_MIME);
+    try{
+      return await patchTusChunk(c,uploadUrl,chunk,offset,body.size,startedAt,onProgress);
+    }catch(error){
+      lastError=error;
+      try{
+        const remoteOffset=await readTusOffset(c,uploadUrl);
+        if(remoteOffset===body.size)return remoteOffset;
+        if(remoteOffset!==null&&remoteOffset>offset)return remoteOffset;
+      }catch{}
+      if(error?.retryable===false)throw error;
+    }
+  }
+  const error=Error('เครือข่ายยังไม่พร้อมหลังลองส่งต่ออัตโนมัติครบแล้ว: '+T(lastError?.message||lastError));
+  error.uploadUncertain=true;
+  throw error;
+}
+async function uploadJsonResumable(c,path,body,type,onProgress=()=>{}){
+  const startedAt=Date.now();
+  const uploadUrl=await createTusUpload(c,path,body,type);
+  let offset=0;
+  onProgress({loaded:0,total:body.size,elapsedMs:0,stalled:false});
+  while(offset<body.size){
+    const nextOffset=await patchTusChunkWithRetry(c,uploadUrl,body,offset,startedAt,onProgress);
+    if(!Number.isFinite(nextOffset)||nextOffset<=offset||nextOffset>body.size){
+      const error=Error('ตำแหน่ง Resumable upload ไม่ถูกต้อง');
+      error.stateUnknown=true;
+      throw error;
+    }
+    offset=nextOffset;
+    await nextTask();
+  }
+  for(const delayMs of [0,500,1500,3000]){
+    if(delayMs)await wait(delayMs);
+    try{
+      if(await verifyUploadedObject(c,path,body.size))return'resumable-upload-complete';
+    }catch{}
+  }
+  const error=Error('ส่ง JSON ครบแล้ว แต่ยังยืนยันไฟล์ใน Storage ไม่ได้ กรุณาอย่าอัปโหลดซ้ำ');
+  error.stateUnknown=true;
+  throw error;
+}
+
+async function verifyUploadedObject(c,path,expectedSize){
+  const response=await request(
+    'ตรวจไฟล์ JSON หลังการเชื่อมต่อขาด',
+    `${c.u}/storage/v1/object/info/${BUCKET}/${encodeURIComponent(path).replace(/%2F/g,'/')}`,
+    {headers:headers(c,{Accept:'application/json'})},
+    20000,
+  );
+  if(response.status===404||response.status===400)return false;
+  const text=await response.text();
+  if(!response.ok)throw Error(`ตรวจ Storage ${response.status}: ${text}`);
+  let info={};try{info=JSON.parse(text)}catch{}
+  const actualSize=N(info?.metadata?.size??info?.size);
+  return actualSize===N(expectedSize)&&actualSize>0;
+}
+async function uploadJsonWithVerification(c,path,body,type,timeoutMs=UPLOAD_TIMEOUT_MS,onProgress=()=>{}){
+  const useResumable=body.size>RESUMABLE_THRESHOLD_BYTES;
+  try{
+    return await (useResumable
+      ?uploadJsonResumable(c,path,body,type,onProgress)
+      :uploadJson(c,path,body,type,timeoutMs,onProgress));
+  }
+  catch(originalError){
+    if(!originalError?.uploadUncertain)throw originalError;
+    stat(80,'การเชื่อมต่อขาด กำลังตรวจว่า JSON ขึ้น Storage แล้วหรือยัง');
+    try{
+      if(await verifyUploadedObject(c,path,body.size)){
+        message('การตอบกลับขาดหาย แต่ตรวจพบ JSON ใน Storage ครบตามขนาดแล้ว กำลังทำขั้นตอนต่อไป');
+        return'verified-after-connection-loss';
+      }
+    }catch{
+      const error=Error('การเชื่อมต่อขาดและยังยืนยันสถานะไฟล์ไม่ได้ กรุณาอย่าอัปโหลดซ้ำจนกว่าจะตรวจ Storage');
+      error.stateUnknown=true;
+      throw error;
+    }
+    throw originalError;
+  }
+}
+async function removeObject(c,path){
+  const response=await request(
+    'ล้าง JSON ที่อัปโหลดไม่สำเร็จ',
+    `${c.u}/storage/v1/object/${BUCKET}/${encodeURIComponent(path).replace(/%2F/g,'/')}`,
+    {method:'DELETE',headers:headers(c)},
+    20000,
+  );
+  if(!response.ok&&response.status!==404&&response.status!==400){
+    throw Error(`ล้างไฟล์ไม่สำเร็จ ${response.status}: ${await response.text()}`);
+  }
+}
+async function rest(c,path,options={},timeoutMs=30000,label='Cloud request'){
+  const response=await request(label,c.u+path,{...options,headers:headers(c,options.headers||{})},timeoutMs);
+  const text=await response.text();
+  if(!response.ok)throw Error(`Database ${response.status}: ${text}`);
+  try{return JSON.parse(text)}catch{return text}
+}
+async function fetchVersion(c,id){
+  const rows=await rest(
+    c,
+    '/rest/v1/doit_versions?id=eq.'+encodeURIComponent(id)+'&select=id,is_active,status,data_status',
+    {headers:{Accept:'application/json'}},
+    20000,
+    'ตรวจสถานะเวอร์ชัน',
+  );
+  return Array.isArray(rows)?rows:[];
+}
+async function insertMetadata(c,payload){
+  try{
+    return await rest(c,'/rest/v1/doit_versions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json',Prefer:'return=minimal'},
+      body:JSON.stringify(payload),
+    },30000,'บันทึก metadata');
+  }catch(originalError){
+    let rows;
+    try{rows=await fetchVersion(c,payload.id)}
+    catch{
+      const error=Error('บันทึก metadata แล้ว แต่ยังยืนยันผลไม่ได้ กรุณาอย่าอัปโหลดซ้ำ');
+      error.stateUnknown=true;
+      throw error;
+    }
+    if(rows.some(row=>row.id===payload.id))return rows;
+    throw originalError;
+  }
+}
+async function markFailed(c,id){
+  try{
+    await rest(c,'/rest/v1/doit_versions?id=eq.'+encodeURIComponent(id),{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json',Prefer:'return=minimal'},
+      body:JSON.stringify({status:'failed',data_status:'failed',is_active:false}),
+    },20000,'บันทึกสถานะล้มเหลว');
+  }catch{}
+}
+async function setActiveRpc(c,id){
+  try{
+    return await rest(c,'/rest/v1/rpc/set_doit_active_version',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({p_version_id:id}),
+    },30000,'ตั้งเวอร์ชันล่าสุด');
+  }catch(originalError){
+    let rows;
+    try{rows=await fetchVersion(c,id)}
+    catch{
+      const error=Error('ส่งคำสั่งตั้ง Active แล้ว แต่ยังยืนยันผลไม่ได้ กรุณารีเฟรชและอย่าอัปโหลดซ้ำ');
+      error.stateUnknown=true;
+      throw error;
+    }
+    if(rows.some(row=>row.id===id&&row.is_active===true&&row.data_status==='ready'))return rows;
+    throw originalError;
+  }
+}
+
+function publishSummary(summary){
+  if(typeof window.__setDoitAdminSummary==='function')window.__setDoitAdminSummary(summary);
+}
+
+async function run(){
+  if(busy)return;
+  busy=true;
+  setBusyState(true);
+  let c=null,id='',dataPath='',metadataInserted=false,activeConfirmed=false,uploadResult=null,uploadedPaths=[];
+  try{
+    const file=$('#file')?.files?.[0];
+    if(!file)throw Error('ต้องเลือกไฟล์ก่อน');
+    c=cfg();
+    if(!c.k)throw Error('ยังไม่ได้ตั้งค่า anon key');
+    localStorage.setItem('doit-cloud-cfg',JSON.stringify({url:c.u,key:c.k}));
+
+    stat(5,'เริ่มอ่านไฟล์ DOIT');
+    let buffer=await readFileBuffer(file);
+    await nextTask();
+    stat(12,'ค้นหา Pivot Cache ที่เป็นข้อมูล DOIT');
+    let rows;
+    try{rows=await pivot(buffer)}
+    catch(error){
+      buffer=null;
+      throw Error('อ่าน Pivot ไม่สำเร็จ: '+T(error?.message||error));
+    }
+    if(!rows.length){
+      stat(24,'ไม่พบ Pivot Cache กำลังอ่าน Worksheet');
+      rows=sheets(buffer);
+    }
+    buffer=null;
+    await nextTask();
+    if(!rows.length)throw Error('ไม่พบข้อมูล DOIT');
+
+    id=crypto.randomUUID();
+    const day=new Date().toISOString().slice(0,10);
+    dataPath=`parsed/${day}/${id}.json`;
+    const rowCount=rows.length;
+    const stores=new Set(rows.map(row=>row.store));
+    const people=new Set(rows.map(row=>row.ps));
+    const telesaleBills=new Set(rows.filter(row=>row.isTele).map(row=>[row.inv,row.store,row.tele].join('|')));
+    const totalQty=rows.reduce((sum,row)=>sum+N(row.qty),0);
+    const totalAmount=rows.reduce((sum,row)=>sum+N(row.amt),0);
+    const rawAmount=rows.reduce((sum,row)=>sum+N(row.rawAmt),0);
+    const netAmount=rows.reduce((sum,row)=>sum+N(row.netAmt),0);
+    const createdAt=new Date().toISOString();
+    const summary={
+      version_id:id,
+      fileName:file.name,
+      fileSize:file.size,
+      checkedAt:createdAt,
+      rows:rowCount,
+      stores:stores.size,
+      ps:people.size,
+      teleBills:telesaleBills.size,
+      qty:totalQty,
+      amount:totalAmount,
+      storage_path:'',
+      status:'local-ready',
+    };
+    publishSummary(summary);
+
+    stat(35,'สร้าง JSON แบบแบ่งส่วนเพื่อลดหน่วยความจำ');
+    const metadata={
+      schema:'doit-json-v1',
+      data_schema_version:4,
+      version_id:id,
+      created_at:createdAt,
+      source_file:{name:file.name,size:file.size,stored:false},
+      amount_fields:{
+        priority:'first non-empty source: TotInvc > Correct Amount/LineAmount > LineAmtBeforeDisc > detailAmt > row.amt > Amt > Amount > InvoiceAmt',
+        zero_values:'preserved_from_source',
+        negative_values:'preserved',
+      },
+    };
+    uploadResult=await uploadPayloadPackage(c,dataPath,metadata,rows,progress=>{
+      stat(35+Math.round(Math.max(0,Math.min(1,N(progress.ratio)))*45),progress.text);
+    });
+    uploadedPaths=uploadResult.uploadedPaths;
+
+    stat(82,'บันทึก metadata หลัง JSON สำเร็จ');
+    await insertMetadata(c,{
+      id,
+      file_name:file.name,
+      file_size:file.size,
+      storage_path:dataPath,
+      data_path:dataPath,
+      data_status:'ready',
+      data_schema_version:4,
+      row_count:rowCount,
+      store_count:stores.size,
+      ps_count:people.size,
+      telesale_bill_count:telesaleBills.size,
+      total_qty:totalQty,
+      total_amount:totalAmount,
+      status:'uploaded',
+      is_active:false,
+      uploaded_at:createdAt,
+    });
+    metadataInserted=true;
+
+    stat(93,'ตั้ง JSON ใหม่เป็นไฟล์ล่าสุด');
+    await setActiveRpc(c,id);
+    activeConfirmed=true;
+    summary.status='cloud-active';
+    summary.storage_path=dataPath;
+    publishSummary(summary);
+    stat(100,'เสร็จ: Cloud JSON active',true);
+    message(
+      `สำเร็จ: แปลงและอัปโหลด JSON พร้อมตั้งเป็นข้อมูลล่าสุดแล้ว โดยไม่เก็บ Excel ต้นฉบับ<br>`+
+      `แถว ${F(rowCount)} · ร้าน ${F(stores.size)} · PS ${F(people.size)} · Telesale bills ${F(telesaleBills.size)}<br>`+
+      `ยอดดิบ ${F(rawAmount)} · ยอดสุทธิ ${F(netAmount)}<br>`+
+      `JSON ${formatBytes(uploadResult.totalBytes)} MB · ${uploadResult.mode==='parts'?`แบ่งเก็บ ${uploadResult.partCount} ส่วน (แต่ละส่วนไม่เกิน 5 MB)`: 'ไฟล์เดียว'} · สูตรยอดใช้ field แรกที่มีค่า แม้ค่านั้นเป็น 0`,
+      true,
+    );
+  }catch(error){
+    const stateUnknown=Boolean(error?.stateUnknown);
+    const detail=E(error?.message||error);
+    failStat('อัปโหลด DOIT ไม่สำเร็จ: '+T(error?.message||error));
+    message('อัปโหลด DOIT ไม่สำเร็จ: '+detail);
+    if(!stateUnknown&&c&&id&&metadataInserted&&!activeConfirmed)await markFailed(c,id);
+    const cleanupPaths=Array.isArray(error?.uploadedPaths)?error.uploadedPaths:uploadedPaths;
+    if(c&&!activeConfirmed&&cleanupPaths.length){
+      for(const path of [...cleanupPaths].reverse()){
+        await removeObject(c,path).catch(cleanupError=>console.error('[DOIT cleanup]',cleanupError));
+      }
+    }
+  }finally{
+    uploadResult=null;
+    busy=false;
+    setBusyState(false);
+  }
+}
+
+function ui(){
+  const upload=$('#uploadCloud');
+  if(upload){
+    upload.textContent='แปลง JSON และอัปโหลด';
+    upload.onclick=run;
+    upload.title='ปุ่มเดียว: อ่านครั้งเดียว แปลง JSON อัปโหลด และตั้ง Active อัตโนมัติ';
+  }
+  const old=$('#setActive');
+  if(old){
+    old.textContent='ตั้งล่าสุดรวมในปุ่มอัปโหลดแล้ว';
+    old.disabled=true;
+    old.title='ป้องกันการตั้ง Active แยกจาก JSON';
+  }
+}
+
+window.AdminDoitUploadCore={buildPayloadBlob,buildStorageBatch,streamPivotRecords,formatUploadProgress,verifyUploadedObject,directResumableEndpoint};
+window.addEventListener?.('beforeunload',event=>{
+  if(!busy)return;
+  event.preventDefault();
+  event.returnValue='';
+});
 document.addEventListener('DOMContentLoaded',()=>{ui();setTimeout(ui,500);setTimeout(ui,1200)});
 })();
