@@ -242,7 +242,7 @@ assert.ok(!performanceSource.includes("window.XLSX.read=function"), "Performance
 assert.ok(adminHtml.includes("window.__PERF_LAST_WB=wb"), "Performance may retain only the workbook it explicitly loaded");
 assert.ok(adminHtml.includes("admin-json-v265.js?v=337"));
 assert.ok(adminHtml.includes("admin-progress-popup-v1.js?v=3"));
-assert.ok(adminHtml.includes("admin-storage-manager-v1.js?v=7"));
+assert.ok(adminHtml.includes("admin-storage-manager-v1.js?v=8"));
 assert.ok(adminHtml.includes("admin-performance-active-v2.js?v=3"));
 
 const progressText = core.formatUploadProgress(5 * 1024 * 1024, 20 * 1024 * 1024, 27_000, false);
