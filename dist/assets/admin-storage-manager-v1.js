@@ -104,7 +104,11 @@ async function init(){
   $('#storageDeleteSelected').onclick=deleteSelected;
   $('#storageDays').onchange=()=>refresh(modalFilter);
   $('#storageCheckAll').onchange=event=>{selected.clear();if(event.target.checked)files.filter(file=>statusOf(file).type==='deletable').slice(0,MAX_DELETE).forEach(file=>selected.add(file.path));render()};
-  await refresh('all');
+  files=[];
+  activeGuardLoaded=false;
+  const body=$('#storageFiles');
+  if(body)body.innerHTML='<tr><td colspan="7" class="muted">ยังไม่สแกน Storage · กด “รีเฟรช Storage” เมื่อต้องการจัดการไฟล์</td></tr>';
+  log('ยังไม่สแกน Storage อัตโนมัติ เพื่อไม่ให้แย่งทรัพยากรระหว่างอ่านหรืออัปโหลด DOIT · กด “รีเฟรช Storage” เมื่อต้องการตรวจไฟล์');
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
