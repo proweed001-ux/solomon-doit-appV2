@@ -116,6 +116,11 @@ function inspectPath(value) {
   return { ok: true, path: decoded, prefix, deleteFolderAllowed: true };
 }
 
+function validFolderPath(value) {
+  const folder = text(value);
+  return Boolean(folder) && inspectPath(folder + '/__folder__').ok;
+}
+
 function dateFrom(value) {
   const match = text(value).match(/(20\d{2})[-_/](\d{2})[-_/](\d{2})/);
   return match ? `${match[1]}-${match[2]}-${match[3]}` : '';
@@ -159,8 +164,7 @@ async function listFolder(key, prefix, depth, output, visited) {
       if (!name) continue;
       const path = prefix ? (name.startsWith(prefix + '/') ? name : prefix + '/' + name) : name;
       if (isFolderEntry(item)) {
-        const folderProbe = inspectPath(path + '/__folder__');
-        if (!folderProbe.ok) continue;
+        if (!validFolderPath(path)) continue;
         await listFolder(key, path, depth + 1, output, visited);
       } else {
         const inspected = inspectPath(path);
@@ -415,6 +419,7 @@ export const _test = {
   collectDoitActivePaths,
   classifyFiles,
   inspectPath,
+  validFolderPath,
   parseBasic,
   validateDeleteSelection,
   validAnonKey,
