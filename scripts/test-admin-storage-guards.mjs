@@ -63,16 +63,17 @@ for (const path of [
   'parsed/2026-07-12/active-manifest.json',
   'parsed/2026-07-12/active-bundle/part-0001.json',
 ]) {
-  assert.equal(byPath.get(path)?.deletable, false, `protected file entered delete flow: ${path}`);
+  assert.equal(byPath.get(path)?.protected, true, `risky file must keep its warning: ${path}`);
+  assert.equal(byPath.get(path)?.deletable, true, `every safe Storage file must be deletable: ${path}`);
 }
 
 const ordinary = 'parsed/2026-05-01/ordinary.json';
 assert.equal(byPath.get(ordinary)?.deletable, true, 'ordinary file must enter delete flow after login');
-assert.equal(byPath.get('performance/2026-07-01/month.json')?.deletable, true, 'inactive current-month performance file must be deletable');
+assert.equal(byPath.get('performance/2026-07-01/month.json')?.deletable, true, 'current-month performance file must be deletable');
 assert.equal(byPath.get('team/2026-01-01/old.png')?.deletable, true, 'team file must be deletable');
 assert.equal(_test.validateDeleteSelection(rows, [ordinary], { activeLoaded: true, truncated: false }).ok, true);
-assert.equal(_test.validateDeleteSelection(rows, ['performance/active.json'], { activeLoaded: true, truncated: false }).error, 'protected_file');
-assert.equal(_test.validateDeleteSelection(rows, [ordinary], { activeLoaded: false, truncated: false }).error, 'active_guard_unavailable');
+assert.equal(_test.validateDeleteSelection(rows, ['performance/active.json'], { activeLoaded: true, truncated: false }).ok, true);
+assert.equal(_test.validateDeleteSelection(rows, ['performance/active.json'], { activeLoaded: false, truncated: false }).ok, true);
 assert.equal(_test.validateDeleteSelection(rows, [ordinary], { activeLoaded: true, truncated: true }).error, 'inventory_truncated');
 assert.equal(_test.MAX_DELETE, 20);
 
@@ -89,7 +90,9 @@ assert.match(storageUi, /const collapsedFolders=new Set\(\)/, 'folder collapse s
 assert.match(storageUi, /class="storageFolderToggle"/, 'folder header must be a toggle button');
 assert.match(storageUi, /aria-expanded=/, 'folder toggle must expose expanded state');
 assert.match(storageUi, /collapsedFolders\.has\(folder\)/, 'folder rows must support collapse and expand');
-assert.match(adminHtml, /admin-storage-manager-v1\.js\?v=7/, 'admin must load the current storage UI asset');
+assert.match(adminHtml, /admin-storage-manager-v1\.js\?v=8/, 'admin must load the current storage UI asset');
 assert.match(adminHtml, /แตะชื่อโฟลเดอร์เพื่อพับ\/ขยาย/, 'admin must explain folder collapse control');
+assert.match(storageUi, /เลือกและลบได้ทุกไฟล์ รวมไฟล์ระบบและ Active/, 'UI must allow every file while warning about risky files');
+assert.doesNotMatch(storageUi, /รอตรวจ Active/, 'Active guard must not disable deletion');
 
 console.log('admin storage guard regression: PASS');
