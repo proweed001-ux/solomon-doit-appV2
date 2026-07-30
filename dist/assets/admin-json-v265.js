@@ -4,6 +4,8 @@ const URL0='https://saodmeoilixfdqentofp.supabase.co';
 const BUCKET='doit-files';
 const JSON_MIME='application/json;charset=utf-8';
 const CHUNK_ROWS=500;
+const UPLOAD_TIMEOUT_MS=600000;
+const BUSY_CONTROL_IDS=['uploadCloud','choose','file','clear','testCloud'];
 const $=s=>document.querySelector(s);
 const T=v=>String(v??'').trim();
 let busy=false;
@@ -21,6 +23,29 @@ function hasValue(v){if(v==null)return false;const s=T(v);return s!==''&&s!=='-'
 function F(n){return N(n).toLocaleString('th-TH')}
 function E(v){return T(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function nextTask(){return new Promise(resolve=>setTimeout(resolve,0))}
+function setBusyState(active){
+  BUSY_CONTROL_IDS.forEach(id=>{const element=$('#'+id);if(element)element.disabled=Boolean(active)});
+  document.body?.classList?.toggle('doit-upload-busy',Boolean(active));
+}
+function stepForPercent(percent){
+  if(percent>=100)return'ready';
+  if(percent>=62)return'upload';
+  if(percent>=35)return'index';
+  if(percent>=12)return'parse';
+  if(percent>5)return'read';
+  return'pick';
+}
+function formatBytes(bytes){
+  const mb=Math.max(0,N(bytes))/1024/1024;
+  return mb>=10?mb.toFixed(1):mb.toFixed(2);
+}
+function formatUploadProgress(loaded,total,elapsedMs,stalled=false){
+  const safeTotal=Math.max(1,N(total));
+  const percent=Math.max(0,Math.min(100,Math.round((N(loaded)/safeTotal)*100)));
+  const seconds=Math.max(0,Math.round(N(elapsedMs)/1000));
+  const heartbeat=stalled?' · เครือข่ายยังไม่ส่งข้อมูลเพิ่ม แต่ระบบยังรออยู่':'';
+  return `กำลังอัปโหลด JSON ${formatBytes(loaded)} / ${formatBytes(total)} MB · ${percent}% · ${seconds} วินาที${heartbeat}`;
+}
 
 function cfg(){
   let saved={};
@@ -34,14 +59,18 @@ function headers(c,extra={}){
 }
 function message(text,ok=false){
   const el=$('#cloudStatus');
-  if(el)el.innerHTML=`<div class="${ok?'ok':'muted'}">${text}</div>`;
-  console.log('[ADMIN JSON v268 one-click]',T(text).replace(/<[^>]+>/g,' '));
+  const plain=T(text).replace(/<[^>]+>/g,' ');
+  const className=ok?'ok':(/ผิดพลาด|ไม่สำเร็จ|timeout|error/i.test(plain)?'warn':'muted');
+  if(el)el.innerHTML=`<div class="${className}">${text}</div>`;
+  console.log('[ADMIN JSON v269 progress-safe]',plain);
 }
 function stat(percent,text,done=false){
   const bar=$('#bar'),pct=$('#pct'),status=$('#status');
-  if(bar&&typeof percent==='number')bar.style.width=Math.max(0,Math.min(100,percent))+'%';
-  if(pct)pct.textContent=done?'100%':'กำลังทำงาน';
+  const safePercent=typeof percent==='number'?Math.max(0,Math.min(100,percent)):null;
+  if(bar&&safePercent!==null)bar.style.width=safePercent+'%';
+  if(pct&&safePercent!==null)pct.textContent=(done?100:Math.round(safePercent))+'%';
   if(status)status.textContent=text;
+  if(safePercent!==null)document.querySelectorAll('.step').forEach(node=>node.classList.toggle('on',node.dataset.s===stepForPercent(safePercent)));
 }
 function failStat(text){
   const pct=$('#pct'),status=$('#status');
@@ -330,16 +359,84 @@ async function request(label,url,options={},timeoutMs=30000){
     clearTimeout(timer);
   }
 }
-async function put(c,path,body,type,timeoutMs=180000){
+function uploadJson(c,path,body,type,timeoutMs=UPLOAD_TIMEOUT_MS,onProgress=()=>{}){
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();
+    const startedAt=Date.now();
+    let loaded=0,total=Math.max(1,N(body?.size)),lastProgressAt=startedAt,settled=false;
+    const finish=(callback,value)=>{
+      if(settled)return;
+      settled=true;
+      clearInterval(heartbeat);
+      callback(value);
+    };
+    const uncertainError=message=>{
+      const error=Error(message);
+      error.uploadUncertain=true;
+      return error;
+    };
+    const report=()=>{
+      const now=Date.now();
+      onProgress({loaded,total,elapsedMs:now-startedAt,stalled:now-lastProgressAt>=15000});
+    };
+    const heartbeat=setInterval(report,1000);
+    xhr.open('POST',`${c.u}/storage/v1/object/${BUCKET}/${encodeURIComponent(path).replace(/%2F/g,'/')}`,true);
+    xhr.timeout=timeoutMs;
+    xhr.setRequestHeader('apikey',c.k);
+    xhr.setRequestHeader('authorization','Bearer '+c.k);
+    xhr.setRequestHeader('Content-Type',type);
+    xhr.setRequestHeader('x-upsert','true');
+    xhr.upload.onprogress=event=>{
+      if(event.lengthComputable)total=Math.max(1,event.total);
+      loaded=Math.max(loaded,event.loaded||0);
+      lastProgressAt=Date.now();
+      report();
+    };
+    xhr.onload=()=>{
+      if(xhr.status>=200&&xhr.status<300){
+        loaded=total;
+        report();
+        finish(resolve,xhr.responseText);
+      }else finish(reject,Error(`Storage ${xhr.status}: ${xhr.responseText||'upload failed'}`));
+    };
+    xhr.onerror=()=>finish(reject,uncertainError('การเชื่อมต่อขาดระหว่างอัปโหลด JSON'));
+    xhr.ontimeout=()=>finish(reject,uncertainError('อัปโหลด JSON timeout หลัง '+Math.round(timeoutMs/1000)+' วินาที'));
+    xhr.onabort=()=>finish(reject,uncertainError('การอัปโหลด JSON ถูกยกเลิก'));
+    report();
+    xhr.send(body);
+  });
+}
+async function verifyUploadedObject(c,path,expectedSize){
   const response=await request(
-    'อัปโหลด JSON',
-    `${c.u}/storage/v1/object/${BUCKET}/${encodeURIComponent(path).replace(/%2F/g,'/')}`,
-    {method:'POST',headers:headers(c,{'Content-Type':type,'x-upsert':'true'}),body},
-    timeoutMs,
+    'ตรวจไฟล์ JSON หลังการเชื่อมต่อขาด',
+    `${c.u}/storage/v1/object/info/${BUCKET}/${encodeURIComponent(path).replace(/%2F/g,'/')}`,
+    {headers:headers(c,{Accept:'application/json'})},
+    20000,
   );
+  if(response.status===404||response.status===400)return false;
   const text=await response.text();
-  if(!response.ok)throw Error(`Storage ${response.status}: ${text}`);
-  return text;
+  if(!response.ok)throw Error(`ตรวจ Storage ${response.status}: ${text}`);
+  let info={};try{info=JSON.parse(text)}catch{}
+  const actualSize=N(info?.metadata?.size??info?.size);
+  return actualSize===N(expectedSize)&&actualSize>0;
+}
+async function uploadJsonWithVerification(c,path,body,type,timeoutMs=UPLOAD_TIMEOUT_MS,onProgress=()=>{}){
+  try{return await uploadJson(c,path,body,type,timeoutMs,onProgress)}
+  catch(originalError){
+    if(!originalError?.uploadUncertain)throw originalError;
+    stat(80,'การเชื่อมต่อขาด กำลังตรวจว่า JSON ขึ้น Storage แล้วหรือยัง');
+    try{
+      if(await verifyUploadedObject(c,path,body.size)){
+        message('การตอบกลับขาดหาย แต่ตรวจพบ JSON ใน Storage ครบตามขนาดแล้ว กำลังทำขั้นตอนต่อไป');
+        return'verified-after-connection-loss';
+      }
+    }catch{
+      const error=Error('การเชื่อมต่อขาดและยังยืนยันสถานะไฟล์ไม่ได้ กรุณาอย่าอัปโหลดซ้ำจนกว่าจะตรวจ Storage');
+      error.stateUnknown=true;
+      throw error;
+    }
+    throw originalError;
+  }
 }
 async function removeObject(c,path){
   const response=await request(
@@ -423,6 +520,7 @@ function publishSummary(summary){
 async function run(){
   if(busy)return;
   busy=true;
+  setBusyState(true);
   let c=null,id='',dataPath='',metadataInserted=false,dataUploaded=false,activeConfirmed=false,payload=null;
   try{
     const file=$('#file')?.files?.[0];
@@ -435,7 +533,12 @@ async function run(){
     let buffer=await readFileBuffer(file);
     await nextTask();
     stat(12,'ค้นหา Pivot Cache ที่เป็นข้อมูล DOIT');
-    let rows=await pivot(buffer).catch(()=>[]);
+    let rows;
+    try{rows=await pivot(buffer)}
+    catch(error){
+      buffer=null;
+      throw Error('อ่าน Pivot ไม่สำเร็จ: '+T(error?.message||error));
+    }
     if(!rows.length){
       stat(24,'ไม่พบ Pivot Cache กำลังอ่าน Worksheet');
       rows=sheets(buffer);
@@ -490,8 +593,11 @@ async function run(){
     });
     await nextTask();
 
-    stat(62,`อัปโหลด JSON ${(payload.size/1024/1024).toFixed(1)} MB (ไม่เก็บ Excel ต้นฉบับ)`);
-    await put(c,dataPath,payload,JSON_MIME,180000);
+    stat(62,`เตรียมอัปโหลด JSON ${(payload.size/1024/1024).toFixed(1)} MB (ไม่เก็บ Excel ต้นฉบับ)`);
+    await uploadJsonWithVerification(c,dataPath,payload,JSON_MIME,UPLOAD_TIMEOUT_MS,progress=>{
+      const ratio=Math.max(0,Math.min(1,N(progress.loaded)/Math.max(1,N(progress.total))));
+      stat(62+Math.round(ratio*18),formatUploadProgress(progress.loaded,progress.total,progress.elapsedMs,progress.stalled));
+    });
     dataUploaded=true;
 
     stat(82,'บันทึก metadata หลัง JSON สำเร็จ');
@@ -531,15 +637,17 @@ async function run(){
     );
   }catch(error){
     const stateUnknown=Boolean(error?.stateUnknown);
+    const detail=E(error?.message||error);
+    failStat('อัปโหลด DOIT ไม่สำเร็จ: '+T(error?.message||error));
+    message('อัปโหลด DOIT ไม่สำเร็จ: '+detail);
     if(!stateUnknown&&c&&id&&metadataInserted&&!activeConfirmed)await markFailed(c,id);
     if(!stateUnknown&&c&&dataPath&&dataUploaded&&!activeConfirmed){
       await removeObject(c,dataPath).catch(cleanupError=>console.error('[DOIT cleanup]',cleanupError));
     }
-    failStat('DOIT upload error');
-    message('อัปโหลด DOIT ไม่สำเร็จ: '+E(error?.message||error));
   }finally{
     payload=null;
     busy=false;
+    setBusyState(false);
   }
 }
 
@@ -558,6 +666,11 @@ function ui(){
   }
 }
 
-window.AdminDoitUploadCore={buildPayloadBlob,streamPivotRecords};
+window.AdminDoitUploadCore={buildPayloadBlob,streamPivotRecords,formatUploadProgress,verifyUploadedObject};
+window.addEventListener?.('beforeunload',event=>{
+  if(!busy)return;
+  event.preventDefault();
+  event.returnValue='';
+});
 document.addEventListener('DOMContentLoaded',()=>{ui();setTimeout(ui,500);setTimeout(ui,1200)});
 })();
