@@ -158,11 +158,13 @@ async function listFolder(key, prefix, depth, output, visited) {
       const name = text(item?.name);
       if (!name) continue;
       const path = prefix ? (name.startsWith(prefix + '/') ? name : prefix + '/' + name) : name;
-      const inspected = inspectPath(path);
-      if (!inspected.ok) continue;
       if (isFolderEntry(item)) {
-        await listFolder(key, inspected.path, depth + 1, output, visited);
+        const folderProbe = inspectPath(path + '/__folder__');
+        if (!folderProbe.ok) continue;
+        await listFolder(key, path, depth + 1, output, visited);
       } else {
+        const inspected = inspectPath(path);
+        if (!inspected.ok) continue;
         output.push({
           path: inspected.path,
           size: Number(item?.metadata?.size || item?.size || 0) || 0,
