@@ -31,7 +31,7 @@
 <script src="/assets/admin-team-photo-v1.js?v=3"></script>
 <script src="/assets/admin-progress-popup-v1.js?v=3"></script>
 <script src="/assets/admin-performance-active-v2.js?v=3"></script>
-<script src="/assets/admin-storage-manager-v1.js?v=5"></script>
+<script src="/assets/admin-storage-manager-v1.js?v=6"></script>
 <script>
 (()=>{'use strict';
 const $=s=>document.querySelector(s),T=v=>String(v??'').trim(),K=v=>T(v).replace(/\s+/g,'').toLowerCase(),N=v=>typeof v==='number'?(Number.isFinite(v)?v:0):(Number(T(v).replace(/,/g,'').replace(/%/g,'').replace(/[^0-9.\-]/g,''))||0),F=v=>N(v).toLocaleString('th-TH',{maximumFractionDigits:0}),P=v=>N(v).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})+'%',E=v=>T(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
