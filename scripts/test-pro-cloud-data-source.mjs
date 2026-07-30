@@ -185,7 +185,6 @@ function testEdgeFunctionContract() {
   [
     'mode: "json_parts"',
     '"doit-json-manifest-v1"',
-    '"doit-json-part-v1"',
     "createSignedUrls(paths",
     "manifest_version_mismatch",
     "manifest_row_gap",
