@@ -92,14 +92,21 @@ Deno.serve(async (req: Request) => {
     // Old versions point directly to one potentially large JSON file. Inspect only
     // small objects; this prevents the Edge Function from loading legacy 40–50 MB
     // payloads into memory merely to determine their format.
-    const { data: objectInfo, error: objectInfoError } = await supabase
-      .schema("storage")
-      .from("objects")
-      .select("metadata")
-      .eq("bucket_id", BUCKET)
-      .eq("name", active.data_path)
-      .limit(1)
-      .maybeSingle();
+    const slashIndex = active.data_path.lastIndexOf("/");
+    const folder =
+      slashIndex >= 0 ? active.data_path.slice(0, slashIndex) : "";
+    const fileName =
+      slashIndex >= 0 ? active.data_path.slice(slashIndex + 1) : active.data_path;
+    const { data: listedObjects, error: objectInfoError } = await supabase.storage
+      .from(BUCKET)
+      .list(folder, {
+        limit: 100,
+        offset: 0,
+        search: fileName,
+      });
+    const objectInfo = listedObjects?.find(
+      (item) => item.id && item.name === fileName,
+    );
 
     const objectSize = Number(objectInfo?.metadata?.size);
     if (
