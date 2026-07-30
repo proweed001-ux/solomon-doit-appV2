@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import ts from "typescript";
 import { resolveCloudPayload } from "../dist/assets/pro/data-source.js";
 
 const originalFetch = globalThis.fetch;
@@ -196,6 +197,21 @@ function testEdgeFunctionContract() {
     assert.ok(source.includes(token), "Edge contract missing: " + token);
   });
   assert.ok(!source.includes('.schema("storage")'));
+  const transpiled = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.ESNext,
+    },
+    reportDiagnostics: true,
+  });
+  const syntaxErrors = (transpiled.diagnostics || []).filter(
+    (diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error,
+  );
+  assert.deepEqual(
+    syntaxErrors.map((diagnostic) => diagnostic.messageText),
+    [],
+    "Edge Function must have valid TypeScript syntax",
+  );
 }
 
 try {
