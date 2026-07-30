@@ -82,6 +82,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Foundation smoke check
         run: npm run smoke
+      - name: Admin storage deletion and folder guards
+        run: npm run test:admin-storage
       - name: Admin DOIT one-click upload regression
         run: npm run test:admin-doit-upload
       - name: Performance CD123 regression
