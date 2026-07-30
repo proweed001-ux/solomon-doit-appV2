@@ -13,7 +13,7 @@
     "preview": "vite preview --host=0.0.0.0 --port=3000",
     "clean": "rimraf dist",
     "smoke": "node scripts/smoke-check.mjs",
-    "verify": "npm run smoke && npm run test:admin-doit-upload && npm run test:fuel-price && npm run test:fuel-random-km && npm run test:pro-scope && npm run test:pro-regression && npm run test:pro-lazy && npm run test:local-xlsx && npm run test:qa-doit && npm run test:pro-redirects && npm run test:pro-architecture && npm run test:pro-modules && npm run test:pro-browser",
+    "verify": "npm run smoke && npm run test:admin-doit-upload && npm run test:fuel-price && npm run test:fuel-random-km && npm run test:pro-scope && npm run test:pro-regression && npm run test:pro-cloud && npm run test:pro-lazy && npm run test:local-xlsx && npm run test:qa-doit && npm run test:pro-redirects && npm run test:pro-architecture && npm run test:pro-modules && npm run test:pro-browser",
     "verify:react": "npm run build && npm run smoke",
     "test:pro-scope": "node scripts/test-pro-change-scope.mjs",
     "test:pro-architecture": "node scripts/test-pro-architecture.mjs",
@@ -29,7 +29,8 @@
     "test:pro-redirects": "node scripts/test-pro-redirects.mjs",
     "test:admin-storage": "node scripts/test-admin-storage-guards.mjs",
     "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\"",
-    "test:admin-doit-upload": "node scripts/test-admin-doit-upload.mjs"
+    "test:admin-doit-upload": "node scripts/test-admin-doit-upload.mjs",
+    "test:pro-cloud": "node scripts/test-pro-cloud-data-source.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.4",
