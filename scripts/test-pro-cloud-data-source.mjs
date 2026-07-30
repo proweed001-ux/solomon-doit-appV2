@@ -65,13 +65,13 @@ function multipartResponse() {
     active: { id: "version-new", row_count: 3 },
     parts: [
       {
-        part_index: 1,
+        part_index: 0,
         row_start: 0,
         row_count: 2,
         url: "https://signed/part-1",
       },
       {
-        part_index: 2,
+        part_index: 1,
         row_start: 2,
         row_count: 1,
         url: "https://signed/part-2",
@@ -85,17 +85,15 @@ function multipartRoutes() {
     "https://signed/part-1": {
       schema: "doit-json-part-v1",
       version_id: "version-new",
-      part_index: 1,
+      part_index: 0,
       row_start: 0,
-      row_count: 2,
       rows: [{ id: 1 }, { id: 2 }],
     },
     "https://signed/part-2": {
       schema: "doit-json-part-v1",
       version_id: "version-new",
-      part_index: 2,
+      part_index: 1,
       row_start: 2,
-      row_count: 1,
       rows: [{ id: 3 }],
     },
   };
