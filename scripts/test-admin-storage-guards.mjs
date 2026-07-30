@@ -13,6 +13,9 @@ for (const path of ['../outside.txt', 'doit/../performance/active.json', '/perfo
 assert.equal(_test.inspectPath('parsed/2026-04-01/old.json').deleteFolderAllowed, true);
 assert.equal(_test.inspectPath('team/old.png').deleteFolderAllowed, true);
 assert.equal(_test.inspectPath('future-folder/old.json').deleteFolderAllowed, true);
+assert.equal(_test.validFolderPath('doit'), true);
+assert.equal(_test.validFolderPath('performance/compare'), true);
+assert.equal(_test.validFolderPath('../outside'), false);
 
 const active = {
   dataPath: 'performance/2026-05-01/current.json',
