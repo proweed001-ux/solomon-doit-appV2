@@ -21,6 +21,7 @@
     "test:pro-browser": "playwright test --config=playwright.pro.config.mjs",
     "test:pro-lazy": "node scripts/test-pro-telesale-pagination.mjs",
     "test:pro-regression": "node scripts/test-pro-regression.mjs",
+    "test:pro-cloud": "node scripts/test-pro-cloud-data-source.mjs",
     "test:fuel-price": "node scripts/test-fuel-price-parser.mjs",
     "test:fuel-random-km": "node scripts/test-fuel-random-km.mjs",
     "test:fuel-warning": "node scripts/test-fuel-warning.mjs",
@@ -29,8 +30,7 @@
     "test:pro-redirects": "node scripts/test-pro-redirects.mjs",
     "test:admin-storage": "node scripts/test-admin-storage-guards.mjs",
     "check:doit": "node scripts/check-doit.mjs \"../Daily_DOIT_Template_V1.4 2026-05 - AYA (4).xlsx\"",
-    "test:admin-doit-upload": "node scripts/test-admin-doit-upload.mjs",
-    "test:pro-cloud": "node scripts/test-pro-cloud-data-source.mjs"
+    "test:admin-doit-upload": "node scripts/test-admin-doit-upload.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.4",

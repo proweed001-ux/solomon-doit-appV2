@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import ts from "typescript";
-import { resolveCloudPayload } from "../dist/assets/pro/data-source.js";
+import {
+  publicFetch,
+  resolveCloudPayload,
+} from "../dist/assets/pro/data-source.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -12,21 +15,37 @@ function jsonResponse(payload, status = 200) {
   });
 }
 
-function mockFetch(routes) {
-  globalThis.fetch = async (url) => {
+function mockFetch(routes, requests = []) {
+  globalThis.fetch = async (url, options = {}) => {
     const key = String(url);
+    requests.push(key);
     if (!(key in routes)) return jsonResponse({ error: "not_found" }, 404);
     const route = routes[key];
+    if (typeof route === "function") return route(options);
     return route instanceof Response ? route : jsonResponse(route);
   };
 }
 
+function hangingResponse({ signal }) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    signal?.addEventListener(
+      "abort",
+      () => reject(new DOMException("Aborted", "AbortError")),
+      { once: true },
+    );
+  });
+}
+
 async function testLegacyArray() {
   const rows = [{ id: 1 }, { id: 2 }];
-  mockFetch({ "https://signed/legacy": rows });
+  mockFetch({ "https://signed/legacy-array": rows });
   const payload = await resolveCloudPayload({
     mode: "json_url",
-    url: "https://signed/legacy",
+    url: "https://signed/legacy-array",
     active: { row_count: 2 },
   });
   assert.deepEqual(payload, rows);
@@ -45,11 +64,29 @@ async function testLegacyRowsObject() {
   );
 }
 
-async function testDirectPayload() {
+async function testDirectLegacyPayload() {
   const payload = { rows: [{ id: "direct" }] };
   assert.deepEqual(
-    await resolveCloudPayload({ mode: "inline", payload }),
+    await resolveCloudPayload({
+      mode: "inline",
+      payload,
+      row_count: 1,
+    }),
     payload,
+  );
+}
+
+async function testLegacyIncompleteRowsFails() {
+  mockFetch({
+    "https://signed/legacy-incomplete": [{ id: 1 }],
+  });
+  await assert.rejects(
+    resolveCloudPayload({
+      mode: "json_url",
+      url: "https://signed/legacy-incomplete",
+      active: { row_count: 2 },
+    }),
+    /จำนวนแถว JSON Cloud ไม่ครบ: ได้ 1 จาก 2/,
   );
 }
 
@@ -68,13 +105,13 @@ function multipartResponse() {
         part_index: 0,
         row_start: 0,
         row_count: 2,
-        url: "https://signed/part-1",
+        url: "https://signed/part-0",
       },
       {
         part_index: 1,
         row_start: 2,
         row_count: 1,
-        url: "https://signed/part-2",
+        url: "https://signed/part-1",
       },
     ],
   };
@@ -82,14 +119,14 @@ function multipartResponse() {
 
 function multipartRoutes() {
   return {
-    "https://signed/part-1": {
+    "https://signed/part-0": {
       schema: "doit-json-part-v1",
       version_id: "version-new",
       part_index: 0,
       row_start: 0,
       rows: [{ id: 1 }, { id: 2 }],
     },
-    "https://signed/part-2": {
+    "https://signed/part-1": {
       schema: "doit-json-part-v1",
       version_id: "version-new",
       part_index: 1,
@@ -99,8 +136,9 @@ function multipartRoutes() {
   };
 }
 
-async function testMultipartInOrderWithProgress() {
-  mockFetch(multipartRoutes());
+async function testMultipartInOrderWithoutPayloadRowCount() {
+  const requests = [];
+  mockFetch(multipartRoutes(), requests);
   const progress = [];
   const payload = await resolveCloudPayload(multipartResponse(), {
     onProgress(value) {
@@ -111,15 +149,66 @@ async function testMultipartInOrderWithProgress() {
   assert.equal(payload.schema, "doit-json-v1");
   assert.equal(payload.version_id, "version-new");
   assert.deepEqual(payload.rows, [{ id: 1 }, { id: 2 }, { id: 3 }]);
-  assert.deepEqual(progress, [
-    { partIndex: 1, partCount: 2, rowsLoaded: 2, rowCount: 3 },
-    { partIndex: 2, partCount: 2, rowsLoaded: 3, rowCount: 3 },
+  assert.deepEqual(requests, [
+    "https://signed/part-0",
+    "https://signed/part-1",
   ]);
+  assert.deepEqual(progress, [
+    {
+      phase: "loading",
+      partIndex: 1,
+      partCount: 2,
+      rowsLoaded: 0,
+      rowCount: 3,
+    },
+    {
+      phase: "loaded",
+      partIndex: 1,
+      partCount: 2,
+      rowsLoaded: 2,
+      rowCount: 3,
+    },
+    {
+      phase: "loading",
+      partIndex: 2,
+      partCount: 2,
+      rowsLoaded: 2,
+      rowCount: 3,
+    },
+    {
+      phase: "loaded",
+      partIndex: 2,
+      partCount: 2,
+      rowsLoaded: 3,
+      rowCount: 3,
+    },
+  ]);
+}
+
+async function testPartTimeoutFailsClearly() {
+  const routes = multipartRoutes();
+  routes["https://signed/part-0"] = hangingResponse;
+  mockFetch(routes);
+  await assert.rejects(
+    resolveCloudPayload(multipartResponse(), { fetchTimeoutMs: 10 }),
+    /JSON ส่วน 1\/2 ใช้เวลาเกิน 1 วินาที/,
+  );
+}
+
+async function testManifestTimeoutFailsClearly() {
+  mockFetch({
+    "https://saodmeoilixfdqentofp.supabase.co/functions/v1/doit-active?mode=data":
+      hangingResponse,
+  });
+  await assert.rejects(
+    publicFetch("data", { fetchTimeoutMs: 10 }),
+    /Cloud data ใช้เวลาเกิน 1 วินาที/,
+  );
 }
 
 async function testMissingPartFails() {
   const routes = multipartRoutes();
-  routes["https://signed/part-2"] = jsonResponse({ error: "gone" }, 404);
+  routes["https://signed/part-1"] = jsonResponse({ error: "gone" }, 404);
   mockFetch(routes);
   await assert.rejects(
     resolveCloudPayload(multipartResponse()),
@@ -127,23 +216,77 @@ async function testMissingPartFails() {
   );
 }
 
-async function testPartVersionMismatchFails() {
+async function testCorruptPartSchemaFails() {
   const routes = multipartRoutes();
-  routes["https://signed/part-2"].version_id = "another-version";
+  routes["https://signed/part-1"].schema = "broken-schema";
   mockFetch(routes);
   await assert.rejects(
     resolveCloudPayload(multipartResponse()),
-    /เป็นคนละเวอร์ชัน/,
+    /JSON ส่วน 2 ใช้ schema ไม่ถูกต้อง/,
   );
+}
+
+async function testPartVersionMismatchFails() {
+  const routes = multipartRoutes();
+  routes["https://signed/part-1"].version_id = "another-version";
+  mockFetch(routes);
+  await assert.rejects(
+    resolveCloudPayload(multipartResponse()),
+    /JSON ส่วน 2 เป็นคนละเวอร์ชัน/,
+  );
+}
+
+async function testActiveVersionMismatchFails() {
+  const response = multipartResponse();
+  response.active.id = "another-version";
+  mockFetch(multipartRoutes());
+  await assert.rejects(
+    resolveCloudPayload(response),
+    /ข้อมูล Cloud เป็นคนละเวอร์ชันกับข้อมูลที่ active/,
+  );
+}
+
+async function testZeroBasedPartIndexMismatchFails() {
+  const routes = multipartRoutes();
+  routes["https://signed/part-0"].part_index = 1;
+  mockFetch(routes);
+  await assert.rejects(
+    resolveCloudPayload(multipartResponse()),
+    /JSON ส่วน 1 มีเลขส่วนไม่ตรงกัน/,
+  );
+}
+
+async function testManifestOrderFailsBeforeFetchingPart() {
+  const response = multipartResponse();
+  response.parts[0].part_index = 1;
+  const requests = [];
+  mockFetch(multipartRoutes(), requests);
+  await assert.rejects(
+    resolveCloudPayload(response),
+    /ข้อมูล Cloud ผิดลำดับที่ส่วน 1/,
+  );
+  assert.deepEqual(requests, []);
 }
 
 async function testManifestGapFailsBeforeSecondFetch() {
   const response = multipartResponse();
   response.parts[1].row_start = 1;
-  mockFetch(multipartRoutes());
+  const requests = [];
+  mockFetch(multipartRoutes(), requests);
   await assert.rejects(
     resolveCloudPayload(response),
-    /ช่วงแถวขาดหรือซ้ำ/,
+    /ช่วงแถวขาดหรือซ้ำที่ส่วน 2/,
+  );
+  assert.deepEqual(requests, ["https://signed/part-0"]);
+}
+
+async function testPartRowCountMismatchFails() {
+  const routes = multipartRoutes();
+  routes["https://signed/part-1"].rows = [];
+  mockFetch(routes);
+  await assert.rejects(
+    resolveCloudPayload(multipartResponse()),
+    /JSON ส่วน 2 มีจำนวนแถวไม่ครบ/,
   );
 }
 
@@ -154,7 +297,7 @@ async function testIncompleteTotalFails() {
   mockFetch(multipartRoutes());
   await assert.rejects(
     resolveCloudPayload(response),
-    /จำนวนแถว JSON Cloud ไม่ครบ/,
+    /จำนวนแถว JSON Cloud ไม่ครบ: ได้ 3 จาก 4/,
   );
 }
 
@@ -215,16 +358,24 @@ function testEdgeFunctionContract() {
 try {
   await testLegacyArray();
   await testLegacyRowsObject();
-  await testDirectPayload();
-  await testMultipartInOrderWithProgress();
+  await testDirectLegacyPayload();
+  await testLegacyIncompleteRowsFails();
+  await testMultipartInOrderWithoutPayloadRowCount();
+  await testPartTimeoutFailsClearly();
+  await testManifestTimeoutFailsClearly();
   await testMissingPartFails();
+  await testCorruptPartSchemaFails();
   await testPartVersionMismatchFails();
+  await testActiveVersionMismatchFails();
+  await testZeroBasedPartIndexMismatchFails();
+  await testManifestOrderFailsBeforeFetchingPart();
   await testManifestGapFailsBeforeSecondFetch();
+  await testPartRowCountMismatchFails();
   await testIncompleteTotalFails();
   await testOldBackendManifestFailsClearly();
   testEdgeFunctionContract();
   console.log(
-    "Pro Cloud data source passed: legacy JSON, multipart JSON, progress, and corruption guards.",
+    "Pro Cloud data source passed: legacy Array/{rows}, v7 multipart, zero-based order, progress, corruption guards, and Edge contract.",
   );
 } finally {
   globalThis.fetch = originalFetch;

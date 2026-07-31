@@ -135,7 +135,7 @@
         <section class="card tableCard">
           <div class="tableTop modeTop">
             <div class="tableTitleBox">
-              <h3>รายการถอดของ</h3>
+              <h3 id="modeHeading">ถอดของ Pro</h3>
               <div id="tableCount" class="hint">โหลดไฟล์เพื่อแสดงข้อมูล</div>
             </div>
             <div id="displayActionButtons" class="displayActionButtons">
@@ -145,7 +145,7 @@
             <div class="tabs">
               <button class="tab on">ถอดของ Pro</button
               ><button class="tab">กระจายสินค้า</button
-              ><button class="tab">ใบส่งร้านจริง</button
+              ><button class="tab">บิลจริง</button
               ><button class="tab">จัดแล้ว</button
               ><button class="tab">รายการดิบ</button
               ><button class="tab orderTab">รวม order</button>
@@ -153,7 +153,7 @@
           </div>
           <div class="sendBar">
             <div class="sendLabel">
-              <span>ส่งให้ร้าน:</span
+              <span id="sendLabelText">ส่งให้ร้าน:</span
               ><button class="pickBtn" data-pick="receivers">
                 <b id="sendText">ยังไม่เลือก</b><span>▾</span>
               </button>
@@ -175,6 +175,7 @@
               </tbody>
             </table>
           </div>
+          <div id="realBills" class="realBills" hidden></div>
           <div class="pagination" id="pager"></div>
         </section>
         <div class="bottomBar">
