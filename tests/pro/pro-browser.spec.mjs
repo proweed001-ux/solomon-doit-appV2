@@ -993,11 +993,9 @@ test("flushes a focused quantity before autosave and state-changing commands", a
   });
   await expect(secondSend).toHaveValue("2");
 
-  await page.evaluate(async () => {
-    const stateModule = await import("/assets/pro/state.js");
-    stateModule.state.pageSize = 1;
-    document.querySelector("#searchBtn").click();
-  });
+  page.once("dialog", (dialog) => dialog.accept("1"));
+  await page.locator("#displayBtn").click();
+  await expect(page.locator("#pager")).toContainText("1/");
   const beforePage = await quantitySnapshot(page, "send", 0);
   await firstSend.focus();
   await firstSend.fill("5");
@@ -1746,6 +1744,8 @@ test("keeps large real-bill tabs, pickers and pagination responsive", async ({
   await expect(page.locator("#pickList .pickItem")).toHaveCount(5);
   await page.locator("#pickClose").click();
 
+  await page.locator("#q").fill("");
+  await page.locator("#searchBtn").click();
   const beforeDrawer = metrics;
   const drawerStart = Date.now();
   await page.locator("#teleBtn").click();
