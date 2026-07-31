@@ -56,10 +56,13 @@ import {
   createSelection,
   createFilterContexts,
   HISTORY_MAX_BYTES,
+  PAGE_SIZE_DEFAULT,
+  PAGE_SIZE_MAX,
   historyStats,
   loadState,
   mapVal,
   mergeSelection,
+  normalizePageSize,
   push,
   rkey,
   restore,
@@ -71,6 +74,10 @@ import {
   switchFilterContext,
   trimHistory,
 } from "../dist/assets/pro/state.js";
+import {
+  buildTelesaleBills,
+  filterTelesaleBills,
+} from "../dist/assets/pro/telesale.js";
 
 const fixture = JSON.parse(
   fs.readFileSync("scripts/fixtures/pro-regression-v1.json", "utf8"),
@@ -166,6 +173,62 @@ assert.ok(
     groups.reduce((sum, item) => sum + item.netAmt, 0) * 1.07 -
       fixture.expected.vatAmount,
   ) < 1e-9,
+);
+
+const searchableTelesaleBills = buildTelesaleBills([
+  {
+    date: "2026-07-01",
+    inv: "TS-SEARCH-1",
+    store: "ร้านค้นหา",
+    tele: "TELE-SEARCH",
+    code: "MATCH-CODE",
+    sku: "สินค้าที่ค้นหา",
+    ps: "PS001",
+    brand: "Brand A",
+    type: "INVC",
+    qty: 1,
+    amt: 10,
+  },
+  {
+    date: "2026-07-01",
+    inv: "TS-SEARCH-1",
+    store: "ร้านค้นหา",
+    tele: "TELE-SEARCH",
+    code: "FULL-BILL-LINE",
+    sku: "สินค้าอีกบรรทัด",
+    ps: "PS001",
+    brand: "Brand B",
+    type: "INVC",
+    qty: 2,
+    amt: 20,
+  },
+  {
+    date: "2026-07-01",
+    inv: "TS-SEARCH-2",
+    store: "ร้านอื่น",
+    tele: "TELE-OTHER",
+    code: "OTHER-CODE",
+    sku: "สินค้าอื่น",
+    ps: "PS001",
+    brand: "Brand C",
+    type: "INVC",
+    qty: 3,
+    amt: 30,
+  },
+]);
+const searchedTelesale = filterTelesaleBills(
+  searchableTelesaleBills,
+  "MATCH-CODE",
+);
+assert.equal(searchedTelesale.length, 1);
+assert.equal(
+  searchedTelesale[0].lines.length,
+  2,
+  "Telesale search must preserve every line in the matching bill",
+);
+assert.equal(
+  filterTelesaleBills(searchableTelesaleBills, "TELE-OTHER")[0].store,
+  "ร้านอื่น",
 );
 assert.equal(sentQty, fixture.expected.sentQty);
 assert.equal(remainingQty, fixture.expected.remainingQty);
@@ -1538,6 +1601,10 @@ assert.deepEqual(mergeSelection({ receivers: ["ร้านเดิม"] }), {
   brands: [],
   types: [],
 });
+assert.equal(normalizePageSize(-1), PAGE_SIZE_DEFAULT);
+assert.equal(normalizePageSize(1.5), PAGE_SIZE_DEFAULT);
+assert.equal(normalizePageSize(PAGE_SIZE_MAX + 1), PAGE_SIZE_DEFAULT);
+assert.equal(normalizePageSize(12), 12);
 const memory = new Map();
 globalThis.localStorage = {
   getItem: (key) => memory.get(key) ?? null,
@@ -1568,6 +1635,14 @@ state.sel = createSelection();
 loadState();
 assert.deepEqual(state.sel.billStores, ["ร้าน TS"], "Autosave/reload must retain billStores");
 assert.equal(sk(), "doit-core-unified-v1:legacy-state");
+const originalSetItem = globalThis.localStorage.setItem;
+globalThis.localStorage.setItem = () => {
+  throw new DOMException("quota reached", "QuotaExceededError");
+};
+const failedSave = save();
+assert.equal(failedSave.ok, false);
+assert.match(failedSave.error, /quota reached/);
+globalThis.localStorage.setItem = originalSetItem;
 
 state.mode = "pick";
 state.sel = createSelection();
@@ -1712,8 +1787,8 @@ assert.match(
 );
 assert.match(
   coreSource,
-  /onInput:[\s\S]*state\[input\.dataset\.map\]\[input\.dataset\.k\]\s*=\s*N\(input\.value\)/,
-  "Input must update the authoritative quantity state",
+  /onInput:[\s\S]*value === 0\) delete map\[input\.dataset\.k\][\s\S]*else map\[input\.dataset\.k\] = value/,
+  "Input must update authoritative quantity state without retaining zero keys",
 );
 assert.match(
   sendStoreSource,

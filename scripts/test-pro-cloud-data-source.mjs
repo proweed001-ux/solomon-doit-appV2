@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import ts from "typescript";
-import { resolveCloudPayload } from "../dist/assets/pro/data-source.js";
+import {
+  publicFetch,
+  resolveCloudPayload,
+} from "../dist/assets/pro/data-source.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -13,14 +16,28 @@ function jsonResponse(payload, status = 200) {
 }
 
 function mockFetch(routes, requests = []) {
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (url, options = {}) => {
     const key = String(url);
     requests.push(key);
     if (!(key in routes)) return jsonResponse({ error: "not_found" }, 404);
     const route = routes[key];
-    if (typeof route === "function") return route();
+    if (typeof route === "function") return route(options);
     return route instanceof Response ? route : jsonResponse(route);
   };
+}
+
+function hangingResponse({ signal }) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    signal?.addEventListener(
+      "abort",
+      () => reject(new DOMException("Aborted", "AbortError")),
+      { once: true },
+    );
+  });
 }
 
 async function testLegacyArray() {
@@ -137,9 +154,56 @@ async function testMultipartInOrderWithoutPayloadRowCount() {
     "https://signed/part-1",
   ]);
   assert.deepEqual(progress, [
-    { partIndex: 1, partCount: 2, rowsLoaded: 2, rowCount: 3 },
-    { partIndex: 2, partCount: 2, rowsLoaded: 3, rowCount: 3 },
+    {
+      phase: "loading",
+      partIndex: 1,
+      partCount: 2,
+      rowsLoaded: 0,
+      rowCount: 3,
+    },
+    {
+      phase: "loaded",
+      partIndex: 1,
+      partCount: 2,
+      rowsLoaded: 2,
+      rowCount: 3,
+    },
+    {
+      phase: "loading",
+      partIndex: 2,
+      partCount: 2,
+      rowsLoaded: 2,
+      rowCount: 3,
+    },
+    {
+      phase: "loaded",
+      partIndex: 2,
+      partCount: 2,
+      rowsLoaded: 3,
+      rowCount: 3,
+    },
   ]);
+}
+
+async function testPartTimeoutFailsClearly() {
+  const routes = multipartRoutes();
+  routes["https://signed/part-0"] = hangingResponse;
+  mockFetch(routes);
+  await assert.rejects(
+    resolveCloudPayload(multipartResponse(), { fetchTimeoutMs: 10 }),
+    /JSON ส่วน 1\/2 ใช้เวลาเกิน 1 วินาที/,
+  );
+}
+
+async function testManifestTimeoutFailsClearly() {
+  mockFetch({
+    "https://saodmeoilixfdqentofp.supabase.co/functions/v1/doit-active?mode=data":
+      hangingResponse,
+  });
+  await assert.rejects(
+    publicFetch("data", { fetchTimeoutMs: 10 }),
+    /Cloud data ใช้เวลาเกิน 1 วินาที/,
+  );
 }
 
 async function testMissingPartFails() {
@@ -297,6 +361,8 @@ try {
   await testDirectLegacyPayload();
   await testLegacyIncompleteRowsFails();
   await testMultipartInOrderWithoutPayloadRowCount();
+  await testPartTimeoutFailsClearly();
+  await testManifestTimeoutFailsClearly();
   await testMissingPartFails();
   await testCorruptPartSchemaFails();
   await testPartVersionMismatchFails();

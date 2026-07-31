@@ -1,5 +1,40 @@
 export const ACTIVE_ENDPOINT =
   "https://saodmeoilixfdqentofp.supabase.co/functions/v1/doit-active";
+export const CLOUD_FETCH_TIMEOUT_MS = 30_000;
+
+function timeoutMs(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0
+    ? number
+    : CLOUD_FETCH_TIMEOUT_MS;
+}
+
+async function fetchTextWithTimeout(url, options, label, requestedTimeoutMs) {
+  const controller = new AbortController();
+  const duration = timeoutMs(requestedTimeoutMs);
+  const timer = setTimeout(() => controller.abort(), duration);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    return { response, text };
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(
+        label + " ใช้เวลาเกิน " + Math.ceil(duration / 1_000) + " วินาที",
+      );
+    }
+    throw new Error(
+      label +
+        " เชื่อมต่อไม่สำเร็จ" +
+        (error?.message ? ": " + error.message : ""),
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function positiveInt(value, label, allowZero = false) {
   const number = Number(value);
@@ -9,25 +44,27 @@ function positiveInt(value, label, allowZero = false) {
   return number;
 }
 
-async function fetchJson(url, label) {
+async function fetchJson(url, label, requestedTimeoutMs) {
   if (!url) throw new Error("ข้อมูล Cloud ไม่ถูกต้อง: ไม่มี URL สำหรับ " + label);
 
-  const response = await fetch(url, {
-    headers: { Accept: "application/json" },
-  });
+  const { response, text } = await fetchTextWithTimeout(
+    url,
+    { headers: { Accept: "application/json" } },
+    label,
+    requestedTimeoutMs,
+  );
   if (!response.ok) {
-    const errorText = await response.text();
     throw new Error(
       label +
         " โหลดไม่สำเร็จ (HTTP " +
         response.status +
         ")" +
-        (errorText ? ": " + errorText.slice(0, 180) : ""),
+        (text ? ": " + text.slice(0, 180) : ""),
     );
   }
 
   try {
-    return await response.json();
+    return JSON.parse(text);
   } catch {
     throw new Error(label + " ไม่ใช่ JSON ที่สมบูรณ์");
   }
@@ -67,7 +104,11 @@ function assertLegacyPayload(payload, response) {
   return payload;
 }
 
-async function resolveMultipartPayload(response, onProgress) {
+async function resolveMultipartPayload(
+  response,
+  onProgress,
+  requestedTimeoutMs,
+) {
   const parts = response?.parts;
   const partCount = positiveInt(response?.part_count, "part_count");
   const rowCount = positiveInt(response?.row_count, "row_count", true);
@@ -120,9 +161,17 @@ async function resolveMultipartPayload(response, onProgress) {
       );
     }
 
+    onProgress({
+      phase: "loading",
+      partIndex: displayPartIndex,
+      partCount,
+      rowsLoaded: rows.length,
+      rowCount,
+    });
     const payload = await fetchJson(
       descriptor.url,
       "JSON ส่วน " + displayPartIndex + "/" + partCount,
+      requestedTimeoutMs,
     );
     if (payload?.schema !== "doit-json-part-v1") {
       throw new Error(
@@ -166,6 +215,7 @@ async function resolveMultipartPayload(response, onProgress) {
     rows.push(...payload.rows);
     nextRowStart += descriptorCount;
     onProgress({
+      phase: "loaded",
       partIndex: displayPartIndex,
       partCount,
       rowsLoaded: rows.length,
@@ -197,11 +247,13 @@ async function resolveMultipartPayload(response, onProgress) {
   };
 }
 
-export async function publicFetch(mode) {
-  const response = await fetch(ACTIVE_ENDPOINT + "?mode=" + mode, {
-    headers: { Accept: "application/json" },
-  });
-  const text = await response.text();
+export async function publicFetch(mode, options = {}) {
+  const { response, text } = await fetchTextWithTimeout(
+    ACTIVE_ENDPOINT + "?mode=" + mode,
+    { headers: { Accept: "application/json" } },
+    "Cloud " + mode,
+    options.fetchTimeoutMs,
+  );
   if (!response.ok) throw new Error(text || String(response.status));
   try {
     return JSON.parse(text);
@@ -213,12 +265,35 @@ export async function publicFetch(mode) {
 export async function resolveCloudPayload(response, options = {}) {
   const onProgress =
     typeof options.onProgress === "function" ? options.onProgress : () => {};
+  const requestedTimeoutMs = options.fetchTimeoutMs;
 
   if (response?.mode === "json_parts") {
-    return resolveMultipartPayload(response, onProgress);
+    return resolveMultipartPayload(
+      response,
+      onProgress,
+      requestedTimeoutMs,
+    );
   }
   if (response?.mode === "json_url") {
-    const payload = await fetchJson(response.url, "JSON Cloud");
+    onProgress({
+      phase: "loading",
+      partIndex: 1,
+      partCount: 1,
+      rowsLoaded: 0,
+      rowCount: expectedRowCount(response) ?? 0,
+    });
+    const payload = await fetchJson(
+      response.url,
+      "JSON Cloud",
+      requestedTimeoutMs,
+    );
+    onProgress({
+      phase: "loaded",
+      partIndex: 1,
+      partCount: 1,
+      rowsLoaded: rowsFromLegacyPayload(payload)?.length || 0,
+      rowCount: expectedRowCount(response) ?? 0,
+    });
     return assertLegacyPayload(payload, response);
   }
   if (response?.payload !== undefined) {

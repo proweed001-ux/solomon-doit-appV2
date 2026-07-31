@@ -2,6 +2,26 @@ import { N, SEP, T } from "./utils.js";
 
 export const HISTORY_MAX_ENTRIES = 80;
 export const HISTORY_MAX_BYTES = 2 * 1024 * 1024;
+export const PAGE_SIZE_DEFAULT = 80;
+export const PAGE_SIZE_MIN = 1;
+export const PAGE_SIZE_MAX = 200;
+
+export function normalizePageSize(value, fallback = PAGE_SIZE_DEFAULT) {
+  const number = Number(value);
+  if (
+    Number.isInteger(number) &&
+    number >= PAGE_SIZE_MIN &&
+    number <= PAGE_SIZE_MAX
+  ) {
+    return number;
+  }
+  const fallbackNumber = Number(fallback);
+  return Number.isInteger(fallbackNumber) &&
+    fallbackNumber >= PAGE_SIZE_MIN &&
+    fallbackNumber <= PAGE_SIZE_MAX
+    ? fallbackNumber
+    : PAGE_SIZE_DEFAULT;
+}
 
 export const createSelection = () => ({
   dates: [],
@@ -70,7 +90,7 @@ export const state = {
   key: "active",
   q: "",
   page: 1,
-  pageSize: 80,
+  pageSize: PAGE_SIZE_DEFAULT,
   mode: "pick",
   showDetails: false,
   bound: false,
@@ -222,7 +242,7 @@ export function restore(snapshot) {
     state.pull = saved.pull || {};
     state.ins = saved.ins || [];
     state.page = saved.page || 1;
-    state.pageSize = saved.pageSize || 80;
+    state.pageSize = normalizePageSize(saved.pageSize);
     state.mode = saved.mode || "pick";
     state.filterContexts = mergeFilterContexts(saved.filterContexts);
     if (!applyFilterContext(state.filterContexts[filterContextKey()])) {
@@ -242,22 +262,30 @@ export function sk() {
 
 export function save() {
   syncCurrentFilterContext();
-  localStorage.setItem(
-    sk(),
-    JSON.stringify({
-      sel: state.sel,
-      filterContexts: state.filterContexts,
-      q: state.q,
-      send: state.send,
-      add: state.add,
-      pull: state.pull,
-      ins: state.ins,
-      mode: state.mode,
-      pageSize: state.pageSize,
-      showDetails: state.showDetails,
-      remainView: state.remainView,
-    }),
-  );
+  try {
+    localStorage.setItem(
+      sk(),
+      JSON.stringify({
+        sel: state.sel,
+        filterContexts: state.filterContexts,
+        q: state.q,
+        send: state.send,
+        add: state.add,
+        pull: state.pull,
+        ins: state.ins,
+        mode: state.mode,
+        pageSize: normalizePageSize(state.pageSize),
+        showDetails: state.showDetails,
+        remainView: state.remainView,
+      }),
+    );
+    return { ok: true, error: "" };
+  } catch (error) {
+    return {
+      ok: false,
+      error: T(error?.message) || "พื้นที่จัดเก็บในเครื่องไม่พร้อมใช้งาน",
+    };
+  }
 }
 
 export function loadState() {
@@ -274,7 +302,7 @@ export function loadState() {
     if (!applyFilterContext(state.filterContexts[filterContextKey()])) {
       syncCurrentFilterContext();
     }
-    state.pageSize = saved.pageSize || state.pageSize;
+    state.pageSize = normalizePageSize(saved.pageSize, state.pageSize);
     state.showDetails = Boolean(saved.showDetails);
     state.remainView = saved.remainView || state.remainView || "all";
   } catch {}

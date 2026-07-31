@@ -470,13 +470,18 @@ test("commits send, add and pull as one authoritative edit session", async ({
   await firstSend.press("Tab");
   const afterClear = await quantitySnapshot(page, "send", 0);
   expect(afterClear.dom).toBe("");
-  expect(afterClear.stateValue).toBe(0);
-  expect(afterClear.storedValue).toBe(0);
+  expect(afterClear.stateValue).toBeNull();
+  expect(afterClear.storedValue).toBeNull();
+  expect(afterClear.stateHasKey).toBe(false);
+  expect(afterClear.storedHasKey).toBe(false);
   expect(afterClear.history).toBe(beforeClear.history + 1);
   await page.locator("#undo").click();
   await expect(firstSend).toHaveValue("12");
   await page.locator("#redo").click();
   await expect(firstSend).toHaveValue("");
+  const afterClearRedo = await quantitySnapshot(page, "send", 0);
+  expect(afterClearRedo.stateHasKey).toBe(false);
+  expect(afterClearRedo.storedHasKey).toBe(false);
   await expect(page.locator('[data-pick="receivers"]')).toContainText(
     fixtureMeta.receiver,
   );
@@ -612,6 +617,20 @@ test("moves changed and unchanged quantity inputs exactly once", async ({
   expect(afterPullEnter.stateValue).toBeNull();
   expect(afterPullEnter.storedValue).toBeNull();
 
+  await sendInputs.first().focus();
+  await sendInputs.first().press("Shift+Tab");
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe(
+    "showDetailBtn",
+  );
+
+  await sendInputs.last().focus();
+  await sendInputs.last().press("Tab");
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe("undo");
+
+  await pullInputs.last().focus();
+  await pullInputs.last().press("Tab");
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe("undo");
+
   expect(runtime.errors).toEqual([]);
 });
 
@@ -725,6 +744,110 @@ test("does not add history or clear redo when a picker is applied without change
   expect(redone.dom).toBe("1");
   expect(redone.stateValue).toBe(1);
   expect(redone.redo).toBe(0);
+  expect(runtime.errors).toEqual([]);
+});
+
+test("does not add history or clear redo for no-op commands and cancelled prompts", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+  await chooseOnly(page, "receivers", fixtureMeta.receiver);
+
+  const firstSend = page
+    .locator('#table input.jdata[data-map="send"]')
+    .first();
+  await firstSend.fill("1");
+  await firstSend.press("Tab");
+  await page.locator("#undo").click();
+
+  const historyState = () =>
+    page.evaluate(async () => {
+      const stateModule = await import("/assets/pro/state.js");
+      return {
+        history: stateModule.state.hist.length,
+        redo: stateModule.state.redoStack.length,
+      };
+    });
+  const beforeNoOps = await historyState();
+  expect(beforeNoOps.redo).toBe(1);
+
+  await page.locator(".tabs .tab").first().click();
+  await page.locator("#searchBtn").click();
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.locator("#displayBtn").click();
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.locator("#insertBtn").click();
+
+  expect(await historyState()).toEqual(beforeNoOps);
+  await page.locator("#redo").click();
+  await expect(firstSend).toHaveValue("1");
+  expect(runtime.errors).toEqual([]);
+});
+
+test("validates page size without corrupting pagination", async ({ page }) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+
+  const pageState = () =>
+    page.evaluate(async () => {
+      const stateModule = await import("/assets/pro/state.js");
+      return {
+        pageSize: stateModule.state.pageSize,
+        history: stateModule.state.hist.length,
+      };
+    });
+  const baseline = await pageState();
+
+  page.once("dialog", (dialog) => dialog.accept("-1"));
+  await page.locator("#displayBtn").click();
+  await expect(page.locator("#msg")).toContainText(
+    "จำนวนแถวต้องเป็นเลขจำนวนเต็ม",
+  );
+  expect(await pageState()).toEqual(baseline);
+
+  page.once("dialog", (dialog) => dialog.accept("201"));
+  await page.locator("#displayBtn").click();
+  expect(await pageState()).toEqual(baseline);
+
+  page.once("dialog", (dialog) => dialog.accept("12"));
+  await page.locator("#displayBtn").click();
+  const changed = await pageState();
+  expect(changed.pageSize).toBe(12);
+  expect(changed.history).toBe(baseline.history + 1);
+  await expect(page.locator("#table tbody tr[data-pool-key]")).toHaveCount(12);
+  expect(runtime.errors).toEqual([]);
+});
+
+test("reports local workbook and LocalStorage failures without page errors", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+  await expect(page.locator("#file")).toHaveValue("");
+
+  await page.locator("#file").setInputFiles({
+    name: "broken.xlsx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: Buffer.alloc(0),
+  });
+  await expect(page.locator("#msg")).toContainText("โหลดไฟล์ไม่สำเร็จ");
+  await expect(page.locator("#file")).toHaveValue("");
+
+  await page.evaluate(() => {
+    const originalSetItem = Storage.prototype.setItem;
+    window.__restoreStorageSetItem = () => {
+      Storage.prototype.setItem = originalSetItem;
+    };
+    Storage.prototype.setItem = () => {
+      throw new DOMException("fixture quota", "QuotaExceededError");
+    };
+  });
+  await page.locator("#autosaveBtn").click();
+  await expect(page.locator("#msg")).toContainText("บันทึกไม่สำเร็จ");
+  await expect(page.locator("#msg")).toContainText("fixture quota");
+  await page.evaluate(() => window.__restoreStorageSetItem());
   expect(runtime.errors).toEqual([]);
 });
 
@@ -990,6 +1113,33 @@ test("combines PS and Telesale in the real Combined Order tab for XLSX and XLSM"
 
     await page.locator("#clearFilter").click();
   }
+  expect(runtime.errors).toEqual([]);
+});
+
+test("searches Telesale drawer by product while preserving the full bill", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+
+  await page.locator("#q").fill("TSKU-001");
+  await page.locator("#searchBtn").click();
+  await page.locator("#teleBtn").click();
+  await expect(page.locator("#teleDrawer")).toHaveClass(/on/);
+  await expect(page.locator("#drawerBody .teleBill")).toHaveCount(1);
+  await expect(page.locator("#drawerBody")).toContainText(
+    "สินค้า Telesale 001",
+  );
+  await expect(page.locator("#drawerBody")).toContainText(
+    fixtureMeta.numericProductName,
+  );
+  await expect(page.locator("#teleBtn")).toContainText("(1)");
+
+  await page.locator("#closeDrawer").click();
+  await page.locator("#q").fill(fixtureMeta.realTsStore);
+  await page.locator("#searchBtn").click();
+  await page.locator("#teleBtn").click();
+  await expect(page.locator("#drawerBody .teleBill")).toHaveCount(2);
   expect(runtime.errors).toEqual([]);
 });
 
@@ -2177,8 +2327,8 @@ test("loads v7 multipart Cloud data in order and restores the load button", asyn
   await page.locator("#cloudLoadBtn").click();
   await expect.poll(() => partRequests.length).toBe(2);
   await expect(page.locator("#cloudLoadBtn")).toBeDisabled();
-  await expect(page.locator("#cloudLoadBtn")).toHaveText("กำลังโหลด 1/2");
-  await expect(page.locator("#cloudMsg")).toContainText("กำลังโหลดส่วน 1/2");
+  await expect(page.locator("#cloudLoadBtn")).toHaveText("กำลังโหลด 2/2");
+  await expect(page.locator("#cloudMsg")).toContainText("กำลังโหลดส่วน 2/2");
 
   releaseSecondPart();
   await expect(page.locator("#msg")).toContainText("โหลดสำเร็จ 3 แถว");

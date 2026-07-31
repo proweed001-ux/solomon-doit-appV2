@@ -7,8 +7,10 @@ import { buildOrderPrintPayload, renderOrderMode } from "./order.js";
 import { renderDoneMode } from "./done.js";
 import {
   buildTelesaleBills,
+  filterTelesaleBills,
   renderTelesaleDrawer,
   TELE_PAGE_SIZE,
+  telesaleRowMatchesQuery,
 } from "./telesale.js";
 import {
   $,
@@ -41,6 +43,9 @@ import {
   trimHistory,
   restoreHistoryCheckpoint,
   switchFilterContext,
+  PAGE_SIZE_MIN,
+  PAGE_SIZE_MAX,
+  normalizePageSize,
 } from "./state.js";
 import { norm, arr, parseDoitFile } from "./parser-adapter.js";
 import {
@@ -115,10 +120,23 @@ import { preparePrint } from "./print.js";
   const REAL_BILL_PICKER_WINDOW = 120;
   let fullRenderSequence = 0;
   let activeFullRender = null;
+  let persistenceError = "";
 
   function msg(s) {
     const m = $("#msg");
-    if (m) m.textContent = s;
+    if (m) {
+      m.textContent =
+        s +
+        (persistenceError
+          ? " · บันทึกในเครื่องไม่สำเร็จ: " + persistenceError
+          : "");
+    }
+  }
+  function persistState() {
+    const result = save();
+    persistenceError = result.ok ? "" : result.error;
+    if (!result.ok) msg("ไม่สามารถบันทึก State ลงในเครื่องได้");
+    return result;
   }
   function cloud(s) {
     const m = $("#cloudMsg");
@@ -418,6 +436,20 @@ import { preparePrint } from "./print.js";
       [...leftValues].every((value) => rightValues.has(value))
     );
   }
+  function sameSelectionState(left, right) {
+    return Object.keys(createSelection()).every((key) =>
+      sameSelection(left?.[key], right?.[key]),
+    );
+  }
+  function clearedSelection() {
+    const next = createSelection();
+    if (state.mode === "ship") {
+      next.receivers = [...state.sel.receivers];
+    } else {
+      next.billStores = [...state.sel.billStores];
+    }
+    return next;
+  }
   function applyPick() {
     if (state.mode === "ship" && !realBillPickerSession?.options) {
       return msg("กำลังเตรียมตัวเลือก กรุณารอสักครู่");
@@ -571,7 +603,7 @@ import { preparePrint } from "./print.js";
         if (pkKey(k) === id) delete o[k];
       }),
     );
-    save();
+    persistState();
     render();
     msg("ลบสินค้าแทรกแล้ว");
   }
@@ -789,13 +821,21 @@ import { preparePrint } from "./print.js";
         onEditStart: quantityEditCheckpoint,
         onRevert: revertQuantityEdit,
         onInput: (input) => {
-          state[input.dataset.map][input.dataset.k] = N(input.value);
+          const map = state[input.dataset.map];
+          const value = N(input.value);
+          if (!T(input.value) || value === 0) delete map[input.dataset.k];
+          else map[input.dataset.k] = value;
           recalcPickRow(input.closest("tr"));
         },
         onCommit: (input, { render: shouldRender = true } = {}) => {
-          state[input.dataset.map][input.dataset.k] = N(input.value);
-          save();
-          if (!shouldRender) return;
+          const map = state[input.dataset.map];
+          const value = N(input.value);
+          if (!T(input.value) || value === 0) delete map[input.dataset.k];
+          else map[input.dataset.k] = value;
+          if (!shouldRender) {
+            persistState();
+            return;
+          }
           render();
         },
       });
@@ -978,6 +1018,7 @@ import { preparePrint } from "./print.js";
       rowsVersion,
       state.sel.dates,
       state.sel.ps,
+      T(state.q),
     ]);
   }
   function invalidateTelesale() {
@@ -991,7 +1032,14 @@ import { preparePrint } from "./print.js";
     if (telesaleCache.countSignature !== signature) {
       const keys = new Set();
       state.rows.forEach((row) => {
-        if (!row.isTele || !okDate(row) || !okPs(row)) return;
+        if (
+          !row.isTele ||
+          !okDate(row) ||
+          !okPs(row) ||
+          !telesaleRowMatchesQuery(row, state.q)
+        ) {
+          return;
+        }
         keys.add([row.inv, row.store, row.tele, row.date].join("|"));
       });
       telesaleCache.count = keys.size;
@@ -1003,7 +1051,10 @@ import { preparePrint } from "./print.js";
   function teleBills() {
     const signature = telesaleSignature();
     if (telesaleCache.signature !== signature) {
-      telesaleCache.bills = buildTelesaleBills(teleRows());
+      telesaleCache.bills = filterTelesaleBills(
+        buildTelesaleBills(teleRows()),
+        state.q,
+      );
       telesaleCache.signature = signature;
       corePerformance.telesaleModelBuilds += 1;
     }
@@ -1071,7 +1122,7 @@ import { preparePrint } from "./print.js";
     const renderPending = Boolean(renderMode(pool, renderId));
     updateTelesaleButton();
     if ($("#teleDrawer")?.classList.contains("on")) renderTele();
-    save();
+    persistState();
     if (!renderPending) markFullRenderReady(renderId);
   }
   function loadData(p, m = {}) {
@@ -1155,7 +1206,7 @@ import { preparePrint } from "./print.js";
           button.textContent =
             "กำลังโหลด " + progress.partIndex + "/" + progress.partCount;
           cloud(
-            "กำลังโหลดส่วน " +
+            (progress.phase === "loaded" ? "โหลดแล้วส่วน " : "กำลังโหลดส่วน ") +
               progress.partIndex +
               "/" +
               progress.partCount +
@@ -1178,20 +1229,37 @@ import { preparePrint } from "./print.js";
   }
   async function loadFile(file) {
     const json = await parseDoitFile(file);
+    if (!Array.isArray(json) || !json.length) {
+      throw new Error("ไม่พบข้อมูลแถวในไฟล์");
+    }
     loadData(json, {
       file_name: file.name,
       id: file.name,
     });
   }
   function addInsert() {
-    commitPendingQuantityEdit({ render: false, reason: "add-insert" });
-    push();
-    const name = T(prompt("ชื่อสินค้าที่ต้องการแทรก"));
-    if (!name) return;
-    const qty = N(prompt("จำนวนออเดอร์รวม", "0")),
-      unit = N(prompt("ราคา/หน่วย ถ้าไม่รู้ใส่ 0", "0")),
-      code = T(prompt("รหัสสินค้า ถ้ามี ไม่บังคับ", "")),
+    const committed = commitPendingQuantityEdit({
+      render: false,
+      reason: "add-insert",
+    });
+    const cancelInsert = () => {
+      if (committed) render();
+      msg("ยกเลิกการแทรกสินค้า");
+    };
+    const nameInput = prompt("ชื่อสินค้าที่ต้องการแทรก");
+    const name = T(nameInput);
+    if (!name) return cancelInsert();
+    const qtyInput = prompt("จำนวนออเดอร์รวม", "0");
+    if (qtyInput == null) return cancelInsert();
+    const unitInput = prompt("ราคา/หน่วย ถ้าไม่รู้ใส่ 0", "0");
+    if (unitInput == null) return cancelInsert();
+    const codeInput = prompt("รหัสสินค้า ถ้ามี ไม่บังคับ", "");
+    if (codeInput == null) return cancelInsert();
+    const qty = N(qtyInput),
+      unit = N(unitInput),
+      code = T(codeInput),
       id = "INSERT:" + Date.now();
+    push();
     state.ins.push({
       id,
       name,
@@ -1199,7 +1267,7 @@ import { preparePrint } from "./print.js";
       unit,
       code,
     });
-    save();
+    persistState();
     msg("แทรกสินค้าแล้ว: " + name);
     render();
   }
@@ -1265,14 +1333,18 @@ import { preparePrint } from "./print.js";
     state.send = {};
     state.add = {};
     state.pull = {};
-    save();
+    persistState();
     render();
     msg("รีเซ็ตแล้ว");
   }
   function autosave() {
     commitPendingQuantityEdit({ render: false, reason: "autosave" });
-    save();
-    msg("บันทึกแล้ว " + new Date().toLocaleTimeString("th-TH"));
+    const result = persistState();
+    msg(
+      result.ok
+        ? "บันทึกแล้ว " + new Date().toLocaleTimeString("th-TH")
+        : "บันทึกไม่สำเร็จ",
+    );
   }
   function patchBrandTitle() {
     document.title = TITLE;
@@ -1296,10 +1368,14 @@ import { preparePrint } from "./print.js";
       if (b && !b.dataset.bound) {
         b.dataset.bound = "1";
         b.onclick = () => {
-          commitPendingQuantityEdit({
+          const committed = commitPendingQuantityEdit({
             render: false,
             reason: "remain-mode",
           });
+          if (state.mode === "remain") {
+            if (committed) render();
+            return msg("อยู่ในโหมดสรุปของเหลือแล้ว");
+          }
           push();
           state.mode = "remain";
           state.page = 1;
@@ -1339,35 +1415,56 @@ import { preparePrint } from "./print.js";
     state.bound = true;
     fixUi();
     $("#choose").onclick = () => $("#file").click();
-    $("#file").onchange = (e) =>
-      e.target.files[0] && loadFile(e.target.files[0]);
+    $("#file").onchange = async (event) => {
+      const input = event.currentTarget;
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        msg("กำลังอ่านไฟล์ " + file.name);
+        await loadFile(file);
+      } catch (error) {
+        msg("โหลดไฟล์ไม่สำเร็จ: " + (error?.message || "อ่านไฟล์ไม่ได้"));
+      } finally {
+        input.value = "";
+      }
+    };
     $("#cloudCheckBtn").onclick = check;
     $("#cloudLoadBtn").onclick = loadCloud;
     $("#searchBtn").onclick = () => {
-      commitPendingQuantityEdit({ render: false, reason: "search" });
+      const committed = commitPendingQuantityEdit({
+        render: false,
+        reason: "search",
+      });
       closePick();
+      const nextQuery = T($("#q").value);
+      if (nextQuery === T(state.q)) {
+        $("#q").value = state.q;
+        if (committed) render();
+        return msg("คำค้นหาไม่เปลี่ยน");
+      }
       push();
-      state.q = $("#q").value;
+      state.q = nextQuery;
       state.page = 1;
       realBillPage = 1;
       realBillSelector.refreshFilters();
       render();
     };
     $("#clearFilter").onclick = () => {
-      commitPendingQuantityEdit({
+      const committed = commitPendingQuantityEdit({
         render: false,
         reason: "clear-filter",
       });
       closePick();
-      push();
-      const preservedReceivers = [...state.sel.receivers];
-      const preservedBillStores = [...state.sel.billStores];
-      state.sel = createSelection();
-      if (state.mode === "ship") {
-        state.sel.receivers = preservedReceivers;
-      } else {
-        state.sel.billStores = preservedBillStores;
+      const nextSelection = clearedSelection();
+      if (
+        sameSelectionState(state.sel, nextSelection) &&
+        !T(state.q)
+      ) {
+        if (committed) render();
+        return msg("ไม่มีตัวกรองให้ล้าง");
       }
+      push();
+      state.sel = nextSelection;
       state.q = "";
       state.page = 1;
       realBillPage = 1;
@@ -1429,13 +1526,37 @@ import { preparePrint } from "./print.js";
         msg(state.showDetails ? "แสดงรายละเอียดแล้ว" : "ซ่อนรายละเอียดแล้ว");
       };
     $("#displayBtn").onclick = () => {
-      commitPendingQuantityEdit({
+      const committed = commitPendingQuantityEdit({
         render: false,
         reason: "page-size",
       });
+      const answer = prompt("จำนวนแถวต่อหน้า", state.pageSize);
+      if (answer == null) {
+        if (committed) render();
+        return msg("ยกเลิกการปรับจำนวนแสดง");
+      }
+      const requested = Number(answer);
+      if (
+        !Number.isInteger(requested) ||
+        requested < PAGE_SIZE_MIN ||
+        requested > PAGE_SIZE_MAX
+      ) {
+        if (committed) render();
+        return msg(
+          "จำนวนแถวต้องเป็นเลขจำนวนเต็ม " +
+            PAGE_SIZE_MIN +
+            "–" +
+            PAGE_SIZE_MAX,
+        );
+      }
+      const nextPageSize = normalizePageSize(requested, state.pageSize);
+      if (nextPageSize === state.pageSize) {
+        if (committed) render();
+        return msg("จำนวนแสดงไม่เปลี่ยน");
+      }
       push();
-      state.pageSize =
-        Number(prompt("จำนวนแถวต่อหน้า", state.pageSize)) || state.pageSize;
+      state.pageSize = nextPageSize;
+      state.page = 1;
       render();
     };
     $("#undo").onclick = undo;
@@ -1446,14 +1567,18 @@ import { preparePrint } from "./print.js";
       (t, i) =>
         (t.onclick = () => {
           const startedAt = performance.now();
-          commitPendingQuantityEdit({
+          const committed = commitPendingQuantityEdit({
             render: false,
             reason: "mode",
           });
           closePick();
-          push();
           const nextMode =
             ["pick", "dist", "ship", "done", "raw", "order"][i] || "pick";
+          if (nextMode === state.mode) {
+            if (committed) render(startedAt);
+            return msg("อยู่ในโหมด: " + T(t.textContent));
+          }
+          push();
           switchFilterContext(nextMode);
           state.mode = nextMode;
           state.page = 1;

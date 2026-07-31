@@ -38,17 +38,22 @@ function sameTarget(input, target) {
 
 function nextTargetFor(input, backwards = false) {
   const inputs = input.matches(SEND_SELECTOR) ? sendInputs() : quantityInputs();
-  const index = Math.max(0, inputs.indexOf(input));
-  const nextIndex = Math.min(
-    inputs.length - 1,
-    Math.max(0, index + (backwards ? -1 : 1)),
-  );
-  return inputTarget(inputs[nextIndex] || input);
+  const index = inputs.indexOf(input);
+  const nextIndex = index + (backwards ? -1 : 1);
+  if (index < 0 || nextIndex < 0) {
+    return { selector: "#showDetailBtn" };
+  }
+  if (nextIndex >= inputs.length) {
+    return { selector: "#undo" };
+  }
+  return inputTarget(inputs[nextIndex]);
 }
 
 function focusTarget(target) {
   refreshSendInputs();
-  const next = quantityInputs().find((input) => sameTarget(input, target));
+  const next = target?.selector
+    ? document.querySelector(target.selector)
+    : quantityInputs().find((input) => sameTarget(input, target));
   if (!next) return;
   next.focus({ preventScroll: true });
   next.scrollIntoView({ block: "center", inline: "nearest" });

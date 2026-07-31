@@ -1,4 +1,4 @@
-import { $, $$, B, E, F, N, dlabel } from "./utils.js";
+import { $, $$, B, E, F, N, T, dlabel } from "./utils.js";
 
 export const TELE_PAGE_SIZE = 20;
 
@@ -27,6 +27,44 @@ export function buildTelesaleBills(rows) {
     (left, right) =>
       left.date.localeCompare(right.date) ||
       left.store.localeCompare(right.store, "th"),
+  );
+}
+
+export function telesaleRowMatchesQuery(row, query) {
+  const needle = T(query).toLowerCase();
+  if (!needle) return true;
+  return [
+    row.date,
+    row.inv,
+    row.store,
+    row.tele,
+    row.code,
+    row.sku,
+    row.ps,
+    row.brand,
+    row.type,
+  ]
+    .map(T)
+    .join(" ")
+    .toLowerCase()
+    .includes(needle);
+}
+
+export function filterTelesaleBills(bills, query) {
+  const needle = T(query);
+  if (!needle) return bills || [];
+  return (bills || []).filter(
+    (bill) =>
+      telesaleRowMatchesQuery(
+        {
+          date: bill.date,
+          inv: bill.inv,
+          store: bill.store,
+          tele: bill.tele,
+        },
+        needle,
+      ) ||
+      bill.lines.some((row) => telesaleRowMatchesQuery(row, needle)),
   );
 }
 
