@@ -833,6 +833,7 @@ import { preparePrint } from "./print.js";
           if (!T(input.value) || value === 0) delete map[input.dataset.k];
           else map[input.dataset.k] = value;
           if (!shouldRender) {
+            renderPickSummary();
             persistState();
             return;
           }
@@ -1079,6 +1080,26 @@ import { preparePrint } from "./print.js";
       },
     });
   }
+  function renderPickSummary(summary = currentSummary()) {
+    const tot = summary.total,
+      sent = summary.sent,
+      rem = summary.remain,
+      raw = summary.raw,
+      net = summary.net;
+    $("#amount").textContent =
+      "฿ " +
+      (raw ? B(raw) : "—") +
+      (net
+        ? " / สุทธิ ฿ " + B(net) + " / รวม VAT ฿ " + B(net * 1.07)
+        : "—");
+    $("#doneAmount").textContent = F(sent);
+    $("#remainAmount").textContent = F(rem);
+    $("#remainAmount").className = rem < 0 ? "bad" : "blue";
+    $("#donePct").textContent =
+      (tot ? Math.round((sent * 1000) / tot) / 10 : 0) + "%";
+    $("#doneBar").style.width =
+      Math.min(100, tot ? (sent * 100) / tot : 0) + "%";
+  }
   function render(startedAt = performance.now()) {
     const renderId = ++fullRenderSequence;
     corePerformance.fullRenderCalls += 1;
@@ -1092,26 +1113,9 @@ import { preparePrint } from "./print.js";
     if (summaryCards) summaryCards.hidden = shipMode;
     let pool = [];
     if (!shipMode) {
-      const summary = currentSummary(),
-        tot = summary.total,
-        sent = summary.sent,
-        rem = summary.remain,
-        raw = summary.raw,
-        net = summary.net;
+      const summary = currentSummary();
       pool = summary.pool;
-      $("#amount").textContent =
-        "฿ " +
-        (raw ? B(raw) : "—") +
-        (net
-          ? " / สุทธิ ฿ " + B(net) + " / รวม VAT ฿ " + B(net * 1.07)
-          : "—");
-      $("#doneAmount").textContent = F(sent);
-      $("#remainAmount").textContent = F(rem);
-      $("#remainAmount").className = rem < 0 ? "bad" : "blue";
-      $("#donePct").textContent =
-        (tot ? Math.round((sent * 1000) / tot) / 10 : 0) + "%";
-      $("#doneBar").style.width =
-        Math.min(100, tot ? (sent * 100) / tot : 0) + "%";
+      renderPickSummary(summary);
     }
     $$(".tab").forEach((t, i) =>
       t.classList.toggle(

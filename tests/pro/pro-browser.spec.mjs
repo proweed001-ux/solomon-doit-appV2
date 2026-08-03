@@ -634,6 +634,56 @@ test("moves changed and unchanged quantity inputs exactly once", async ({
   expect(runtime.errors).toEqual([]);
 });
 
+test("keeps the native mobile Next focus target connected after a changed send value", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.xlsx);
+  await chooseOnly(page, "receivers", fixtureMeta.receiver);
+
+  const sendInputs = page.locator(
+    '#table input.jdata[data-map="send"]',
+  );
+  const firstSend = sendInputs.nth(0);
+  const baseline = await quantitySnapshot(page, "send", 0);
+  await firstSend.focus();
+  await firstSend.fill("7");
+
+  const nativeNext = await firstSend.evaluate((input) => {
+    const inputs = [
+      ...document.querySelectorAll(
+        '#table input.jdata[data-map="send"]:not(:disabled)',
+      ),
+    ];
+    const next = inputs[inputs.indexOf(input) + 1];
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    input.blur();
+    next.focus();
+    return {
+      currentConnected: input.isConnected,
+      nextConnected: next.isConnected,
+      nextFocused: document.activeElement === next,
+      nextIndex: inputs.indexOf(document.activeElement),
+    };
+  });
+
+  expect(nativeNext).toEqual({
+    currentConnected: true,
+    nextConnected: true,
+    nextFocused: true,
+    nextIndex: 1,
+  });
+  const committed = await quantitySnapshot(page, "send", 0);
+  expect(committed.dom).toBe("7");
+  expect(committed.stateValue).toBe(7);
+  expect(committed.storedValue).toBe(7);
+  expect(committed.history).toBe(baseline.history + 1);
+  expect(committed.pending).toBe(false);
+  expect(committed.doneAmount).toBe("7");
+  expect(committed.activeSendIndex).toBe(1);
+  expect(runtime.errors).toEqual([]);
+});
+
 test("drops a no-op edit history entry when a quantity returns to its original value", async ({
   page,
 }) => {
@@ -851,7 +901,7 @@ test("reports local workbook and LocalStorage failures without page errors", asy
   expect(runtime.errors).toEqual([]);
 });
 
-test("keeps the directly tapped quantity focused after the previous edit renders", async ({
+test("keeps the directly tapped quantity focused without replacing the table", async ({
   page,
 }) => {
   const runtime = await preparePage(page);
