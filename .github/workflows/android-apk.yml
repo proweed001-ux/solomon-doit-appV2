@@ -55,7 +55,12 @@ jobs:
 
       - name: Build installable debug APK
         working-directory: android-wrapper
-        run: gradle --no-daemon --stacktrace :app:assembleDebug
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's/import android.app.PrintManager;/import android.print.PrintManager;/' \
+            app/src/main/java/com/solomon/doitapp2/MainActivity.java
+          gradle --no-daemon --stacktrace :app:assembleDebug
 
       - name: Prepare APK filename and checksum
         shell: bash
