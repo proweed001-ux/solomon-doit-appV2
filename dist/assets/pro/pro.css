@@ -198,6 +198,14 @@
       }
       .cloudStatusCard {
         position: relative;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .topGrid > .card,
+      .filterGrid > .field,
+      .cloudHead,
+      .cloudStatusTitle {
+        min-width: 0;
       }
       .tabs {
         display: grid;
@@ -464,6 +472,7 @@
       }
       .cloudStatusTitle {
         margin: 0;
+        overflow-wrap: anywhere;
       }
       .cloudMeta {
         font-size: 12px;
@@ -1110,7 +1119,7 @@
       body.fuelSecretOn #fuelBillBtn {
         display: block !important;
       }
-      .cloudStatusCard h3 {
+      body.fuelSecretOn .cloudStatusCard h3 {
         padding-right: 382px !important;
       }
       @media (max-width: 720px) {
@@ -1121,8 +1130,11 @@
           height: 38px;
           font-size: 15.5px;
         }
-        .cloudStatusCard h3 {
-          padding-right: 336px !important;
+        body.fuelSecretOn .cloudStatusCard {
+          padding-top: 60px;
+        }
+        body.fuelSecretOn .cloudStatusCard h3 {
+          padding-right: 0 !important;
         }
       }
       @media (max-width: 390px) {
@@ -1131,7 +1143,10 @@
           width: 100% !important;
           margin: 4px 0 8px !important;
         }
-        .cloudStatusCard h3 {
+        body.fuelSecretOn .cloudStatusCard {
+          padding-top: 12px;
+        }
+        body.fuelSecretOn .cloudStatusCard h3 {
           padding-right: 0 !important;
         }
       }

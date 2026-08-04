@@ -2363,6 +2363,52 @@ test("keeps the active Pro flow, state, mobile layout and print contract", async
   expect(runtime.errors).toEqual([]);
 });
 
+test("keeps the Pro shell inside Android WebView widths above 390px", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-390x844");
+  await page.setViewportSize({ width: 412, height: 915 });
+  const runtime = await preparePage(page);
+
+  const layout = await page.evaluate(() => {
+    const selectors = [
+      ".topbar",
+      ".cloudStatusCard",
+      "#resultsModeBtn",
+      ".devTeamBtn",
+      ".topGrid .card:nth-child(2)",
+      "#work > .card",
+    ];
+    const boxes = selectors.map((selector) => {
+      const element = document.querySelector(selector);
+      const box = element.getBoundingClientRect();
+      return { selector, left: box.left, right: box.right, width: box.width };
+    });
+    return {
+      viewportWidth: window.innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      mobileLayout: matchMedia("(max-width: 720px)").matches,
+      narrowLayout: matchMedia("(max-width: 390px)").matches,
+      cloudTitlePaddingRight: getComputedStyle(
+        document.querySelector(".cloudStatusTitle"),
+      ).paddingRight,
+      boxes,
+    };
+  });
+
+  expect(layout.mobileLayout).toBe(true);
+  expect(layout.narrowLayout).toBe(false);
+  expect(layout.cloudTitlePaddingRight).toBe("226px");
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
+  for (const box of layout.boxes) {
+    expect(box.left, `${box.selector} left edge`).toBeGreaterThanOrEqual(-1);
+    expect(box.right, `${box.selector} right edge`).toBeLessThanOrEqual(
+      layout.viewportWidth + 1,
+    );
+  }
+  expect(runtime.errors).toEqual([]);
+});
+
 test("auto-loads v7 multipart Cloud data in order", async ({
   page,
 }) => {
