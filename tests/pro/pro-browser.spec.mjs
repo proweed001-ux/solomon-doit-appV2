@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 import path from "node:path";
+import XLSX from "xlsx";
 import {
+  browserFixtureRows,
   createBrowserFixtureFiles,
+  cutStoreFixtureMeta,
   fixtureMeta,
 } from "../../scripts/fixtures/pro-browser-fixture.mjs";
 
@@ -29,6 +32,19 @@ const forbiddenRequestNames = [
   "pro-native-ui.html",
   "pro-action-dump.txt",
 ];
+const fixtureRowsCache = new Map();
+
+function rowsFromFixture(file) {
+  if (!fixtureRowsCache.has(file)) {
+    const workbook = XLSX.readFile(file);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    fixtureRowsCache.set(
+      file,
+      XLSX.utils.sheet_to_json(sheet, { defval: "" }),
+    );
+  }
+  return fixtureRowsCache.get(file);
+}
 
 async function preparePage(page) {
   const errors = [];
@@ -43,18 +59,27 @@ async function preparePage(page) {
     expect(request.method()).toBe("GET");
     const url = request.url();
     if (url.includes("/doit-active")) {
+      const active = {
+        id: "browser-fixture",
+        file_name: "pro-browser-fixture.xlsx",
+        row_count: fixtureMeta.totalRows,
+        store_count: 22,
+        ps_count: 1,
+        telesale_bill_count: fixtureMeta.telesaleBills,
+      };
+      const mode = new URL(url).searchParams.get("mode");
       await route.fulfill({
         contentType: "application/json",
-        body: JSON.stringify({
-          active: {
-            id: "browser-fixture",
-            file_name: "pro-browser-fixture.xlsx",
-            row_count: fixtureMeta.totalRows,
-            store_count: 22,
-            ps_count: 1,
-            telesale_bill_count: fixtureMeta.teleRows,
-          },
-        }),
+        body: JSON.stringify(
+          mode === "data"
+            ? {
+                active,
+                mode: "inline",
+                row_count: fixtureMeta.totalRows,
+                payload: { rows: browserFixtureRows() },
+              }
+            : { active },
+        ),
       });
       return;
     }
@@ -78,10 +103,14 @@ async function preparePage(page) {
   await expect(page.locator("script[src='/assets/pro/app.js']")).toHaveCount(1);
   await expect(page.locator("#devTeamModal")).toHaveClass(/on/);
   await page.locator("#devTeamModal .devClose").click();
+  await expect(page.locator("#cloudState")).toHaveText("พร้อม");
+  await expect(page.locator("#msg")).toContainText(
+    `โหลดสำเร็จ ${fixtureMeta.totalRows.toLocaleString("th-TH")} แถว`,
+  );
   return { errors, requests };
 }
 
-async function uploadFixture(
+async function loadFixture(
   page,
   file,
   {
@@ -89,8 +118,16 @@ async function uploadFixture(
     teleRows = fixtureMeta.teleRows,
   } = {},
 ) {
-  await page.locator("#file").setInputFiles(file);
-  await expect(page.locator("#fileLabel")).toHaveText(path.basename(file));
+  await page.evaluate(
+    ({ fixtureRows, fileName }) => {
+      window.DOIT_CORE_APP.load(fixtureRows, {
+        id: fileName,
+        file_name: fileName,
+        row_count: fixtureRows.length,
+      });
+    },
+    { fixtureRows: rowsFromFixture(file), fileName: path.basename(file) },
+  );
   await expect(page.locator("#msg")).toContainText(
     `โหลดสำเร็จ ${rows.toLocaleString("th-TH")} แถว`,
   );
@@ -303,32 +340,34 @@ function requestBasename(url) {
   }
 }
 
-test("uploads real XLSX and XLSM fixtures through the file input", async ({
+test("auto-loads the latest Cloud data without manual file controls", async ({
   page,
 }) => {
   const runtime = await preparePage(page);
-  for (const file of [fixtureFiles.xlsx, fixtureFiles.xlsm]) {
-    await uploadFixture(page, file);
-    await expect(page.locator("#amount")).toContainText("2,951.00");
-    await expect(page.locator("#amount")).toContainText("2,691.00");
-    await expect(page.locator("#amount")).toContainText("2,879.37");
-    await expect(page.locator("#table tbody tr[data-pool-key]")).toHaveCount(
-      fixtureMeta.normalRows,
-    );
-    await page.locator('[data-pick="dates"]').click();
-    await expect(
-      page.locator(".pickItem", {
-        hasText: fixtureMeta.date.split("-").reverse().join("/"),
-      }),
-    ).toBeVisible();
-    await page.locator("#pickClose").click();
-    await page.locator('[data-pick="ps"]').click();
-    await expect(page.locator(".pickItem", { hasText: fixtureMeta.ps })).toBeVisible();
-    await page.locator("#pickClose").click();
-    await expect
-      .poll(() => page.evaluate(() => typeof globalThis.XLSX))
-      .toBe("object");
-  }
+  await expect(page.locator("#amount")).toContainText("2,951.00");
+  await expect(page.locator("#amount")).toContainText("2,691.00");
+  await expect(page.locator("#amount")).toContainText("2,879.37");
+  await expect(page.locator("#table tbody tr[data-pool-key]")).toHaveCount(
+    fixtureMeta.normalRows,
+  );
+  await expect(page.locator("#cloudMsg")).toContainText(
+    "pro-browser-fixture.xlsx",
+  );
+  await expect(
+    page.locator("#choose,#file,#fileLabel,#cloudCheckBtn,#cloudLoadBtn"),
+  ).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText("ตรวจไฟล์ล่าสุด");
+  await expect(page.locator("body")).not.toContainText(
+    "โหลดไฟล์ล่าสุดจาก Cloud",
+  );
+  await expect
+    .poll(() => page.evaluate(() => typeof globalThis.XLSX))
+    .toBe("undefined");
+  const cloudRequests = runtime.requests.filter((url) =>
+    url.includes("/doit-active"),
+  );
+  expect(cloudRequests).toHaveLength(1);
+  expect(new URL(cloudRequests[0]).searchParams.get("mode")).toBe("data");
   expect(runtime.requests.some((url) => /cdn\.jsdelivr|unpkg\.com/i.test(url))).toBe(
     false,
   );
@@ -339,7 +378,7 @@ test("commits send, add and pull as one authoritative edit session", async ({
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   await chooseOnly(page, "receivers", fixtureMeta.receiver);
 
   const sendInputs = page.locator(
@@ -493,7 +532,7 @@ test("moves changed and unchanged quantity inputs exactly once", async ({
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   await chooseOnly(page, "receivers", fixtureMeta.receiver);
 
   const sendInputs = page.locator(
@@ -634,11 +673,115 @@ test("moves changed and unchanged quantity inputs exactly once", async ({
   expect(runtime.errors).toEqual([]);
 });
 
+test("keeps the native mobile Next focus target connected after a changed send value", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await loadFixture(page, fixtureFiles.xlsx);
+  await chooseOnly(page, "receivers", fixtureMeta.receiver);
+
+  const sendInputs = page.locator(
+    '#table input.jdata[data-map="send"]',
+  );
+  const firstSend = sendInputs.nth(0);
+  const baseline = await quantitySnapshot(page, "send", 0);
+  await firstSend.focus();
+  await firstSend.fill("7");
+
+  const nativeNext = await firstSend.evaluate((input) => {
+    const inputs = [
+      ...document.querySelectorAll(
+        '#table input.jdata[data-map="send"]:not(:disabled)',
+      ),
+    ];
+    const next = inputs[inputs.indexOf(input) + 1];
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    input.blur();
+    next.focus();
+    return {
+      currentConnected: input.isConnected,
+      nextConnected: next.isConnected,
+      nextFocused: document.activeElement === next,
+      nextIndex: inputs.indexOf(document.activeElement),
+    };
+  });
+
+  expect(nativeNext).toEqual({
+    currentConnected: true,
+    nextConnected: true,
+    nextFocused: true,
+    nextIndex: 1,
+  });
+  const committed = await quantitySnapshot(page, "send", 0);
+  expect(committed.dom).toBe("7");
+  expect(committed.stateValue).toBe(7);
+  expect(committed.storedValue).toBe(7);
+  expect(committed.history).toBe(baseline.history + 1);
+  expect(committed.pending).toBe(false);
+  expect(committed.doneAmount).toBe("7");
+  expect(committed.activeSendIndex).toBe(1);
+  expect(runtime.errors).toEqual([]);
+});
+
+test("keeps Pro quantities visible while cut-store filtering reduces the order", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await loadFixture(page, fixtureFiles.cutStoreXlsx, {
+    rows: cutStoreFixtureMeta.rows,
+    teleRows: 0,
+  });
+  await chooseOnly(page, "receivers", cutStoreFixtureMeta.receiver);
+
+  const sendInput = page.locator(
+    '#table input.jdata[data-map="send"]',
+  ).first();
+  await expect(sendInput).toHaveValue("");
+  await expect(page.locator("#remainAmount")).toHaveText(
+    String(cutStoreFixtureMeta.originalQty),
+  );
+  await sendInput.fill("3");
+  await sendInput.press("Tab");
+  const beforeFilter = await quantitySnapshot(page, "send", 0);
+  expect(beforeFilter.dom).toBe("3");
+  expect(beforeFilter.stateValue).toBe(3);
+  expect(beforeFilter.storedValue).toBe(3);
+  expect(beforeFilter.doneAmount).toBe("3");
+  expect(beforeFilter.remaining).toBe("11");
+
+  await chooseOnly(page, "orderStores", cutStoreFixtureMeta.receiver);
+  const afterFilter = await quantitySnapshot(page, "send", 0);
+  expect(afterFilter.key).toBe(beforeFilter.key);
+  expect(afterFilter.dom).toBe("3");
+  expect(afterFilter.stateValue).toBe(3);
+  expect(afterFilter.storedValue).toBe(3);
+  expect(afterFilter.receivers).toEqual([cutStoreFixtureMeta.receiver]);
+  expect(afterFilter.doneAmount).toBe("3");
+  expect(afterFilter.remaining).toBe("1");
+  await expect(page.locator("#remainAmount")).toHaveText("1");
+  await expect(page.locator("#table tbody tr").first()).toContainText(
+    `${cutStoreFixtureMeta.filteredQty} ชิ้น · 1 ร้าน · 1 บิล`,
+  );
+
+  await page.locator("#undo").click();
+  const afterUndo = await quantitySnapshot(page, "send", 0);
+  expect(afterUndo.dom).toBe("3");
+  expect(afterUndo.doneAmount).toBe("3");
+  expect(afterUndo.remaining).toBe("11");
+
+  await page.locator("#redo").click();
+  const afterRedo = await quantitySnapshot(page, "send", 0);
+  expect(afterRedo.dom).toBe("3");
+  expect(afterRedo.doneAmount).toBe("3");
+  expect(afterRedo.remaining).toBe("1");
+  expect(runtime.errors).toEqual([]);
+});
+
 test("drops a no-op edit history entry when a quantity returns to its original value", async ({
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   await chooseOnly(page, "receivers", fixtureMeta.receiver);
 
   const sendInputs = page.locator(
@@ -705,7 +848,7 @@ test("does not add history or clear redo when a picker is applied without change
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   await chooseOnly(page, "receivers", fixtureMeta.receiver);
 
   const firstSend = page
@@ -751,7 +894,7 @@ test("does not add history or clear redo for no-op commands and cancelled prompt
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   await chooseOnly(page, "receivers", fixtureMeta.receiver);
 
   const firstSend = page
@@ -787,7 +930,7 @@ test("does not add history or clear redo for no-op commands and cancelled prompt
 
 test("validates page size without corrupting pagination", async ({ page }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
 
   const pageState = () =>
     page.evaluate(async () => {
@@ -819,21 +962,11 @@ test("validates page size without corrupting pagination", async ({ page }) => {
   expect(runtime.errors).toEqual([]);
 });
 
-test("reports local workbook and LocalStorage failures without page errors", async ({
+test("reports LocalStorage failures without page errors", async ({
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
-  await expect(page.locator("#file")).toHaveValue("");
-
-  await page.locator("#file").setInputFiles({
-    name: "broken.xlsx",
-    mimeType:
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    buffer: Buffer.alloc(0),
-  });
-  await expect(page.locator("#msg")).toContainText("โหลดไฟล์ไม่สำเร็จ");
-  await expect(page.locator("#file")).toHaveValue("");
+  await loadFixture(page, fixtureFiles.xlsx);
 
   await page.evaluate(() => {
     const originalSetItem = Storage.prototype.setItem;
@@ -851,11 +984,11 @@ test("reports local workbook and LocalStorage failures without page errors", asy
   expect(runtime.errors).toEqual([]);
 });
 
-test("keeps the directly tapped quantity focused after the previous edit renders", async ({
+test("keeps the directly tapped quantity focused without replacing the table", async ({
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   await chooseOnly(page, "receivers", fixtureMeta.receiver);
 
   const sendInputs = page.locator(
@@ -919,7 +1052,7 @@ test("flushes a focused quantity before autosave and state-changing commands", a
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   await chooseOnly(page, "receivers", fixtureMeta.receiver);
 
   const sendInputs = page.locator(
@@ -960,7 +1093,7 @@ test("flushes a focused quantity before autosave and state-changing commands", a
   await page.reload();
   await expect(page.locator("#devTeamModal")).toHaveClass(/on/);
   await page.locator("#devTeamModal .devClose").click();
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   const afterReload = await quantitySnapshot(page, "send", 0);
   expect(afterReload.dom).toBe("1");
   expect(afterReload.stateValue).toBe(1);
@@ -1045,7 +1178,7 @@ test("keeps the browser history at 80 entries and 2 MiB", async ({
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   const stats = await page.evaluate(async () => {
     const stateModule = await import("/assets/pro/state.js");
     stateModule.state.hist = [];
@@ -1075,7 +1208,7 @@ test("combines PS and Telesale in the real Combined Order tab for XLSX and XLSM"
 }) => {
   const runtime = await preparePage(page);
   for (const file of [fixtureFiles.xlsx, fixtureFiles.xlsm]) {
-    await uploadFixture(page, file);
+    await loadFixture(page, file);
     await openOrderMode(page);
     await expectCombinedOrder(page);
     await expectOrderPrintNamesOnly(page);
@@ -1118,7 +1251,7 @@ test("searches Telesale drawer by product while preserving the full bill", async
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
 
   await page.locator("#q").fill("TSKU-001");
   await page.locator("#searchBtn").click();
@@ -1145,7 +1278,7 @@ test("paginates Combined Order while printing every filtered product", async ({
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   await page.evaluate(async () => {
     const stateModule = await import("/assets/pro/state.js");
     stateModule.state.pageSize = 10;
@@ -1188,7 +1321,7 @@ test("restores Pro filters and quantities after Real Bill search", async ({
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   await chooseOnly(page, "receivers", fixtureMeta.receiver);
   await chooseOnly(page, "brands", "Fixture Brand");
   const firstSend = page
@@ -1230,7 +1363,7 @@ test("shows and prints real PS and Telesale bills without changing send-to-store
 }) => {
   const runtime = await preparePage(page);
   for (const file of [fixtureFiles.xlsx, fixtureFiles.xlsm]) {
-    await uploadFixture(page, file);
+    await loadFixture(page, file);
     await expect(page.locator("#tableCount")).toHaveText(
       `ถอดของ Pro ${fixtureMeta.normalRows.toLocaleString("th-TH")} รายการ`,
     );
@@ -1537,7 +1670,7 @@ test("keeps large real-bill tabs, pickers and pagination responsive", async ({
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.largeXlsx, {
+  await loadFixture(page, fixtureFiles.largeXlsx, {
     rows: fixtureMeta.largeRows,
     teleRows: fixtureMeta.largeTeleRows,
   });
@@ -1982,7 +2115,7 @@ test("cancels stale real-bill picker work without applying partial options", asy
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   await page.locator(".tabs .tab").nth(2).click();
   const baseline = await page.evaluate(
     () => window.DOIT_CORE_APP.health().realBillPerformance,
@@ -2058,10 +2191,7 @@ test("cancels stale real-bill picker work without applying partial options", asy
   await page.evaluate(() => {
     document.querySelector('[data-pick="receivers"]').click();
   });
-  await page.locator("#file").setInputFiles(fixtureFiles.xlsm);
-  await expect(page.locator("#fileLabel")).toHaveText(
-    path.basename(fixtureFiles.xlsm),
-  );
+  await loadFixture(page, fixtureFiles.xlsm);
   await settleAnimationFrames(page);
   await expect(page.locator("#pickShade")).not.toHaveClass(/on/);
   await expect
@@ -2077,7 +2207,7 @@ test("keeps the active Pro flow, state, mobile layout and print contract", async
   page,
 }) => {
   const runtime = await preparePage(page);
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
 
   const scriptEntries = await page.locator("script[src]").evaluateAll((scripts) =>
     scripts.map((script) => script.getAttribute("src")),
@@ -2138,7 +2268,7 @@ test("keeps the active Pro flow, state, mobile layout and print contract", async
   await page.reload();
   await expect(page.locator("#devTeamModal")).toHaveClass(/on/);
   await page.locator("#devTeamModal .devClose").click();
-  await uploadFixture(page, fixtureFiles.xlsx);
+  await loadFixture(page, fixtureFiles.xlsx);
   await expect(page.locator('[data-pick="receivers"]')).toContainText(
     fixtureMeta.receiver,
   );
@@ -2151,7 +2281,7 @@ test("keeps the active Pro flow, state, mobile layout and print contract", async
   await page.locator("#devTeamModal .devClose").click();
 
   for (let index = 0; index < 5; index += 1) {
-    await page.locator(".uploadCard h3").click();
+    await page.locator(".cloudStatusTitle").click();
   }
   await expect(page.locator("#fuelBillBtn")).toBeVisible();
 
@@ -2233,7 +2363,7 @@ test("keeps the active Pro flow, state, mobile layout and print contract", async
   expect(runtime.errors).toEqual([]);
 });
 
-test("loads v7 multipart Cloud data in order and restores the load button", async ({
+test("auto-loads v7 multipart Cloud data in order", async ({
   page,
 }) => {
   const errors = [];
@@ -2322,29 +2452,22 @@ test("loads v7 multipart Cloud data in order and restores the load button", asyn
   await page.goto("/pro.html?t=1028");
   await expect(page.locator("#devTeamModal")).toHaveClass(/on/);
   await page.locator("#devTeamModal .devClose").click();
-  await expect(page.locator("#cloudState")).toHaveText("พร้อม");
-
-  await page.locator("#cloudLoadBtn").click();
   await expect.poll(() => partRequests.length).toBe(2);
-  await expect(page.locator("#cloudLoadBtn")).toBeDisabled();
-  await expect(page.locator("#cloudLoadBtn")).toHaveText("กำลังโหลด 2/2");
+  await expect(page.locator("#cloudState")).toHaveText("กำลังโหลด 2/2");
   await expect(page.locator("#cloudMsg")).toContainText("กำลังโหลดส่วน 2/2");
 
   releaseSecondPart();
   await expect(page.locator("#msg")).toContainText("โหลดสำเร็จ 3 แถว");
-  await expect(page.locator("#cloudMsg")).toContainText(
-    "โหลด Cloud สำเร็จ 3 แถว",
-  );
-  await expect(page.locator("#fileLabel")).toHaveText("cloud-multipart.xlsx");
-  await expect(page.locator("#cloudLoadBtn")).toBeEnabled();
-  await expect(page.locator("#cloudLoadBtn")).toHaveText(
-    "โหลดไฟล์ล่าสุดจาก Cloud",
-  );
+  await expect(page.locator("#cloudMsg")).toContainText("cloud-multipart.xlsx");
+  await expect(page.locator("#cloudState")).toHaveText("พร้อม");
+  await expect(
+    page.locator("#choose,#file,#fileLabel,#cloudCheckBtn,#cloudLoadBtn"),
+  ).toHaveCount(0);
   expect(partRequests).toEqual([0, 1]);
   expect(errors).toEqual([]);
 });
 
-test("shows a multipart Cloud error and restores the load button", async ({
+test("shows a clear error when automatic multipart Cloud loading fails", async ({
   page,
 }) => {
   const errors = [];
@@ -2416,8 +2539,6 @@ test("shows a multipart Cloud error and restores the load button", async ({
   await page.goto("/pro.html?t=1028");
   await expect(page.locator("#devTeamModal")).toHaveClass(/on/);
   await page.locator("#devTeamModal .devClose").click();
-  await expect(page.locator("#cloudState")).toHaveText("พร้อม");
-  await page.locator("#cloudLoadBtn").click();
 
   await expect(page.locator("#cloudMsg")).toContainText(
     "โหลด Cloud ไม่สำเร็จ: JSON ส่วน 1/1 โหลดไม่สำเร็จ (HTTP 500)",
@@ -2425,10 +2546,12 @@ test("shows a multipart Cloud error and restores the load button", async ({
   await expect(page.locator("#cloudMsg")).toContainText(
     "fixture_part_failure",
   );
-  await expect(page.locator("#cloudLoadBtn")).toBeEnabled();
-  await expect(page.locator("#cloudLoadBtn")).toHaveText(
-    "โหลดไฟล์ล่าสุดจาก Cloud",
+  await expect(page.locator("#cloudState")).toHaveText("ผิดพลาด");
+  await expect(page.locator("#msg")).toContainText(
+    "โหลด Cloud ไม่สำเร็จ: JSON ส่วน 1/1 โหลดไม่สำเร็จ (HTTP 500)",
   );
-  await expect(page.locator("#msg")).toHaveText("พร้อมใช้งาน");
+  await expect(
+    page.locator("#choose,#file,#fileLabel,#cloudCheckBtn,#cloudLoadBtn"),
+  ).toHaveCount(0);
   expect(errors).toEqual([]);
 });

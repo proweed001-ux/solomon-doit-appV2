@@ -47,7 +47,7 @@ import {
   PAGE_SIZE_MAX,
   normalizePageSize,
 } from "./state.js";
-import { norm, arr, parseDoitFile } from "./parser-adapter.js";
+import { norm, arr } from "./parser-adapter.js";
 import {
   okDate,
   okPs,
@@ -121,6 +121,7 @@ import { preparePrint } from "./print.js";
   let fullRenderSequence = 0;
   let activeFullRender = null;
   let persistenceError = "";
+  let cloudLoadInFlight = false;
 
   function msg(s) {
     const m = $("#msg");
@@ -141,6 +142,25 @@ import { preparePrint } from "./print.js";
   function cloud(s) {
     const m = $("#cloudMsg");
     if (m) m.innerHTML = s;
+  }
+  function cloudSummary(active) {
+    const metadata = active || {};
+    const rowCount = Number.isInteger(Number(metadata.row_count))
+      ? Number(metadata.row_count)
+      : state.rows.length;
+    const stats = ["แถว: " + F(rowCount)];
+    if (Number.isFinite(Number(metadata.store_count)))
+      stats.push("ร้าน: " + F(metadata.store_count));
+    if (Number.isFinite(Number(metadata.ps_count)))
+      stats.push("PS: " + F(metadata.ps_count));
+    if (Number.isFinite(Number(metadata.telesale_bill_count)))
+      stats.push("Telesale bills: " + F(metadata.telesale_bill_count));
+    return (
+      "ไฟล์: <b>" +
+      E(metadata.file_name || "JSON Cloud") +
+      "</b><br>" +
+      stats.join(" · ")
+    );
   }
   function lab(k) {
     return (
@@ -833,6 +853,7 @@ import { preparePrint } from "./print.js";
           if (!T(input.value) || value === 0) delete map[input.dataset.k];
           else map[input.dataset.k] = value;
           if (!shouldRender) {
+            renderPickSummary();
             persistState();
             return;
           }
@@ -1079,6 +1100,26 @@ import { preparePrint } from "./print.js";
       },
     });
   }
+  function renderPickSummary(summary = currentSummary()) {
+    const tot = summary.total,
+      sent = summary.sent,
+      rem = summary.remain,
+      raw = summary.raw,
+      net = summary.net;
+    $("#amount").textContent =
+      "฿ " +
+      (raw ? B(raw) : "—") +
+      (net
+        ? " / สุทธิ ฿ " + B(net) + " / รวม VAT ฿ " + B(net * 1.07)
+        : "—");
+    $("#doneAmount").textContent = F(sent);
+    $("#remainAmount").textContent = F(rem);
+    $("#remainAmount").className = rem < 0 ? "bad" : "blue";
+    $("#donePct").textContent =
+      (tot ? Math.round((sent * 1000) / tot) / 10 : 0) + "%";
+    $("#doneBar").style.width =
+      Math.min(100, tot ? (sent * 100) / tot : 0) + "%";
+  }
   function render(startedAt = performance.now()) {
     const renderId = ++fullRenderSequence;
     corePerformance.fullRenderCalls += 1;
@@ -1092,26 +1133,9 @@ import { preparePrint } from "./print.js";
     if (summaryCards) summaryCards.hidden = shipMode;
     let pool = [];
     if (!shipMode) {
-      const summary = currentSummary(),
-        tot = summary.total,
-        sent = summary.sent,
-        rem = summary.remain,
-        raw = summary.raw,
-        net = summary.net;
+      const summary = currentSummary();
       pool = summary.pool;
-      $("#amount").textContent =
-        "฿ " +
-        (raw ? B(raw) : "—") +
-        (net
-          ? " / สุทธิ ฿ " + B(net) + " / รวม VAT ฿ " + B(net * 1.07)
-          : "—");
-      $("#doneAmount").textContent = F(sent);
-      $("#remainAmount").textContent = F(rem);
-      $("#remainAmount").className = rem < 0 ? "bad" : "blue";
-      $("#donePct").textContent =
-        (tot ? Math.round((sent * 1000) / tot) / 10 : 0) + "%";
-      $("#doneBar").style.width =
-        Math.min(100, tot ? (sent * 100) / tot : 0) + "%";
+      renderPickSummary(summary);
     }
     $$(".tab").forEach((t, i) =>
       t.classList.toggle(
@@ -1161,7 +1185,6 @@ import { preparePrint } from "./print.js";
     state.hist = [];
     state.redoStack = [];
     loadState();
-    $("#fileLabel").textContent = m.file_name || "JSON Cloud";
     msg(
       "โหลดสำเร็จ " +
         F(state.rows.length) +
@@ -1171,39 +1194,26 @@ import { preparePrint } from "./print.js";
     );
     render();
   }
-  async function check() {
-    try {
-      $("#cloudState").textContent = "กำลังตรวจ";
-      const p = await publicFetch("meta");
-      state.active = p.active;
-      cloud(
-        "ไฟล์: <b>" +
-          E(state.active.file_name) +
-          "</b><br>แถว: " +
-          F(state.active.row_count) +
-          " · ร้าน: " +
-          F(state.active.store_count) +
-          " · PS: " +
-          F(state.active.ps_count) +
-          " · Telesale bills: " +
-          F(state.active.telesale_bill_count),
-      );
-      $("#cloudState").textContent = "พร้อม";
-    } catch (e) {
-      cloud("ตรวจ Cloud ไม่สำเร็จ: " + E(e.message));
-      $("#cloudState").textContent = "ผิดพลาด";
-    }
-  }
   async function loadCloud() {
-    const button = $("#cloudLoadBtn");
+    if (cloudLoadInFlight) return;
+    cloudLoadInFlight = true;
+    $("#cloudState").textContent = "กำลังโหลด";
+    cloud("กำลังดึงข้อมูลล่าสุดจาก Cloud…");
+    msg("กำลังโหลดข้อมูลล่าสุดจาก Cloud");
     try {
-      button.disabled = true;
-      button.textContent = "กำลังโหลด...";
-      if (!state.active) await check();
       const p = await publicFetch("data");
+      const active = p.active || state.active || {
+        id: p.version_id,
+        file_name: p.file_name,
+        row_count: p.row_count,
+        store_count: p.store_count,
+        ps_count: p.ps_count,
+        telesale_bill_count: p.telesale_bill_count,
+      };
+      state.active = active;
       const data = await resolveCloudPayload(p, {
         onProgress(progress) {
-          button.textContent =
+          $("#cloudState").textContent =
             "กำลังโหลด " + progress.partIndex + "/" + progress.partCount;
           cloud(
             (progress.phase === "loaded" ? "โหลดแล้วส่วน " : "กำลังโหลดส่วน ") +
@@ -1218,24 +1228,17 @@ import { preparePrint } from "./print.js";
           );
         },
       });
-      loadData(data, p.active || state.active);
-      cloud("โหลด Cloud สำเร็จ " + F(state.rows.length) + " แถว");
+      loadData(data, active);
+      cloud(cloudSummary(active));
+      $("#cloudState").textContent = "พร้อม";
     } catch (e) {
-      cloud("โหลด Cloud ไม่สำเร็จ: " + E(e.message));
+      const reason = e?.message || "ไม่ทราบสาเหตุ";
+      cloud("โหลด Cloud ไม่สำเร็จ: " + E(reason));
+      msg("โหลด Cloud ไม่สำเร็จ: " + reason);
+      $("#cloudState").textContent = "ผิดพลาด";
     } finally {
-      button.disabled = false;
-      button.textContent = "โหลดไฟล์ล่าสุดจาก Cloud";
+      cloudLoadInFlight = false;
     }
-  }
-  async function loadFile(file) {
-    const json = await parseDoitFile(file);
-    if (!Array.isArray(json) || !json.length) {
-      throw new Error("ไม่พบข้อมูลแถวในไฟล์");
-    }
-    loadData(json, {
-      file_name: file.name,
-      id: file.name,
-    });
   }
   function addInsert() {
     const committed = commitPendingQuantityEdit({
@@ -1414,22 +1417,6 @@ import { preparePrint } from "./print.js";
     if (state.bound) return;
     state.bound = true;
     fixUi();
-    $("#choose").onclick = () => $("#file").click();
-    $("#file").onchange = async (event) => {
-      const input = event.currentTarget;
-      const file = input.files?.[0];
-      if (!file) return;
-      try {
-        msg("กำลังอ่านไฟล์ " + file.name);
-        await loadFile(file);
-      } catch (error) {
-        msg("โหลดไฟล์ไม่สำเร็จ: " + (error?.message || "อ่านไฟล์ไม่ได้"));
-      } finally {
-        input.value = "";
-      }
-    };
-    $("#cloudCheckBtn").onclick = check;
-    $("#cloudLoadBtn").onclick = loadCloud;
     $("#searchBtn").onclick = () => {
       const committed = commitPendingQuantityEdit({
         render: false,
@@ -1637,5 +1624,5 @@ import { preparePrint } from "./print.js";
     health,
   };
   bind();
-  check();
+  void loadCloud();
 })();

@@ -1,5 +1,4 @@
 import "./bootstrap.js";
-import "../vendor/xlsx-0.18.5.full.min.js";
 import "./core.js";
 import { initFuelSecret } from "./fuel-secret.js";
 import { initResultsMode } from "./results-mode.js";

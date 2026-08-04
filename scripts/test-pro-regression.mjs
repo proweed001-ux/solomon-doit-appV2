@@ -62,6 +62,7 @@ import {
   loadState,
   mapVal,
   mergeSelection,
+  normalizeAllocationMap,
   normalizePageSize,
   push,
   rkey,
@@ -74,6 +75,7 @@ import {
   switchFilterContext,
   trimHistory,
 } from "../dist/assets/pro/state.js";
+import { SEP } from "../dist/assets/pro/utils.js";
 import {
   buildTelesaleBills,
   filterTelesaleBills,
@@ -108,6 +110,44 @@ state.send = {};
 state.add = {};
 state.pull = {};
 state.ins = [];
+
+const allocationPoolKey = "Cut Brand|Cut Size|CUT-001|สินค้าตัดร้าน|INVC";
+const allocationStore = "ร้านเก็บค่าที่กรอก";
+const oldUncutKey = [
+  JSON.stringify({
+    d: state.sel.dates,
+    p: state.sel.ps,
+    c: [],
+  }),
+  allocationStore,
+  allocationPoolKey,
+].join(SEP);
+const oldCutKey = [
+  JSON.stringify({
+    d: state.sel.dates,
+    p: state.sel.ps,
+    c: ["ร้านตัดบิลจริง"],
+  }),
+  allocationStore,
+  allocationPoolKey,
+].join(SEP);
+const normalizedAllocations = normalizeAllocationMap({
+  [oldCutKey]: 9,
+  [oldUncutKey]: 5,
+});
+state.sel.receivers = [allocationStore];
+state.sel.orderStores = ["ร้านตัดบิลจริง"];
+state.send = normalizedAllocations;
+assert.equal(Object.keys(normalizedAllocations).length, 1);
+assert.equal(mapVal(state.send, allocationPoolKey), 5);
+assert.equal(sumMap(state.send, allocationPoolKey), 5);
+assert.equal(
+  Object.keys(normalizedAllocations)[0].split(SEP)[0],
+  JSON.stringify({ d: state.sel.dates, p: state.sel.ps }),
+  "Manual quantity scope must not depend on the cut-store filter",
+);
+state.sel = { ...createSelection(), ...fixture.selection };
+state.send = {};
 
 for (const kind of ["send", "add", "pull"]) {
   for (const item of fixture.manual[kind]) {
@@ -1755,6 +1795,11 @@ assert.match(
   /input\.onkeydown[\s\S]*event\.preventDefault\(\)[\s\S]*finishEdit\(input,[\s\S]*focusTarget\(moveTarget\)/,
   "Handled Enter and Tab keys must move focus once even when the value is unchanged",
 );
+assert.match(
+  sendStoreSource,
+  /input\.onchange[\s\S]*reason: "change", render: false[\s\S]*input\.onblur[\s\S]*reason: "blur", render: false[\s\S]*input\.onkeydown[\s\S]*render: false[\s\S]*focusTarget\(moveTarget\)/,
+  "Quantity navigation must commit without replacing the focused input table",
+);
 assert.doesNotMatch(
   sendStoreSource,
   /committed\s*\|\|\s*input\.matches\(SEND_SELECTOR\)/,
@@ -1775,10 +1820,10 @@ assert.match(
   /export function restoreHistoryCheckpoint\(checkpoint\)/,
   "State owner must restore History and Redo after a no-op edit",
 );
-assert.match(
+assert.doesNotMatch(
   sendStoreSource,
-  /pointerdown[\s\S]*restorePointerTarget[\s\S]*queueMicrotask/,
-  "Direct pointer navigation must restore the tapped quantity after render",
+  /pointerdown|pointerTarget|restorePointerTarget/,
+  "Quantity navigation must not need a second focus-restoration layer",
 );
 assert.match(
   coreSource,
@@ -1789,6 +1834,11 @@ assert.match(
   coreSource,
   /onInput:[\s\S]*value === 0\) delete map\[input\.dataset\.k\][\s\S]*else map\[input\.dataset\.k\] = value/,
   "Input must update authoritative quantity state without retaining zero keys",
+);
+assert.match(
+  coreSource,
+  /if \(!shouldRender\) \{[\s\S]*renderPickSummary\(\);[\s\S]*persistState\(\)[\s\S]*function renderPickSummary/,
+  "A non-rendering quantity commit must still refresh totals and persist state",
 );
 assert.match(
   sendStoreSource,

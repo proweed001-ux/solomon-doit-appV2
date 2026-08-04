@@ -196,25 +196,8 @@
         grid-template-columns: 1.1fr 0.9fr;
         gap: 12px;
       }
-      .uploadCard {
+      .cloudStatusCard {
         position: relative;
-      }
-      .uploadRow {
-        min-height: 44px;
-        border: 1px solid #d1d5db;
-        border-radius: 9px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 6px 10px;
-        background: #fff;
-      }
-      .fileName {
-        flex: 1;
-        min-width: 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
       .tabs {
         display: grid;
@@ -473,18 +456,14 @@
         font-size: 12px;
         margin-top: 6px;
       }
-      .cloudBox {
-        margin-top: 10px;
-        border: 1px solid #bbf7d0;
-        background: #f0fdf4;
-        border-radius: 12px;
-        padding: 10px;
-      }
       .cloudHead {
         display: flex;
         justify-content: space-between;
         gap: 8px;
         align-items: center;
+      }
+      .cloudStatusTitle {
+        margin: 0;
       }
       .cloudMeta {
         font-size: 12px;
@@ -493,14 +472,7 @@
         margin-top: 6px;
         word-break: break-word;
       }
-      .cloudBtns {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        margin-top: 10px;
-      }
       .fileBtn,
-      .cloudBtn,
       .outline,
       .clear,
       .searchBtn,
@@ -1031,7 +1003,7 @@
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.34);
         cursor: pointer;
       }
-      .uploadCard h3 {
+      .cloudStatusCard h3 {
         padding-right: 258px;
       }
       @media (max-width: 720px) {
@@ -1042,7 +1014,7 @@
           height: 38px;
           font-size: 15.5px;
         }
-        .uploadCard h3 {
+        .cloudStatusCard h3 {
           padding-right: 226px;
         }
       }
@@ -1057,10 +1029,10 @@
           width: 100% !important;
           margin-bottom: 8px !important;
         }
-        .uploadCard h3 {
+        .cloudStatusCard h3 {
           padding-right: 0;
         }
-        .uploadCard {
+        .cloudStatusCard {
           display: grid;
           gap: 8px;
         }
@@ -1138,7 +1110,7 @@
       body.fuelSecretOn #fuelBillBtn {
         display: block !important;
       }
-      .uploadCard h3 {
+      .cloudStatusCard h3 {
         padding-right: 382px !important;
       }
       @media (max-width: 720px) {
@@ -1149,7 +1121,7 @@
           height: 38px;
           font-size: 15.5px;
         }
-        .uploadCard h3 {
+        .cloudStatusCard h3 {
           padding-right: 336px !important;
         }
       }
@@ -1159,7 +1131,7 @@
           width: 100% !important;
           margin: 4px 0 8px !important;
         }
-        .uploadCard h3 {
+        .cloudStatusCard h3 {
           padding-right: 0 !important;
         }
       }

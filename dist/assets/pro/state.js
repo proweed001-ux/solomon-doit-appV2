@@ -237,9 +237,9 @@ export function restore(snapshot) {
     const saved = JSON.parse(snapshot);
     state.sel = mergeSelection(saved.sel);
     state.q = saved.q || "";
-    state.send = saved.send || {};
-    state.add = saved.add || {};
-    state.pull = saved.pull || {};
+    state.send = normalizeAllocationMap(saved.send);
+    state.add = normalizeAllocationMap(saved.add);
+    state.pull = normalizeAllocationMap(saved.pull);
     state.ins = saved.ins || [];
     state.page = saved.page || 1;
     state.pageSize = normalizePageSize(saved.pageSize);
@@ -293,9 +293,9 @@ export function loadState() {
     const saved = JSON.parse(localStorage.getItem(sk()) || "{}");
     state.sel = mergeSelection(saved.sel);
     state.q = saved.q || "";
-    state.send = saved.send || {};
-    state.add = saved.add || {};
-    state.pull = saved.pull || {};
+    state.send = normalizeAllocationMap(saved.send);
+    state.add = normalizeAllocationMap(saved.add);
+    state.pull = normalizeAllocationMap(saved.pull);
     state.ins = saved.ins || [];
     state.mode = saved.mode || state.mode;
     state.filterContexts = mergeFilterContexts(saved.filterContexts);
@@ -312,7 +312,6 @@ export function scope() {
   return JSON.stringify({
     d: state.sel.dates,
     p: state.sel.ps,
-    c: state.sel.orderStores,
   });
 }
 
@@ -350,16 +349,75 @@ export function parseKey(key) {
   return { scope: "", store: "", pk: text };
 }
 
-export function scopeOk(parsed) {
-  if (!parsed) return false;
+function scopeValues(value) {
+  if (Array.isArray(value)) return value.map(T);
+  const text = T(value);
+  return text ? text.split(",").map(T) : [];
+}
+
+function allocationScopeParts(parsed) {
+  if (!parsed) return null;
   if (parsed.legacy) {
-    return (
-      parsed.scope.d === state.sel.dates.join(",") &&
-      parsed.scope.p === state.sel.ps.join(",") &&
-      parsed.scope.c === state.sel.orderStores.join(",")
-    );
+    return {
+      d: scopeValues(parsed.scope?.d),
+      p: scopeValues(parsed.scope?.p),
+      c: scopeValues(parsed.scope?.c),
+      hasCutScope: true,
+    };
   }
-  return parsed.scope === scope();
+  try {
+    const source =
+      typeof parsed.scope === "string"
+        ? JSON.parse(parsed.scope)
+        : parsed.scope;
+    if (!source || typeof source !== "object") return null;
+    return {
+      d: scopeValues(source.d),
+      p: scopeValues(source.p),
+      c: scopeValues(source.c),
+      hasCutScope: Object.prototype.hasOwnProperty.call(source, "c"),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function canonicalScope(parts) {
+  return JSON.stringify({ d: parts.d, p: parts.p });
+}
+
+export function normalizeAllocationMap(saved) {
+  if (!saved || typeof saved !== "object" || Array.isArray(saved)) return {};
+  const normalized = {};
+  const priority = new Map();
+  Object.entries(saved).forEach(([key, value]) => {
+    const parsed = parseKey(key);
+    const parts = allocationScopeParts(parsed);
+    if (!parts || !parsed.store || !parsed.pk) {
+      normalized[key] = value;
+      return;
+    }
+    const canonicalKey = [
+      canonicalScope(parts),
+      parsed.store,
+      parsed.pk,
+    ].join(SEP);
+    const nextPriority = parts.hasCutScope
+      ? parts.c.length
+        ? 1
+        : 2
+      : 3;
+    if (nextPriority >= (priority.get(canonicalKey) ?? -1)) {
+      normalized[canonicalKey] = value;
+      priority.set(canonicalKey, nextPriority);
+    }
+  });
+  return normalized;
+}
+
+export function scopeOk(parsed) {
+  const parts = allocationScopeParts(parsed);
+  return Boolean(parts && canonicalScope(parts) === scope());
 }
 
 export function pkKey(key) {

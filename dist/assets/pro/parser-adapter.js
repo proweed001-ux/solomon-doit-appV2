@@ -264,10 +264,3 @@ export function arr(payload) {
       ? payload.rows
       : [];
 }
-
-export async function parseDoitFile(file) {
-  const buffer = await file.arrayBuffer();
-  const workbook = globalThis.XLSX.read(buffer, { type: "array" });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  return globalThis.XLSX.utils.sheet_to_json(sheet, { defval: "" });
-}

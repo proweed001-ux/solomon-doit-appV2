@@ -1,8 +1,6 @@
 const SEND_SELECTOR = '#table input.jdata[data-map="send"]';
 const QUANTITY_SELECTOR = "#table input.jdata[data-map]";
 let editSession = null;
-let pointerTarget = null;
-let pointerTrackingBound = false;
 
 function sendInputs() {
   return [...document.querySelectorAll(SEND_SELECTOR)].filter(
@@ -60,27 +58,6 @@ function focusTarget(target) {
   try {
     next.select();
   } catch {}
-}
-
-function ensurePointerTracking() {
-  if (pointerTrackingBound) return;
-  pointerTrackingBound = true;
-  document.addEventListener(
-    "pointerdown",
-    (event) => {
-      const input = event.target.closest?.(QUANTITY_SELECTOR);
-      pointerTarget =
-        input && !input.disabled ? inputTarget(input) : null;
-    },
-    true,
-  );
-}
-
-function restorePointerTarget() {
-  if (!pointerTarget) return;
-  const target = pointerTarget;
-  pointerTarget = null;
-  queueMicrotask(() => focusTarget(target));
 }
 
 function quantityComparableValue(value) {
@@ -160,26 +137,18 @@ export function bindQuantityInputs({
   onInput,
   onCommit,
 }) {
-  ensurePointerTracking();
   refreshSendInputs();
   inputs.forEach((input) => {
     const callbacks = { onEditStart, onRevert, onInput, onCommit };
     input.onfocus = () => {
-      pointerTarget = null;
       beginEdit(input, callbacks);
       if (input.matches(SEND_SELECTOR)) refreshSendInputs();
     };
     input.oninput = () => updateEdit(input, callbacks);
-    input.onchange = () => {
-      if (finishEdit(input, { reason: "change", render: true })) {
-        restorePointerTarget();
-      }
-    };
-    input.onblur = () => {
-      if (finishEdit(input, { reason: "blur", render: true })) {
-        restorePointerTarget();
-      }
-    };
+    input.onchange = () =>
+      finishEdit(input, { reason: "change", render: false });
+    input.onblur = () =>
+      finishEdit(input, { reason: "blur", render: false });
     input.onkeydown = (event) => {
       if (event.key !== "Enter" && event.key !== "Tab") return;
       const moveTarget = nextTargetFor(input, event.shiftKey);
@@ -187,7 +156,7 @@ export function bindQuantityInputs({
       event.stopPropagation();
       finishEdit(input, {
         reason: event.key.toLowerCase(),
-        render: true,
+        render: false,
       });
       focusTarget(moveTarget);
     };

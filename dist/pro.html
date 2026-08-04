@@ -26,39 +26,21 @@
     <main class="wrap">
       <section id="upload">
         <div class="topGrid">
-          <div class="card uploadCard">
+          <div class="card cloudStatusCard">
             <button id="fuelBillBtn" type="button" class="fuelBillBtn">
               บิลน้ำมัน</button
             ><button id="resultsModeBtn" type="button" class="resultsModeBtn">
               ผลงาน</button
             ><button class="devTeamBtn">ทีมพัฒนา</button>
-            <h3>☁ อัปโหลดไฟล์ DOIT</h3>
-            <div class="uploadRow">
-              <button id="choose" class="fileBtn">เลือกไฟล์</button
-              ><span id="fileLabel" class="fileName">ยังไม่ได้เลือกไฟล์</span
-              ><input
-                id="file"
-                type="file"
-                accept=".xlsx,.xlsm,.xls,.csv"
-                hidden
-              />
+            <div class="cloudHead">
+              <h3 class="cloudStatusTitle">☁ ข้อมูล DOIT ล่าสุด</h3>
+              <span id="cloudState" role="status">กำลังโหลด</span>
             </div>
-            <div id="msg" class="hint">พร้อมใช้งาน</div>
-            <div class="cloudBox">
-              <div class="cloudHead">
-                <b>ไฟล์ DOIT ล่าสุดจากระบบกลาง</b
-                ><span id="cloudState">รอตรวจสอบ</span>
-              </div>
-              <div id="cloudMsg" class="cloudMeta">
-                กด “ตรวจไฟล์ล่าสุด” เพื่อดูไฟล์ที่หัวหน้าอัปโหลด
-              </div>
-              <div class="cloudBtns">
-                <button class="cloudBtn" id="cloudCheckBtn">
-                  ตรวจไฟล์ล่าสุด</button
-                ><button class="cloudBtn main" id="cloudLoadBtn">
-                  โหลดไฟล์ล่าสุดจาก Cloud
-                </button>
-              </div>
+            <div id="cloudMsg" class="cloudMeta" aria-live="polite">
+              กำลังดึงข้อมูลล่าสุดจาก Cloud…
+            </div>
+            <div id="msg" class="hint" aria-live="polite">
+              กำลังเตรียมข้อมูล
             </div>
           </div>
           <div class="card">
