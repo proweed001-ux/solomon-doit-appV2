@@ -57,6 +57,19 @@ const scripts = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi
 assert.equal(scripts.length, 1, "Pro HTML must have one JavaScript entry");
 assert.equal(scripts[0][1], "/assets/pro/app.js");
 assert.match(scripts[0][0], /type=["']module["']/i);
+[
+  'id="choose"',
+  'id="file"',
+  'id="fileLabel"',
+  'id="cloudCheckBtn"',
+  'id="cloudLoadBtn"',
+  "uploadRow",
+  "uploadCard",
+  "ตรวจไฟล์ล่าสุด",
+  "โหลดไฟล์ล่าสุดจาก Cloud",
+].forEach((token) =>
+  assert.ok(!html.includes(token), `Pro HTML contains removed manual control: ${token}`),
+);
 
 const graph = activeGraph(entry);
 const activeProModules = [...graph]
@@ -120,10 +133,16 @@ assert.equal(
   "Active graph must have one state owner",
 );
 assert.ok(
-  [...graph].some(
+  ![...graph].some(
     (file) => relative(file) === "dist/assets/vendor/xlsx-0.18.5.full.min.js",
   ),
-  "Active graph must use the local XLSX bundle",
+  "Cloud-only Pro must not load the XLSX parser bundle",
 );
+const core = read(path.join(root, "dist/assets/pro/core.js"));
+assert.doesNotMatch(
+  core,
+  /parseDoitFile|cloudCheckBtn|cloudLoadBtn|#choose|#file\b/,
+);
+assert.match(core, /bind\(\);\s*void loadCloud\(\);/);
 
 console.log("Active Pro module graph passed:", activeProModules);

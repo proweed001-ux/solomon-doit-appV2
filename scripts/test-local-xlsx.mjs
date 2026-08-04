@@ -24,8 +24,8 @@ assert.match(
   'Pro must use its single module entry',
 );
 assert.ok(
-  proEntry.includes('../vendor/xlsx-0.18.5.full.min.js'),
-  'Pro module entry must import the same-origin XLSX bundle',
+  !proEntry.includes('../vendor/xlsx-0.18.5.full.min.js'),
+  'Cloud-only Pro must not load the XLSX parser bundle',
 );
 assert.doesNotMatch(
   proEntry,
@@ -44,7 +44,7 @@ assert.equal(typeof context.XLSX?.utils?.book_new, 'function');
 
 console.log('Same-origin XLSX bundle passed:', {
   pages: pages.length,
-  proEntry: '/assets/pro/app.js',
+  proCloudOnly: true,
   version: context.XLSX.version,
   sha256: digest(deployed),
 });

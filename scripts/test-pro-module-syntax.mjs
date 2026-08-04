@@ -20,6 +20,6 @@ for (const file of modules) {
 
 const app = fs.readFileSync(path.join(proRoot, "app.js"), "utf8");
 assert.match(app, /import "\.\/core\.js";/);
-assert.match(app, /import "\.\.\/vendor\/xlsx-0\.18\.5\.full\.min\.js";/);
+assert.doesNotMatch(app, /xlsx-0\.18\.5\.full\.min\.js/);
 
 console.log(`Pro module syntax passed for ${modules.length} active modules.`);
