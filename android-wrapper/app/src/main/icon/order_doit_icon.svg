@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a3196"/>
+      <stop offset="0.48" stop-color="#041b58"/>
+      <stop offset="1" stop-color="#020b2b"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#19a65a"/>
+      <stop offset="1" stop-color="#087536"/>
+    </linearGradient>
+    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffb22a"/>
+      <stop offset="1" stop-color="#ff7b00"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="1004" height="1004" rx="174" fill="url(#bg)"/>
+  <text x="520" y="247" text-anchor="middle" font-family="DejaVu Sans" font-size="164" font-weight="900" font-style="italic" fill="#000000" opacity="0.40">Order</text>
+  <text x="512" y="235" text-anchor="middle" font-family="DejaVu Sans" font-size="164" font-weight="900" font-style="italic" fill="#ffffff">Order</text>
+  <g opacity="0.98">
+    <rect x="120" y="390" width="175" height="20" rx="10" fill="url(#orange)"/>
+    <rect x="145" y="447" width="150" height="20" rx="10" fill="url(#orange)"/>
+    <rect x="177" y="504" width="118" height="20" rx="10" fill="url(#orange)"/>
+  </g>
+  <g opacity="0.42" transform="translate(10 13)">
+    <path d="M370 318 H610 L738 446 V650 Q738 672 716 672 H370 Q348 672 348 650 V340 Q348 318 370 318 Z" fill="#000000"/>
+    <rect x="300" y="386" width="230" height="260" rx="26" fill="#000000"/>
+  </g>
+  <g>
+    <path d="M370 318 H610 L738 446 V650 Q738 672 716 672 H370 Q348 672 348 650 V340 Q348 318 370 318 Z" fill="#f5f6f8"/>
+    <path d="M610 318 V425 Q610 446 631 446 H738 Z" fill="url(#green)"/>
+    <rect x="300" y="386" width="230" height="260" rx="26" fill="url(#green)"/>
+    <text x="423" y="580" text-anchor="middle" font-family="DejaVu Sans" font-size="190" font-weight="900" fill="#000000" opacity="0.30">X</text>
+    <text x="415" y="572" text-anchor="middle" font-family="DejaVu Sans" font-size="190" font-weight="900" fill="#ffffff">X</text>
+    <g fill="#109447">
+      <rect x="575" y="455" width="64" height="48" rx="3"/>
+      <rect x="656" y="455" width="64" height="48" rx="3"/>
+      <rect x="575" y="522" width="64" height="48" rx="3"/>
+      <rect x="656" y="522" width="64" height="48" rx="3" opacity="0.82"/>
+      <rect x="575" y="589" width="64" height="48" rx="3"/>
+      <rect x="656" y="589" width="64" height="48" rx="3" opacity="0.72"/>
+    </g>
+  </g>
+  <text x="163" y="850" font-family="DejaVu Sans" font-size="208" font-weight="900" font-style="italic" fill="#000000" opacity="0.36">DO</text>
+  <text x="155" y="838" font-family="DejaVu Sans" font-size="208" font-weight="900" font-style="italic" fill="#ffffff">DO</text>
+  <text x="568" y="850" font-family="DejaVu Sans" font-size="208" font-weight="900" font-style="italic" fill="#000000" opacity="0.36">IT</text>
+  <text x="560" y="838" font-family="DejaVu Sans" font-size="208" font-weight="900" font-style="italic" fill="#ff8500">IT</text>
+  <path d="M748 414 C948 455 980 659 829 831 C728 944 499 975 267 917" fill="none" stroke="url(#orange)" stroke-width="28" stroke-linecap="round"/>
+  <path d="M257 914 C420 981 627 969 782 891" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round"/>
+</svg>
