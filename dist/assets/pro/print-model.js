@@ -26,15 +26,15 @@ export function lineKey(store, row) {
 
 export function lineVal(store, row) {
   const edit = editMap()[lineKey(store, row)] || null;
-  const qty = edit ? N(edit.qty) : N(row.qty);
+  const qty = N(row.qty);
   const unit = edit ? N(edit.unit) : N(row.unit);
   return { qty, unit, total: qty * unit };
 }
 
-export function saveLineEdit(key, qty, unit) {
+export function saveLinePriceEdit(key, unit) {
   if (!key) return;
   const edits = editMap();
-  edits[key] = { qty: N(qty), unit: N(unit), ts: Date.now() };
+  edits[key] = { unit: N(unit), ts: Date.now() };
   localStorage.setItem(PRINT_EDIT_KEY, JSON.stringify(edits));
 }
 
