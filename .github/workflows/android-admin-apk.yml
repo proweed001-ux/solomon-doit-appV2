@@ -42,12 +42,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          SRC="android-admin-wrapper/app/src/main/icon/admin_doit_icon.jpg.b64"
+          PARTS="android-admin-wrapper/app/src/main/icon/admin_doit_icon.part"
           OUT="android-admin-wrapper/app/src/main/res/mipmap-xxxhdpi"
           mkdir -p "$OUT"
-          base64 --decode "$SRC" > "$OUT/ic_launcher.jpg"
+          cat "${PARTS}00" "${PARTS}01" "${PARTS}02" | base64 --decode > "$OUT/ic_launcher.jpg"
           cp "$OUT/ic_launcher.jpg" "$OUT/ic_launcher_round.jpg"
           test -s "$OUT/ic_launcher.jpg"
+          file "$OUT/ic_launcher.jpg" | grep -F 'JPEG image data'
 
       - name: Apply verified source correction
         shell: bash
