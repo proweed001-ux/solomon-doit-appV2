@@ -62,6 +62,7 @@ import {
   loadState,
   mapVal,
   mergeSelection,
+  normalizeAllocationMap,
   normalizePageSize,
   push,
   rkey,
@@ -74,6 +75,7 @@ import {
   switchFilterContext,
   trimHistory,
 } from "../dist/assets/pro/state.js";
+import { SEP } from "../dist/assets/pro/utils.js";
 import {
   buildTelesaleBills,
   filterTelesaleBills,
@@ -108,6 +110,44 @@ state.send = {};
 state.add = {};
 state.pull = {};
 state.ins = [];
+
+const allocationPoolKey = "Cut Brand|Cut Size|CUT-001|สินค้าตัดร้าน|INVC";
+const allocationStore = "ร้านเก็บค่าที่กรอก";
+const oldUncutKey = [
+  JSON.stringify({
+    d: state.sel.dates,
+    p: state.sel.ps,
+    c: [],
+  }),
+  allocationStore,
+  allocationPoolKey,
+].join(SEP);
+const oldCutKey = [
+  JSON.stringify({
+    d: state.sel.dates,
+    p: state.sel.ps,
+    c: ["ร้านตัดบิลจริง"],
+  }),
+  allocationStore,
+  allocationPoolKey,
+].join(SEP);
+const normalizedAllocations = normalizeAllocationMap({
+  [oldCutKey]: 9,
+  [oldUncutKey]: 5,
+});
+state.sel.receivers = [allocationStore];
+state.sel.orderStores = ["ร้านตัดบิลจริง"];
+state.send = normalizedAllocations;
+assert.equal(Object.keys(normalizedAllocations).length, 1);
+assert.equal(mapVal(state.send, allocationPoolKey), 5);
+assert.equal(sumMap(state.send, allocationPoolKey), 5);
+assert.equal(
+  Object.keys(normalizedAllocations)[0].split(SEP)[0],
+  JSON.stringify({ d: state.sel.dates, p: state.sel.ps }),
+  "Manual quantity scope must not depend on the cut-store filter",
+);
+state.sel = { ...createSelection(), ...fixture.selection };
+state.send = {};
 
 for (const kind of ["send", "add", "pull"]) {
   for (const item of fixture.manual[kind]) {

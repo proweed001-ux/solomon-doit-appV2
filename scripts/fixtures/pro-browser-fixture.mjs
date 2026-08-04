@@ -44,6 +44,48 @@ export const fixtureMeta = {
   hugeStores: 120,
 };
 
+export const cutStoreFixtureMeta = {
+  date: "2026-07-20",
+  ps: "AYAPS998",
+  receiver: "ร้านตัดบิลจริง",
+  remainingStore: "ร้านคงเหลือ",
+  rows: 2,
+  productCode: "CUT-STORE-001",
+  originalQty: 14,
+  excludedQty: 10,
+  filteredQty: 4,
+};
+
+export function cutStoreFixtureRows() {
+  const base = {
+    InvoiceDate: cutStoreFixtureMeta.date,
+    SOTypeID: "INVC",
+    SO_SalespersonID: cutStoreFixtureMeta.ps,
+    SKUCode: cutStoreFixtureMeta.productCode,
+    SKUDescription: "สินค้าทดสอบตัดร้านบิลจริง",
+    GroupBrand: "Cut Store Brand",
+    TAS_SizeGroup: "Cut Store Size",
+  };
+  return [
+    {
+      ...base,
+      InvoiceNo: "CUT-INV-001",
+      CustomerName: cutStoreFixtureMeta.receiver,
+      ShipQtyPCS: cutStoreFixtureMeta.excludedQty,
+      LineAmtBeforeDisc: 100,
+      InvoiceAmt: 90,
+    },
+    {
+      ...base,
+      InvoiceNo: "CUT-INV-002",
+      CustomerName: cutStoreFixtureMeta.remainingStore,
+      ShipQtyPCS: cutStoreFixtureMeta.filteredQty,
+      LineAmtBeforeDisc: 40,
+      InvoiceAmt: 36,
+    },
+  ];
+}
+
 export function browserFixtureRows() {
   const normal = Array.from({ length: fixtureMeta.normalRows }, (_, index) => {
     const number = index + 1;
@@ -148,9 +190,17 @@ export function createBrowserFixtureFiles(outputDir) {
       outputDir,
       "pro-browser-performance-6000-fixture.xlsx",
     ),
+    cutStoreXlsx: path.join(outputDir, "pro-browser-cut-store-fixture.xlsx"),
   };
   XLSX.writeFile(workbook, files.xlsx, { bookType: "xlsx" });
   XLSX.writeFile(workbook, files.xlsm, { bookType: "xlsm" });
+  const cutStoreWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    cutStoreWorkbook,
+    XLSX.utils.json_to_sheet(cutStoreFixtureRows()),
+    "DOIT",
+  );
+  XLSX.writeFile(cutStoreWorkbook, files.cutStoreXlsx, { bookType: "xlsx" });
   const largeWorkbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(
     largeWorkbook,

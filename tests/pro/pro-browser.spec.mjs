@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import path from "node:path";
 import {
   createBrowserFixtureFiles,
+  cutStoreFixtureMeta,
   fixtureMeta,
 } from "../../scripts/fixtures/pro-browser-fixture.mjs";
 
@@ -681,6 +682,60 @@ test("keeps the native mobile Next focus target connected after a changed send v
   expect(committed.pending).toBe(false);
   expect(committed.doneAmount).toBe("7");
   expect(committed.activeSendIndex).toBe(1);
+  expect(runtime.errors).toEqual([]);
+});
+
+test("keeps Pro quantities visible while cut-store filtering reduces the order", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await uploadFixture(page, fixtureFiles.cutStoreXlsx, {
+    rows: cutStoreFixtureMeta.rows,
+    teleRows: 0,
+  });
+  await chooseOnly(page, "receivers", cutStoreFixtureMeta.receiver);
+
+  const sendInput = page.locator(
+    '#table input.jdata[data-map="send"]',
+  ).first();
+  await expect(sendInput).toHaveValue("");
+  await expect(page.locator("#remainAmount")).toHaveText(
+    String(cutStoreFixtureMeta.originalQty),
+  );
+  await sendInput.fill("3");
+  await sendInput.press("Tab");
+  const beforeFilter = await quantitySnapshot(page, "send", 0);
+  expect(beforeFilter.dom).toBe("3");
+  expect(beforeFilter.stateValue).toBe(3);
+  expect(beforeFilter.storedValue).toBe(3);
+  expect(beforeFilter.doneAmount).toBe("3");
+  expect(beforeFilter.remaining).toBe("11");
+
+  await chooseOnly(page, "orderStores", cutStoreFixtureMeta.receiver);
+  const afterFilter = await quantitySnapshot(page, "send", 0);
+  expect(afterFilter.key).toBe(beforeFilter.key);
+  expect(afterFilter.dom).toBe("3");
+  expect(afterFilter.stateValue).toBe(3);
+  expect(afterFilter.storedValue).toBe(3);
+  expect(afterFilter.receivers).toEqual([cutStoreFixtureMeta.receiver]);
+  expect(afterFilter.doneAmount).toBe("3");
+  expect(afterFilter.remaining).toBe("1");
+  await expect(page.locator("#remainAmount")).toHaveText("1");
+  await expect(page.locator("#table tbody tr").first()).toContainText(
+    `${cutStoreFixtureMeta.filteredQty} ชิ้น · 1 ร้าน · 1 บิล`,
+  );
+
+  await page.locator("#undo").click();
+  const afterUndo = await quantitySnapshot(page, "send", 0);
+  expect(afterUndo.dom).toBe("3");
+  expect(afterUndo.doneAmount).toBe("3");
+  expect(afterUndo.remaining).toBe("11");
+
+  await page.locator("#redo").click();
+  const afterRedo = await quantitySnapshot(page, "send", 0);
+  expect(afterRedo.dom).toBe("3");
+  expect(afterRedo.doneAmount).toBe("3");
+  expect(afterRedo.remaining).toBe("1");
   expect(runtime.errors).toEqual([]);
 });
 
