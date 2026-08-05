@@ -50,6 +50,7 @@
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .realBillTable {
@@ -134,7 +135,32 @@
   }
 
   .realBillTable {
+    width: max-content;
     min-width: 560px;
+  }
+
+  .realBillTable th:first-child,
+  .realBillTable td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    width: 240px;
+    min-width: 240px;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: #fff;
+    box-shadow: 7px 0 9px -9px #0f172a;
+  }
+
+  .realBillTable th:first-child {
+    z-index: 3;
+    background: #f8fafc;
+  }
+
+  .realBillTable .realBillTotal td:first-child {
+    background: #f1f5f9;
   }
 
   .realBillPager {
@@ -368,6 +394,7 @@
       .tableWrap {
         overflow: auto;
         -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
       }
       .tbl {
         border-collapse: collapse;
@@ -866,6 +893,11 @@
         padding: 4px;
       }
       @media (max-width: 720px) {
+        body > .topbar,
+        body > .wrap,
+        body > footer {
+          zoom: 0.8;
+        }
         .wrap {
           padding: 8px;
         }
@@ -967,7 +999,7 @@
         border-radius: 10px !important;
         font-size: 12.5px !important;
         line-height: 1.05 !important;
-        white-space: normal !important;
+        white-space: nowrap !important;
       }
       .tableTitleBox {
         min-width: 0;
@@ -1060,16 +1092,31 @@
         padding: 0 3px;
         font-size: 11px;
         line-height: 1.05;
-        white-space: normal;
+        white-space: nowrap;
+      }
+      .sendActionButtons .teleBtn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
       }
       @media (max-width: 720px) {
         .sendActionButtons {
+          display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
+          overflow: visible;
+          padding: 0;
         }
         .sendActionButtons button {
+          width: 100%;
+          min-width: 0;
           height: 38px;
-          font-size: 10.8px;
+          font-size: 11.5px;
           padding: 0 2px;
+          overflow: hidden;
+        }
+        .sendActionButtons .teleBtnCount {
+          display: none;
         }
       }
       .displayActionButtons {
@@ -1152,10 +1199,6 @@
       }
 
 .blue { color: #2563eb !important; font-weight: 900; }
-.tbl { min-width: 560px !important; font-size: 12px !important; }
-.tbl th, .tbl td { padding: 6px 4px !important; }
-.tbl input.pick { width: 54px !important; height: 32px !important; }
-.tableWrap { overflow-x: auto !important; }
 .insertDelBtn { margin-left: 8px; border: 1px solid #ef4444; background: #fef2f2; color: #dc2626; border-radius: 7px; padding: 2px 8px; font-size: 11px; font-weight: 950; }
 .r { text-align: right; }
 .c { text-align: center; }
@@ -1164,8 +1207,6 @@
 #diagBtn.settingsGear { width: 40px; height: 40px; border-radius: 999px; padding: 0 !important; display: flex; align-items: center; justify-content: center; font-size: 21px; line-height: 1; background: #ffffff1a !important; color: #fff !important; border: 1px solid #ffffff55 !important; }
 .displayActionButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; }
 .displayActionButtons button { width: 100%; height: 40px; white-space: nowrap; }
-.sendActionButtons { grid-column: 1/-1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 0; }
-.sendActionButtons button { width: 100%; height: 38px; min-width: 0; padding: 0 3px; font-size: 11px; line-height: 1.05; white-space: normal; }
 @keyframes ayaLetterWave { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(-5px); } 50% { transform: translateY(0); } 75% { transform: translateY(4px); } }
 .ayaBrandTitle { display: inline-flex !important; align-items: center !important; justify-content: center !important; font-family: "Arial Black", Impact, system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif !important; font-size: 21px !important; font-weight: 1000 !important; letter-spacing: .25px !important; line-height: 1 !important; color: #fff !important; -webkit-text-fill-color: #fff !important; background: none !important; text-shadow: 0 2px 3px rgba(0, 0, 0, .55) !important; white-space: nowrap !important; overflow: visible !important; }
 .ayaBrandTitle .ayaChar { display: inline-block !important; color: #fff !important; animation: ayaLetterWave 2.2s ease-in-out infinite !important; animation-delay: calc(var(--i) * .075s) !important; }
@@ -1180,11 +1221,8 @@
 .devQrPosterEmpty { width: min(160px, 38vw); height: min(160px, 38vw); display: flex; align-items: center; justify-content: center; text-align: center; border: 1px dashed #86efac; color: #166534; font-weight: 950; background: #fff; }
 @media (max-width: 720px) {
   .wrap { padding: 8px !important; }
-  .tbl { min-width: 540px !important; }
   .p small { font-size: 11px !important; }
   .displayActionButtons { grid-column: 1/-1; grid-template-columns: 1fr 1fr; }
-  .sendActionButtons { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .sendActionButtons button { height: 38px; font-size: 10.8px; padding: 0 2px; }
   .ayaBrandTitle { font-size: 16.2px !important; letter-spacing: .05px !important; }
   .ayaBrandTitle .ayaChar { animation-duration: 2.35s !important; animation-delay: calc(var(--i) * .065s) !important; }
   .devQrPosterTop { font-size: 15px; }
@@ -1192,6 +1230,124 @@
   .devQrPosterFrame img, .devQrPosterEmpty { width: min(132px, 35vw); height: min(132px, 35vw); }
   .devQrPosterBrand { font-size: 27px; }
   .devQrPosterScan { font-size: 10.5px; }
+}
+
+.mobileTableScrollHint {
+  display: none;
+}
+
+@media screen and (max-width: 720px) {
+  .mobileTableScrollHint {
+    display: block;
+    padding: 6px 10px;
+    border-bottom: 1px solid #dbeafe;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .realBillScrollHint {
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+  }
+
+  .tableWrap {
+    overflow-x: auto;
+    overflow-y: visible;
+    overscroll-behavior-x: contain;
+  }
+
+  .tbl {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  #table[data-mode]:not([data-mode="remain"]) {
+    min-width: 560px;
+  }
+
+  #table[data-mode="remain"] {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .tbl th,
+  .tbl td {
+    white-space: nowrap;
+  }
+
+  .tbl .p b,
+  .tbl .p small,
+  .tbl .detailBox {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(1),
+  #table[data-mode="remain"] :is(th, td:not([colspan])):nth-child(1),
+  #table[data-mode="done"] :is(th, td:not([colspan])):nth-child(1),
+  #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(1),
+  #table[data-mode="order"] :is(th, td:not([colspan])):nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    width: 34px;
+    min-width: 34px;
+    max-width: 34px;
+    background: #fff;
+  }
+
+  #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(2),
+  #table[data-mode="remain"] :is(th, td:not([colspan])):nth-child(2),
+  #table[data-mode="done"] :is(th, td:not([colspan])):nth-child(2),
+  #table[data-mode="order"] :is(th, td:not([colspan])):nth-child(2),
+  #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(5) {
+    position: sticky;
+    left: 34px;
+    z-index: 2;
+    width: 176px;
+    min-width: 176px;
+    max-width: 176px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: #fff;
+    box-shadow: 7px 0 9px -9px #0f172a;
+  }
+
+  #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(3) {
+    width: 56px;
+    min-width: 56px;
+    max-width: 56px;
+  }
+
+  #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(n+4):nth-child(-n+6) {
+    width: 64px;
+    min-width: 64px;
+    max-width: 64px;
+  }
+
+  #table[data-mode="dist"] :is(th, td:not([colspan])):nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    width: 282px;
+    min-width: 282px;
+    max-width: 282px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: #fff;
+    box-shadow: 7px 0 9px -9px #0f172a;
+  }
+
+  #table[data-mode] thead th {
+    z-index: 4;
+    background: #f8fafc;
+  }
 }
 
 @page {
@@ -1227,7 +1383,7 @@
 }
 
 .printMobileSafeA4 .a4Sheet {
-  width: min(194mm, 100vw) !important;
+  width: 194mm !important;
   height: 277mm !important;
   margin: 10mm auto !important;
   padding: 0 !important;
@@ -1238,6 +1394,7 @@
   overflow: hidden !important;
   page-break-after: always !important;
   break-after: page !important;
+  zoom: var(--pro-print-preview-scale, 1);
 }
 
 .printMobileSafeA4 .receiptPage {
@@ -1519,6 +1676,7 @@
         padding: 8mm;
         box-sizing: border-box;
         background: #fff;
+        zoom: var(--pro-print-preview-scale, 1);
       }
       .proPrintGeneric.orderPrint .receiptPage {
         min-height: auto;
@@ -1632,6 +1790,7 @@
           margin: 0 !important;
           padding: 0 !important;
           box-shadow: none !important;
+          zoom: 1 !important;
         }
         .proPrintGeneric.orderPrint .receiptPage {
           padding-top: 4mm !important;
@@ -1707,6 +1866,39 @@
         }
       }
 
+@media screen and (max-width: 720px) {
+  .printOverlay[data-preview-fit="screen"] {
+    overflow-x: hidden;
+  }
+
+  .printOverlay .printBar > b {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .printOverlay .printBar > span {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .printMobileSafeA4 .a4Sheet,
+  .proPrintGeneric .receiptPage {
+    margin: 8px auto !important;
+  }
+
+  .printMobileSafeA4 .itemName,
+  .proPrintGeneric .receiptTable td:nth-child(2) {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    word-break: normal !important;
+  }
+}
+
 @media print {
         .printMobileSafeA4 .a4Sheet {
           width: 210mm !important;
@@ -1719,6 +1911,7 @@
           overflow: hidden !important;
           break-after: page !important;
           page-break-after: always !important;
+          zoom: 1 !important;
         }
         .printMobileSafeA4 .a4Sheet:last-child {
           break-after: auto !important;
