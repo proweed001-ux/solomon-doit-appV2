@@ -142,11 +142,21 @@
             </div>
             <button id="showDetailBtn" class="outline">แสดงรายละเอียด</button>
             <div id="sendActionButtons" class="sendActionButtons">
-              <button id="teleBtn" class="teleBtn">บิล Telesale (0)</button
+              <button
+                id="teleBtn"
+                class="teleBtn"
+                aria-label="บิล Telesale (0)"
+                title="บิล Telesale (0)"
+              >
+                <span class="teleBtnLabel">บิล Telesale</span>
+                <span class="teleBtnCount">(0)</span></button
               ><button id="insertBtn" class="outline">+ แทรกสินค้า</button
               ><button id="prepPrint" class="outline">เตรียมปริ้น</button
               ><button id="remainBtn" class="outline">สรุปของเหลือ</button>
             </div>
+          </div>
+          <div id="tableScrollHint" class="mobileTableScrollHint" aria-hidden="true">
+            ← เลื่อนตารางเพื่อดูข้อมูล →
           </div>
           <div class="tableWrap">
             <table class="tbl" id="table">

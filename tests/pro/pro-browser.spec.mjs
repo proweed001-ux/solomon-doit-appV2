@@ -2449,6 +2449,8 @@ test("keeps the Pro shell inside Android WebView widths above 390px", async ({
       documentWidth: document.documentElement.scrollWidth,
       mobileLayout: matchMedia("(max-width: 720px)").matches,
       narrowLayout: matchMedia("(max-width: 390px)").matches,
+      shellZoom: getComputedStyle(document.querySelector(".wrap")).zoom,
+      footerZoom: getComputedStyle(document.querySelector("body > footer")).zoom,
       cloudTitlePaddingRight: getComputedStyle(
         document.querySelector(".cloudStatusTitle"),
       ).paddingRight,
@@ -2458,6 +2460,8 @@ test("keeps the Pro shell inside Android WebView widths above 390px", async ({
 
   expect(layout.mobileLayout).toBe(true);
   expect(layout.narrowLayout).toBe(false);
+  expect(layout.shellZoom).toBe("0.8");
+  expect(layout.footerZoom).toBe("0.8");
   expect(layout.cloudTitlePaddingRight).toBe("226px");
   expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
   for (const box of layout.boxes) {
@@ -2466,6 +2470,172 @@ test("keeps the Pro shell inside Android WebView widths above 390px", async ({
       layout.viewportWidth + 1,
     );
   }
+  expect(runtime.errors).toEqual([]);
+});
+
+test("keeps mobile Pro tables single-line and fits print previews to the screen", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-390x844");
+  const runtime = await preparePage(page);
+  await loadFixture(page, fixtureFiles.xlsx);
+
+  const assertPinnedMode = async (mode, productColumn, shouldScroll = true) => {
+    await expect(page.locator("#table")).toHaveAttribute("data-mode", mode);
+    const shape = await page.locator("#table").evaluate(
+      (table, column) => {
+        const wrap = table.closest(".tableWrap");
+        const product = table.querySelector(`thead th:nth-child(${column})`);
+        return {
+          documentWidth: document.documentElement.scrollWidth,
+          viewportWidth: window.innerWidth,
+          tableScrolls: wrap.scrollWidth > wrap.clientWidth,
+          overflowX: getComputedStyle(wrap).overflowX,
+          productPosition: getComputedStyle(product).position,
+          productWhiteSpace: getComputedStyle(product).whiteSpace,
+        };
+      },
+      productColumn,
+    );
+    expect(shape.documentWidth).toBeLessThanOrEqual(shape.viewportWidth + 1);
+    expect(shape.tableScrolls).toBe(shouldScroll);
+    expect(["auto", "scroll"]).toContain(shape.overflowX);
+    expect(shape.productPosition).toBe("sticky");
+    expect(shape.productWhiteSpace).toBe("nowrap");
+  };
+
+  await expect(page.locator("#tableScrollHint")).toBeVisible();
+  const actionShape = await page.locator("#sendActionButtons").evaluate((bar) => ({
+    scrolls: bar.scrollWidth > bar.clientWidth,
+    overflowX: getComputedStyle(bar).overflowX,
+    display: getComputedStyle(bar).display,
+    columns: getComputedStyle(bar).gridTemplateColumns.split(" ").length,
+    labels: [...bar.querySelectorAll("button")].map((button) =>
+      button.querySelector(".teleBtnLabel")?.textContent ||
+      button.textContent.trim(),
+    ),
+    whiteSpaces: [...bar.querySelectorAll("button")].map(
+      (button) => getComputedStyle(button).whiteSpace,
+    ),
+    buttonsFit: [...bar.querySelectorAll("button")].every((button) => {
+      const barBox = bar.getBoundingClientRect();
+      const buttonBox = button.getBoundingClientRect();
+      return (
+        buttonBox.left >= barBox.left - 1 &&
+        buttonBox.right <= barBox.right + 1
+      );
+    }),
+  }));
+  expect(actionShape.scrolls).toBe(false);
+  expect(actionShape.overflowX).toBe("visible");
+  expect(actionShape.display).toBe("grid");
+  expect(actionShape.columns).toBe(4);
+  expect(actionShape.labels).toEqual([
+    "บิล Telesale",
+    "+ แทรกสินค้า",
+    "เตรียมปริ้น",
+    "สรุปของเหลือ",
+  ]);
+  expect(actionShape.whiteSpaces.every((value) => value === "nowrap")).toBe(true);
+  expect(actionShape.buttonsFit).toBe(true);
+
+  await assertPinnedMode("pick", 2);
+  for (const [tabIndex, mode, productColumn] of [
+    [1, "dist", 1],
+    [3, "done", 2],
+    [4, "raw", 5],
+    [5, "order", 2],
+  ]) {
+    await page.locator(".tabs .tab").nth(tabIndex).click();
+    await assertPinnedMode(mode, productColumn);
+  }
+
+  await page.locator("#remainBtn").click();
+  await assertPinnedMode("remain", 2, false);
+  await page.locator("#prepPrint").click();
+  let overlay = page.locator(".printOverlay.proPrintGeneric");
+  await expect(overlay).toHaveAttribute("data-preview-fit", "screen");
+  let preview = await overlay.evaluate((element) => {
+    const pageElement = element.querySelector(".receiptPage");
+    const box = pageElement.getBoundingClientRect();
+    const item = pageElement.querySelector(".receiptTable tbody td:nth-child(2)");
+    return {
+      left: box.left,
+      right: box.right,
+      viewport: window.innerWidth,
+      scale: Number(element.dataset.previewScale),
+      itemWhiteSpace: getComputedStyle(item).whiteSpace,
+    };
+  });
+  expect(preview.left).toBeGreaterThanOrEqual(-1);
+  expect(preview.right).toBeLessThanOrEqual(preview.viewport + 1);
+  expect(preview.scale).toBeGreaterThan(0);
+  expect(preview.scale).toBeLessThan(1);
+  expect(preview.itemWhiteSpace).toBe("nowrap");
+  const sizeButton = overlay.locator("[data-print-size]");
+  await expect(sizeButton).toBeVisible();
+  await expect(sizeButton).toHaveText("ขนาดจริง");
+  await sizeButton.click();
+  await expect(overlay).toHaveAttribute("data-preview-fit", "actual");
+  await expect(overlay).toHaveAttribute("data-preview-scale", "1.0000");
+  expect(
+    await overlay.locator(".receiptPage").evaluate(
+      (element) => element.getBoundingClientRect().right > window.innerWidth,
+    ),
+  ).toBe(true);
+  await sizeButton.click();
+  await expect(overlay).toHaveAttribute("data-preview-fit", "screen");
+  await page.emulateMedia({ media: "print" });
+  expect(
+    await overlay.locator(".receiptPage").evaluate((element) => getComputedStyle(element).zoom),
+  ).toBe("1");
+  await page.emulateMedia({ media: "screen" });
+  await overlay.locator("[data-print-close]").click();
+
+  await page.locator(".tabs .tab").nth(2).click();
+  await page.locator("#q").fill(fixtureMeta.realTsStore);
+  await page.locator("#searchBtn").click();
+  await expect(page.locator("#realBills .realBill").first()).toBeVisible();
+  await expect(page.locator("#realBills .realBillScrollHint")).toBeVisible();
+  const realBillShape = await page.locator(".realBillTableWrap").first().evaluate((wrap) => {
+    const product = wrap.querySelector("tbody td:first-child");
+    return {
+      scrolls: wrap.scrollWidth > wrap.clientWidth,
+      position: getComputedStyle(product).position,
+      whiteSpace: getComputedStyle(product).whiteSpace,
+    };
+  });
+  expect(realBillShape.scrolls).toBe(true);
+  expect(realBillShape.position).toBe("sticky");
+  expect(realBillShape.whiteSpace).toBe("nowrap");
+
+  await page.locator("#prepPrint").click();
+  overlay = page.locator(".printOverlay.realBillPrint");
+  await expect(overlay).toHaveAttribute("data-preview-fit", "screen");
+  preview = await overlay.evaluate((element) => {
+    const sheet = element.querySelector(".a4Sheet");
+    const box = sheet.getBoundingClientRect();
+    return {
+      left: box.left,
+      right: box.right,
+      viewport: window.innerWidth,
+      scale: Number(element.dataset.previewScale),
+      itemWhiteSpace: getComputedStyle(element.querySelector(".itemName")).whiteSpace,
+    };
+  });
+  expect(preview.left).toBeGreaterThanOrEqual(-1);
+  expect(preview.right).toBeLessThanOrEqual(preview.viewport + 1);
+  expect(preview.scale).toBeGreaterThan(0);
+  expect(preview.scale).toBeLessThan(1);
+  expect(preview.itemWhiteSpace).toBe("nowrap");
+  await expect(overlay.locator("[data-print-size]")).toBeVisible();
+  await page.emulateMedia({ media: "print" });
+  expect(
+    await overlay.locator(".a4Sheet").first().evaluate((element) => getComputedStyle(element).zoom),
+  ).toBe("1");
+  await page.emulateMedia({ media: "screen" });
+  await overlay.locator("[data-print-close]").click();
+
   expect(runtime.errors).toEqual([]);
 });
 

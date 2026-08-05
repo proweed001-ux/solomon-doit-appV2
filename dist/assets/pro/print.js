@@ -40,13 +40,59 @@ function printBar(label) {
   return (
     '<div class="printBar"><b>' +
     E(label) +
-    '</b><span><button type="button" data-print-close>ปิด</button> <button type="button" data-print-now>ปริ้น</button></span></div>'
+    '</b><span><button type="button" data-print-size hidden>ขนาดจริง</button><button type="button" data-print-close>ปิด</button><button type="button" data-print-now>ปริ้น</button></span></div>'
   );
 }
 
 function bindOverlay(overlay) {
-  overlay.querySelector("[data-print-close]")?.addEventListener("click", () => overlay.remove());
+  overlay.querySelector("[data-print-close]")?.addEventListener("click", () => {
+    overlay.previewFitCleanup?.();
+    overlay.remove();
+  });
   overlay.querySelector("[data-print-now]")?.addEventListener("click", () => window.print());
+}
+
+function fitPrintPreview(overlay, pageSelector) {
+  const media = window.matchMedia("screen and (max-width: 720px)");
+  const sizeButton = overlay.querySelector("[data-print-size]");
+  let frame = 0;
+  const update = () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      const page = overlay.querySelector(pageSelector);
+      const availableWidth = Math.max(1, overlay.clientWidth - 16);
+      const pageWidth = page?.offsetWidth || availableWidth;
+      const fitScreen = media.matches && overlay.dataset.previewMode !== "actual";
+      const scale = fitScreen ? Math.min(1, availableWidth / pageWidth) : 1;
+      overlay.style.setProperty("--pro-print-preview-scale", scale.toFixed(4));
+      overlay.dataset.previewFit = fitScreen ? "screen" : "actual";
+      overlay.dataset.previewScale = scale.toFixed(4);
+      if (sizeButton) {
+        sizeButton.hidden = !media.matches;
+        sizeButton.textContent = fitScreen ? "ขนาดจริง" : "พอดีจอ";
+      }
+    });
+  };
+  const observer = window.ResizeObserver
+    ? new ResizeObserver(update)
+    : null;
+  observer?.observe(overlay);
+  const toggleSize = () => {
+    overlay.dataset.previewMode =
+      overlay.dataset.previewMode === "actual" ? "fit" : "actual";
+    update();
+  };
+  sizeButton?.addEventListener("click", toggleSize);
+  window.addEventListener("resize", update);
+  media.addEventListener?.("change", update);
+  overlay.previewFitCleanup = () => {
+    cancelAnimationFrame(frame);
+    observer?.disconnect();
+    sizeButton?.removeEventListener("click", toggleSize);
+    window.removeEventListener("resize", update);
+    media.removeEventListener?.("change", update);
+  };
+  update();
 }
 
 function blankRows(count) {
@@ -292,6 +338,7 @@ function openRealBills(bills) {
     realBillPagesHtml(bills);
   document.body.appendChild(overlay);
   bindOverlay(overlay);
+  fitPrintPreview(overlay, ".a4Sheet");
   return true;
 }
 
@@ -336,6 +383,7 @@ function openStoreBills(bills) {
     printBar("ตรวจ/แก้ไขก่อนปริ้น — A4 มือถือ กันเครื่องปริ้นกินขอบ") + billPagesHtml(bills);
   document.body.appendChild(overlay);
   bindOverlay(overlay);
+  fitPrintPreview(overlay, ".a4Sheet");
   const recalculate = (persist) =>
     overlay.querySelectorAll(".receiptPage").forEach((page) => recalculateReceipt(page, persist));
   recalculate(false);
@@ -462,6 +510,7 @@ function openGenericPrint(title, heads, rows, options = {}) {
     '</tbody></table><div class="noteBox" contenteditable="true">หมายเหตุ: </div><div class="signGrid"><div class="signBox" contenteditable="true">ผู้ส่งสินค้า / ผู้จัดทำ</div><div class="signBox" contenteditable="true">ผู้รับสินค้า</div></div></section>';
   document.body.appendChild(overlay);
   bindOverlay(overlay);
+  fitPrintPreview(overlay, ".receiptPage");
 }
 
 export function preparePrint({

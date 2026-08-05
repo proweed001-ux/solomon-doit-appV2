@@ -969,7 +969,9 @@ function realBillPagerHtml(model) {
 }
 
 function realBillCardsHtml(bills) {
-  return bills
+  return (
+    '<div class="mobileTableScrollHint realBillScrollHint" aria-hidden="true">← เลื่อนตารางเพื่อดูยอดด้านขวา →</div>' +
+    bills
     .map(
       (bill) =>
         '<article class="realBill" data-real-key="' +
@@ -999,7 +1001,8 @@ function realBillCardsHtml(bills) {
         B(bill.vat) +
         "</td></tr></tbody></table></div></article>",
     )
-    .join("");
+    .join("")
+  );
 }
 
 export function realBillsHtml(

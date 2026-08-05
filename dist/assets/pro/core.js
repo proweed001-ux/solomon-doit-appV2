@@ -720,10 +720,12 @@ import { preparePrint } from "./print.js";
   function showRealBillSurface(active) {
     const table = $("#table");
     const tableWrap = table?.closest(".tableWrap");
+    const tableScrollHint = $("#tableScrollHint");
     const realBills = $("#realBills");
     const pageControls = $("#pager");
     if (table) table.hidden = active;
     if (tableWrap) tableWrap.hidden = active;
+    if (tableScrollHint) tableScrollHint.hidden = active;
     if (realBills) realBills.hidden = !active;
     if (pageControls) pageControls.hidden = active;
   }
@@ -827,6 +829,8 @@ import { preparePrint } from "./print.js";
     recalcPickRow(input.closest("tr"));
   }
   function renderMode(pool, renderId) {
+    const table = $("#table");
+    if (table) table.dataset.mode = state.mode;
     if (state.mode !== "ship") {
       realBillRenderToken += 1;
       showRealBillSurface(false);
@@ -1084,8 +1088,21 @@ import { preparePrint } from "./print.js";
   function updateTelesaleButton() {
     const button = $("#teleBtn");
     if (button) {
-      button.textContent =
-        "บิล Telesale (" + F(teleBillCount()) + ")";
+      const countText = F(teleBillCount());
+      let label = button.querySelector(".teleBtnLabel");
+      let count = button.querySelector(".teleBtnCount");
+      if (!label || !count) {
+        label = document.createElement("span");
+        label.className = "teleBtnLabel";
+        count = document.createElement("span");
+        count.className = "teleBtnCount";
+        button.replaceChildren(label, count);
+      }
+      label.textContent = "บิล Telesale";
+      count.textContent = "(" + countText + ")";
+      const accessibleLabel = "บิล Telesale (" + countText + ")";
+      button.setAttribute("aria-label", accessibleLabel);
+      button.title = accessibleLabel;
     }
     corePerformance.telesaleButtonUpdates += 1;
   }
