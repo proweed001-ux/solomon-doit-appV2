@@ -5,7 +5,7 @@ import {
   buildBills,
   lineKey,
   lineVal,
-  saveLineEdit,
+  saveLinePriceEdit,
 } from "./print-model.js";
 import { splitRealBillsForPrint } from "./real-bills.js";
 import { state } from "./state.js";
@@ -307,7 +307,7 @@ function recalculateReceipt(page, persist = false) {
   page.querySelectorAll("tr[data-line]").forEach((row) => {
     const qty = N(row.querySelector(".rq")?.textContent);
     const unit = N(row.querySelector(".ru")?.textContent);
-    if (persist) saveLineEdit(decodeKey(row.dataset.editKey), qty, unit);
+    if (persist) saveLinePriceEdit(decodeKey(row.dataset.editKey), unit);
     const total = row.querySelector(".rt");
     if (total) total.textContent = B(qty * unit);
   });

@@ -374,6 +374,66 @@ test("auto-loads the latest Cloud data without manual file controls", async ({
   expect(runtime.errors).toEqual([]);
 });
 
+test("rebuilds print quantities from current Pro state while retaining price edits", async ({
+  page,
+}) => {
+  const runtime = await preparePage(page);
+  await chooseOnly(page, "dates", fixtureMeta.date);
+  await chooseOnly(page, "ps", fixtureMeta.ps);
+  await chooseOnly(page, "receivers", fixtureMeta.receiver);
+
+  const sendInput = page.locator('#table input.jdata[data-map="send"]').first();
+  await sendInput.fill("5");
+  await sendInput.press("Tab");
+  await expect(sendInput).toHaveValue("5");
+
+  await page.locator("#prepPrint").click();
+  let overlay = page.locator(".printOverlay.printMobileSafeA4");
+  await expect(overlay).toBeVisible();
+  await expect(overlay.locator("tr[data-line] .rq").first()).toHaveText("5");
+
+  const unitCell = overlay.locator("tr[data-line] .ru").first();
+  await unitCell.fill("123.45");
+  await unitCell.press("Tab");
+  const savedPriceEdit = await page.evaluate(() => {
+    const edits = JSON.parse(
+      localStorage.getItem("doit-pro-print-price-edits-v1") || "{}",
+    );
+    return Object.values(edits)[0] || null;
+  });
+  expect(savedPriceEdit).toMatchObject({ unit: 123.45 });
+  expect(savedPriceEdit).not.toHaveProperty("qty");
+
+  await page.evaluate(() => {
+    const key = "doit-pro-print-price-edits-v1";
+    const edits = JSON.parse(localStorage.getItem(key) || "{}");
+    const firstKey = Object.keys(edits)[0];
+    edits[firstKey] = { ...edits[firstKey], qty: 5 };
+    localStorage.setItem(key, JSON.stringify(edits));
+  });
+  await overlay.locator("[data-print-close]").click();
+
+  await sendInput.fill("2");
+  await sendInput.press("Tab");
+  const currentQuantity = await quantitySnapshot(page, "send");
+  expect(currentQuantity.dom).toBe("2");
+  expect(currentQuantity.stateValue).toBe(2);
+  expect(currentQuantity.storedValue).toBe(2);
+
+  await page.locator("#prepPrint").click();
+  overlay = page.locator(".printOverlay.printMobileSafeA4");
+  await expect(overlay).toBeVisible();
+  await expect(overlay.locator("tr[data-line] .rq").first()).toHaveText("2");
+  await expect(overlay.locator("tr[data-line] .ru").first()).toHaveText(
+    "123.45",
+  );
+  await expect(overlay.locator("tr[data-line] .rt").first()).toHaveText(
+    "246.90",
+  );
+
+  expect(runtime.errors).toEqual([]);
+});
+
 test("commits send, add and pull as one authoritative edit session", async ({
   page,
 }) => {

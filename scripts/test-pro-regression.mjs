@@ -25,9 +25,12 @@ import {
 import {
   BILL_ROWS,
   BILLS_PER_A4,
+  PRINT_EDIT_KEY,
   buildBills,
   doneSummary,
+  lineKey,
   lineVal,
+  saveLinePriceEdit,
 } from "../dist/assets/pro/print-model.js";
 import {
   billPagesHtml,
@@ -289,6 +292,67 @@ assert.equal(
   fixture.expected.printQty,
   "Print model must use send quantities only",
 );
+
+const originalLocalStorage = globalThis.localStorage;
+const printStorage = new Map();
+globalThis.localStorage = {
+  getItem(key) {
+    return printStorage.has(key) ? printStorage.get(key) : null;
+  },
+  setItem(key, value) {
+    printStorage.set(key, String(value));
+  },
+  removeItem(key) {
+    printStorage.delete(key);
+  },
+};
+const targetPrintRow = moduleBills[0].rows[0];
+const targetStateKey = rkey(targetPrintRow.poolKey, receiver);
+const originalPrintQty = state.send[targetStateKey];
+const targetPrintKey = lineKey(receiver, targetPrintRow);
+saveLinePriceEdit(targetPrintKey, 123.45);
+let persistedPrintEdit = JSON.parse(
+  globalThis.localStorage.getItem(PRINT_EDIT_KEY),
+)[targetPrintKey];
+assert.equal(persistedPrintEdit.unit, 123.45);
+assert.equal(
+  Object.hasOwn(persistedPrintEdit, "qty"),
+  false,
+  "Print storage must persist price only",
+);
+persistedPrintEdit.qty = originalPrintQty;
+globalThis.localStorage.setItem(
+  PRINT_EDIT_KEY,
+  JSON.stringify({ [targetPrintKey]: persistedPrintEdit }),
+);
+state.send[targetStateKey] = originalPrintQty + 4;
+const refreshedPrintRow = buildBills()
+  .flatMap((bill) => bill.rows)
+  .find((row) => row.poolKey === targetPrintRow.poolKey);
+const refreshedPrintValue = lineVal(receiver, refreshedPrintRow);
+assert.equal(
+  refreshedPrintValue.qty,
+  originalPrintQty + 4,
+  "Legacy print qty must not override current send quantity",
+);
+assert.equal(
+  refreshedPrintValue.unit,
+  123.45,
+  "Current send quantity must retain the saved print price",
+);
+saveLinePriceEdit(targetPrintKey, 234.56);
+persistedPrintEdit = JSON.parse(
+  globalThis.localStorage.getItem(PRINT_EDIT_KEY),
+)[targetPrintKey];
+assert.equal(
+  Object.hasOwn(persistedPrintEdit, "qty"),
+  false,
+  "Saving a price again must remove legacy qty from that edit",
+);
+state.send[targetStateKey] = originalPrintQty;
+if (originalLocalStorage === undefined) delete globalThis.localStorage;
+else globalThis.localStorage = originalLocalStorage;
+
 assert.equal(done.storeTotal, fixture.expected.printStoreTotal);
 assert.equal(
   (twoSheetHtml.match(/class="a4Sheet"/g) || []).length,
