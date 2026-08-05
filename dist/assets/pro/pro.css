@@ -1277,8 +1277,8 @@
   }
 
   #table[data-mode="pick"] {
-    width: 760px;
-    min-width: 760px;
+    width: 740px;
+    min-width: 740px;
     table-layout: fixed;
   }
 
@@ -1348,9 +1348,9 @@
   }
 
   #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(2) {
-    width: 220px;
-    min-width: 220px;
-    max-width: 220px;
+    width: 200px;
+    min-width: 200px;
+    max-width: 200px;
   }
 
   #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(3) {
