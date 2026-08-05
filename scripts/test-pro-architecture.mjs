@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import postcss from "postcss";
 
 const root = process.cwd();
 const entry = path.join(root, "dist/assets/pro/app.js");
@@ -144,5 +145,45 @@ assert.doesNotMatch(
   /parseDoitFile|cloudCheckBtn|cloudLoadBtn|#choose|#file\b/,
 );
 assert.match(core, /bind\(\);\s*void loadCloud\(\);/);
+
+const proCssPath = path.join(root, "dist/assets/pro/pro.css");
+const proCss = postcss.parse(read(proCssPath), { from: proCssPath });
+const cssDeclarations = new Map();
+const cssOverrides = [];
+
+const atRuleContext = (node) => {
+  const context = [];
+  for (let parent = node.parent; parent?.type !== "root"; parent = parent.parent) {
+    if (parent.type === "atrule") {
+      context.unshift(`@${parent.name} ${parent.params}`.trim());
+    }
+  }
+  return context.join(" > ") || "base";
+};
+
+proCss.walkRules((rule) => {
+  const context = atRuleContext(rule);
+  const declarations = rule.nodes.filter((node) => node.type === "decl");
+  for (const selector of rule.selectors) {
+    const owner = `${context} || ${selector.trim()}`;
+    for (const declaration of declarations) {
+      const key = `${owner} || ${declaration.prop}`;
+      const previousLine = cssDeclarations.get(key);
+      if (previousLine !== undefined) {
+        cssOverrides.push(
+          `${owner} redeclares ${declaration.prop} at lines ${previousLine} and ${declaration.source.start.line}`,
+        );
+      } else {
+        cssDeclarations.set(key, declaration.source.start.line);
+      }
+    }
+  }
+});
+
+assert.deepEqual(
+  cssOverrides,
+  [],
+  "Pro CSS must keep one property owner per selector and media context",
+);
 
 console.log("Active Pro module graph passed:", activeProModules);
