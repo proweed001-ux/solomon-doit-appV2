@@ -136,7 +136,7 @@
 
   .realBillTable {
     width: max-content;
-    min-width: 100%;
+    min-width: 560px;
   }
 
   .realBillTable th:first-child,
