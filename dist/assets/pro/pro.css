@@ -125,54 +125,6 @@
   padding: 0 10px;
 }
 
-@media (max-width: 720px) {
-  .realBillHead {
-    grid-template-columns: 1fr;
-  }
-
-  .realBillHead small {
-    grid-column: 1;
-  }
-
-  .realBillTable {
-    width: max-content;
-    min-width: 560px;
-  }
-
-  .realBillTable th:first-child,
-  .realBillTable td:first-child {
-    position: sticky;
-    left: 0;
-    z-index: 2;
-    width: 240px;
-    min-width: 240px;
-    max-width: 240px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    background: #fff;
-    box-shadow: 7px 0 9px -9px #0f172a;
-  }
-
-  .realBillTable th:first-child {
-    z-index: 3;
-    background: #f8fafc;
-  }
-
-  .realBillTable .realBillTotal td:first-child {
-    background: #f1f5f9;
-  }
-
-  .realBillPager {
-    grid-template-columns: 82px 1fr 82px;
-    gap: 5px;
-  }
-
-  .realBillPager button {
-    padding: 0 5px;
-    font-size: 12px;
-  }
-}
       body {
         margin: 0;
         background: #f6f7f8;
@@ -187,7 +139,8 @@
       }
       .topbar {
         min-height: 56px;
-        background: linear-gradient(90deg, #075424, #087b34);
+        overflow: hidden !important;
+        background: linear-gradient(90deg, #075424, #087b34) !important;
         color: #fff;
         display: flex;
         align-items: center;
@@ -228,9 +181,7 @@
         max-width: 100%;
       }
       .topGrid > .card,
-      .filterGrid > .field,
-      .cloudHead,
-      .cloudStatusTitle {
+      .filterGrid > .field {
         min-width: 0;
       }
       .tabs {
@@ -238,9 +189,6 @@
         grid-template-columns: repeat(6, 1fr);
         gap: 8px;
         margin-bottom: 12px;
-      }
-      .tab {
-        height: 44px;
       }
       .filterGrid {
         display: grid;
@@ -408,6 +356,8 @@
         border-right: 1px solid #eef2f7;
         padding: 6px 4px;
         text-align: center;
+      }
+      .tbl td {
         background: #fff;
       }
       .tbl th {
@@ -457,18 +407,6 @@
       .pagination[hidden] {
         display: none !important;
       }
-      .page {
-        height: 32px;
-        border: 1px solid #d1d5db;
-        background: #fff;
-        border-radius: 7px;
-        font-weight: 900;
-        padding: 0 10px;
-      }
-      .page.on {
-        background: #087b34;
-        color: #fff;
-      }
       .bottomBar {
         display: flex;
         justify-content: space-between;
@@ -496,9 +434,11 @@
         justify-content: space-between;
         gap: 8px;
         align-items: center;
+        min-width: 0;
       }
       .cloudStatusTitle {
         margin: 0;
+        min-width: 0;
         overflow-wrap: anywhere;
       }
       .cloudMeta {
@@ -518,24 +458,23 @@
       .tab,
       .page,
       .teleBtn,
-      .devClose,
-      .insertDelBtn {
+      .devClose {
         height: 38px;
         padding: 0 12px;
         border: 0 !important;
-        background: linear-gradient(
-          180deg,
-          #22c55e 0%,
-          #0b8f3a 58%,
-          #06652b 100%
+        background: var(
+          --pro-button-background,
+          linear-gradient(180deg, #22c55e 0%, #0b8f3a 58%, #06652b 100%)
         ) !important;
         color: #fff !important;
         border-radius: 12px !important;
         font-weight: 950 !important;
-        box-shadow:
+        box-shadow: var(
+          --pro-button-shadow,
           0 3px 0 #03451e,
           0 6px 10px rgba(3, 69, 30, 0.22),
-          inset 0 1px 0 rgba(255, 255, 255, 0.48) !important;
+          inset 0 1px 0 rgba(255, 255, 255, 0.48)
+        ) !important;
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.34) !important;
         cursor: pointer !important;
       }
@@ -554,26 +493,34 @@
         border: 1px solid #ffffff55 !important;
       }
       .teleBtn {
-        background: linear-gradient(
-          180deg,
-          #a855f7 0%,
-          #7e22ce 58%,
-          #581c87 100%
-        ) !important;
-        box-shadow:
+        --pro-button-background: linear-gradient(
+          180deg, #a855f7 0%, #7e22ce 58%, #581c87 100%
+        );
+        --pro-button-shadow:
           0 3px 0 #3b0764,
           0 6px 10px rgba(88, 28, 135, 0.26),
-          inset 0 1px 0 rgba(255, 255, 255, 0.48) !important;
+          inset 0 1px 0 rgba(255, 255, 255, 0.48);
+      }
+      .insertDelBtn {
+        margin-left: 8px;
+        padding: 2px 8px;
+        border: 1px solid #ef4444;
+        border-radius: 7px;
+        background: #fef2f2;
+        color: #dc2626;
+        font-size: 11px;
+        font-weight: 950;
       }
       .tab.on,
       .page.on,
-      .cloudBtn.main,
       .searchBtn {
+        --pro-button-background: linear-gradient(
+          180deg, #34d66d 0%, #0a9f42 58%, #06722f 100%
+        );
+      }
+      .cloudBtn.main {
         background: linear-gradient(
-          180deg,
-          #34d66d 0%,
-          #0a9f42 58%,
-          #06722f 100%
+          180deg, #34d66d 0%, #0a9f42 58%, #06722f 100%
         ) !important;
       }
       .devTeamBtn {
@@ -892,62 +839,6 @@
         border: 1px solid #000;
         padding: 4px;
       }
-      @media (max-width: 720px) {
-        body > .topbar,
-        body > .wrap,
-        body > footer {
-          zoom: 0.8;
-        }
-        .wrap {
-          padding: 8px;
-        }
-        .topGrid,
-        .filterGrid,
-        .searchLine,
-        .summary,
-        .sendBar {
-          grid-template-columns: 1fr;
-        }
-        .tabs {
-          grid-template-columns: 1fr 1fr;
-        }
-        .title {
-          font-size: 15px;
-        }
-        .sendLabel {
-          grid-template-columns: 1fr;
-        }
-        .tbl {
-          min-width: 540px;
-        }
-        .p small {
-          font-size: 11px;
-        }
-        .devTeamBtn {
-          position: absolute;
-          right: 12px;
-          top: 10px;
-          width: 118px;
-          height: 38px;
-          font-size: 15.5px;
-        }
-        .devPerson {
-          grid-template-columns: 1fr 128px;
-          gap: 10px;
-          padding: 12px;
-        }
-        .devInfo b {
-          font-size: 17px;
-        }
-        .devCode,
-        .devRole {
-          font-size: 13px;
-        }
-        .devPhotoFrame {
-          height: 112px;
-          border-width: 5px;
-        }
-      }
       @media print {
         body > *:not(.printOverlay) {
           display: none !important;
@@ -1004,22 +895,6 @@
       .tableTitleBox {
         min-width: 0;
       }
-      @media (max-width: 720px) {
-        .modeTop {
-          grid-template-columns: 1fr !important;
-        }
-        .modeTop #displayActionButtons {
-          grid-column: 1/-1 !important;
-        }
-        .modeTop .tabs {
-          grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-        }
-        .modeTop .tab {
-          height: 34px !important;
-          font-size: 12px !important;
-          padding: 0 3px !important;
-        }
-      }
       .resultsModeBtn {
         position: absolute;
         right: 154px;
@@ -1047,37 +922,6 @@
       .cloudStatusCard h3 {
         padding-right: 258px;
       }
-      @media (max-width: 720px) {
-        .resultsModeBtn {
-          right: 140px;
-          top: 10px;
-          width: 96px;
-          height: 38px;
-          font-size: 15.5px;
-        }
-        .cloudStatusCard h3 {
-          padding-right: 226px;
-        }
-      }
-      @media (max-width: 390px) {
-        .resultsModeBtn {
-          position: static;
-          width: 100%;
-          margin: 4px 0 8px;
-        }
-        .devTeamBtn {
-          position: static !important;
-          width: 100% !important;
-          margin-bottom: 8px !important;
-        }
-        .cloudStatusCard h3 {
-          padding-right: 0;
-        }
-        .cloudStatusCard {
-          display: grid;
-          gap: 8px;
-        }
-      }
       .sendActionButtons {
         grid-column: 1/-1;
         display: grid;
@@ -1100,25 +944,6 @@
         justify-content: center;
         gap: 3px;
       }
-      @media (max-width: 720px) {
-        .sendActionButtons {
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          overflow: visible;
-          padding: 0;
-        }
-        .sendActionButtons button {
-          width: 100%;
-          min-width: 0;
-          height: 38px;
-          font-size: 11.5px;
-          padding: 0 2px;
-          overflow: hidden;
-        }
-        .sendActionButtons .teleBtnCount {
-          display: none;
-        }
-      }
       .displayActionButtons {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -1129,12 +954,6 @@
         width: 100%;
         height: 40px;
         white-space: nowrap;
-      }
-      @media (max-width: 720px) {
-        .displayActionButtons {
-          grid-column: 1/-1;
-          grid-template-columns: 1fr 1fr;
-        }
       }
       .fuelBillBtn {
         position: absolute;
@@ -1169,48 +988,15 @@
       body.fuelSecretOn .cloudStatusCard h3 {
         padding-right: 382px !important;
       }
-      @media (max-width: 720px) {
-        .fuelBillBtn {
-          right: 244px;
-          top: 10px;
-          width: 96px;
-          height: 38px;
-          font-size: 15.5px;
-        }
-        body.fuelSecretOn .cloudStatusCard {
-          padding-top: 60px;
-        }
-        body.fuelSecretOn .cloudStatusCard h3 {
-          padding-right: 0 !important;
-        }
-      }
-      @media (max-width: 390px) {
-        .fuelBillBtn {
-          position: static !important;
-          width: 100% !important;
-          margin: 4px 0 8px !important;
-        }
-        body.fuelSecretOn .cloudStatusCard {
-          padding-top: 12px;
-        }
-        body.fuelSecretOn .cloudStatusCard h3 {
-          padding-right: 0 !important;
-        }
-      }
 
-.blue { color: #2563eb !important; font-weight: 900; }
-.insertDelBtn { margin-left: 8px; border: 1px solid #ef4444; background: #fef2f2; color: #dc2626; border-radius: 7px; padding: 2px 8px; font-size: 11px; font-weight: 950; }
 .r { text-align: right; }
 .c { text-align: center; }
 [contenteditable="true"] { outline: 1px dashed transparent; cursor: text; }
 [contenteditable="true"]:focus { outline: 1px dashed #2563eb; background: #eff6ff; }
 #diagBtn.settingsGear { width: 40px; height: 40px; border-radius: 999px; padding: 0 !important; display: flex; align-items: center; justify-content: center; font-size: 21px; line-height: 1; background: #ffffff1a !important; color: #fff !important; border: 1px solid #ffffff55 !important; }
-.displayActionButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; }
-.displayActionButtons button { width: 100%; height: 40px; white-space: nowrap; }
 @keyframes ayaLetterWave { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(-5px); } 50% { transform: translateY(0); } 75% { transform: translateY(4px); } }
 .ayaBrandTitle { display: inline-flex !important; align-items: center !important; justify-content: center !important; font-family: "Arial Black", Impact, system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif !important; font-size: 21px !important; font-weight: 1000 !important; letter-spacing: .25px !important; line-height: 1 !important; color: #fff !important; -webkit-text-fill-color: #fff !important; background: none !important; text-shadow: 0 2px 3px rgba(0, 0, 0, .55) !important; white-space: nowrap !important; overflow: visible !important; }
 .ayaBrandTitle .ayaChar { display: inline-block !important; color: #fff !important; animation: ayaLetterWave 2.2s ease-in-out infinite !important; animation-delay: calc(var(--i) * .075s) !important; }
-.topbar { overflow: hidden !important; background: linear-gradient(90deg, #075424, #087b34) !important; }
 .devQrPoster { background: #fff; border: 0; border-radius: 0; box-shadow: none; margin: 4px auto 0; padding: 0 0 6px; text-align: center; width: 100%; }
 .devQrPosterTop { font-weight: 950; font-size: 18px; line-height: 1; color: #0f3f55; letter-spacing: .7px; margin: 0 auto 3px; }
 .devQrPosterLine { width: 168px; height: 4px; background: linear-gradient(90deg, #0f3f55 0 42%, #22c55e 42% 58%, #0f3f55 58% 100%); border-radius: 999px; margin: 0 auto 6px; }
@@ -1219,24 +1005,238 @@
 .devQrPosterBrand { font-weight: 950; font-size: 34px; line-height: .9; color: #0f3f55; letter-spacing: 1.2px; margin: 3px auto 0; }
 .devQrPosterScan { font-weight: 900; font-size: 12px; color: #087b34; line-height: 1.1; margin-top: 5px; }
 .devQrPosterEmpty { width: min(160px, 38vw); height: min(160px, 38vw); display: flex; align-items: center; justify-content: center; text-align: center; border: 1px dashed #86efac; color: #166534; font-weight: 950; background: #fff; }
-@media (max-width: 720px) {
-  .wrap { padding: 8px !important; }
-  .p small { font-size: 11px !important; }
-  .displayActionButtons { grid-column: 1/-1; grid-template-columns: 1fr 1fr; }
-  .ayaBrandTitle { font-size: 16.2px !important; letter-spacing: .05px !important; }
-  .ayaBrandTitle .ayaChar { animation-duration: 2.35s !important; animation-delay: calc(var(--i) * .065s) !important; }
-  .devQrPosterTop { font-size: 15px; }
-  .devQrPosterLine { width: 136px; height: 3px; }
-  .devQrPosterFrame img, .devQrPosterEmpty { width: min(132px, 35vw); height: min(132px, 35vw); }
-  .devQrPosterBrand { font-size: 27px; }
-  .devQrPosterScan { font-size: 10.5px; }
-}
-
 .mobileTableScrollHint {
   display: none;
 }
 
-@media screen and (max-width: 720px) {
+@media (max-width: 720px) {
+  body > .topbar,
+  body > .wrap,
+  body > footer {
+    zoom: 0.8;
+  }
+
+  .wrap {
+    padding: 8px !important;
+  }
+
+  .topGrid,
+  .filterGrid,
+  .searchLine,
+  .summary,
+  .sendBar {
+    grid-template-columns: 1fr;
+  }
+
+  .tabs {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .title {
+    font-size: 15px;
+  }
+
+  .sendLabel {
+    grid-template-columns: 1fr;
+  }
+
+  .p small {
+    font-size: 11px !important;
+  }
+
+  .devTeamBtn {
+    position: absolute;
+    right: 12px;
+    top: 10px;
+    width: 118px;
+    height: 38px;
+    font-size: 15.5px;
+  }
+
+  .devPerson {
+    grid-template-columns: 1fr 128px;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .devInfo b {
+    font-size: 17px;
+  }
+
+  .devCode,
+  .devRole {
+    font-size: 13px;
+  }
+
+  .devPhotoFrame {
+    height: 112px;
+    border-width: 5px;
+  }
+
+  .modeTop {
+    grid-template-columns: 1fr !important;
+  }
+
+  .modeTop #displayActionButtons {
+    grid-column: 1/-1 !important;
+  }
+
+  .modeTop .tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .modeTop .tab {
+    height: 34px !important;
+    padding: 0 3px !important;
+    font-size: 12px !important;
+  }
+
+  .resultsModeBtn {
+    right: 140px;
+    top: 10px;
+    width: 96px;
+    height: 38px;
+    font-size: 15.5px;
+  }
+
+  .cloudStatusCard h3 {
+    padding-right: 226px;
+  }
+
+  .sendActionButtons {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow: visible;
+    padding: 0;
+  }
+
+  .sendActionButtons button {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    padding: 0 2px;
+    overflow: hidden;
+    font-size: 11.5px;
+  }
+
+  .sendActionButtons .teleBtnCount {
+    display: none;
+  }
+
+  .displayActionButtons {
+    grid-column: 1/-1;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .fuelBillBtn {
+    right: 244px;
+    top: 10px;
+    width: 96px;
+    height: 38px;
+    font-size: 15.5px;
+  }
+
+  body.fuelSecretOn .cloudStatusCard {
+    padding-top: 60px;
+  }
+
+  body.fuelSecretOn .cloudStatusCard h3 {
+    padding-right: 0 !important;
+  }
+
+  .ayaBrandTitle {
+    font-size: 16.2px !important;
+    letter-spacing: .05px !important;
+  }
+
+  .ayaBrandTitle .ayaChar {
+    animation-duration: 2.35s !important;
+    animation-delay: calc(var(--i) * .065s) !important;
+  }
+
+  .devQrPosterTop {
+    font-size: 15px;
+  }
+
+  .devQrPosterLine {
+    width: 136px;
+    height: 3px;
+  }
+
+  .devQrPosterFrame img,
+  .devQrPosterEmpty {
+    width: min(132px, 35vw);
+    height: min(132px, 35vw);
+  }
+
+  .devQrPosterBrand {
+    font-size: 27px;
+  }
+
+  .devQrPosterScan {
+    font-size: 10.5px;
+  }
+
+  .realBillHead {
+    grid-template-columns: 1fr;
+  }
+
+  .realBillHead small {
+    grid-column: 1;
+  }
+
+  .realBillTable {
+    width: 560px;
+    min-width: 560px;
+    table-layout: fixed;
+  }
+
+  .realBillTable th:first-child,
+  .realBillTable td:first-child {
+    position: sticky;
+    left: 0;
+    width: 300px;
+    min-width: 300px;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    box-shadow: 7px 0 9px -9px #0f172a;
+  }
+
+  .realBillTable td:first-child {
+    z-index: 2;
+    background: #fff;
+  }
+
+  .realBillTable th:first-child {
+    z-index: 3;
+    background: #f8fafc;
+  }
+
+  .realBillTable :is(th, td):nth-child(2) {
+    width: 60px;
+  }
+
+  .realBillTable :is(th, td):nth-child(3),
+  .realBillTable :is(th, td):nth-child(4) {
+    width: 100px;
+  }
+
+  .realBillTable .realBillTotal td:first-child {
+    background: #f1f5f9;
+  }
+
+  .realBillPager {
+    grid-template-columns: 82px 1fr 82px;
+    gap: 5px;
+  }
+
+  .realBillPager button {
+    padding: 0 5px;
+    font-size: 12px;
+  }
+
   .mobileTableScrollHint {
     display: block;
     padding: 6px 10px;
@@ -1266,13 +1266,35 @@
     min-width: 100%;
   }
 
-  #table[data-mode]:not([data-mode="remain"]) {
+  #table[data-mode="pick"] {
+    width: 740px;
+    min-width: 740px;
+    table-layout: fixed;
+  }
+
+  #table[data-mode="dist"],
+  #table[data-mode="done"] {
+    width: 560px;
     min-width: 560px;
+    table-layout: fixed;
+  }
+
+  #table[data-mode="raw"] {
+    width: 664px;
+    min-width: 664px;
+    table-layout: fixed;
+  }
+
+  #table[data-mode="order"] {
+    width: 644px;
+    min-width: 644px;
+    table-layout: fixed;
   }
 
   #table[data-mode="remain"] {
     width: 100%;
     min-width: 100%;
+    table-layout: fixed;
   }
 
   .tbl th,
@@ -1303,20 +1325,22 @@
   }
 
   #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(2),
-  #table[data-mode="remain"] :is(th, td:not([colspan])):nth-child(2),
   #table[data-mode="done"] :is(th, td:not([colspan])):nth-child(2),
   #table[data-mode="order"] :is(th, td:not([colspan])):nth-child(2),
   #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(5) {
     position: sticky;
     left: 34px;
     z-index: 2;
-    width: 176px;
-    min-width: 176px;
-    max-width: 176px;
     overflow: hidden;
     text-overflow: ellipsis;
     background: #fff;
     box-shadow: 7px 0 9px -9px #0f172a;
+  }
+
+  #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(2) {
+    width: 200px;
+    min-width: 200px;
+    max-width: 200px;
   }
 
   #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(3) {
@@ -1331,22 +1355,165 @@
     max-width: 64px;
   }
 
+  #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(n+7) {
+    width: 86px;
+    min-width: 86px;
+    max-width: 86px;
+  }
+
   #table[data-mode="dist"] :is(th, td:not([colspan])):nth-child(1) {
     position: sticky;
     left: 0;
     z-index: 2;
-    width: 282px;
-    min-width: 282px;
-    max-width: 282px;
+    width: 400px;
+    min-width: 400px;
+    max-width: 400px;
     overflow: hidden;
     text-overflow: ellipsis;
     background: #fff;
     box-shadow: 7px 0 9px -9px #0f172a;
   }
 
+  #table[data-mode="dist"] :is(th, td:not([colspan])):nth-child(2) {
+    width: 70px;
+  }
+
+  #table[data-mode="dist"] :is(th, td:not([colspan])):nth-child(3) {
+    width: 90px;
+  }
+
+  #table[data-mode="remain"] :is(th, td:not([colspan])):nth-child(2) {
+    position: sticky;
+    left: 34px;
+    z-index: 2;
+    width: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: #fff;
+    box-shadow: 7px 0 9px -9px #0f172a;
+  }
+
+  #table[data-mode="remain"] :is(th, td:not([colspan])):nth-child(3) {
+    width: 68px;
+  }
+
+  #table[data-mode="done"] :is(th, td:not([colspan])):nth-child(2) {
+    width: 316px;
+    min-width: 316px;
+    max-width: 316px;
+  }
+
+  #table[data-mode="done"] :is(th, td:not([colspan])):nth-child(3) {
+    width: 90px;
+  }
+
+  #table[data-mode="done"] :is(th, td:not([colspan])):nth-child(4) {
+    width: 120px;
+  }
+
+  #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(2) {
+    width: 96px;
+  }
+
+  #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(3) {
+    width: 80px;
+  }
+
+  #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(4) {
+    width: 170px;
+  }
+
+  #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(5) {
+    width: 220px;
+    min-width: 220px;
+    max-width: 220px;
+  }
+
+  #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(6) {
+    width: 64px;
+  }
+
+  #table[data-mode="order"] :is(th, td:not([colspan])):nth-child(2) {
+    width: 268px;
+    min-width: 268px;
+    max-width: 268px;
+  }
+
+  #table[data-mode="order"] :is(th, td:not([colspan])):nth-child(3) {
+    width: 72px;
+  }
+
+  #table[data-mode="order"] :is(th, td:not([colspan])):nth-child(n+4) {
+    width: 90px;
+  }
+
+  #table[data-mode="done"] .totalRow > td,
+  #table[data-mode="order"] .totalRow > td {
+    position: static;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    box-shadow: none;
+  }
+
+  .teleTbl {
+    table-layout: fixed;
+  }
+
+  .teleTbl :is(th, td) {
+    white-space: nowrap;
+  }
+
+  .teleTbl :is(th, td):first-child {
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+  }
+
+  .teleTbl :is(th, td):nth-child(2) {
+    width: 60px;
+  }
+
+  .teleTbl :is(th, td):nth-child(3) {
+    width: 80px;
+  }
+
+  .teleTbl :is(th, td):nth-child(4) {
+    width: 90px;
+  }
+
   #table[data-mode] thead th {
     z-index: 4;
     background: #f8fafc;
+  }
+}
+
+@media (max-width: 390px) {
+  .resultsModeBtn,
+  .fuelBillBtn {
+    position: static !important;
+    width: 100% !important;
+    margin: 4px 0 8px !important;
+  }
+
+  .devTeamBtn {
+    position: static !important;
+    width: 100% !important;
+    margin-bottom: 8px !important;
+  }
+
+  .cloudStatusCard {
+    display: grid;
+    gap: 8px;
+  }
+
+  .cloudStatusCard h3,
+  body.fuelSecretOn .cloudStatusCard h3 {
+    padding-right: 0 !important;
+  }
+
+  body.fuelSecretOn .cloudStatusCard {
+    padding-top: 12px;
   }
 }
 
@@ -1614,13 +1781,18 @@
   }
 
   .printMobileSafeA4 .a4Sheet {
-    width: 194mm !important;
-    height: 277mm !important;
-    margin: 10mm 8mm !important;
-    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-sizing: border-box !important;
+    width: 210mm !important;
+    height: 296mm !important;
+    margin: 0 !important;
+    padding: 8mm 7mm !important;
+    overflow: hidden !important;
     box-shadow: none !important;
-    page-break-after: always !important;
     break-after: page !important;
+    page-break-after: always !important;
+    zoom: 1 !important;
   }
 
   .printMobileSafeA4 .a4Sheet:last-child {
@@ -1629,7 +1801,10 @@
   }
 
   .printMobileSafeA4 .receiptPage {
-    height: 138.5mm !important;
+    box-sizing: border-box !important;
+    height: 140mm !important;
+    min-height: 0 !important;
+    flex: 0 0 140mm !important;
     margin: 0 !important;
     padding: 2.5mm 3.5mm !important;
     overflow: hidden !important;
@@ -1719,14 +1894,14 @@
       .proPrintGeneric .receiptTable {
         width: 100%;
         border-collapse: collapse;
-        table-layout: fixed;
+        table-layout: fixed !important;
         font-size: 13.2px;
         line-height: 1.25;
       }
       .proPrintGeneric .receiptTable th,
       .proPrintGeneric .receiptTable td {
         border: 1px solid #111;
-        padding: 4.6px 5px;
+        padding: 4px 5px !important;
         vertical-align: top;
       }
       .proPrintGeneric .receiptTable th {
@@ -1736,26 +1911,52 @@
       }
       .proPrintGeneric .receiptTable th:first-child,
       .proPrintGeneric .receiptTable td:first-child {
-        width: 34px;
-        text-align: center;
+        width: 8mm !important;
+        min-width: 8mm !important;
+        max-width: 8mm !important;
+        padding-left: 2px !important;
+        padding-right: 2px !important;
+        text-align: center !important;
       }
       .proPrintGeneric .receiptTable th:nth-child(2),
       .proPrintGeneric .receiptTable td:nth-child(2) {
-        width: auto;
+        width: auto !important;
+        text-align: left !important;
+      }
+      .proPrintGeneric .receiptTable th:nth-child(3),
+      .proPrintGeneric .receiptTable td:nth-child(3) {
+        width: 22mm !important;
+        min-width: 22mm !important;
+        max-width: 22mm !important;
+        text-align: right !important;
+      }
+      .proPrintGeneric .receiptTable th:nth-child(4),
+      .proPrintGeneric .receiptTable td:nth-child(4) {
+        width: 30mm !important;
+        min-width: 30mm !important;
+        max-width: 30mm !important;
+        text-align: right !important;
       }
       .proPrintGeneric .receiptTable th:not(:nth-child(2)),
       .proPrintGeneric .receiptTable td:not(:nth-child(2)) {
         text-align: right;
       }
       .proPrintGeneric .receiptTable td:nth-child(2) {
-        text-align: left;
         word-break: break-word;
-        font-size: 13.8px;
+        font-size: 13.8px !important;
+        line-height: 1.22 !important;
         font-weight: 750;
+      }
+      .proPrintGeneric .receiptTable th:nth-child(3),
+      .proPrintGeneric .receiptTable th:nth-child(4) {
+        white-space: nowrap !important;
       }
       .proPrintGeneric .totalRow td {
         font-weight: 950;
         background: #f9fafb;
+      }
+      .proPrintGeneric .totalRow td:first-child {
+        text-align: right !important;
       }
       .proPrintGeneric .noteBox {
         border: 1px solid #777;
@@ -1788,7 +1989,8 @@
           width: auto !important;
           min-height: auto !important;
           margin: 0 !important;
-          padding: 0 !important;
+          padding: 6mm 0 !important;
+          box-sizing: border-box !important;
           box-shadow: none !important;
           zoom: 1 !important;
         }
@@ -1796,73 +1998,14 @@
           padding-top: 4mm !important;
           padding-bottom: 4mm !important;
         }
-        .proPrintGeneric.orderPrint .receiptTable tr {
-          break-inside: avoid;
-          page-break-inside: avoid;
+        .proPrintGeneric .receiptTable tr {
+          break-inside: avoid !important;
+          page-break-inside: avoid !important;
         }
         .proPrintGeneric .receiptTable th {
           background: #eee !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
-        }
-      }
-
-.proPrintGeneric .receiptTable {
-        table-layout: fixed !important;
-      }
-      .proPrintGeneric .receiptTable th:first-child,
-      .proPrintGeneric .receiptTable td:first-child {
-        width: 8mm !important;
-        min-width: 8mm !important;
-        max-width: 8mm !important;
-        text-align: center !important;
-        padding-left: 2px !important;
-        padding-right: 2px !important;
-      }
-      .proPrintGeneric .receiptTable th:nth-child(2),
-      .proPrintGeneric .receiptTable td:nth-child(2) {
-        width: auto !important;
-        text-align: left !important;
-      }
-      .proPrintGeneric .receiptTable th:nth-child(3),
-      .proPrintGeneric .receiptTable td:nth-child(3) {
-        width: 22mm !important;
-        min-width: 22mm !important;
-        max-width: 22mm !important;
-        text-align: right !important;
-      }
-      .proPrintGeneric .receiptTable th:nth-child(4),
-      .proPrintGeneric .receiptTable td:nth-child(4) {
-        width: 30mm !important;
-        min-width: 30mm !important;
-        max-width: 30mm !important;
-        text-align: right !important;
-      }
-      .proPrintGeneric .receiptTable th,
-      .proPrintGeneric .receiptTable td {
-        padding-top: 4px !important;
-        padding-bottom: 4px !important;
-      }
-      .proPrintGeneric .receiptTable td:nth-child(2) {
-        font-size: 13.8px !important;
-        line-height: 1.22 !important;
-      }
-      .proPrintGeneric .receiptTable th:nth-child(3),
-      .proPrintGeneric .receiptTable th:nth-child(4) {
-        white-space: nowrap !important;
-      }
-      .proPrintGeneric .totalRow td:first-child {
-        text-align: right !important;
-      }
-      @media print {
-        .proPrintGeneric .receiptPage {
-          padding-top: 6mm !important;
-          padding-bottom: 6mm !important;
-          box-sizing: border-box !important;
-        }
-        .proPrintGeneric .receiptTable tr {
-          break-inside: avoid !important;
-          page-break-inside: avoid !important;
         }
       }
 
@@ -1898,34 +2041,3 @@
     word-break: normal !important;
   }
 }
-
-@media print {
-        .printMobileSafeA4 .a4Sheet {
-          width: 210mm !important;
-          height: 296mm !important;
-          margin: 0 !important;
-          padding: 8mm 7mm !important;
-          display: flex !important;
-          flex-direction: column !important;
-          box-sizing: border-box !important;
-          overflow: hidden !important;
-          break-after: page !important;
-          page-break-after: always !important;
-          zoom: 1 !important;
-        }
-        .printMobileSafeA4 .a4Sheet:last-child {
-          break-after: auto !important;
-          page-break-after: auto !important;
-        }
-        .printMobileSafeA4 .receiptPage {
-          height: 140mm !important;
-          flex: 0 0 140mm !important;
-          min-height: 0 !important;
-          margin: 0 !important;
-          padding: 2.5mm 3.5mm !important;
-          box-sizing: border-box !important;
-          overflow: hidden !important;
-          break-inside: avoid !important;
-          page-break-inside: avoid !important;
-        }
-      }
