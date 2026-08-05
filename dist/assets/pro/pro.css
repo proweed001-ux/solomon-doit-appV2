@@ -135,8 +135,9 @@
   }
 
   .realBillTable {
-    width: max-content;
+    width: 560px;
     min-width: 560px;
+    table-layout: fixed;
   }
 
   .realBillTable th:first-child,
@@ -144,14 +145,23 @@
     position: sticky;
     left: 0;
     z-index: 2;
-    width: 240px;
-    min-width: 240px;
-    max-width: 240px;
+    width: 300px;
+    min-width: 300px;
+    max-width: 300px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     background: #fff;
     box-shadow: 7px 0 9px -9px #0f172a;
+  }
+
+  .realBillTable :is(th, td):nth-child(2) {
+    width: 60px;
+  }
+
+  .realBillTable :is(th, td):nth-child(3),
+  .realBillTable :is(th, td):nth-child(4) {
+    width: 100px;
   }
 
   .realBillTable th:first-child {
@@ -1266,13 +1276,35 @@
     min-width: 100%;
   }
 
-  #table[data-mode]:not([data-mode="remain"]) {
+  #table[data-mode="pick"] {
+    width: 760px;
+    min-width: 760px;
+    table-layout: fixed;
+  }
+
+  #table[data-mode="dist"],
+  #table[data-mode="done"] {
+    width: 560px;
     min-width: 560px;
+    table-layout: fixed;
+  }
+
+  #table[data-mode="raw"] {
+    width: 664px;
+    min-width: 664px;
+    table-layout: fixed;
+  }
+
+  #table[data-mode="order"] {
+    width: 644px;
+    min-width: 644px;
+    table-layout: fixed;
   }
 
   #table[data-mode="remain"] {
     width: 100%;
     min-width: 100%;
+    table-layout: fixed;
   }
 
   .tbl th,
@@ -1303,20 +1335,22 @@
   }
 
   #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(2),
-  #table[data-mode="remain"] :is(th, td:not([colspan])):nth-child(2),
   #table[data-mode="done"] :is(th, td:not([colspan])):nth-child(2),
   #table[data-mode="order"] :is(th, td:not([colspan])):nth-child(2),
   #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(5) {
     position: sticky;
     left: 34px;
     z-index: 2;
-    width: 176px;
-    min-width: 176px;
-    max-width: 176px;
     overflow: hidden;
     text-overflow: ellipsis;
     background: #fff;
     box-shadow: 7px 0 9px -9px #0f172a;
+  }
+
+  #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(2) {
+    width: 220px;
+    min-width: 220px;
+    max-width: 220px;
   }
 
   #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(3) {
@@ -1331,17 +1365,131 @@
     max-width: 64px;
   }
 
+  #table[data-mode="pick"] :is(th, td:not([colspan])):nth-child(n+7) {
+    width: 86px;
+    min-width: 86px;
+    max-width: 86px;
+  }
+
   #table[data-mode="dist"] :is(th, td:not([colspan])):nth-child(1) {
     position: sticky;
     left: 0;
     z-index: 2;
-    width: 282px;
-    min-width: 282px;
-    max-width: 282px;
+    width: 400px;
+    min-width: 400px;
+    max-width: 400px;
     overflow: hidden;
     text-overflow: ellipsis;
     background: #fff;
     box-shadow: 7px 0 9px -9px #0f172a;
+  }
+
+  #table[data-mode="dist"] :is(th, td:not([colspan])):nth-child(2) {
+    width: 70px;
+  }
+
+  #table[data-mode="dist"] :is(th, td:not([colspan])):nth-child(3) {
+    width: 90px;
+  }
+
+  #table[data-mode="remain"] :is(th, td:not([colspan])):nth-child(2) {
+    position: sticky;
+    left: 34px;
+    z-index: 2;
+    width: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: #fff;
+    box-shadow: 7px 0 9px -9px #0f172a;
+  }
+
+  #table[data-mode="remain"] :is(th, td:not([colspan])):nth-child(3) {
+    width: 68px;
+  }
+
+  #table[data-mode="done"] :is(th, td:not([colspan])):nth-child(2) {
+    width: 316px;
+    min-width: 316px;
+    max-width: 316px;
+  }
+
+  #table[data-mode="done"] :is(th, td:not([colspan])):nth-child(3) {
+    width: 90px;
+  }
+
+  #table[data-mode="done"] :is(th, td:not([colspan])):nth-child(4) {
+    width: 120px;
+  }
+
+  #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(2) {
+    width: 96px;
+  }
+
+  #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(3) {
+    width: 80px;
+  }
+
+  #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(4) {
+    width: 170px;
+  }
+
+  #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(5) {
+    width: 220px;
+    min-width: 220px;
+    max-width: 220px;
+  }
+
+  #table[data-mode="raw"] :is(th, td:not([colspan])):nth-child(6) {
+    width: 64px;
+  }
+
+  #table[data-mode="order"] :is(th, td:not([colspan])):nth-child(2) {
+    width: 268px;
+    min-width: 268px;
+    max-width: 268px;
+  }
+
+  #table[data-mode="order"] :is(th, td:not([colspan])):nth-child(3) {
+    width: 72px;
+  }
+
+  #table[data-mode="order"] :is(th, td:not([colspan])):nth-child(n+4) {
+    width: 90px;
+  }
+
+  #table[data-mode="done"] .totalRow > td,
+  #table[data-mode="order"] .totalRow > td {
+    position: static;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    box-shadow: none;
+  }
+
+  .teleTbl {
+    table-layout: fixed;
+  }
+
+  .teleTbl :is(th, td) {
+    white-space: nowrap;
+  }
+
+  .teleTbl :is(th, td):first-child {
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+  }
+
+  .teleTbl :is(th, td):nth-child(2) {
+    width: 60px;
+  }
+
+  .teleTbl :is(th, td):nth-child(3) {
+    width: 80px;
+  }
+
+  .teleTbl :is(th, td):nth-child(4) {
+    width: 90px;
   }
 
   #table[data-mode] thead th {

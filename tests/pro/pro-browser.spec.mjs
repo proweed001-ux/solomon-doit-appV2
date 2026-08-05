@@ -2480,12 +2480,22 @@ test("keeps mobile Pro tables single-line and fits print previews to the screen"
   const runtime = await preparePage(page);
   await loadFixture(page, fixtureFiles.xlsx);
 
-  const assertPinnedMode = async (mode, productColumn, shouldScroll = true) => {
+  const assertPinnedMode = async (
+    mode,
+    productColumn,
+    quantityColumn,
+    shouldScroll = true,
+  ) => {
     await expect(page.locator("#table")).toHaveAttribute("data-mode", mode);
     const shape = await page.locator("#table").evaluate(
-      (table, column) => {
+      (table, { productColumn, quantityColumn }) => {
         const wrap = table.closest(".tableWrap");
-        const product = table.querySelector(`thead th:nth-child(${column})`);
+        const product = table.querySelector(
+          `thead th:nth-child(${productColumn})`,
+        );
+        const quantity = table.querySelector(
+          `thead th:nth-child(${quantityColumn})`,
+        );
         return {
           documentWidth: document.documentElement.scrollWidth,
           viewportWidth: window.innerWidth,
@@ -2493,15 +2503,18 @@ test("keeps mobile Pro tables single-line and fits print previews to the screen"
           overflowX: getComputedStyle(wrap).overflowX,
           productPosition: getComputedStyle(product).position,
           productWhiteSpace: getComputedStyle(product).whiteSpace,
+          productWidth: product.getBoundingClientRect().width,
+          quantityWidth: quantity.getBoundingClientRect().width,
         };
       },
-      productColumn,
+      { productColumn, quantityColumn },
     );
     expect(shape.documentWidth).toBeLessThanOrEqual(shape.viewportWidth + 1);
     expect(shape.tableScrolls).toBe(shouldScroll);
     expect(["auto", "scroll"]).toContain(shape.overflowX);
     expect(shape.productPosition).toBe("sticky");
     expect(shape.productWhiteSpace).toBe("nowrap");
+    expect(shape.productWidth).toBeGreaterThan(shape.quantityWidth * 2);
   };
 
   await expect(page.locator("#tableScrollHint")).toBeVisible();
@@ -2539,19 +2552,38 @@ test("keeps mobile Pro tables single-line and fits print previews to the screen"
   expect(actionShape.whiteSpaces.every((value) => value === "nowrap")).toBe(true);
   expect(actionShape.buttonsFit).toBe(true);
 
-  await assertPinnedMode("pick", 2);
-  for (const [tabIndex, mode, productColumn] of [
-    [1, "dist", 1],
-    [3, "done", 2],
-    [4, "raw", 5],
-    [5, "order", 2],
+  await assertPinnedMode("pick", 2, 3);
+  for (const [tabIndex, mode, productColumn, quantityColumn] of [
+    [1, "dist", 1, 2],
+    [3, "done", 2, 3],
+    [4, "raw", 5, 6],
+    [5, "order", 2, 3],
   ]) {
     await page.locator(".tabs .tab").nth(tabIndex).click();
-    await assertPinnedMode(mode, productColumn);
+    await assertPinnedMode(mode, productColumn, quantityColumn);
   }
 
   await page.locator("#remainBtn").click();
-  await assertPinnedMode("remain", 2, false);
+  await assertPinnedMode("remain", 2, 3, false);
+
+  await page.locator("#teleBtn").click();
+  const telesaleColumns = await page.locator(".teleTbl").first().evaluate((table) => {
+    const product = table.querySelector("thead th:nth-child(1)");
+    const quantity = table.querySelector("thead th:nth-child(2)");
+    return {
+      productWidth: product.getBoundingClientRect().width,
+      quantityWidth: quantity.getBoundingClientRect().width,
+      productWhiteSpace: getComputedStyle(product).whiteSpace,
+      quantityWhiteSpace: getComputedStyle(quantity).whiteSpace,
+    };
+  });
+  expect(telesaleColumns.productWidth).toBeGreaterThan(
+    telesaleColumns.quantityWidth * 2,
+  );
+  expect(telesaleColumns.productWhiteSpace).toBe("nowrap");
+  expect(telesaleColumns.quantityWhiteSpace).toBe("nowrap");
+  await page.locator("#closeDrawer").click();
+
   await page.locator("#prepPrint").click();
   let overlay = page.locator(".printOverlay.proPrintGeneric");
   await expect(overlay).toHaveAttribute("data-preview-fit", "screen");
@@ -2599,15 +2631,21 @@ test("keeps mobile Pro tables single-line and fits print previews to the screen"
   await expect(page.locator("#realBills .realBillScrollHint")).toBeVisible();
   const realBillShape = await page.locator(".realBillTableWrap").first().evaluate((wrap) => {
     const product = wrap.querySelector("tbody td:first-child");
+    const quantity = wrap.querySelector("tbody td:nth-child(2)");
     return {
       scrolls: wrap.scrollWidth > wrap.clientWidth,
       position: getComputedStyle(product).position,
       whiteSpace: getComputedStyle(product).whiteSpace,
+      productWidth: product.getBoundingClientRect().width,
+      quantityWidth: quantity.getBoundingClientRect().width,
     };
   });
   expect(realBillShape.scrolls).toBe(true);
   expect(realBillShape.position).toBe("sticky");
   expect(realBillShape.whiteSpace).toBe("nowrap");
+  expect(realBillShape.productWidth).toBeGreaterThan(
+    realBillShape.quantityWidth * 4,
+  );
 
   await page.locator("#prepPrint").click();
   overlay = page.locator(".printOverlay.realBillPrint");
