@@ -15,7 +15,7 @@ export default defineConfig({
   },
   webServer: {
     command: "npx vite preview --host 127.0.0.1 --port 4175",
-    url: "http://127.0.0.1:4175/performance-v2.html",
+    url: "http://127.0.0.1:4175/performance.html?mode=ds",
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
   },
