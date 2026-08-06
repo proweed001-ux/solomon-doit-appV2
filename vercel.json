@@ -28,7 +28,7 @@
   "rewrites": [
     {
       "source": "/performance",
-      "destination": "/performance-v2.html"
+      "destination": "/performance.html"
     },
     {
       "source": "/performance-reveal",
