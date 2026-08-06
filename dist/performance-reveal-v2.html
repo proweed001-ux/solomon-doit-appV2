@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>AYA Top Performance</title>
+  <link rel="stylesheet" href="/assets/performance-reveal-v2.css?v=1">
+</head>
+<body>
+  <div class="background"></div>
+  <div class="shell">
+    <nav class="page-nav" aria-label="เมนูนำทาง">
+      <a class="nav-button" href="/performance?mode=ds">← Performance</a>
+      <div class="nav-actions"><button id="fullscreen-toggle" class="nav-button" type="button">⛶ เต็มจอ</button></div>
+    </nav>
+    <header class="header">
+      <h1>AYA TOP PERFORMANCE</h1>
+      <div id="period" class="period">LATEST PERFORMANCE CHAMPIONS</div>
+      <div id="status" class="status">กำลังโหลดข้อมูล Performance ล่าสุด...</div>
+    </header>
+    <div class="mode-tabs">
+      <button class="mode-button active" type="button" data-mode="ps">หมวด PS</button>
+      <button class="mode-button" type="button" data-mode="ads">หมวด ADS</button>
+    </div>
+    <main>
+      <section class="mode-panel" data-panel="ps">
+        <div id="stage-ps" class="award-stage"><div id="slides-ps"></div></div>
+        <div class="award-controls">
+          <button id="prev-ps" class="award-button" type="button" data-previous="ps">← ก่อนหน้า</button>
+          <div class="award-position"><b id="counter-ps">รางวัล 1 / 6</b><span id="title-ps">TOP VOLUME</span></div>
+          <button id="next-ps" class="award-button" type="button" data-next="ps">รางวัลถัดไป →</button>
+        </div>
+      </section>
+      <section class="mode-panel" data-panel="ads" hidden>
+        <div id="stage-ads" class="award-stage"><div id="slides-ads"></div></div>
+        <div class="award-controls">
+          <button id="prev-ads" class="award-button" type="button" data-previous="ads">← ก่อนหน้า</button>
+          <div class="award-position"><b id="counter-ads">รางวัล 1 / 6</b><span id="title-ads">TOP VOLUME</span></div>
+          <button id="next-ads" class="award-button" type="button" data-next="ads">รางวัลถัดไป →</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div class="presentation-arrows" aria-label="เปลี่ยนรางวัล">
+    <button id="presentation-prev" class="presentation-arrow previous" type="button" aria-label="รางวัลก่อนหน้า">‹</button>
+    <button id="presentation-next" class="presentation-arrow next" type="button" aria-label="รางวัลถัดไป">›</button>
+  </div>
+  <script type="module" src="/assets/performance-reveal-v2.js?v=1"></script>
+</body>
+</html>
