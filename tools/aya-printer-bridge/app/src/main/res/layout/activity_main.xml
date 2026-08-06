@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="AYA Printer Bridge"
+            android:textColor="#1C1B1F"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Proof of Concept — Canon E410 ผ่าน Router RAW TCP"
+            android:textColor="#5F5B66"
+            android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="IP ของ Router"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/ipInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:autofillHints=""
+            android:inputType="text"
+            android:singleLine="true" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="พอร์ต RAW TCP"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/portInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:autofillHints=""
+            android:inputType="number"
+            android:singleLine="true" />
+
+        <Button
+            android:id="@+id/testButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="ทดสอบการเชื่อมต่อ 192.168.1.1:9100" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="20dp"
+            android:background="#DED8E1" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="ไฟล์งานพิมพ์"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/selectedFileText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#F3EEF5"
+            android:padding="12dp"
+            android:text="ยังไม่ได้เลือกไฟล์"
+            android:textColor="#49454F"
+            android:textIsSelectable="true" />
+
+        <Button
+            android:id="@+id/chooseButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="เลือกไฟล์ .PRN / .RAW / .BIN" />
+
+        <Button
+            android:id="@+id/sendButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="ส่งงานพิมพ์ไปยัง Router" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="#FFF4E5"
+            android:padding="12dp"
+            android:text="ห้ามเลือก PDF หรือ JPG โดยตรง รุ่นนี้ยังไม่มีไดรเวอร์สร้างคำสั่ง Canon E410 ภายใน APK และจะยอมส่งเฉพาะไฟล์ RAW ที่สร้างจากไดรเวอร์ E410 แล้วเท่านั้น"
+            android:textColor="#6D4C00"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="สถานะและ Log"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#151217"
+            android:minHeight="180dp"
+            android:padding="12dp"
+            android:textColor="#F7F2F8"
+            android:textSize="13sp"
+            android:typeface="monospace" />
+
+    </LinearLayout>
+</ScrollView>
