@@ -2,32 +2,6 @@ import { $, $$, B, E, F, N, T, dlabel } from "./utils.js";
 
 export const TELE_PAGE_SIZE = 20;
 
-function keepTelesaleCountVisible(button = $("#teleBtn")) {
-  const count = button?.querySelector(".teleBtnCount");
-  if (!count) return;
-  count.style.setProperty("display", "inline", "important");
-  count.style.marginLeft = "3px";
-}
-
-export function initTelesaleButtonCount() {
-  const button = $("#teleBtn");
-  if (!button) return;
-  let label = button.querySelector(".teleBtnLabel");
-  let count = button.querySelector(".teleBtnCount");
-  if (!label) {
-    label = document.createElement("span");
-    label.className = "teleBtnLabel";
-  }
-  if (!count) {
-    count = document.createElement("span");
-    count.className = "teleBtnCount";
-  }
-  label.textContent = "บิล Telesale";
-  if (!count.textContent) count.textContent = "(0)";
-  button.replaceChildren(label, count);
-  keepTelesaleCountVisible(button);
-}
-
 export function buildTelesaleBills(rows) {
   const bills = new Map();
   rows.forEach((row) => {
@@ -144,7 +118,6 @@ function billHtml(bill) {
 export function renderTelesaleDrawer({ bills, page, onPage }) {
   const body = $("#drawerBody");
   const drawer = $("#teleDrawer");
-  keepTelesaleCountVisible();
   if (!body) return page;
   if (!drawer?.classList.contains("on")) {
     body.innerHTML =
