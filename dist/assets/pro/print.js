@@ -520,6 +520,9 @@ export function preparePrint({
   realBillPrint = null,
   orderPrint = null,
 }) {
+  if (document.querySelector(".printOverlay")) {
+    return { ok: false, reason: "print-overlay-open" };
+  }
   if (mode === "pick") {
     const bills = buildBills();
     if (!bills.length) {
