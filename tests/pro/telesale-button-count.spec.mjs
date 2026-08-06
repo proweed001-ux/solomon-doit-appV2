@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 const ACTIVE_ENDPOINT =
   "https://saodmeoilixfdqentofp.supabase.co/functions/v1/doit-active";
 
-test("shows the Telesale bill count before opening the drawer", async ({ page }) => {
+async function mockEmptyCloud(page) {
   await page.route(`${ACTIVE_ENDPOINT}?mode=data`, async (route) => {
     await route.fulfill({
       status: 200,
@@ -22,7 +22,18 @@ test("shows the Telesale bill count before opening the drawer", async ({ page })
       }),
     });
   });
+}
 
+async function closeTeamModal(page) {
+  await page.waitForTimeout(400);
+  const teamModal = page.locator("#devTeamModal");
+  if (await teamModal.evaluate((element) => element.classList.contains("on"))) {
+    await teamModal.locator(".devClose").click();
+  }
+}
+
+test("shows the Telesale bill count before opening the drawer", async ({ page }) => {
+  await mockEmptyCloud(page);
   await page.goto("/pro.html?t=telesale-count-visible");
 
   const button = page.locator("#teleBtn");
@@ -32,16 +43,13 @@ test("shows the Telesale bill count before opening the drawer", async ({ page })
   await expect(label).toHaveText("บิล Telesale");
   await expect(count).toHaveText("(0)");
   await expect(count).toBeVisible();
-  expect(await count.evaluate((element) => getComputedStyle(element).display)).not.toBe(
-    "none",
-  );
+  const beforeStyle = await count.evaluate((element) => ({
+    display: element.style.display,
+    marginLeft: element.style.marginLeft,
+  }));
+  expect(beforeStyle).toEqual({ display: "inline", marginLeft: "3px" });
 
-  await page.waitForTimeout(400);
-  const teamModal = page.locator("#devTeamModal");
-  if (await teamModal.evaluate((element) => element.classList.contains("on"))) {
-    await teamModal.locator(".devClose").click();
-  }
-
+  await closeTeamModal(page);
   const beforeChildren = await button.evaluate((element) =>
     [...element.children].map((child) => child.className),
   );
@@ -52,12 +60,36 @@ test("shows the Telesale bill count before opening the drawer", async ({ page })
   await expect(label).toHaveText("บิล Telesale");
   await expect(count).toHaveText("(0)");
   await expect(count).toBeVisible();
-  expect(await count.evaluate((element) => getComputedStyle(element).display)).not.toBe(
-    "none",
-  );
 
+  const afterStyle = await count.evaluate((element) => ({
+    display: element.style.display,
+    marginLeft: element.style.marginLeft,
+  }));
+  expect(afterStyle).toEqual(beforeStyle);
   const afterChildren = await button.evaluate((element) =>
     [...element.children].map((child) => child.className),
   );
   expect(afterChildren).toEqual(beforeChildren);
+});
+
+test("blocks a second print preview while one is already open", async ({ page }) => {
+  await mockEmptyCloud(page);
+  const dialogs = [];
+  page.on("dialog", async (dialog) => {
+    dialogs.push(dialog.message());
+    await dialog.dismiss();
+  });
+  await page.goto("/pro.html?t=single-print-overlay");
+  await closeTeamModal(page);
+
+  await page.evaluate(() => {
+    const overlay = document.createElement("div");
+    overlay.className = "printOverlay";
+    document.body.appendChild(overlay);
+  });
+  await expect(page.locator(".printOverlay")).toHaveCount(1);
+
+  await page.locator("#prepPrint").click();
+  await expect(page.locator(".printOverlay")).toHaveCount(1);
+  expect(dialogs).toEqual([]);
 });
