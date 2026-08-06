@@ -28,11 +28,11 @@
   "rewrites": [
     {
       "source": "/performance",
-      "destination": "/performance.html"
+      "destination": "/performance-v2.html"
     },
     {
       "source": "/performance-reveal",
-      "destination": "/performance-reveal.html"
+      "destination": "/performance-reveal-v2.html"
     }
   ]
 }
