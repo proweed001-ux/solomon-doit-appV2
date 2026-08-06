@@ -15,7 +15,7 @@ on:
       - "vercel.json"
       - "package.json"
       - "package-lock.json"
-      - "playwright.pro.config.mjs"
+      - "playwright*.config.mjs"
       - "tsconfig*.json"
       - "vite.config.*"
       - ".github/workflows/web-ci.yml"
@@ -33,7 +33,7 @@ on:
       - "vercel.json"
       - "package.json"
       - "package-lock.json"
-      - "playwright.pro.config.mjs"
+      - "playwright*.config.mjs"
       - "tsconfig*.json"
       - "vite.config.*"
       - ".github/workflows/web-ci.yml"
@@ -45,7 +45,7 @@ permissions:
 jobs:
   pro-verification:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -88,6 +88,10 @@ jobs:
         run: npm run test:admin-doit-upload
       - name: Performance CD123 regression
         run: node scripts/test-performance-cd123.mjs
+      - name: Performance data ownership regression
+        run: npm run test:performance-data
+      - name: Performance browser regression
+        run: npm run test:performance-browser
       - name: Pro change-scope guard tests
         run: npm run test:pro-scope
       - name: Pro module regression
