@@ -93,7 +93,7 @@ test("shows latest reveal before history and keeps the award flow usable", async
   await activeCard.locator(".race-cover").click();
   await expect(activeCard).toHaveClass(/winner-ready/);
   await expect(activeCard.locator(".race-row")).toHaveCount(5);
-  await activeCard.locator(".race-track").click({ position: { x: 4, y: 4 } });
+  await activeCard.click({ position: { x: 8, y: 8 } });
   await expect(activeCard.locator(".winner-reveal")).toHaveClass(/visible/);
   await expect(activeCard.locator(".winner-percent")).toContainText(/\.\d{2}%$/);
   await activeCard.locator(".winner-back").click();
