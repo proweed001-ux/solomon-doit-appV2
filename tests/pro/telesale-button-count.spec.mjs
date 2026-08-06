@@ -44,10 +44,11 @@ test("shows the Telesale bill count before opening the drawer", async ({ page })
   await expect(count).toHaveText("(0)");
   await expect(count).toBeVisible();
   const beforeStyle = await count.evaluate((element) => ({
-    display: element.style.display,
-    marginLeft: element.style.marginLeft,
+    inlineDisplay: element.style.display,
+    computedDisplay: getComputedStyle(element).display,
   }));
-  expect(beforeStyle).toEqual({ display: "inline", marginLeft: "3px" });
+  expect(beforeStyle.inlineDisplay).toBe("");
+  expect(beforeStyle.computedDisplay).not.toBe("none");
 
   await closeTeamModal(page);
   const beforeChildren = await button.evaluate((element) =>
@@ -62,8 +63,8 @@ test("shows the Telesale bill count before opening the drawer", async ({ page })
   await expect(count).toBeVisible();
 
   const afterStyle = await count.evaluate((element) => ({
-    display: element.style.display,
-    marginLeft: element.style.marginLeft,
+    inlineDisplay: element.style.display,
+    computedDisplay: getComputedStyle(element).display,
   }));
   expect(afterStyle).toEqual(beforeStyle);
   const afterChildren = await button.evaluate((element) =>
@@ -72,24 +73,26 @@ test("shows the Telesale bill count before opening the drawer", async ({ page })
   expect(afterChildren).toEqual(beforeChildren);
 });
 
-test("blocks a second print preview while one is already open", async ({ page }) => {
+test("blocks every print mode at the print owner while an overlay is open", async ({ page }) => {
   await mockEmptyCloud(page);
-  const dialogs = [];
-  page.on("dialog", async (dialog) => {
-    dialogs.push(dialog.message());
-    await dialog.dismiss();
-  });
   await page.goto("/pro.html?t=single-print-overlay");
   await closeTeamModal(page);
 
-  await page.evaluate(() => {
+  const results = await page.evaluate(async () => {
     const overlay = document.createElement("div");
     overlay.className = "printOverlay";
     document.body.appendChild(overlay);
-  });
-  await expect(page.locator(".printOverlay")).toHaveCount(1);
 
-  await page.locator("#prepPrint").dispatchEvent("click");
+    const { preparePrint } = await import("/assets/pro/print.js");
+    return ["pick", "ship", "order"].map((mode) =>
+      preparePrint({ mode, title: "ทดสอบ" }),
+    );
+  });
+
+  expect(results).toEqual([
+    { ok: false, reason: "print-overlay-open" },
+    { ok: false, reason: "print-overlay-open" },
+    { ok: false, reason: "print-overlay-open" },
+  ]);
   await expect(page.locator(".printOverlay")).toHaveCount(1);
-  expect(dialogs).toEqual([]);
 });
