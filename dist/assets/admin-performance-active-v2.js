@@ -1,28 +1,212 @@
-(()=>
-{'use strict';
-if(window.__ADMIN_PERFORMANCE_ACTIVE_V2__)return;window.__ADMIN_PERFORMANCE_ACTIVE_V2__=true;
-const nativeFetch=window.fetch.bind(window);let lastPayload=null;
-const T=v=>String(v??'').trim(),K=v=>T(v).replace(/\s+/g,'').toLowerCase(),N=v=>typeof v==='number'?(isFinite(v)?v:0):(Number(T(v).replace(/,/g,'').replace(/%/g,'').replace(/[^0-9.\-]/g,''))||0),P=v=>{v=N(v);return v&&v<=1.5?v*100:v};
+(()=>{
+'use strict';
+if(window.__ADMIN_PERFORMANCE_ACTIVE_V2__)return;
+window.__ADMIN_PERFORMANCE_ACTIVE_V2__=true;
+const nativeFetch=window.fetch.bind(window);
+let lastPayload=null;
+const T=value=>String(value??'').trim();
+const K=value=>T(value).replace(/\s+/g,'').toLowerCase();
+const N=value=>typeof value==='number'?(Number.isFinite(value)?value:0):(Number(T(value).replace(/,/g,'').replace(/%/g,'').replace(/[^0-9.\-]/g,''))||0);
+const P=value=>{const number=N(value);return number&&number<=1.5?number*100:number};
 const MKEYS=['sales','giv','moq','dc1','dc2','dc3','cd13','cd123','bills','gps','dgp'];
-function monthNo(v){const s=K(v),m=String(v||'').match(/(?:20)?(\d{2})[-_\/ ]?(0[1-9]|1[0-2])/);if(m)return m[2];const th=[['มกราคม','01'],['มกรา','01'],['jan','01'],['กุมภาพันธ์','02'],['กุมภา','02'],['feb','02'],['มีนาคม','03'],['มีนา','03'],['mar','03'],['เมษายน','04'],['เมษา','04'],['apr','04'],['พฤษภาคม','05'],['พฤษภา','05'],['may','05'],['มิถุนายน','06'],['มิถุนา','06'],['jun','06'],['กรกฎาคม','07'],['กรกฎา','07'],['jul','07'],['สิงหาคม','08'],['สิงหา','08'],['aug','08'],['กันยายน','09'],['กันยา','09'],['sep','09'],['ตุลาคม','10'],['ตุลา','10'],['oct','10'],['พฤศจิกายน','11'],['พฤศจิกา','11'],['nov','11'],['ธันวาคม','12'],['ธันวา','12'],['dec','12']];return (th.find(([k])=>s.includes(K(k)))||[])[1]||''}
-function wd(){try{const s=window.__PERF_LAST_WB?.Sheets?.['Seller Report'];const v=c=>s?.[c]?.v??s?.[c]?.w??'';const d3=T(v('D3')),d4=N(v('D4')),d5=N(v('D5')),mn=monthNo(d3),yr=(new Date()).getFullYear();return{reportMonthText:d3,reportMonthNo:mn,period:mn?String(yr)+mn:'',totalWorkdays:d4,workdayNo:d5,daysLeft:Math.max(d4-d5,0)}}catch{return{}}}
-function periodOf(source,rd,w){if(w?.period)return w.period;let s=T(source),m=s.match(/(20\d{2})[-_ ]?(0[1-9]|1[0-2])/);if(m)return m[1]+m[2];m=T(rd).match(/(20\d{2})-(\d{2})/);return m?m[1]+m[2]:new Date().toISOString().slice(0,7).replace('-','')}
-function pick(o,n){const ks=Object.keys(o||{});for(const x of n){let k=ks.find(a=>K(a)===K(x));if(k)return o[k]}for(const x of n){let k=ks.find(a=>K(a).includes(K(x)));if(k)return o[k]}return''}
-function metric(o,t,a,i){const target=N(pick(o,t)),actual=N(pick(o,a));return{target,actual,index:P(N(pick(o,i)))||(target?actual/target*100:0)}}
-function addPace(row,daysLeft){MKEYS.forEach(k=>{const m=row?.[k];if(!m)return;const rem=Math.max(N(m.target)-N(m.actual),0);m.remaining=rem;m.daysLeft=daysLeft;m.perDay=daysLeft>0?rem/daysLeft:rem})}
-function moqMetric(o){const target=N(pick(o,['เป้าหมายการกระจาย SBD'])),actual=N(pick(o,['การกระจาย SBD MOQ']));return{target,actual,index:target?actual/target*100:P(N(pick(o,['Index MOQ 75%','Index MOQ'])))}}
-function cd123Metric(o){const target=N(pick(o,['Target CD1+2+3','Target CD1+CD2+CD3','Target CD123','เป้าหมาย CD1+2+3','เป้าหมาย CD123'])),actual=N(pick(o,['การกระจาย CD1+2+3','การกระจาย CD1+CD2+CD3','การกระจาย CD123']));return{target,actual,index:target?actual/target*100:P(N(pick(o,['Index CD1+2+3','Index CD1+CD2+CD3','Index CD123'])))}}
-function minRow(r){const o=r.sellerReport||{};return{ads:r.adsCode,ps:r.psCode,name:r.psName,branch:r.branch,type:pick(o,['Type']),sales:metric(o,['เป้าหมายยอดขาย'],['ยอดขายใน Doit'],['Index']),giv:metric(o,['Target Volume GIV'],['Volume GIV'],['Index Volume GIV']),moq:moqMetric(o),dc1:metric(o,['เป้าหมาย CD1 RJ SH RH JJ 70ML'],['การกระจาย CD1 RJ SH RH JJ 70ML'],['Index CD1 RJ SH RH JJ 70ML']),dc2:metric(o,['เป้าหมาย CD2 DN FE SF 450ML'],['การกระจาย CD2 DN FE SF 450ML'],['Index CD2 DN FE SF 450ML']),dc3:metric(o,['เป้าหมาย CD3 GL Blue2 Flexi'],['การกระจาย CD3 GL Blue2 Flexi'],['Index CD3 GL Blue2 Flexi']),cd13:metric(o,['Target CD1+CD3'],['การกระจาย CD1+CD3'],['Index CD1+CD3']),cd123:cd123Metric(o),bills:metric(o,['เป้าหมายบิลซื้อทั้งหมด'],['จำนวนบิลซื้อทั้งหมด'],[]),gps:{target:0,actual:P(N(pick(o,['% GPS Compliance เฉลี่ยทั้งเดือน']))),index:P(N(pick(o,['% GPS Compliance เฉลี่ยทั้งเดือน'])))},dgp:metric(o,['เป้าหมาย Golden Point'],['Golden Point'],['Index'])}}
-function sum(rows,code,name){const r={code,name:name||code};MKEYS.forEach(k=>{let t=0,a=0,ix=0,c=0;rows.forEach(x=>{t+=N(x[k]?.target);a+=N(x[k]?.actual);ix+=N(x[k]?.index);c++});r[k]={target:t,actual:a,index:t?a/t*100:(c?ix/c:0)}});return r}
-function ranks(rows){const o={};MKEYS.forEach(k=>o[k]=[...rows].sort((a,b)=>N(b[k]?.index)-N(a[k]?.index)).map(x=>({ads:x.ads||x.code,ps:x.ps||x.code,name:x.name,target:N(x[k]?.target),actual:N(x[k]?.actual),index:N(x[k]?.index),remaining:N(x[k]?.remaining),perDay:N(x[k]?.perDay),daysLeft:N(x[k]?.daysLeft)})));return o}
-function buildMin(data){const w=wd(),ps=(data.ps||[]).map(minRow),codes=[...new Set(ps.map(x=>x.ads).filter(Boolean))].sort(),ads=codes.map(c=>({...sum(ps.filter(x=>x.ads===c),c,c),ads:c,ps:c})),ds=sum(ps,'DS','DS'),rd=data.reportDate||'',period=periodOf(data.source||'',rd,w),workday=N(data.workdayNo||data.meta?.workdayNo)||w.workdayNo||new Date().getDate(),total=N(data.totalWorkdays||data.meta?.totalWorkdays)||w.totalWorkdays,daysLeft=Math.max(total-workday,0),key=period+'-WD'+String(workday).padStart(2,'0'),cmp='performance/compare/'+key+'.json';[ds,...ads,...ps].forEach(r=>addPace(r,daysLeft));return{meta:{schema:'performance-min-v5',source:data.source||'',updatedAt:new Date().toISOString(),reportDate:rd,reportMonthText:w.reportMonthText||'',reportMonthNo:w.reportMonthNo||'',period,workdayNo:workday,totalWorkdays:total,daysLeft,reportKey:key,comparePath:cmp},ds,ads,ps,ms:data.ms||[],rank:{ads:ranks(ads),ps:ranks(ps)}}}
-function reportDate(data,path){if(data&&data.reportDate)return data.reportDate;const fromPath=String(path||'').match(/performance\/(20\d{2}-\d{2}-\d{2})\//);return fromPath?fromPath[1]:new Date().toISOString().slice(0,10)}
-async function digest(text){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('')}catch{return''}}
+const THAI_MONTHS=[['มกราคม','01'],['มกรา','01'],['jan','01'],['กุมภาพันธ์','02'],['กุมภา','02'],['feb','02'],['มีนาคม','03'],['มีนา','03'],['mar','03'],['เมษายน','04'],['เมษา','04'],['apr','04'],['พฤษภาคม','05'],['พฤษภา','05'],['may','05'],['มิถุนายน','06'],['มิถุนา','06'],['jun','06'],['กรกฎาคม','07'],['กรกฎา','07'],['jul','07'],['สิงหาคม','08'],['สิงหา','08'],['aug','08'],['กันยายน','09'],['กันยา','09'],['sep','09'],['ตุลาคม','10'],['ตุลา','10'],['oct','10'],['พฤศจิกายน','11'],['พฤศจิกา','11'],['nov','11'],['ธันวาคม','12'],['ธันวา','12'],['dec','12']];
+function normalizeYear(value){let year=Number(value);if(year>2400)year-=543;return year>=2000&&year<=2200?year:0}
+function monthYear(value,reportDate=''){
+  const text=T(value),compact=K(text);
+  let month='';
+  let year=0;
+  const numeric=text.match(/(?:^|\D)((?:20|25)\d{2})[-_\/ ]?(0?[1-9]|1[0-2])(?:\D|$)/);
+  if(numeric){year=normalizeYear(numeric[1]);month=String(Number(numeric[2])).padStart(2,'0')}
+  if(!month)month=(THAI_MONTHS.find(([name])=>compact.includes(K(name)))||[])[1]||'';
+  if(!year){const hit=text.match(/(?:^|\D)((?:20|25)\d{2})(?:\D|$)/);if(hit)year=normalizeYear(hit[1])}
+  const report=T(reportDate).match(/(20\d{2})-(\d{2})/);
+  if(!year&&report)year=Number(report[1]);
+  if(!month&&report)month=report[2];
+  return{month,year,period:month&&year?String(year)+month:''};
+}
+function workbookMeta(reportDate=''){
+  try{
+    const sheet=window.__PERF_LAST_WB?.Sheets?.['Seller Report'];
+    const value=cell=>sheet?.[cell]?.v??sheet?.[cell]?.w??'';
+    const reportMonthText=T(value('D3'));
+    const totalWorkdays=N(value('D4'));
+    const workdayNo=N(value('D5'));
+    const info=monthYear(reportMonthText,reportDate);
+    return{reportMonthText,reportMonthNo:info.month,reportYear:info.year,period:info.period,totalWorkdays,workdayNo,daysLeft:Math.max(totalWorkdays-workdayNo,0)};
+  }catch{return{}}
+}
+function periodOf(source,reportDate,workbook){
+  if(workbook?.period)return workbook.period;
+  const sourceMatch=T(source).match(/(20\d{2})[-_ ]?(0[1-9]|1[0-2])/);
+  if(sourceMatch)return sourceMatch[1]+sourceMatch[2];
+  const reportMatch=T(reportDate).match(/(20\d{2})-(\d{2})/);
+  return reportMatch?reportMatch[1]+reportMatch[2]:new Date().toISOString().slice(0,7).replace('-','');
+}
+function pick(object,names){
+  const keys=Object.keys(object||{});
+  for(const name of names){const key=keys.find(candidate=>K(candidate)===K(name));if(key)return object[key]}
+  for(const name of names){const key=keys.find(candidate=>K(candidate).includes(K(name)));if(key)return object[key]}
+  return'';
+}
+function metric(object,targetNames,actualNames,indexNames){
+  const target=N(pick(object,targetNames));
+  const actual=N(pick(object,actualNames));
+  return{target,actual,index:P(N(pick(object,indexNames)))||(target?actual/target*100:0)};
+}
+function moqMetric(object){
+  const target=N(pick(object,['เป้าหมายการกระจาย SBD']));
+  const actual=N(pick(object,['การกระจาย SBD MOQ']));
+  return{target,actual,index:target?actual/target*100:P(N(pick(object,['Index MOQ 75%','Index MOQ'])))};
+}
+function cd123Metric(object){
+  const target=N(pick(object,['Target CD1+2+3','Target CD1+CD2+CD3','Target CD123','เป้าหมาย CD1+2+3','เป้าหมาย CD123']));
+  const actual=N(pick(object,['การกระจาย CD1+2+3','การกระจาย CD1+CD2+CD3','การกระจาย CD123']));
+  return{target,actual,index:target?actual/target*100:P(N(pick(object,['Index CD1+2+3','Index CD1+CD2+CD3','Index CD123'])))};
+}
+function minRow(row){
+  const report=row.sellerReport||{};
+  return{
+    ads:row.adsCode,
+    ps:row.psCode,
+    name:row.psName,
+    branch:row.branch,
+    type:pick(report,['Type']),
+    sales:metric(report,['เป้าหมายยอดขาย'],['ยอดขายใน Doit'],['Index']),
+    giv:metric(report,['Target Volume GIV'],['Volume GIV'],['Index Volume GIV']),
+    moq:moqMetric(report),
+    dc1:metric(report,['เป้าหมาย CD1 RJ SH RH JJ 70ML'],['การกระจาย CD1 RJ SH RH JJ 70ML'],['Index CD1 RJ SH RH JJ 70ML']),
+    dc2:metric(report,['เป้าหมาย CD2 DN FE SF 450ML'],['การกระจาย CD2 DN FE SF 450ML'],['Index CD2 DN FE SF 450ML']),
+    dc3:metric(report,['เป้าหมาย CD3 GL Blue2 Flexi'],['การกระจาย CD3 GL Blue2 Flexi'],['Index CD3 GL Blue2 Flexi']),
+    cd13:metric(report,['Target CD1+CD3'],['การกระจาย CD1+CD3'],['Index CD1+CD3']),
+    cd123:cd123Metric(report),
+    bills:metric(report,['เป้าหมายบิลซื้อทั้งหมด'],['จำนวนบิลซื้อทั้งหมด'],[]),
+    gps:{target:0,actual:P(N(pick(report,['% GPS Compliance เฉลี่ยทั้งเดือน']))),index:P(N(pick(report,['% GPS Compliance เฉลี่ยทั้งเดือน'])))},
+    dgp:metric(report,['เป้าหมาย Golden Point'],['Golden Point'],['Index'])
+  };
+}
+function addPace(row,daysLeft){
+  MKEYS.forEach(key=>{
+    const value=row?.[key];
+    if(!value)return;
+    const remaining=Math.max(N(value.target)-N(value.actual),0);
+    value.remaining=remaining;
+    value.daysLeft=daysLeft;
+    value.perDay=daysLeft>0?remaining/daysLeft:remaining;
+  });
+}
+function aggregate(rows,key){
+  let target=0,actual=0,indexTotal=0,indexCount=0;
+  (rows||[]).forEach(row=>{
+    const value=row?.[key]||{};
+    const rowTarget=N(value.target);
+    if(key==='cd123'&&rowTarget<=0)return;
+    target+=rowTarget;
+    actual+=N(value.actual);
+    const rowIndex=N(value.index);
+    if(rowIndex>0){indexTotal+=rowIndex;indexCount+=1}
+  });
+  return{target,actual,index:target?actual/target*100:(indexCount?indexTotal/indexCount:0)};
+}
+function sum(rows,code,name){
+  const result={code,name:name||code};
+  MKEYS.forEach(key=>result[key]=aggregate(rows,key));
+  return result;
+}
+function ranks(rows){
+  const result={};
+  MKEYS.forEach(key=>{
+    result[key]=[...(rows||[])]
+      .filter(row=>key!=='cd123'||N(row?.cd123?.target)>0)
+      .sort((left,right)=>N(right[key]?.index)-N(left[key]?.index)||N(right[key]?.actual)-N(left[key]?.actual)||T(left.ps||left.ads||left.code).localeCompare(T(right.ps||right.ads||right.code),'en'))
+      .map(row=>({ads:row.ads||row.code,ps:row.ps||row.code,name:row.name,target:N(row[key]?.target),actual:N(row[key]?.actual),index:N(row[key]?.index),remaining:N(row[key]?.remaining),perDay:N(row[key]?.perDay),daysLeft:N(row[key]?.daysLeft)}));
+  });
+  return result;
+}
+function buildMin(data){
+  const reportDate=data.reportDate||data.meta?.reportDate||'';
+  const workbook=workbookMeta(reportDate);
+  const ps=(data.ps||[]).map(minRow);
+  const codes=[...new Set(ps.map(row=>row.ads).filter(Boolean))].sort();
+  const ads=codes.map(code=>({...sum(ps.filter(row=>row.ads===code),code,code),ads:code,ps:code}));
+  const ds=sum(ps,'DS','DS');
+  const period=periodOf(data.source||'',reportDate,workbook);
+  const workday=N(data.workdayNo||data.meta?.workdayNo)||workbook.workdayNo||new Date().getDate();
+  const total=N(data.totalWorkdays||data.meta?.totalWorkdays)||workbook.totalWorkdays;
+  const daysLeft=Math.max(total-workday,0);
+  const reportKey=period+'-WD'+String(workday).padStart(2,'0');
+  const comparePath='performance/compare/'+reportKey+'.json';
+  [ds,...ads,...ps].forEach(row=>addPace(row,daysLeft));
+  return{
+    meta:{schema:'performance-min-v5',source:data.source||'',updatedAt:new Date().toISOString(),reportDate,reportMonthText:workbook.reportMonthText||'',reportMonthNo:workbook.reportMonthNo||'',reportYear:workbook.reportYear||0,period,workdayNo:workday,totalWorkdays:total,daysLeft,reportKey,comparePath},
+    ds,ads,ps,ms:data.ms||[],rank:{ads:ranks(ads),ps:ranks(ps)}
+  };
+}
+function reportDate(data,path){
+  if(data&&data.reportDate)return data.reportDate;
+  const fromPath=T(path).match(/performance\/(20\d{2}-\d{2}-\d{2})\//);
+  return fromPath?fromPath[1]:new Date().toISOString().slice(0,10);
+}
+async function digest(text){
+  try{const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(bytes)).map(value=>value.toString(16).padStart(2,'0')).join('')}catch{return''}
+}
 async function bodyText(body){if(!body)return'';if(typeof body==='string')return body;if(body instanceof Blob)return await body.text();return''}
-function objectPath(url){const m=String(url||'').match(/\/storage\/v1\/object\/doit-files\/(.+)$/);return m?decodeURIComponent(m[1]).replace(/^\/+/, ''):''}
-async function putLike(activeUrl,headers,path,obj){const u=String(activeUrl).replace(/performance\/active\.json.*$/,'')+path;return nativeFetch(u,{method:'POST',headers:{...headers,'Content-Type':'application/json','x-upsert':'true'},body:new Blob([JSON.stringify(obj)],{type:'application/json'}),cache:'no-store'}).catch(()=>null)}
-async function extraFiles(url,headers,data){try{const min=buildMin(data),cmp=min.meta.comparePath;let cur=null;try{const r=await nativeFetch(String(url).replace(/performance\/active\.json.*$/,'')+'performance/current.min.json',{headers,cache:'no-store'});if(r.ok)cur=await r.json()}catch{}await putLike(url,headers,cmp,min);let hist=[];try{const r=await nativeFetch(String(url).replace(/performance\/active\.json.*$/,'')+'performance/history-index.json',{headers,cache:'no-store'});if(r.ok)hist=await r.json()}catch{}hist=[{period:min.meta.period,workdayNo:min.meta.workdayNo,totalWorkdays:min.meta.totalWorkdays,daysLeft:min.meta.daysLeft,reportKey:min.meta.reportKey,path:cmp,updatedAt:min.meta.updatedAt,totalActual:min.ds.sales.actual,totalTarget:min.ds.sales.target,totalRemaining:min.ds.sales.remaining,totalPerDay:min.ds.sales.perDay},...(Array.isArray(hist)?hist:[]).filter(x=>x.path!==cmp&&x.reportKey!==min.meta.reportKey)].slice(0,31);await putLike(url,headers,'performance/history-index.json',hist);if(!cur?.meta?.reportKey||String(min.meta.reportKey)>=String(cur.meta.reportKey))await putLike(url,headers,'performance/current.min.json',min);return min}catch(e){console.warn('performance min skipped',e)}}
-window.fetch=async(input,opt={})=>{const url=String(typeof input==='string'?input:input?.url||''),method=String(opt?.method||'GET').toUpperCase(),path=objectPath(url);if(method==='POST'&&/^performance\//.test(path)&&/\.json$/.test(path)&&!/^performance\/(active|index|current\.min|history-index)\.json$/.test(path)){const text=await bodyText(opt.body);try{const data=JSON.parse(text),rd=reportDate(data,path),hash=await digest(text);data.reportDate=rd;data.hash=hash;data.dataSchemaVersion=2;data.currentDataPath=path;lastPayload={path,reportDate:rd,hash,data};opt={...opt,body:new Blob([JSON.stringify(data)],{type:'application/json'})}}catch{}}
- if(method==='POST'&&path==='performance/active.json'){const text=await bodyText(opt.body);try{const incoming=JSON.parse(text),oldRes=await nativeFetch(url,{headers:opt.headers,cache:'no-store'}).catch(()=>null);let old=null;if(oldRes&&oldRes.ok)old=await oldRes.json().catch(()=>null);let min=null;if(lastPayload?.data)min=await extraFiles(url,opt.headers,lastPayload.data);const currentPath=lastPayload?.path||incoming.dataPath||'',rd=lastPayload?.reportDate||reportDate(lastPayload?.data,currentPath),curKey=min?.meta?.reportKey||'',oldKey=old?.reportKey||old?.currentReportKey||'',oldPath=old?.dataPath||old?.currentDataPath||'',previousDataPath=oldPath&&oldKey!==curKey?oldPath:(old?.previousDataPath||''),history=[{reportKey:oldKey,reportDate:old?.reportDate||'',dataPath:oldPath,versionId:old?.versionId||'',updatedAt:old?.updatedAt||''},...(old?.history||[])].filter(x=>x.dataPath).slice(0,30),active={...incoming,schema:'performance-active-v5',reportDate:rd,reportKey:curKey,currentReportKey:curKey,revision:oldKey===curKey?Number(old?.revision||1)+1:1,hash:lastPayload?.hash||'',dataPath:currentPath,currentDataPath:currentPath,latestPath:currentPath,previousDataPath,updatedAt:new Date().toISOString(),counts:{ads:incoming.adsCount||lastPayload?.data?.ads?.length||0,ps:incoming.psCount||lastPayload?.data?.ps?.length||0,ms:incoming.msCount||lastPayload?.data?.ms?.length||0},history};if(oldKey&&curKey&&curKey<oldKey)active.note='Older workday uploaded: compare/history updated, current.min.json kept at newer workday';opt={...opt,body:new Blob([JSON.stringify(active)],{type:'application/json'})}}catch{}}
- return nativeFetch(input,opt)};
+function objectPath(url){const match=T(url).match(/\/storage\/v1\/object\/doit-files\/(.+)$/);return match?decodeURIComponent(match[1]).replace(/^\/+/, ''):''}
+async function putLike(activeUrl,headers,path,object){
+  const url=T(activeUrl).replace(/performance\/active\.json.*$/,'')+path;
+  return nativeFetch(url,{method:'POST',headers:{...headers,'Content-Type':'application/json','x-upsert':'true'},body:new Blob([JSON.stringify(object)],{type:'application/json'}),cache:'no-store'}).catch(()=>null);
+}
+async function extraFiles(url,headers,data){
+  try{
+    const min=buildMin(data);
+    const comparePath=min.meta.comparePath;
+    let current=null;
+    try{const response=await nativeFetch(T(url).replace(/performance\/active\.json.*$/,'')+'performance/current.min.json',{headers,cache:'no-store'});if(response.ok)current=await response.json()}catch{}
+    await putLike(url,headers,comparePath,min);
+    let history=[];
+    try{const response=await nativeFetch(T(url).replace(/performance\/active\.json.*$/,'')+'performance/history-index.json',{headers,cache:'no-store'});if(response.ok)history=await response.json()}catch{}
+    history=[{period:min.meta.period,workdayNo:min.meta.workdayNo,totalWorkdays:min.meta.totalWorkdays,daysLeft:min.meta.daysLeft,reportKey:min.meta.reportKey,reportDate:min.meta.reportDate,path:comparePath,updatedAt:min.meta.updatedAt,totalActual:min.ds.sales.actual,totalTarget:min.ds.sales.target,totalRemaining:min.ds.sales.remaining,totalPerDay:min.ds.sales.perDay},...(Array.isArray(history)?history:[]).filter(item=>item.path!==comparePath&&item.reportKey!==min.meta.reportKey)].slice(0,31);
+    await putLike(url,headers,'performance/history-index.json',history);
+    if(!current?.meta?.reportKey||T(min.meta.reportKey)>=T(current.meta.reportKey))await putLike(url,headers,'performance/current.min.json',min);
+    return min;
+  }catch(error){console.warn('performance min skipped',error)}
+}
+window.fetch=async(input,options={})=>{
+  const url=T(typeof input==='string'?input:input?.url||'');
+  const method=T(options?.method||'GET').toUpperCase();
+  const path=objectPath(url);
+  if(method==='POST'&&/^performance\//.test(path)&&/\.json$/.test(path)&&!/^performance\/(active|index|current\.min|history-index)\.json$/.test(path)){
+    const text=await bodyText(options.body);
+    try{
+      const data=JSON.parse(text);
+      const date=reportDate(data,path);
+      const hash=await digest(text);
+      data.reportDate=date;
+      data.hash=hash;
+      data.dataSchemaVersion=2;
+      data.currentDataPath=path;
+      lastPayload={path,reportDate:date,hash,data};
+      options={...options,body:new Blob([JSON.stringify(data)],{type:'application/json'})};
+    }catch{}
+  }
+  if(method==='POST'&&path==='performance/active.json'){
+    const text=await bodyText(options.body);
+    try{
+      const incoming=JSON.parse(text);
+      const oldResponse=await nativeFetch(url,{headers:options.headers,cache:'no-store'}).catch(()=>null);
+      const old=oldResponse&&oldResponse.ok?await oldResponse.json().catch(()=>null):null;
+      const min=lastPayload?.data?await extraFiles(url,options.headers,lastPayload.data):null;
+      const currentPath=lastPayload?.path||incoming.dataPath||'';
+      const date=lastPayload?.reportDate||reportDate(lastPayload?.data,currentPath);
+      const currentKey=min?.meta?.reportKey||'';
+      const oldKey=old?.reportKey||old?.currentReportKey||'';
+      const oldPath=old?.dataPath||old?.currentDataPath||'';
+      const previousDataPath=oldPath&&oldKey!==currentKey?oldPath:(old?.previousDataPath||'');
+      const history=[{reportKey:oldKey,reportDate:old?.reportDate||'',dataPath:oldPath,versionId:old?.versionId||'',updatedAt:old?.updatedAt||''},...(old?.history||[])].filter(item=>item.dataPath).slice(0,30);
+      const active={...incoming,schema:'performance-active-v5',reportDate:date,reportKey:currentKey,currentReportKey:currentKey,revision:oldKey===currentKey?Number(old?.revision||1)+1:1,hash:lastPayload?.hash||'',dataPath:currentPath,currentDataPath:currentPath,latestPath:currentPath,previousDataPath,updatedAt:new Date().toISOString(),counts:{ads:incoming.adsCount||lastPayload?.data?.ads?.length||0,ps:incoming.psCount||lastPayload?.data?.ps?.length||0,ms:incoming.msCount||lastPayload?.data?.ms?.length||0},history};
+      if(oldKey&&currentKey&&currentKey<oldKey)active.note='Older workday uploaded: compare/history updated, current.min.json kept at newer workday';
+      options={...options,body:new Blob([JSON.stringify(active)],{type:'application/json'})};
+    }catch{}
+  }
+  return nativeFetch(input,options);
+};
 })();
