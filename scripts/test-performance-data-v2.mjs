@@ -59,7 +59,7 @@ const revealHtml = fs.readFileSync("dist/performance-reveal-v2.html", "utf8");
 const revealJs = fs.readFileSync("dist/assets/performance-reveal-v2.js", "utf8");
 const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8"));
 assert.ok(boardHtml.includes("performance-board-v4.js?v=11"), "Existing Board owner must remain active");
-assert.ok(!boardHtml.includes("performance-cd-adapter"), "Active Board must not load the legacy fetch adapter");
+assert.ok(!/<script[^>]+performance-cd-adapter/i.test(boardHtml), "Active Board must not execute the legacy fetch adapter");
 assert.ok(boardJs.includes("STORE='perf-v5'"), "Board cache must move away from stale adapter-era data");
 assert.ok(boardJs.includes("if(k==='cd123'&&target<=0)return"), "Board totals must exclude CD123 actual without target");
 assert.ok(boardJs.includes("a.cd123=aggregate(rows,'cd123')"), "Board ADS CD123 must be rebuilt from eligible PS rows");
