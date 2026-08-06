@@ -11,12 +11,21 @@ function keepTelesaleCountVisible(button = $("#teleBtn")) {
 
 export function initTelesaleButtonCount() {
   const button = $("#teleBtn");
-  if (!button || button.dataset.teleCountVisibleBound === "1") return;
-  button.dataset.teleCountVisibleBound = "1";
-  const sync = () => keepTelesaleCountVisible(button);
-  const observer = new MutationObserver(sync);
-  observer.observe(button, { childList: true, subtree: true });
-  sync();
+  if (!button) return;
+  let label = button.querySelector(".teleBtnLabel");
+  let count = button.querySelector(".teleBtnCount");
+  if (!label) {
+    label = document.createElement("span");
+    label.className = "teleBtnLabel";
+  }
+  if (!count) {
+    count = document.createElement("span");
+    count.className = "teleBtnCount";
+  }
+  label.textContent = "บิล Telesale";
+  if (!count.textContent) count.textContent = "(0)";
+  button.replaceChildren(label, count);
+  keepTelesaleCountVisible(button);
 }
 
 export function buildTelesaleBills(rows) {
