@@ -53,35 +53,35 @@ function metric(object,targetNames,actualNames,indexNames){
   const actual=N(pick(object,actualNames));
   return{target,actual,index:P(N(pick(object,indexNames)))||(target?actual/target*100:0)};
 }
-function moqMetric(object){
-  const target=N(pick(object,['เป้าหมายการกระจาย SBD']));
-  const actual=N(pick(object,['การกระจาย SBD MOQ']));
-  return{target,actual,index:target?actual/target*100:P(N(pick(object,['Index MOQ 75%','Index MOQ'])))};
+function moqMetric(o){
+  const target=N(pick(o,['เป้าหมายการกระจาย SBD']));
+  const actual=N(pick(o,['การกระจาย SBD MOQ']));
+  return{target,actual,index:target?actual/target*100:P(N(pick(o,['Index MOQ 75%','Index MOQ'])))};
 }
-function cd123Metric(object){
-  const target=N(pick(object,['Target CD1+2+3','Target CD1+CD2+CD3','Target CD123','เป้าหมาย CD1+2+3','เป้าหมาย CD123']));
-  const actual=N(pick(object,['การกระจาย CD1+2+3','การกระจาย CD1+CD2+CD3','การกระจาย CD123']));
-  return{target,actual,index:target?actual/target*100:P(N(pick(object,['Index CD1+2+3','Index CD1+CD2+CD3','Index CD123'])))};
+function cd123Metric(o){
+  const target=N(pick(o,['Target CD1+2+3','Target CD1+CD2+CD3','Target CD123','เป้าหมาย CD1+2+3','เป้าหมาย CD123']));
+  const actual=N(pick(o,['การกระจาย CD1+2+3','การกระจาย CD1+CD2+CD3','การกระจาย CD123']));
+  return{target,actual,index:target?actual/target*100:P(N(pick(o,['Index CD1+2+3','Index CD1+CD2+CD3','Index CD123'])))};
 }
 function minRow(row){
-  const report=row.sellerReport||{};
+  const o=row.sellerReport||{};
   return{
     ads:row.adsCode,
     ps:row.psCode,
     name:row.psName,
     branch:row.branch,
-    type:pick(report,['Type']),
-    sales:metric(report,['เป้าหมายยอดขาย'],['ยอดขายใน Doit'],['Index']),
-    giv:metric(report,['Target Volume GIV'],['Volume GIV'],['Index Volume GIV']),
-    moq:moqMetric(report),
-    dc1:metric(report,['เป้าหมาย CD1 RJ SH RH JJ 70ML'],['การกระจาย CD1 RJ SH RH JJ 70ML'],['Index CD1 RJ SH RH JJ 70ML']),
-    dc2:metric(report,['เป้าหมาย CD2 DN FE SF 450ML'],['การกระจาย CD2 DN FE SF 450ML'],['Index CD2 DN FE SF 450ML']),
-    dc3:metric(report,['เป้าหมาย CD3 GL Blue2 Flexi'],['การกระจาย CD3 GL Blue2 Flexi'],['Index CD3 GL Blue2 Flexi']),
-    cd13:metric(report,['Target CD1+CD3'],['การกระจาย CD1+CD3'],['Index CD1+CD3']),
-    cd123:cd123Metric(report),
-    bills:metric(report,['เป้าหมายบิลซื้อทั้งหมด'],['จำนวนบิลซื้อทั้งหมด'],[]),
-    gps:{target:0,actual:P(N(pick(report,['% GPS Compliance เฉลี่ยทั้งเดือน']))),index:P(N(pick(report,['% GPS Compliance เฉลี่ยทั้งเดือน'])))},
-    dgp:metric(report,['เป้าหมาย Golden Point'],['Golden Point'],['Index'])
+    type:pick(o,['Type']),
+    sales:metric(o,['เป้าหมายยอดขาย'],['ยอดขายใน Doit'],['Index']),
+    giv:metric(o,['Target Volume GIV'],['Volume GIV'],['Index Volume GIV']),
+    moq:moqMetric(o),
+    dc1:metric(o,['เป้าหมาย CD1 RJ SH RH JJ 70ML'],['การกระจาย CD1 RJ SH RH JJ 70ML'],['Index CD1 RJ SH RH JJ 70ML']),
+    dc2:metric(o,['เป้าหมาย CD2 DN FE SF 450ML'],['การกระจาย CD2 DN FE SF 450ML'],['Index CD2 DN FE SF 450ML']),
+    dc3:metric(o,['เป้าหมาย CD3 GL Blue2 Flexi'],['การกระจาย CD3 GL Blue2 Flexi'],['Index CD3 GL Blue2 Flexi']),
+    cd13:metric(o,['Target CD1+CD3'],['การกระจาย CD1+CD3'],['Index CD1+CD3']),
+    cd123:cd123Metric(o),
+    bills:metric(o,['เป้าหมายบิลซื้อทั้งหมด'],['จำนวนบิลซื้อทั้งหมด'],[]),
+    gps:{target:0,actual:P(N(pick(o,['% GPS Compliance เฉลี่ยทั้งเดือน']))),index:P(N(pick(o,['% GPS Compliance เฉลี่ยทั้งเดือน'])))},
+    dgp:metric(o,['เป้าหมาย Golden Point'],['Golden Point'],['Index'])
   };
 }
 function addPace(row,daysLeft){
