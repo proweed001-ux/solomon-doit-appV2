@@ -89,7 +89,7 @@ test("blocks a second print preview while one is already open", async ({ page })
   });
   await expect(page.locator(".printOverlay")).toHaveCount(1);
 
-  await page.locator("#prepPrint").click();
+  await page.locator("#prepPrint").dispatchEvent("click");
   await expect(page.locator(".printOverlay")).toHaveCount(1);
   expect(dialogs).toEqual([]);
 });
