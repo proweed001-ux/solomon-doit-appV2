@@ -53,18 +53,22 @@ const adapter = fs.readFileSync("dist/assets/performance-cd-adapter-v1.js", "utf
 assert.ok(!adapter.includes("window.fetch="), "Legacy adapter must not monkey-patch fetch");
 assert.ok(!adapter.includes("sessionStorage.removeItem"), "Legacy adapter must not clear board cache");
 
-const boardHtml = fs.readFileSync("dist/performance-v2.html", "utf8");
+const boardHtml = fs.readFileSync("dist/performance.html", "utf8");
 const revealHtml = fs.readFileSync("dist/performance-reveal-v2.html", "utf8");
 const revealJs = fs.readFileSync("dist/assets/performance-reveal-v2.js", "utf8");
 const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8"));
-assert.ok(!boardHtml.includes("performance-cd-adapter"));
+assert.ok(boardHtml.includes("performance-board-v4.js?v=11"), "Existing Board owner must remain active");
+assert.ok(!boardHtml.includes("performance-cd-adapter"), "Active Board must not load the legacy fetch adapter");
 assert.ok(!revealHtml.includes("performance-cd-adapter"));
 assert.ok(!revealHtml.includes("cdn.tailwindcss.com"));
 assert.ok(!revealHtml.includes("fonts.googleapis.com"));
 assert.ok(revealJs.includes("minimumFractionDigits: 2"), "Percentage display must remain at two decimals");
 assert.ok(revealJs.includes("const RACE_DURATION_MS = TEST_MODE ? 160 : 10000"));
-assert.equal(vercel.rewrites.find((item) => item.source === "/performance")?.destination, "/performance-v2.html");
+assert.equal(vercel.rewrites.find((item) => item.source === "/performance")?.destination, "/performance.html");
 assert.equal(vercel.rewrites.find((item) => item.source === "/performance-reveal")?.destination, "/performance-reveal-v2.html");
+assert.equal(fs.existsSync("dist/performance-v2.html"), false, "Reduced Board experiment must not remain active");
+assert.equal(fs.existsSync("dist/assets/performance-board-v5.js"), false, "Reduced Board controller must be removed");
+assert.equal(fs.existsSync("dist/assets/performance-v2.css"), false, "Reduced Board styles must be removed");
 
 const admin = fs.readFileSync("dist/assets/admin-performance-active-v2.js", "utf8");
 assert.ok(admin.includes("function monthYear(value,reportDate='')"));
