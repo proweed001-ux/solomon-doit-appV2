@@ -8,6 +8,12 @@ on:
     paths:
       - tools/aya-printer-bridge/**
       - .github/workflows/aya-printer-bridge-build.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tools/aya-printer-bridge/**
+      - .github/workflows/aya-printer-bridge-build.yml
 
 permissions:
   contents: read
