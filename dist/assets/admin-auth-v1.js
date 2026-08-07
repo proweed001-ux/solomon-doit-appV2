@@ -14,7 +14,7 @@ async function verify(session=read()){
   return result?.ok?result:null;
 }
 async function login(id,password){
-  const session={id:String(id||'').trim().toUpperCase(),password:String(password||'')};
+  const session={id:String(id||'').trim().toUpperCase(),password:String(password||'').toLowerCase()};
   const result=await verify(session);
   if(!result)return null;
   sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));
