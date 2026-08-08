@@ -77,6 +77,26 @@ function pack(rows = [person("AYAPS001"), person("AYAPS002")], options = {}) {
   };
 }
 
+function separatorFull(current) {
+  return {
+    meta: { source:"full-performance-fixture" },
+    reportDate: current.meta.reportDate,
+    ads: [{ adsCode:"AYAADS01", adsName:"หัวหน้าทีม 01" }],
+    ps: [{
+      psCode:"AYAPS001",
+      adsCode:"AYAADS01",
+      psName:"พนักงาน AYAPS001",
+      sellerReport: {
+        "เป้าหมาย CD3 GL Blue2 Flexi":100,
+        "การกระจาย CD3 GL Blue2 Flexi":70,
+        "Index CD3 GL Blue2 Flexi":70,
+        "เป้าหมาย CD4-OL":20,
+        "การกระจาย CD4_OL":10,
+      },
+    }],
+  };
+}
+
 async function mockImages(page) {
   await page.route("https://ik.imagekit.io/AYAPS/**", route => route.fulfill({ status: 200, contentType: "image/png", body: PIXEL }));
 }
@@ -179,23 +199,7 @@ test("Board does not render stale session data before current.min finishes", asy
 test("shared Performance CD enrichment accepts root reportDate and separator variants", async ({ page }) => {
   const current = pack([person("AYAPS001", { dc3:metric(100,70) })]);
   delete current.meta.cd4OlCombinedIntoDc3;
-  const full = {
-    meta: { source:"full-performance-fixture" },
-    reportDate: current.meta.reportDate,
-    ads: [{ adsCode:"AYAADS01", adsName:"หัวหน้าทีม 01" }],
-    ps: [{
-      psCode:"AYAPS001",
-      adsCode:"AYAADS01",
-      psName:"พนักงาน AYAPS001",
-      sellerReport: {
-        "เป้าหมาย CD3 GL Blue2 Flexi":100,
-        "การกระจาย CD3 GL Blue2 Flexi":70,
-        "Index CD3 GL Blue2 Flexi":70,
-        "เป้าหมาย CD4-OL":20,
-        "การกระจาย CD4_OL":10,
-      },
-    }],
-  };
+  const full = separatorFull(current);
 
   await mockStorage(page, path => {
     if (path === "performance/current.min.json") return current;
@@ -221,4 +225,32 @@ test("shared Performance CD enrichment accepts root reportDate and separator var
   expect(result.dc3.actual).toBe(80);
   expect(result.dc3.index).toBeCloseTo(66.666, 2);
   expect(result.label).toBe("CD3 + CD4 OL");
+});
+
+test("Profile uses the same root snapshot identity and CD separator rules", async ({ page }) => {
+  const current = pack([person("AYAPS001", { dc3:metric(100,70) })]);
+  delete current.meta.cd4OlCombinedIntoDc3;
+  const full = separatorFull(current);
+
+  await mockImages(page);
+  await mockStorage(page, path => {
+    if (path === "performance/current.min.json") return current;
+    if (path === "performance/active.json") return {
+      reportDate:current.meta.reportDate,
+      reportKey:current.meta.reportKey,
+      updatedAt:"2026-08-08T12:01:00.000Z",
+      dataPath:"performance/live/full.json",
+    };
+    if (path === "performance/live/full.json") return full;
+    return null;
+  });
+
+  await page.goto("/performance-profile.html?type=ps&code=AYAPS001");
+  await expect.poll(() => page.evaluate(() => ({
+    target:window.__PERF_PROFILE_DATA?.ps?.[0]?.dc3?.target,
+    actual:window.__PERF_PROFILE_DATA?.ps?.[0]?.dc3?.actual,
+    flag:window.__PERF_PROFILE_DATA?.meta?.cd4OlCombinedIntoDc3,
+  }))).toEqual({ target:120, actual:80, flag:true });
+  const cd3 = page.locator(".metric-card").filter({ hasText:"CD3 + CD4 OL" });
+  await expect(cd3).toContainText("66.7%");
 });
