@@ -79,6 +79,35 @@ test("Reveal shows all award cards immediately while latest Performance data is 
   expect(errors).toEqual([]);
 });
 
+test("Reveal race uses the full stage height and shows competitors after GO", async ({ page }) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+  await routeRevealData(page);
+
+  await page.goto("/performance-reveal-v2.html?test=1");
+  const activeCard = page.locator("#slides-ps .race-card.active");
+  const track = activeCard.locator(".race-track");
+  await expect(activeCard.locator("[data-start-race]")).toBeVisible();
+
+  const stageBox = await page.locator("#stage-ps").boundingBox();
+  const cardBox = await activeCard.boundingBox();
+  const trackBox = await track.boundingBox();
+  expect(stageBox?.height || 0).toBeGreaterThan(500);
+  expect(cardBox?.height || 0).toBeGreaterThan(500);
+  expect(trackBox?.height || 0).toBeGreaterThan(350);
+
+  await expect(page.locator('#slides-ps [data-category="moq"] .race-badge')).toContainText("TOP DGP");
+
+  await activeCard.locator("[data-start-race]").click();
+  await expect(activeCard).toHaveClass(/winner-ready/);
+  await expect(activeCard.locator(".race-row")).toHaveCount(1);
+  await expect(activeCard.locator(".race-avatar")).toBeVisible();
+  const finalBarHeight = await activeCard.locator(".race-bar").evaluate((element) => parseFloat(getComputedStyle(element).height));
+  expect(finalBarHeight).toBeGreaterThan(40);
+  expect(errors).toEqual([]);
+});
+
 test("Reveal keeps the stage visible and offers retry when latest Performance data fails", async ({ page }) => {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
