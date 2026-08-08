@@ -5,6 +5,7 @@ const TRANSPARENT_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+Xw4xAAAAAElFTkSuQmCC",
   "base64",
 );
+const CD_KEYS = ["dc1", "dc2", "dc3", "cd123"];
 
 function row(ps, ads, multiplier = 1) {
   return {
@@ -63,10 +64,44 @@ function snapshot(day, factor = 1) {
   };
 }
 
-async function mockPerformance(page, currentDay = 18) {
+function zeroCd(pack) {
+  const copy = structuredClone(pack);
+  for (const row of [...copy.ps, ...copy.ads, copy.ds]) {
+    CD_KEYS.forEach((key) => { row[key] = { target: 0, actual: 0, index: 0 }; });
+  }
+  return copy;
+}
+
+function fullCdSource(pack) {
+  const copy = structuredClone(pack);
+  copy.ps = copy.ps.map((item) => ({
+    psCode: item.ps,
+    adsCode: item.ads,
+    psName: item.name,
+    sellerReport: {
+      "เป้าหมาย CD1 RJ SH RH JJ 70ML": item.dc1.target,
+      "การกระจาย CD1 RJ SH RH JJ 70ML": item.dc1.actual,
+      "Index CD1 RJ SH RH JJ 70ML": item.dc1.index,
+      "เป้าหมาย CD2 DN FE SF 450ML": item.dc2.target,
+      "การกระจาย CD2 DN FE SF 450ML": item.dc2.actual,
+      "Index CD2 DN FE SF 450ML": item.dc2.index,
+      "เป้าหมาย CD3 GL Blue2 Flexi": item.dc3.target,
+      "การกระจาย CD3 GL Blue2 Flexi": item.dc3.actual,
+      "Index CD3 GL Blue2 Flexi": item.dc3.index,
+      "Target CD1+2+3": item.cd123.target,
+      "การกระจาย CD1+2+3": item.cd123.actual,
+      "Index CD1+2+3": item.cd123.index,
+    },
+  }));
+  return copy;
+}
+
+async function mockPerformance(page, currentDay = 18, { missingCd = false } = {}) {
   const requests = [];
   page.on("request", (request) => requests.push(request.url()));
-  const latest = snapshot(currentDay, 1);
+  const sourceLatest = snapshot(currentDay, 1);
+  const latest = missingCd ? zeroCd(sourceLatest) : sourceLatest;
+  const fullLatest = missingCd ? fullCdSource(sourceLatest) : sourceLatest;
   const historyDays = (currentDay >= 14
     ? [currentDay - 1, currentDay - 2, currentDay - 3, currentDay - 12, currentDay - 13]
     : Array.from({ length: Math.min(5, currentDay - 1) }, (_, index) => currentDay - index - 1))
@@ -85,6 +120,14 @@ async function mockPerformance(page, currentDay = 18) {
     const path = new URL(route.request().url()).pathname.split("/doit-files/")[1];
     if (path === "performance/current.min.json") {
       await route.fulfill({ contentType: "application/json", body: JSON.stringify(latest) });
+      return;
+    }
+    if (path === "performance/active.json" && missingCd) {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ dataPath: "performance/live/latest-full.json" }) });
+      return;
+    }
+    if (path === "performance/live/latest-full.json" && missingCd) {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(fullLatest) });
       return;
     }
     if (path === "performance/history-index.json") {
@@ -183,6 +226,29 @@ test("uses one-metric accordion drill-down and preserves person and compare flow
 
   expect(requests.some((url) => url.includes("performance-cd-adapter"))).toBe(false);
   expect(requests.some((url) => /cdn\.tailwindcss/i.test(url))).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test("recovers missing CD metrics from the latest full Seller Report snapshot", async ({ page }) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+  const requests = await mockPerformance(page, 18, { missingCd: true });
+
+  await page.goto("/performance.html?mode=ds");
+  await page.locator('[data-metric-key="dc1"]').click();
+  await expect(page.locator(".metric-hero-values")).toContainText("420");
+  await expect(page.locator(".metric-hero-values")).toContainText("600");
+  await expect(page.locator(".metric-hero-stats")).toContainText("70.0%");
+
+  await page.locator('[data-metric-key="cd123"]').click();
+  await expect(page.locator(".metric-hero-values")).toContainText("1,181");
+  await expect(page.locator(".metric-hero-values")).toContainText("1,800");
+  await expect(page.locator(".ads-accordion-item")).toHaveCount(4);
+
+  expect(requests.some((url) => url.endsWith("/performance/active.json"))).toBe(true);
+  expect(requests.some((url) => url.endsWith("/performance/live/latest-full.json"))).toBe(true);
+  expect(requests.some((url) => url.includes("performance-cd-adapter"))).toBe(false);
   expect(errors).toEqual([]);
 });
 
