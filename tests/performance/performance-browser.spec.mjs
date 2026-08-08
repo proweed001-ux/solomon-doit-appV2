@@ -169,9 +169,10 @@ test("shows latest reveal before history and keeps the award flow usable", async
   await page.goto("/performance-reveal-v2.html?test=1");
   await expect(page.locator("#period")).toContainText("AUGUST 2026");
   await expect(page.locator("#slides-ps .race-cover")).toHaveCount(6);
-  await expect(page.locator("#status")).toContainText("กำลังโหลดประวัติ");
 
   await expect(page.locator("#status")).toContainText("ใช้การแข่งขัน 6 ช่วง");
+  await expect(page.locator("#status")).not.toContainText("cache");
+  await expect(page.locator("#status")).not.toContainText("โหลดใหม่");
   const compareRequests = requests.filter((url) => url.includes("/performance/compare/"));
   expect(compareRequests).toHaveLength(5);
   expect(requests.some((url) => /cdn\.tailwindcss|fonts\.googleapis/i.test(url))).toBe(false);
