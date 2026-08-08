@@ -115,6 +115,50 @@ test("Reveal race uses the full stage height and shows competitors after GO", as
   expect(errors).toEqual([]);
 });
 
+test("Reveal pseudo fullscreen fills the viewport and keeps an exit control visible", async ({ page }) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    for (const key of ["requestFullscreen", "webkitRequestFullscreen"]) {
+      try { Object.defineProperty(Element.prototype, key, { value: undefined, configurable: true }); } catch {}
+    }
+  });
+  await routeRevealData(page);
+
+  await page.goto("/performance-reveal-v2.html?test=1");
+  await expect(page.locator("#slides-ps .race-card.active [data-start-race]")).toBeVisible();
+
+  const toggle = page.locator("#fullscreen-toggle");
+  await toggle.click();
+  await expect(page.locator("body")).toHaveClass(/pseudo-fullscreen/);
+  await expect(page.locator("body")).toHaveClass(/presentation-mode/);
+  await expect(toggle).toBeVisible();
+  await expect(page.locator(".header")).toBeHidden();
+  await expect(page.locator(".mode-tabs")).toBeHidden();
+  await expect(page.locator(".award-controls").first()).toBeHidden();
+  await expect(page.locator("#presentation-next")).toBeVisible();
+
+  const viewport = page.viewportSize();
+  const mainBox = await page.locator("main").boundingBox();
+  const panelBox = await page.locator('.mode-panel[data-panel="ps"]').boundingBox();
+  const stageBox = await page.locator("#stage-ps").boundingBox();
+  const cardBox = await page.locator("#slides-ps .race-card.active").boundingBox();
+  expect(viewport).not.toBeNull();
+  expect(Math.abs((mainBox?.height || 0) - viewport.height)).toBeLessThanOrEqual(2);
+  expect(Math.abs((panelBox?.height || 0) - viewport.height)).toBeLessThanOrEqual(2);
+  expect(Math.abs((stageBox?.height || 0) - viewport.height)).toBeLessThanOrEqual(2);
+  expect(Math.abs((cardBox?.height || 0) - viewport.height)).toBeLessThanOrEqual(2);
+  const exitLabel = await toggle.evaluate((element) => getComputedStyle(element, "::before").content);
+  expect(exitLabel).toContain("ออกเต็มจอ");
+
+  await toggle.click();
+  await expect(page.locator("body")).not.toHaveClass(/pseudo-fullscreen/);
+  await expect(page.locator("body")).not.toHaveClass(/presentation-mode/);
+  await expect(page.locator(".header")).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/performance-reveal-v2.html");
+  expect(errors).toEqual([]);
+});
+
 test("Reveal keeps the stage visible and offers retry when latest Performance data fails", async ({ page }) => {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
