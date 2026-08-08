@@ -20,17 +20,63 @@ function photoUrl(code){const base='https://ik.imagekit.io/AYAPS/'+encodeURIComp
 function initials(row,type){const text=nameOf(row,type)!=='-'?nameOf(row,type):codeOf(row,type),parts=String(text).split(/\s+/).filter(Boolean);return E(parts.length>1?(parts[0][0]+parts[1][0]):text.slice(-2))}
 function periodText(meta={}){const report=meta.reportDate||meta.reportKey||'-',wd=N(meta.workdayNo),total=N(meta.totalWorkdays);return `${E(report)}${wd?` · WD ${M(wd)}${total?'/'+M(total):''}`:''}`}
 function profileList(data,type){const rows=type==='ads'?(data.ads||[]):(data.ps||[]);return [...rows].sort((a,b)=>natural(codeOf(a,type),codeOf(b,type)))}
-function typeTabs(type){return `<div class="type-tabs" role="tablist" aria-label="ประเภทโปรไฟล์"><button class="type-tab ${type==='ps'?'on':''}" data-profile-type="ps">PS</button><button class="type-tab ${type==='ads'?'on':''}" data-profile-type="ads">ADS</button></div>`}
+function typeTabs(type){return `<div class="type-tabs" role="tablist" aria-label="ประเภทโปรไฟล์">
+  <button class="type-tab ${type==='ps'?'on':''}" data-profile-type="ps">PS</button>
+  <button class="type-tab ${type==='ads'?'on':''}" data-profile-type="ads">ADS</button>
+</div>`}
 function selector(rows,type,current){return `<label class="profile-select"><span>เลือกรหัส</span><select data-profile-select>${rows.map(r=>{const c=codeOf(r,type);return `<option value="${E(c)}"${c===current?' selected':''}>${E(c)}${nameOf(r,type)!=='-'?' · '+E(nameOf(r,type)):''}</option>`}).join('')}</select></label>`}
-function navButtons(rows,type,index){const prev=rows[index-1],next=rows[index+1];return `<div class="profile-nav"><button ${prev?'':'disabled'} data-profile-code="${prev?E(codeOf(prev,type)):''}" aria-label="โปรไฟล์ก่อนหน้า">← ก่อนหน้า</button><span class="num">${index+1} / ${rows.length}</span><button ${next?'':'disabled'} data-profile-code="${next?E(codeOf(next,type)):''}" aria-label="โปรไฟล์ถัดไป">ถัดไป →</button></div>`}
-function rankInfo(data,row,type){if(type==='ads'){const peers=[...(data.ads||[])].sort((a,b)=>metricIndex(b,'sales')-metricIndex(a,'sales')),i=peers.findIndex(x=>codeOf(x,'ads')===codeOf(row,'ads'));return {rank:i>=0?i+1:0,total:peers.length,scope:'อันดับ ADS'}}const ads=String(row?.ads||row?.adsCode||'').trim(),peers=(data.ps||[]).filter(x=>String(x?.ads||x?.adsCode||'').trim()===ads).sort((a,b)=>metricIndex(b,'sales')-metricIndex(a,'sales')),i=peers.findIndex(x=>codeOf(x,'ps')===codeOf(row,'ps'));return {rank:i>=0?i+1:0,total:peers.length,scope:ads?`อันดับใน ${ads}`:'อันดับ PS'}}
-function primaryCard(row){const k='sales',v=metricData(row,k),idx=metricIndex(row,k),s=statusClass(idx),ring=Math.max(0,Math.min(100,idx));return `<section class="primary-card ${s}"><div class="primary-top"><div><span>ผลงานหลัก</span><h2>${E(C[k])}</h2></div><span class="status ${s}">${statusLabel(idx)}</span></div><div class="primary-body"><div class="ring" style="--pct:${ring}"><div><strong class="num">${P(idx)}</strong><span>Index</span></div></div><div class="primary-values"><div><span>Actual</span><strong class="num">${M(v.actual)}</strong></div><div><span>Target</span><strong class="num">${M(v.target)}</strong></div><div><span>คงเหลือ</span><strong class="num">${M(Math.max(N(v.target)-N(v.actual),0))}</strong></div></div></div></section>`}
-function metricCard(row,key,label){const v=metricData(row,key),idx=metricIndex(row,key),s=statusClass(idx),zeroTarget=N(v.target)<=0;return `<article class="metric-card ${s}"><div class="metric-title"><b>${E(label)}</b><span class="status-dot ${s}" aria-hidden="true"></span></div><strong class="metric-index num">${P(idx)}</strong><div class="metric-bar"><i class="${s}" style="width:${Math.max(0,Math.min(100,idx))}%"></i></div><div class="metric-values">${zeroTarget?`<span>ค่า <b class="num">${M(v.actual)}</b></span>`:`<span>Actual <b class="num">${M(v.actual)}</b></span><span>Target <b class="num">${M(v.target)}</b></span>`}</div></article>`}
+function navButtons(rows,type,index){const prev=rows[index-1],next=rows[index+1];return `<div class="profile-nav">
+  <button ${prev?'':'disabled'} data-profile-code="${prev?E(codeOf(prev,type)):''}" aria-label="โปรไฟล์ก่อนหน้า">← ก่อนหน้า</button>
+  <span class="num">${index+1} / ${rows.length}</span>
+  <button ${next?'':'disabled'} data-profile-code="${next?E(codeOf(next,type)):''}" aria-label="โปรไฟล์ถัดไป">ถัดไป →</button>
+</div>`}
+function rankInfo(data,row,type){const sales=metricIndex(row,'sales');if(type==='ads'){const peers=[...(data.ads||[])].sort((a,b)=>metricIndex(b,'sales')-metricIndex(a,'sales')),i=peers.findIndex(x=>codeOf(x,'ads')===codeOf(row,'ads'));return {rank:i>=0?i+1:0,total:peers.length,scope:'อันดับ ADS'}}const ads=String(row?.ads||row?.adsCode||'').trim(),peers=(data.ps||[]).filter(x=>String(x?.ads||x?.adsCode||'').trim()===ads).sort((a,b)=>metricIndex(b,'sales')-metricIndex(a,'sales')),i=peers.findIndex(x=>codeOf(x,'ps')===codeOf(row,'ps'));return {rank:i>=0?i+1:0,total:peers.length,scope:ads?`อันดับใน ${ads}`:'อันดับ PS',sales}}
+function primaryCard(row){const k='sales',v=metricData(row,k),idx=metricIndex(row,k),s=statusClass(idx),ring=Math.max(0,Math.min(100,idx));return `<section class="primary-card ${s}">
+  <div class="primary-top"><div><span>ผลงานหลัก</span><h2>${E(C[k])}</h2></div><span class="status ${s}">${statusLabel(idx)}</span></div>
+  <div class="primary-body">
+    <div class="ring" style="--pct:${ring}"><div><strong class="num">${P(idx)}</strong><span>Index</span></div></div>
+    <div class="primary-values">
+      <div><span>Actual</span><strong class="num">${M(v.actual)}</strong></div>
+      <div><span>Target</span><strong class="num">${M(v.target)}</strong></div>
+      <div><span>คงเหลือ</span><strong class="num">${M(Math.max(N(v.target)-N(v.actual),0))}</strong></div>
+    </div>
+  </div>
+</section>`}
+function metricCard(row,key,label){const v=metricData(row,key),idx=metricIndex(row,key),s=statusClass(idx),zeroTarget=N(v.target)<=0;return `<article class="metric-card ${s}">
+  <div class="metric-title"><b>${E(label)}</b><span class="status-dot ${s}" aria-hidden="true"></span></div>
+  <strong class="metric-index num">${P(idx)}</strong>
+  <div class="metric-bar"><i class="${s}" style="width:${Math.max(0,Math.min(100,idx))}%"></i></div>
+  <div class="metric-values">${zeroTarget?`<span>ค่า <b class="num">${M(v.actual)}</b></span>`:`<span>Actual <b class="num">${M(v.actual)}</b></span><span>Target <b class="num">${M(v.target)}</b></span>`}</div>
+</article>`}
 function metrics(row,data){return Object.keys(C).filter(k=>k!=='sales').map(k=>metricCard(row,k,data?.labels?.[k]||C[k])).join('')}
-function identityCard(data,row,type){const code=codeOf(row,type),name=nameOf(row,type),team=type==='ps'?String(row?.ads||row?.adsCode||'').trim():'',rank=rankInfo(data,row,type);return `<section class="identity-card"><div class="photo-wrap"><img src="${E(photoUrl(code))}" alt="รูป ${E(code)}" data-profile-photo><div class="photo-fallback" data-photo-fallback>${initials(row,type)}</div></div><div class="identity-main"><span class="role-badge">${type==='ads'?'ADS':'PS'}</span><h1>${E(name)}</h1><strong class="code num">${E(code)}</strong>${team?`<span class="team">ทีม ${E(team)}</span>`:''}<div class="rank-line"><span>${E(rank.scope)}</span><b class="num">${rank.rank||'-'} / ${rank.total||'-'}</b></div></div></section>`}
-function render(data){const q=new URLSearchParams(location.search),type=q.get('type')==='ads'?'ads':'ps',rows=profileList(data,type);if(!rows.length){app.innerHTML=`<section class="empty-card">ยังไม่มีข้อมูล ${type.toUpperCase()}</section>`;return}let code=String(q.get('code')||'').trim(),index=rows.findIndex(r=>codeOf(r,type)===code);if(index<0)index=0;const row=rows[index];code=codeOf(row,type);const m=data.meta||{};app.innerHTML=`${typeTabs(type)}<section class="toolbar">${selector(rows,type,code)}${navButtons(rows,type,index)}</section><section class="report-strip"><span>ข้อมูลล่าสุด</span><b>${periodText(m)}</b></section>${m.cd4OlWarning?`<section class="warning-strip">${E(m.cd4OlWarning)}</section>`:''}<div class="profile-layout"><div class="profile-side">${identityCard(data,row,type)}</div><div class="profile-main">${primaryCard(row)}<section class="metrics-section"><div class="section-head"><div><h2>ผลงานทั้งหมด</h2><span>สถานะตาม Index ของแต่ละ KPI</span></div></div><div class="metrics-grid">${metrics(row,data)}</div></section></div></div>`;const img=app.querySelector('[data-profile-photo]'),fallback=app.querySelector('[data-photo-fallback]');if(img&&fallback){img.addEventListener('load',()=>{img.classList.add('loaded');fallback.hidden=true},{once:true});img.addEventListener('error',()=>{img.hidden=true;fallback.hidden=false},{once:true})}}
+function identityCard(data,row,type){const code=codeOf(row,type),name=nameOf(row,type),team=type==='ps'?String(row?.ads||row?.adsCode||'').trim():'',rank=rankInfo(data,row,type);return `<section class="identity-card">
+  <div class="photo-wrap">
+    <img src="${E(photoUrl(code))}" alt="รูป ${E(code)}" data-profile-photo>
+    <div class="photo-fallback" data-photo-fallback>${initials(row,type)}</div>
+  </div>
+  <div class="identity-main">
+    <span class="role-badge">${type==='ads'?'ADS':'PS'}</span>
+    <h1>${E(name)}</h1>
+    <strong class="code num">${E(code)}</strong>
+    ${team?`<span class="team">ทีม ${E(team)}</span>`:''}
+    <div class="rank-line"><span>${E(rank.scope)}</span><b class="num">${rank.rank||'-'} / ${rank.total||'-'}</b></div>
+  </div>
+</section>`}
+function render(data){const q=new URLSearchParams(location.search),type=q.get('type')==='ads'?'ads':'ps',rows=profileList(data,type);if(!rows.length){app.innerHTML=`<section class="empty-card">ยังไม่มีข้อมูล ${type.toUpperCase()}</section>`;return}let code=String(q.get('code')||'').trim(),index=rows.findIndex(r=>codeOf(r,type)===code);if(index<0)index=0;const row=rows[index];code=codeOf(row,type);const m=data.meta||{};app.innerHTML=`${typeTabs(type)}
+<section class="toolbar">${selector(rows,type,code)}${navButtons(rows,type,index)}</section>
+<section class="report-strip"><span>ข้อมูลล่าสุด</span><b>${periodText(m)}</b></section>
+${m.cd4OlWarning?`<section class="warning-strip">${E(m.cd4OlWarning)}</section>`:''}
+<div class="profile-layout">
+  <div class="profile-side">${identityCard(data,row,type)}</div>
+  <div class="profile-main">${primaryCard(row)}
+    <section class="metrics-section"><div class="section-head"><div><h2>ผลงานทั้งหมด</h2><span>สถานะตาม Index ของแต่ละ KPI</span></div></div><div class="metrics-grid">${metrics(row,data)}</div></section>
+  </div>
+</div>`;
+const img=app.querySelector('[data-profile-photo]'),fallback=app.querySelector('[data-photo-fallback]');if(img&&fallback){img.addEventListener('load',()=>{img.classList.add('loaded');fallback.hidden=true},{once:true});img.addEventListener('error',()=>{img.hidden=true;fallback.hidden=false},{once:true})}}
+function snapshotId(x){const m=x?.meta||{};return String(m.reportKey||m.reportDate||'').trim()}
+function preferBoardSession(current){try{const cached=JSON.parse(sessionStorage.getItem('perf-v5')||'null');if(cached&&snapshotId(cached)&&snapshotId(cached)===snapshotId(current))return cached}catch{}return current}
 function goProfile(type,code){const q=new URLSearchParams();q.set('type',type);if(code)q.set('code',code);location.href=location.pathname+'?'+q.toString()}
 document.addEventListener('click',e=>{const typeBtn=e.target.closest('[data-profile-type]');if(typeBtn){goProfile(typeBtn.dataset.profileType,'');return}const codeBtn=e.target.closest('[data-profile-code]');if(codeBtn&&!codeBtn.disabled){const q=new URLSearchParams(location.search);goProfile(q.get('type')==='ads'?'ads':'ps',codeBtn.dataset.profileCode)}})
 document.addEventListener('change',e=>{const select=e.target.closest('[data-profile-select]');if(select){const q=new URLSearchParams(location.search);goProfile(q.get('type')==='ads'?'ads':'ps',select.value)}})
-fetchJson('performance/current.min.json',7000).then(render).catch(err=>{app.innerHTML=`<section class="empty-card"><h2>โหลดข้อมูลไม่สำเร็จ</h2><p>${E(err.message)}</p><a href="/performance.html?mode=ds">กลับ Performance</a></section>`});
+fetchJson('performance/current.min.json',7000).then(current=>render(preferBoardSession(current))).catch(err=>{app.innerHTML=`<section class="empty-card"><h2>โหลดข้อมูลไม่สำเร็จ</h2><p>${E(err.message)}</p><a href="/performance.html?mode=ds">กลับ Performance</a></section>`});
 })();
