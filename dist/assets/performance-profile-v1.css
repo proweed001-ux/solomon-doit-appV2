@@ -57,11 +57,9 @@ button,select,input{font-family:inherit}
 .rank-line{margin-top:16px;border-top:1px solid var(--line);padding-top:13px;width:100%;display:flex;align-items:center;justify-content:space-between;color:var(--muted)}
 .rank-line b{color:#1f3f68}
 .profile-main{min-width:0;display:grid;gap:18px}
-.workday-card{display:grid;grid-template-columns:1fr 1fr auto;align-items:center;gap:14px;padding:14px 18px;border-radius:18px}
-.workday-card>div{display:grid;gap:2px}
-.workday-card span,.workday-card small{color:var(--muted);font-size:12px}
+.workday-card{display:flex;align-items:center;gap:8px;padding:14px 18px;border-radius:18px}
+.workday-card span{color:var(--muted);font-size:14px;font-weight:600}
 .workday-card strong{font-size:18px;color:#183b67}
-.workday-card small{text-align:right;max-width:260px}
 .primary-card{padding:22px;border-top:4px solid var(--accent)}
 .primary-card.good{border-top-color:var(--good)}
 .primary-card.warn{border-top-color:var(--warn)}
@@ -126,6 +124,7 @@ button,select,input{font-family:inherit}
 .skeleton-line{height:12px;width:72%;border-radius:999px;margin-top:10px}
 .skeleton-line.wide{width:92%;height:18px}
 .skeleton-line.short{width:42%}
+.workday-card.skeleton-card .skeleton-line{width:92px;margin-top:0}
 .skeleton-hero{display:grid;grid-template-columns:148px 1fr;align-items:center;gap:28px;margin-top:18px}
 .skeleton-ring{width:148px;aspect-ratio:1;border-radius:50%}
 @keyframes skeletonMove{to{background-position:-200% 0}}
@@ -141,8 +140,7 @@ button,select,input{font-family:inherit}
   .photo-wrap{aspect-ratio:4/5}
   .identity-main{padding-top:2px}
   .identity-main h1{font-size:21px}
-  .workday-card{grid-template-columns:1fr 1fr;padding:12px 14px}
-  .workday-card small{grid-column:1/-1;text-align:left;max-width:none}
+  .workday-card{padding:12px 14px}
   .primary-card{padding:16px}
   .primary-body{grid-template-columns:112px 1fr;gap:16px}
   .ring{width:108px}
@@ -168,8 +166,6 @@ button,select,input{font-family:inherit}
   .ring{margin:auto}
   .type-tab{flex:1}
   .type-tabs{display:grid;grid-template-columns:1fr 1fr}
-  .workday-card{grid-template-columns:1fr}
-  .workday-card small{grid-column:auto}
   .planner-result{grid-template-columns:1fr}
   .skeleton-hero{grid-template-columns:1fr}
   .skeleton-ring{margin:auto}
