@@ -133,7 +133,9 @@ function aggregate(rows,key){
     const rowIndex=N(value.index);
     if(value&&typeof value==='object'&&('target'in value||'actual'in value||'index'in value)){indexTotal+=rowIndex;indexCount+=1}
   });
-  return{target,actual,index:target?actual/target*100:(indexCount?indexTotal/indexCount:0)};
+  if(target>0)return{target,actual,index:actual/target*100};
+  const average=indexCount?indexTotal/indexCount:0;
+  return{target,actual:key==='gps'?average:actual,index:average};
 }
 function sum(rows,code,name){
   const result={code,name:name||code};
