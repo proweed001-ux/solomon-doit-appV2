@@ -85,5 +85,8 @@ assert.ok(admin.includes("function hasCd4OlMonth(rows)"), "Min generator must de
 assert.ok(admin.includes("dc3:cd3Metric(o,includeCd4Ol)"), "Min generator must combine CD4 OL only into CD3");
 assert.ok(admin.includes("cd4OlCombinedIntoDc3:includeCd4Ol"), "Min metadata must record whether CD4 OL was combined");
 assert.ok(admin.includes("labels:includeCd4Ol?{dc3:'CD3 + CD4 OL'}:{}"), "Min labels must expose the conditional CD3 + CD4 OL state");
+assert.ok(admin.includes("function adsNameMap(data)"), "Min generator must preserve ADS names from the Tracking file");
+assert.ok(admin.includes("adsName:T(adsName)||T(row.adsName)||row.adsCode"), "PS compact rows must carry the ADS display name");
+assert.ok(admin.includes("adsName:name"), "ADS compact rows must carry the ADS display name");
 
 console.log("Performance data ownership regression: PASS");
