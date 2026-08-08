@@ -101,7 +101,9 @@ function aggregateMetric(rows, key) {
       indexCount += 1;
     }
   }
-  return { target, actual, index: target > 0 ? (actual / target) * 100 : (indexCount ? indexTotal / indexCount : 0) };
+  if (target > 0) return { target, actual, index: (actual / target) * 100 };
+  const average = indexCount ? indexTotal / indexCount : 0;
+  return { target, actual: key === "gps" ? average : actual, index: average };
 }
 
 function recomputeGroups(pack, keys) {
@@ -254,11 +256,23 @@ function snapshotIdentity(value) {
   return { reportKey: String(meta.reportKey || meta.currentReportKey || "").trim(), reportDate: String(meta.reportDate || "").trim() };
 }
 
+function snapshotTime(value) {
+  const meta = value?.meta || value || {};
+  const raw = String(meta.updatedAt || meta.generatedAt || meta.uploadedAt || "").trim();
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function manifestMatches(pack, item) {
   const packId = snapshotIdentity(pack);
   const itemId = snapshotIdentity(item);
-  if (packId.reportKey) return Boolean(itemId.reportKey && itemId.reportKey === packId.reportKey);
-  return Boolean(packId.reportDate && itemId.reportDate && itemId.reportDate === packId.reportDate);
+  const identityMatches = packId.reportKey
+    ? Boolean(itemId.reportKey && itemId.reportKey === packId.reportKey)
+    : Boolean(packId.reportDate && itemId.reportDate && itemId.reportDate === packId.reportDate);
+  if (!identityMatches) return false;
+  const packTime = snapshotTime(pack);
+  const itemTime = snapshotTime(item);
+  return !(packTime && itemTime && itemTime < packTime);
 }
 
 function fullMatchesPack(pack, full) {
@@ -349,10 +363,9 @@ async function getActiveManifest() {
 export async function enrichPerformancePack(pack) {
   pack = hydratePerformancePack(pack);
   if (!pack || !Array.isArray(pack.ps)) return pack;
-  const needsNames = (pack.ads || []).some((row) => personName(row, "ads") === personCode(row, "ads")) || (pack.ps || []).some((row) => !String(row.adsName || "").trim());
   const needsCd = pack.ps.some((row) => CD_KEYS.some((key) => metricEmpty(row?.[key])));
   const needsCd4Check = typeof pack?.meta?.cd4OlCombinedIntoDc3 !== "boolean";
-  if (!needsNames && !needsCd && !needsCd4Check) return pack;
+  if (!needsCd && !needsCd4Check) return pack;
   try {
     const active = await getActiveManifest();
     const path = matchingFullPath(active, pack);
