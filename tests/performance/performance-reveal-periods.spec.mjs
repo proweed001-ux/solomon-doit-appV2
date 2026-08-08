@@ -62,6 +62,14 @@ function snapshot({ period, workdayNo, reportDate, salesOffset = 0 }) {
   };
 }
 
+function swapSnapshot(base, { ps3Actual, ps7Actual }) {
+  const copy = structuredClone(base);
+  const ps3 = copy.ps.find((row) => row.ps === "AYAPS003");
+  if (ps3) ps3.sales = metric(1000, ps3Actual);
+  copy.ps.push(psRow(7, ps7Actual));
+  return copy;
+}
+
 async function mockImages(page) {
   await page.route("https://ik.imagekit.io/AYAPS/**", (route) => route.fulfill({ status: 200, contentType: "image/png", body: PIXEL }));
 }
@@ -155,4 +163,52 @@ test("Reveal automatically rolls to the next month and includes later workdays w
   expect(requests).toContain(p2);
   expect(requests).not.toContain(p3);
   expect(requests).not.toContain(august);
+});
+
+test("Reveal smooths the opening sprint and lets a new Top 5 contestant replace a previous one", async ({ page }) => {
+  const base04 = snapshot({ period: "202608", workdayNo: 4, reportDate: "2026-08-06", salesOffset: -60 });
+  const base06 = snapshot({ period: "202608", workdayNo: 6, reportDate: "2026-08-07", salesOffset: 0 });
+  const base07 = snapshot({ period: "202608", workdayNo: 7, reportDate: "2026-08-08", salesOffset: 30 });
+  const wd04 = swapSnapshot(base04, { ps3Actual: 790, ps7Actual: 520 });
+  const wd06 = swapSnapshot(base06, { ps3Actual: 640, ps7Actual: 940 });
+  const current = swapSnapshot(base07, { ps3Actual: 650, ps7Actual: 970 });
+  const p4 = "performance/compare/202608-WD04.json";
+  const p6 = "performance/compare/202608-WD06.json";
+  const p7 = "performance/compare/202608-WD07.json";
+  const index = [
+    { period: "202608", reportKey: "202608-WD07", workdayNo: 7, path: p7 },
+    { period: "202608", reportKey: "202608-WD06", workdayNo: 6, path: p6 },
+    { period: "202608", reportKey: "202608-WD04", workdayNo: 4, path: p4 },
+  ];
+  await mockImages(page);
+  await mockStorage(page, {
+    current,
+    index,
+    snapshots: new Map([[p4, wd04], [p6, wd06]]),
+  });
+
+  await page.goto("/performance-reveal-v2.html?test=1");
+  await expect(page.locator("#status")).toContainText("ใช้การแข่งขัน 3 ช่วง");
+  const start = page.locator('#slides-ps .race-card.active [data-start-race]');
+  await expect(start).toBeEnabled();
+  await start.click();
+
+  const card = page.locator("#slides-ps .race-card.active");
+  const track = card.locator(".race-track");
+  await expect(card).toHaveClass(/winner-ready/);
+  const motion = await track.evaluate((element) => ({
+    swaps: Number(element.dataset.raceSwaps || 0),
+    participants: String(element.dataset.raceParticipants || "").split(",").filter(Boolean),
+    motion: element.dataset.raceMotion,
+    weights: Array.isArray(element._segmentWeights) ? element._segmentWeights : [],
+  }));
+  expect(motion.swaps).toBeGreaterThanOrEqual(1);
+  expect(motion.participants).toContain("AYAPS003");
+  expect(motion.participants).toContain("AYAPS007");
+  expect(motion.motion).toBe("weighted-cubic");
+  expect(motion.weights).toHaveLength(3);
+  expect(motion.weights[0]).toBeGreaterThan(motion.weights.at(-1));
+  await expect(track.locator('[data-person="AYAPS007"]')).toHaveCount(1);
+  await expect(track.locator('[data-person="AYAPS003"]')).toHaveCount(0);
+  await expect(track.locator(".race-row")).toHaveCount(5);
 });
