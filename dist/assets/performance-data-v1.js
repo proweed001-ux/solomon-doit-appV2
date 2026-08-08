@@ -4,6 +4,7 @@ export const PERFORMANCE_HISTORY_INDEX = "performance/history-index.json";
 export const PERFORMANCE_HISTORY_LIMIT = 6;
 export const PERFORMANCE_HISTORY_CACHE = "aya-performance-history-v3";
 const PERFORMANCE_ACTIVE_PATH = "performance/active.json";
+const PERFORMANCE_BOARD_SESSION = "perf-v5";
 const CD_KEYS = ["dc1", "dc2", "dc3", "cd123"];
 
 const PUBLIC_KEY = String.fromCharCode(115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,74,84,104,89,119,65,108,95,45,97,115,107,107,95,99,73,97,67,100,55,53,119,95,84,67,87,75,50,66,84,84);
@@ -14,7 +15,7 @@ export function numberValue(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
-const compact = (value) => String(value ?? "").replace(/\s+/g, "").toUpperCase();
+const compact = (value) => String(value ?? "").replace(/[\s._\-–—/\\]+/g, "").toUpperCase();
 
 function sellerReportNumber(source, exact = [], contains = []) {
   const keys = Object.keys(source || {});
@@ -256,11 +257,35 @@ function snapshotIdentity(value) {
   return { reportKey: String(meta.reportKey || meta.currentReportKey || "").trim(), reportDate: String(meta.reportDate || "").trim() };
 }
 
-function snapshotTime(value) {
+function snapshotVersion(value) {
   const meta = value?.meta || value || {};
-  const raw = String(meta.updatedAt || meta.generatedAt || meta.uploadedAt || "").trim();
-  const parsed = Date.parse(raw);
+  return String(meta.updatedAt || meta.generatedAt || meta.uploadedAt || "").trim();
+}
+
+function snapshotTime(value) {
+  const parsed = Date.parse(snapshotVersion(value));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sameSnapshot(left, right) {
+  const a = snapshotIdentity(left);
+  const b = snapshotIdentity(right);
+  if (a.reportKey || b.reportKey) return Boolean(a.reportKey && b.reportKey && a.reportKey === b.reportKey);
+  return Boolean(a.reportDate && b.reportDate && a.reportDate === b.reportDate);
+}
+
+function exactBoardSession(current) {
+  if (typeof sessionStorage === "undefined") return null;
+  try {
+    const cached = hydratePerformancePack(JSON.parse(sessionStorage.getItem(PERFORMANCE_BOARD_SESSION) || "null"));
+    if (!cached || !sameSnapshot(current, cached)) return null;
+    const currentVersion = snapshotVersion(current);
+    const cachedVersion = snapshotVersion(cached);
+    if (!currentVersion || !cachedVersion || currentVersion !== cachedVersion) return null;
+    return cached;
+  } catch {
+    return null;
+  }
 }
 
 function manifestMatches(pack, item) {
@@ -365,7 +390,9 @@ export async function enrichPerformancePack(pack) {
   if (!pack || !Array.isArray(pack.ps)) return pack;
   const needsCd = pack.ps.some((row) => CD_KEYS.some((key) => metricEmpty(row?.[key])));
   const needsCd4Check = typeof pack?.meta?.cd4OlCombinedIntoDc3 !== "boolean";
-  if (!needsCd && !needsCd4Check) return pack;
+  const needsNames = (pack.ads || []).some((row) => personName(row, "ads") === personCode(row, "ads"))
+    || (pack.ps || []).some((row) => String(row.ads || row.adsCode || "").trim() && !String(row.adsName || "").trim());
+  if (!needsCd && !needsCd4Check && !needsNames) return pack;
   try {
     const active = await getActiveManifest();
     const path = matchingFullPath(active, pack);
@@ -373,7 +400,7 @@ export async function enrichPerformancePack(pack) {
     const full = await fetchPerformanceJson(path, { timeoutMs: 12000 });
     if (!fullMatchesPack(pack, full)) return pack;
     enrichNames(pack, full);
-    enrichCd(pack, full);
+    if (needsCd || needsCd4Check) enrichCd(pack, full);
   } catch (error) {
     console.warn("[Performance enrichment]", error);
   }
@@ -381,8 +408,11 @@ export async function enrichPerformancePack(pack) {
 }
 
 export async function loadLatestPerformance() {
-  const latest = await enrichPerformancePack(await fetchPerformanceJson(PERFORMANCE_CURRENT_PATH));
+  const current = hydratePerformancePack(await fetchPerformanceJson(PERFORMANCE_CURRENT_PATH));
+  const verifiedBoard = exactBoardSession(current);
+  const latest = await enrichPerformancePack(verifiedBoard || current);
   if (!Array.isArray(latest?.ps) || !Array.isArray(latest?.ads)) throw new Error("รูปแบบข้อมูล Performance ไม่ครบ");
+  try { sessionStorage.setItem(PERFORMANCE_BOARD_SESSION, JSON.stringify(latest)); } catch {}
   return latest;
 }
 
