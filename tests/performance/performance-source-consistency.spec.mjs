@@ -174,10 +174,11 @@ test("Board does not render stale session data before current.min finishes", asy
   await expect(page.locator(".metric-hero-values > div").first().locator("strong")).toHaveText("900");
 });
 
-test("shared Performance CD enrichment accepts separator variants such as CD4-OL and CD4_OL", async ({ page }) => {
+test("shared Performance CD enrichment accepts root reportDate and separator variants", async ({ page }) => {
   const current = pack([person("AYAPS001", { dc3:metric(100,70) })]);
   delete current.meta.cd4OlCombinedIntoDc3;
   const full = {
+    meta: { source:"full-performance-fixture" },
     reportDate: current.meta.reportDate,
     ads: [{ adsCode:"AYAADS01", adsName:"หัวหน้าทีม 01" }],
     ps: [{
