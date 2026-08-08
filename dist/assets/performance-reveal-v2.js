@@ -104,11 +104,6 @@ function shuffledPalette() {
   return colors;
 }
 
-function raceColors(profiles) {
-  const colors = shuffledPalette();
-  return new Map(profiles.map((profile, index) => [profile.id, colors[index % colors.length]]));
-}
-
 function periodKey(value) {
   const meta = value?.meta || {};
   const direct = String(meta.period || value?.period || "").trim();
@@ -250,6 +245,7 @@ function cd3Basis(snapshot) {
 function raceFrame(snapshot, mode, category) {
   return {
     label: snapshotLabel(snapshot),
+    workday: workdayNumber(snapshot),
     rows: rowsFor(snapshot, mode).map((row) => ({
       id: personCode(row, mode) || personName(row, mode),
       code: personCode(row, mode),
@@ -270,6 +266,172 @@ function buildFrames(mode, category) {
     if (!source.includes(latest)) source.push(latest);
   }
   return source.map((snapshot) => raceFrame(snapshot, mode, category));
+}
+
+function rankFrameRows(rows, limit = 5) {
+  return [...(rows || [])]
+    .filter((row) => numberValue(row.value) > 0)
+    .sort((a, b) => numberValue(b.value) - numberValue(a.value)
+      || numberValue(b.actual) - numberValue(a.actual)
+      || String(a.code || a.id).localeCompare(String(b.code || b.id), "en"))
+    .slice(0, limit);
+}
+
+function buildRaceStages(frames) {
+  let previousSlots = new Map();
+  return frames.map((frame, frameIndex) => {
+    const top = rankFrameRows(frame.rows);
+    const slots = new Map();
+    if (frameIndex === 0) {
+      [...top]
+        .sort((a, b) => String(a.name || a.code).localeCompare(String(b.name || b.code), "th"))
+        .forEach((row, index) => slots.set(row.id, index));
+    } else {
+      const occupied = new Set();
+      top.forEach((row) => {
+        if (!previousSlots.has(row.id)) return;
+        const slot = previousSlots.get(row.id);
+        slots.set(row.id, slot);
+        occupied.add(slot);
+      });
+      const openSlots = Array.from({ length: 5 }, (_, index) => index).filter((slot) => !occupied.has(slot));
+      top
+        .filter((row) => !slots.has(row.id))
+        .sort((a, b) => String(a.code || a.id).localeCompare(String(b.code || b.id), "en"))
+        .forEach((row, index) => slots.set(row.id, openSlots[index]));
+    }
+    previousSlots = slots;
+    return {
+      ...frame,
+      top,
+      slots,
+      rowMap: new Map(frame.rows.map((row) => [row.id, row])),
+    };
+  });
+}
+
+function zeroRaceStage(firstStage) {
+  const rows = firstStage.top.map((row) => ({ ...row, actual: 0, percent: 0, value: 0 }));
+  return {
+    label: "เริ่มต้น",
+    workday: 0,
+    rows,
+    top: rows,
+    slots: new Map(firstStage.slots),
+    rowMap: new Map(rows.map((row) => [row.id, row])),
+  };
+}
+
+function stageRows(stage) {
+  return stage.top.map((row) => ({
+    ...row,
+    slot: stage.slots.get(row.id) ?? 0,
+    presence: 1,
+    state: "active",
+  }));
+}
+
+function easeInOutCubic(value) {
+  const progress = Math.max(0, Math.min(numberValue(value), 1));
+  return progress < 0.5
+    ? 4 * progress * progress * progress
+    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+}
+
+function interpolatePerson(from, to, progress) {
+  const source = from || to || {};
+  const target = to || from || {};
+  return {
+    id: target.id || source.id,
+    code: target.code || source.code || target.id || source.id,
+    name: target.name || source.name || target.code || source.code || target.id || source.id,
+    photoKey: target.photoKey || source.photoKey || target.code || source.code || target.id || source.id,
+    actual: numberValue(source.actual) + (numberValue(target.actual) - numberValue(source.actual)) * progress,
+    percent: numberValue(source.percent) + (numberValue(target.percent) - numberValue(source.percent)) * progress,
+    value: numberValue(source.value) + (numberValue(target.value) - numberValue(source.value)) * progress,
+  };
+}
+
+function transitionRows(fromStage, toStage, progress) {
+  const ids = new Set([...fromStage.slots.keys(), ...toStage.slots.keys()]);
+  const rows = [];
+  ids.forEach((id) => {
+    const fromActive = fromStage.slots.has(id);
+    const toActive = toStage.slots.has(id);
+    const from = fromStage.rowMap.get(id) || (toStage.rowMap.get(id) ? { ...toStage.rowMap.get(id), actual: 0, percent: 0, value: 0 } : null);
+    const to = toStage.rowMap.get(id) || (fromStage.rowMap.get(id) ? { ...fromStage.rowMap.get(id), actual: 0, percent: 0, value: 0 } : null);
+    if (!from && !to) return;
+    let presence = 1;
+    let state = "active";
+    if (fromActive && !toActive) {
+      presence = 1 - Math.min(progress / 0.46, 1);
+      state = "leaving";
+    } else if (!fromActive && toActive) {
+      presence = Math.max((progress - 0.54) / 0.46, 0);
+      state = "entering";
+    }
+    rows.push({
+      ...interpolatePerson(from, to, progress),
+      slot: toActive ? (toStage.slots.get(id) ?? 0) : (fromStage.slots.get(id) ?? 0),
+      presence,
+      state,
+    });
+  });
+  return rows;
+}
+
+function stageDistance(fromStage, toStage) {
+  const ids = new Set([...fromStage.slots.keys(), ...toStage.slots.keys()]);
+  if (!ids.size) return 1;
+  let squared = 0;
+  ids.forEach((id) => {
+    const from = numberValue(fromStage.rowMap.get(id)?.value);
+    const to = numberValue(toStage.rowMap.get(id)?.value);
+    const delta = to - from;
+    squared += delta * delta;
+  });
+  return Math.sqrt(squared / ids.size);
+}
+
+function raceSegmentWeights(sequence) {
+  return sequence.slice(1).map((toStage, index) => {
+    const fromStage = sequence[index];
+    const distance = stageDistance(fromStage, toStage);
+    const workdayGap = index === 0 ? 1 : Math.max(numberValue(toStage.workday) - numberValue(fromStage.workday), 1);
+    let weight = 0.8 + Math.sqrt(Math.max(distance, 1) / 8);
+    if (index === 0) weight *= 1.25;
+    else weight *= Math.min(Math.sqrt(workdayGap), 1.5);
+    return Math.max(1, Math.min(weight, 3.6));
+  });
+}
+
+function segmentAt(progress, weights) {
+  const total = weights.reduce((sum, value) => sum + value, 0) || 1;
+  const position = Math.max(0, Math.min(progress, 1)) * total;
+  let before = 0;
+  for (let index = 0; index < weights.length; index += 1) {
+    const after = before + weights[index];
+    if (position <= after || index === weights.length - 1) {
+      return { index, local: Math.max(0, Math.min((position - before) / Math.max(weights[index], 0.0001), 1)) };
+    }
+    before = after;
+  }
+  return { index: Math.max(weights.length - 1, 0), local: 1 };
+}
+
+function raceSwapCount(stages) {
+  let swaps = 0;
+  for (let index = 1; index < stages.length; index += 1) {
+    const previous = new Set(stages[index - 1].top.map((row) => row.id));
+    swaps += stages[index].top.filter((row) => !previous.has(row.id)).length;
+  }
+  return swaps;
+}
+
+function raceParticipants(stages) {
+  const ids = new Set();
+  stages.forEach((stage) => stage.top.forEach((row) => ids.add(row.id)));
+  return [...ids];
 }
 
 function cardHtml(mode, category) {
@@ -336,28 +498,10 @@ function moveAward(mode, direction, wrap = false) {
   showAward(mode, next);
 }
 
-function interpolateRows(fromRows, toRows, progress) {
-  const fromMap = new Map(fromRows.map((row) => [row.id, row]));
-  const toMap = new Map(toRows.map((row) => [row.id, row]));
-  const ids = new Set([...fromMap.keys(), ...toMap.keys()]);
-  return [...ids].map((id) => {
-    const from = fromMap.get(id);
-    const to = toMap.get(id);
-    return {
-      id,
-      code: to?.code || from?.code || id,
-      name: to?.name || from?.name || id,
-      photoKey: to?.photoKey || from?.photoKey || id,
-      actual: (from?.actual || 0) + ((to?.actual || 0) - (from?.actual || 0)) * progress,
-      percent: (from?.percent || 0) + ((to?.percent || 0) - (from?.percent || 0)) * progress,
-      value: (from?.value || 0) + ((to?.value || 0) - (from?.value || 0)) * progress,
-    };
-  });
-}
-
-function applyRaceColor(container, element, profile, laneIndex) {
-  const tone = container._raceColors?.get(profile.id) || RACE_PALETTE[laneIndex % RACE_PALETTE.length];
+function applyRaceColor(container, element, slotIndex) {
+  const tone = container._slotColors?.[slotIndex] || RACE_PALETTE[slotIndex % RACE_PALETTE.length];
   element.dataset.raceColor = tone.key;
+  element.dataset.raceSlot = String(slotIndex);
   const bar = element.querySelector(".race-bar");
   const avatar = element.querySelector(".race-avatar");
   const percent = element.querySelector(".race-percent");
@@ -369,26 +513,33 @@ function applyRaceColor(container, element, profile, laneIndex) {
   percent.style.color = tone.accent;
 }
 
-function renderRace(container, rows, profiles, category, finished = false) {
-  const rowMap = new Map(rows.map((row) => [row.id, row]));
-  const ranked = [...rows].sort((a, b) => b.value - a.value || b.actual - a.actual || a.code.localeCompare(b.code, "en"));
+function renderRace(container, rows, category, finished = false) {
+  const visible = rows.filter((row) => numberValue(row.presence) > 0.05);
+  const ranked = [...visible].sort((a, b) => b.value - a.value || b.actual - a.actual || String(a.code).localeCompare(String(b.code), "en"));
   const rankMap = new Map(ranked.map((row, index) => [row.id, index + 1]));
   const maximum = Math.max(container._maximum || 1, 1);
-  profiles.forEach((profile, laneIndex) => {
-    const person = rowMap.get(profile.id) || { ...profile, value: 0, actual: 0, percent: 0 };
-    let element = container.querySelector(`[data-person="${CSS.escape(profile.id)}"]`);
+  const renderedIds = new Set();
+  rows.forEach((person) => {
+    renderedIds.add(person.id);
+    const slotIndex = Number.isFinite(Number(person.slot)) ? Number(person.slot) : 0;
+    let element = container.querySelector(`[data-person="${CSS.escape(person.id)}"]`);
     if (!element) {
       element = document.createElement("div");
       element.className = "race-row";
-      element.dataset.person = profile.id;
+      element.dataset.person = person.id;
       element.innerHTML = `<div class="race-lane"><div class="race-bar"><div class="race-avatar"><img alt=""></div><div class="race-copy"><span class="race-rank"></span><span class="race-name"></span><span class="race-code"></span><strong class="race-actual"></strong><strong class="race-percent"></strong></div></div></div>`;
       container.appendChild(element);
     }
-    const rank = rankMap.get(profile.id) || profiles.length;
-    const finalRank = container._finalRanks.get(profile.id) || rank;
-    element.dataset.finalRank = String(finalRank);
-    element.classList.toggle("race-finished", finished);
-    element.style.transform = `translateX(${laneIndex * 100}%)`;
+    const presence = Math.max(0, Math.min(numberValue(person.presence), 1));
+    const rank = rankMap.get(person.id) || ranked.length || 1;
+    element.classList.toggle("race-finished", finished && presence > 0.99);
+    element.dataset.raceState = person.state || "active";
+    element.style.opacity = String(presence);
+    element.style.visibility = presence <= 0.001 ? "hidden" : "visible";
+    element.style.pointerEvents = presence > 0.5 ? "auto" : "none";
+    element.style.transform = `translateX(${slotIndex * 100}%)`;
+    if (finished && container._finalRanks.has(person.id)) element.dataset.finalRank = String(container._finalRanks.get(person.id));
+    else delete element.dataset.finalRank;
     const bar = element.querySelector(".race-bar");
     bar.style.height = person.value > 0 ? `${Math.max((person.value / maximum) * 100, 1.5)}%` : "0%";
     element.querySelector(".race-rank").textContent = String(rank);
@@ -396,7 +547,7 @@ function renderRace(container, rows, profiles, category, finished = false) {
     element.querySelector(".race-code").textContent = person.code;
     element.querySelector(".race-actual").textContent = formatActual(person.actual, category);
     element.querySelector(".race-percent").textContent = formatPercent(person.percent);
-    applyRaceColor(container, element, profile, laneIndex);
+    applyRaceColor(container, element, slotIndex);
     const image = element.querySelector("img");
     if (image.dataset.key !== person.photoKey) {
       image.dataset.key = person.photoKey;
@@ -404,23 +555,40 @@ function renderRace(container, rows, profiles, category, finished = false) {
       image.onerror = () => safeImage(image, person.name);
     }
   });
+  container.querySelectorAll(".race-row").forEach((element) => {
+    if (renderedIds.has(element.dataset.person)) return;
+    element.style.opacity = "0";
+    element.style.visibility = "hidden";
+    element.style.pointerEvents = "none";
+  });
 }
 
-function animateRace(container, frames, profiles, category, token) {
-  const zero = { label: "เริ่มต้น", rows: profiles.map((row) => ({ ...row, value: 0, actual: 0, percent: 0 })) };
-  const sequence = [zero, ...frames];
+function cleanupRaceRows(container, activeIds) {
+  const keep = new Set(activeIds);
+  container.querySelectorAll(".race-row").forEach((element) => {
+    if (!keep.has(element.dataset.person)) element.remove();
+  });
+}
+
+function animateRace(container, stages, category, token) {
+  const zero = zeroRaceStage(stages[0]);
+  const sequence = [zero, ...stages];
+  const weights = raceSegmentWeights(sequence);
+  container._segmentWeights = weights;
+  container.dataset.raceMotion = "weighted-cubic";
   return new Promise((resolve) => {
     let started = 0;
     const step = (timestamp) => {
       if (raceTokens.get(container.id) !== token) return resolve(false);
       if (!started) started = timestamp;
       const progress = Math.min((timestamp - started) / RACE_DURATION_MS, 1);
-      const scaled = progress * (sequence.length - 1);
-      const segment = Math.min(Math.floor(scaled), sequence.length - 2);
-      const local = Math.min(scaled - segment, 1);
-      const rows = interpolateRows(sequence[segment].rows, sequence[segment + 1].rows, local);
-      renderRace(container, rows, profiles, category, false);
-      byId(`date-${container.id}`).textContent = sequence[segment + 1].label;
+      const position = segmentAt(progress, weights);
+      const fromStage = sequence[position.index];
+      const toStage = sequence[position.index + 1];
+      const eased = easeInOutCubic(position.local);
+      const rows = transitionRows(fromStage, toStage, eased);
+      renderRace(container, rows, category, false);
+      byId(`date-${container.id}`).textContent = toStage.label;
       if (progress < 1) requestAnimationFrame(step);
       else resolve(true);
     };
@@ -437,42 +605,38 @@ async function startRace(raceId) {
   const key = raceId.split("-").slice(2).join("-");
   const category = categories.find((item) => item.key === key);
   if (!category) return;
-  const frames = buildFrames(mode, category);
-  const latestRows = frames.at(-1)?.rows || [];
-  const profiles = [...latestRows]
-    .filter((row) => row.value > 0)
-    .sort((a, b) => b.value - a.value || b.actual - a.actual || a.code.localeCompare(b.code, "en"))
-    .slice(0, 5)
-    .sort((a, b) => a.name.localeCompare(b.name, "th"));
+  const stages = buildRaceStages(buildFrames(mode, category));
+  const finalStage = stages.at(-1);
   card.classList.remove("winner-ready");
   container._winner = null;
   container._category = null;
-  if (!profiles.length) {
+  if (!finalStage?.top?.length) {
     container.innerHTML = '<div class="race-empty">ไม่มีข้อมูลสำหรับการแข่งขันรางวัลนี้</div>';
     byId(`date-${raceId}`).textContent = "ไม่มีข้อมูลสำหรับการแข่งขัน";
     stopTrack("race");
     return;
   }
-  const finalistIds = new Set(profiles.map((row) => row.id));
-  const filteredFrames = frames.map((frame) => {
-    const map = new Map(frame.rows.filter((row) => finalistIds.has(row.id)).map((row) => [row.id, row]));
-    return { ...frame, rows: profiles.map((profile) => map.get(profile.id) || { ...profile, value: 0, actual: 0, percent: 0 }) };
-  });
+  const laneCount = Math.max(...stages.map((stage) => stage.top.length), 1);
   container.innerHTML = "";
-  container.style.setProperty("--race-lanes", String(profiles.length));
-  container._raceColors = raceColors(profiles);
-  container._maximum = Math.max(...filteredFrames.flatMap((frame) => frame.rows.map((row) => row.value)), 1) * 1.05;
-  container._finalRanks = new Map([...filteredFrames.at(-1).rows].sort((a, b) => b.value - a.value || b.actual - a.actual || a.code.localeCompare(b.code, "en")).map((row, index) => [row.id, index + 1]));
+  container.style.setProperty("--race-lanes", String(laneCount));
+  container._slotColors = shuffledPalette();
+  container._maximum = Math.max(...stages.flatMap((stage) => stage.top.map((row) => row.value)), 1) * 1.05;
+  container._finalRanks = new Map(finalStage.top.map((row, index) => [row.id, index + 1]));
+  container.dataset.raceSwaps = String(raceSwapCount(stages));
+  container.dataset.raceParticipants = raceParticipants(stages).join(",");
   const token = Symbol(raceId);
   raceTokens.set(raceId, token);
   closeWinner(card);
   playRaceAudio();
-  renderRace(container, profiles.map((row) => ({ ...row, value: 0, actual: 0, percent: 0 })), profiles, category, false);
-  const completed = await animateRace(container, filteredFrames, profiles, category, token);
+  const zero = zeroRaceStage(stages[0]);
+  renderRace(container, stageRows(zero), category, false);
+  const completed = await animateRace(container, stages, category, token);
   stopTrack("race");
   if (!completed || raceTokens.get(raceId) !== token) return;
-  renderRace(container, filteredFrames.at(-1).rows, profiles, category, true);
-  const winner = [...filteredFrames.at(-1).rows].sort((a, b) => b.value - a.value || b.actual - a.actual || a.code.localeCompare(b.code, "en"))[0];
+  const finalRows = stageRows(finalStage);
+  renderRace(container, finalRows, category, true);
+  cleanupRaceRows(container, finalStage.top.map((row) => row.id));
+  const winner = finalStage.top[0];
   if (!winner || winner.value <= 0) return;
   container._winner = winner;
   container._category = category;
