@@ -1,10 +1,12 @@
 import {
+  enrichPerformancePack,
+  fetchPerformanceJson,
   formatPerformancePeriod,
   loadLatestPerformance,
-  loadPerformanceHistory,
   metricActual,
   metricPercent,
   numberValue,
+  PERFORMANCE_HISTORY_INDEX,
   personCode,
   personName,
   snapshotLabel,
@@ -20,6 +22,14 @@ const TEST_MODE = new URLSearchParams(location.search).get("test") === "1";
 const RACE_DURATION_MS = TEST_MODE ? 160 : 10000;
 const COUNTDOWN_STEP_MS = TEST_MODE ? 20 : 850;
 const COUNTDOWN_HIDE_MS = TEST_MODE ? 80 : 3650;
+const RACE_HISTORY_MAX = 31;
+const RACE_PALETTE = Object.freeze([
+  Object.freeze({ key: "gold", accent: "#facc15", top: "#806110", mid: "#3d300d", bottom: "#0d0c07", glow: "#facc1555" }),
+  Object.freeze({ key: "cyan", accent: "#22d3ee", top: "#0e7490", mid: "#164e63", bottom: "#06161c", glow: "#22d3ee55" }),
+  Object.freeze({ key: "pink", accent: "#f472b6", top: "#9d174d", mid: "#4a102d", bottom: "#18070f", glow: "#f472b655" }),
+  Object.freeze({ key: "green", accent: "#4ade80", top: "#15803d", mid: "#14532d", bottom: "#06140b", glow: "#4ade8055" }),
+  Object.freeze({ key: "purple", accent: "#a78bfa", top: "#6d28d9", mid: "#3b176d", bottom: "#10071b", glow: "#a78bfa55" }),
+]);
 const categories = [
   { key: "sales", title: "TOP VOLUME", subtitle: "ยอดขายใน DOIT", unit: "บาท" },
   { key: "moq", title: "TOP DGP", subtitle: "จำนวนรายการ", unit: "รายการ" },
@@ -35,6 +45,7 @@ const countdownTokens = new Map();
 const audioState = { tracks: new Map(), fireworksTimer: 0, context: null };
 let latest = null;
 let timeline = [];
+let timelineReady = false;
 let pseudoFullscreenHistoryPushed = false;
 
 const byId = (id) => document.getElementById(id);
@@ -72,6 +83,150 @@ function personImageUrl(code) {
 function safeImage(image, seed) {
   image.onerror = null;
   image.src = avatarDataUrl(seed);
+}
+
+function randomIndex(length) {
+  if (length <= 1) return 0;
+  if (globalThis.crypto?.getRandomValues) {
+    const value = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(value);
+    return value[0] % length;
+  }
+  return Math.floor(Math.random() * length);
+}
+
+function shuffledPalette() {
+  const colors = [...RACE_PALETTE];
+  for (let index = colors.length - 1; index > 0; index -= 1) {
+    const swap = randomIndex(index + 1);
+    [colors[index], colors[swap]] = [colors[swap], colors[index]];
+  }
+  return colors;
+}
+
+function raceColors(profiles) {
+  const colors = shuffledPalette();
+  return new Map(profiles.map((profile, index) => [profile.id, colors[index % colors.length]]));
+}
+
+function periodKey(value) {
+  const meta = value?.meta || {};
+  const direct = String(meta.period || value?.period || "").trim();
+  if (/^20\d{4}$/.test(direct)) return direct;
+  const sources = [
+    meta.reportKey,
+    value?.reportKey,
+    meta.reportDate,
+    value?.reportDate,
+    value?.path,
+    meta.comparePath,
+  ];
+  for (const source of sources) {
+    const raw = String(source || "").trim();
+    if (!raw) continue;
+    const keyMatch = raw.match(/(?:^|[^0-9])(20\d{2})(0[1-9]|1[0-2])(?:[^0-9]|$)/);
+    if (keyMatch) return `${keyMatch[1]}${keyMatch[2]}`;
+    const dateMatch = raw.match(/(?:^|[^0-9])(20\d{2})[-/](0[1-9]|1[0-2])(?:[-/][0-3]?\d)?(?:[^0-9]|$)/);
+    if (dateMatch) return `${dateMatch[1]}${dateMatch[2]}`;
+  }
+  return "";
+}
+
+function workdayNumber(value) {
+  const meta = value?.meta || {};
+  const direct = numberValue(meta.workdayNo || value?.workdayNo);
+  if (direct > 0) return direct;
+  const sources = [meta.reportKey, value?.reportKey, value?.path, meta.comparePath];
+  for (const source of sources) {
+    const match = String(source || "").match(/WD0*(\d+)/i);
+    if (match) return Number(match[1]) || 0;
+  }
+  return 0;
+}
+
+function historyIdentity(value) {
+  const meta = value?.meta || {};
+  const reportKey = String(meta.reportKey || value?.reportKey || "").trim();
+  if (reportKey) return reportKey;
+  const period = periodKey(value);
+  const workday = workdayNumber(value);
+  if (period && workday) return `${period}-WD${String(workday).padStart(2, "0")}`;
+  return String(meta.reportDate || value?.reportDate || value?.path || "").trim();
+}
+
+function historyOrder(value) {
+  const workday = workdayNumber(value);
+  if (workday > 0) return workday;
+  const raw = String(value?.meta?.reportDate || value?.reportDate || "").trim();
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function indexedHistory(index) {
+  if (Array.isArray(index)) return index;
+  if (Array.isArray(index?.items)) return index.items;
+  if (Array.isArray(index?.history)) return index.history;
+  return [];
+}
+
+function selectRaceHistoryItems(index, current) {
+  const currentPeriod = periodKey(current);
+  const currentWorkday = workdayNumber(current);
+  const currentIdentity = historyIdentity(current);
+  const indexed = indexedHistory(index).filter((item) => item?.path);
+  const compactHistory = indexed.filter((item) => String(item.path).startsWith("performance/compare/"));
+  const candidates = compactHistory.length ? compactHistory : indexed;
+  const unique = new Map();
+  for (const item of candidates) {
+    const itemPeriod = periodKey(item);
+    if (currentPeriod && itemPeriod !== currentPeriod) continue;
+    const itemWorkday = workdayNumber(item);
+    if (currentWorkday && itemWorkday && itemWorkday > currentWorkday) continue;
+    const identity = historyIdentity(item);
+    if (!identity || identity === currentIdentity || unique.has(identity)) continue;
+    unique.set(identity, item);
+  }
+  return [...unique.values()]
+    .sort((a, b) => historyOrder(a) - historyOrder(b) || historyIdentity(a).localeCompare(historyIdentity(b), "en"))
+    .slice(-Math.max(RACE_HISTORY_MAX - 1, 0));
+}
+
+async function loadRaceHistory(current, { onProgress } = {}) {
+  const index = await fetchPerformanceJson(PERFORMANCE_HISTORY_INDEX, { timeoutMs: 8000 });
+  const items = selectRaceHistoryItems(index, current);
+  const stats = { remembered: 0, downloaded: 0 };
+  const history = [];
+  for (let cursor = 0; cursor < items.length; cursor += 2) {
+    const batch = items.slice(cursor, cursor + 2);
+    const results = await Promise.allSettled(batch.map(async (item) => {
+      const snapshot = await enrichPerformancePack(await fetchPerformanceJson(item.path, { remember: true, stats }));
+      if (!Array.isArray(snapshot?.ps) || !Array.isArray(snapshot?.ads)) return null;
+      if (periodKey(current) && periodKey(snapshot) !== periodKey(current)) return null;
+      return snapshot;
+    }));
+    results.forEach((result) => {
+      if (result.status === "fulfilled" && result.value) history.push(result.value);
+    });
+    onProgress?.({ loaded: Math.min(cursor + batch.length, items.length), total: items.length, stats });
+  }
+  const currentIdentity = historyIdentity(current);
+  const unique = new Map();
+  history.forEach((snapshot) => {
+    const identity = historyIdentity(snapshot);
+    if (!identity || identity === currentIdentity || unique.has(identity)) return;
+    unique.set(identity, snapshot);
+  });
+  const ordered = [...unique.values()].sort((a, b) => historyOrder(a) - historyOrder(b) || historyIdentity(a).localeCompare(historyIdentity(b), "en"));
+  return { timeline: [...ordered, current], stats };
+}
+
+function setTimelineReady(ready) {
+  timelineReady = ready;
+  document.querySelectorAll("[data-start-race]").forEach((cover) => {
+    cover.disabled = !ready;
+    const strong = cover.querySelector("strong");
+    if (strong) strong.textContent = ready ? "START THE RACE" : "กำลังเตรียมช่วงการแข่งขัน...";
+  });
 }
 
 function topRows(rows, key, mode, limit = 5) {
@@ -200,6 +355,20 @@ function interpolateRows(fromRows, toRows, progress) {
   });
 }
 
+function applyRaceColor(container, element, profile, laneIndex) {
+  const tone = container._raceColors?.get(profile.id) || RACE_PALETTE[laneIndex % RACE_PALETTE.length];
+  element.dataset.raceColor = tone.key;
+  const bar = element.querySelector(".race-bar");
+  const avatar = element.querySelector(".race-avatar");
+  const percent = element.querySelector(".race-percent");
+  bar.style.borderTopColor = tone.accent;
+  bar.style.background = `linear-gradient(${tone.top},${tone.mid} 52%,${tone.bottom})`;
+  bar.style.boxShadow = `0 -8px 24px ${tone.glow}`;
+  avatar.style.borderColor = tone.accent;
+  avatar.style.boxShadow = `0 0 0 4px #050505,0 0 22px ${tone.glow}`;
+  percent.style.color = tone.accent;
+}
+
 function renderRace(container, rows, profiles, category, finished = false) {
   const rowMap = new Map(rows.map((row) => [row.id, row]));
   const ranked = [...rows].sort((a, b) => b.value - a.value || b.actual - a.actual || a.code.localeCompare(b.code, "en"));
@@ -227,6 +396,7 @@ function renderRace(container, rows, profiles, category, finished = false) {
     element.querySelector(".race-code").textContent = person.code;
     element.querySelector(".race-actual").textContent = formatActual(person.actual, category);
     element.querySelector(".race-percent").textContent = formatPercent(person.percent);
+    applyRaceColor(container, element, profile, laneIndex);
     const image = element.querySelector("img");
     if (image.dataset.key !== person.photoKey) {
       image.dataset.key = person.photoKey;
@@ -260,7 +430,7 @@ function animateRace(container, frames, profiles, category, token) {
 
 async function startRace(raceId) {
   const container = byId(raceId);
-  if (!container) return;
+  if (!container || !timelineReady) return;
   const card = container.closest(".race-card");
   if (!card?.classList.contains("active") || card.closest(".mode-panel")?.hidden) return;
   const mode = raceId.split("-")[1];
@@ -290,6 +460,7 @@ async function startRace(raceId) {
   });
   container.innerHTML = "";
   container.style.setProperty("--race-lanes", String(profiles.length));
+  container._raceColors = raceColors(profiles);
   container._maximum = Math.max(...filteredFrames.flatMap((frame) => frame.rows.map((row) => row.value)), 1) * 1.05;
   container._finalRanks = new Map([...filteredFrames.at(-1).rows].sort((a, b) => b.value - a.value || b.actual - a.actual || a.code.localeCompare(b.code, "en")).map((row, index) => [row.id, index + 1]));
   const token = Symbol(raceId);
@@ -375,7 +546,7 @@ function playCountdownTone(isGo) {
 }
 
 function countdown(cover, raceId) {
-  if (!latest) return;
+  if (!latest || !timelineReady) return;
   const mode = raceId.split("-")[1];
   const key = raceId.split("-").slice(2).join("-");
   if (!topRows(rowsFor(latest, mode), key, mode, 1).length) {
@@ -503,8 +674,12 @@ async function toggleFullscreen() {
   syncFullscreen();
 }
 
+function periodDisplayMeta(snapshot) {
+  return { ...(snapshot || {}), ...(snapshot?.meta || {}) };
+}
+
 function renderLatest() {
-  byId("period").textContent = `CHAMPIONS OF ${formatPerformancePeriod(latest.meta || {})}`;
+  byId("period").textContent = `CHAMPIONS OF ${formatPerformancePeriod(periodDisplayMeta(latest))}`;
   renderMode("ps");
   renderMode("ads");
   switchMode(modeState.active);
@@ -515,16 +690,20 @@ async function bootstrap() {
   try {
     latest = await loadLatestPerformance();
     timeline = [latest];
+    timelineReady = false;
     renderLatest();
-    status.textContent = `ข้อมูลล่าสุด • ${snapshotLabel(latest)} · กำลังโหลดประวัติ`;
-    loadPerformanceHistory(latest, {
-      onProgress: ({ loaded, total }) => status.textContent = `ข้อมูลล่าสุด • ${snapshotLabel(latest)} · ประวัติ ${loaded}/${total}`,
+    setTimelineReady(false);
+    status.textContent = `ข้อมูลล่าสุด • ${snapshotLabel(latest)} · กำลังเตรียมช่วงการแข่งขัน`;
+    loadRaceHistory(latest, {
+      onProgress: ({ loaded, total }) => status.textContent = `ข้อมูลล่าสุด • ${snapshotLabel(latest)} · กำลังโหลดช่วงการแข่งขัน ${loaded}/${total}`,
     }).then((result) => {
       timeline = result.timeline;
-      status.textContent = `ข้อมูลล่าสุด • ${snapshotLabel(latest)} · ใช้การแข่งขัน ${timeline.length} ช่วง · cache สำรอง ${result.stats.remembered} · โหลดใหม่ ${result.stats.downloaded}`;
+      setTimelineReady(true);
+      status.textContent = `ข้อมูลล่าสุด • ${snapshotLabel(latest)} · ใช้การแข่งขัน ${timeline.length} ช่วง`;
     }).catch((error) => {
       timeline = [latest];
-      status.textContent = `ข้อมูลล่าสุด • ${snapshotLabel(latest)} · ประวัติโหลดไม่สำเร็จ (${error.message})`;
+      setTimelineReady(true);
+      status.textContent = `ข้อมูลล่าสุด • ${snapshotLabel(latest)} · ใช้การแข่งขัน 1 ช่วง · ประวัติโหลดไม่สำเร็จ (${error.message})`;
     });
   } catch (error) {
     status.textContent = `โหลดข้อมูลล่าสุดไม่สำเร็จ (${error.name === "AbortError" ? "หมดเวลา" : error.message})`;
