@@ -5,7 +5,7 @@ window.__ADMIN_PERFORMANCE_ACTIVE_V2__=true;
 const nativeFetch=window.fetch.bind(window);
 let lastPayload=null;
 const T=value=>String(value??'').trim();
-const K=value=>T(value).replace(/\s+/g,'').toLowerCase();
+const K=value=>T(value).replace(/[\s._\-–—/\\]+/g,'').toLowerCase();
 const N=value=>typeof value==='number'?(Number.isFinite(value)?value:0):(Number(T(value).replace(/,/g,'').replace(/%/g,'').replace(/[^0-9.\-]/g,''))||0);
 const P=value=>{const number=N(value);return number&&number<=1.5?number*100:number};
 const MKEYS=['sales','giv','moq','dc1','dc2','dc3','cd13','cd123','bills','gps','dgp'];
