@@ -27,7 +27,7 @@
       <section class="mode-panel" data-panel="ps">
         <div id="stage-ps" class="award-stage"><div id="slides-ps"></div></div>
         <div class="award-controls">
-          <button id="prev-ps" class="award-button" type="button" data-previous="ps">← ก่อนหน้า</button>
+          <button id="prev-ps" class="award-button" type="button" data-previous="ps" disabled>← ก่อนหน้า</button>
           <div class="award-position"><b id="counter-ps">รางวัล 1 / 6</b><span id="title-ps">TOP VOLUME</span></div>
           <button id="next-ps" class="award-button" type="button" data-next="ps">รางวัลถัดไป →</button>
         </div>
@@ -35,7 +35,7 @@
       <section class="mode-panel" data-panel="ads" hidden>
         <div id="stage-ads" class="award-stage"><div id="slides-ads"></div></div>
         <div class="award-controls">
-          <button id="prev-ads" class="award-button" type="button" data-previous="ads">← ก่อนหน้า</button>
+          <button id="prev-ads" class="award-button" type="button" data-previous="ads" disabled>← ก่อนหน้า</button>
           <div class="award-position"><b id="counter-ads">รางวัล 1 / 6</b><span id="title-ads">TOP VOLUME</span></div>
           <button id="next-ads" class="award-button" type="button" data-next="ads">รางวัลถัดไป →</button>
         </div>
@@ -46,6 +46,78 @@
     <button id="presentation-prev" class="presentation-arrow previous" type="button" aria-label="รางวัลก่อนหน้า">‹</button>
     <button id="presentation-next" class="presentation-arrow next" type="button" aria-label="รางวัลถัดไป">›</button>
   </div>
+  <script>
+    (() => {
+      const categories = [
+        ["sales", "TOP VOLUME"],
+        ["moq", "TOP DGP"],
+        ["dc1", "TOP CD1"],
+        ["dc2", "TOP CD2"],
+        ["dc3", "TOP CD3"],
+        ["cd123", "TOP CD123"],
+      ];
+      const escapeHtml = (value) => String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+      const loadingCard = (mode, category, index) => {
+        const [key, title] = category;
+        return `<article class="award-slide race-card${index === 0 ? " active" : ""}" data-award-slide data-title="${escapeHtml(title)}" data-category="${escapeHtml(key)}" data-race="race-${mode}-${escapeHtml(key)}" aria-busy="true">
+          <button class="race-cover" type="button" disabled data-reveal-loading>
+            <span class="race-badge">${escapeHtml(title)}</span>
+            <strong>กำลังโหลดข้อมูล...</strong>
+          </button>
+        </article>`;
+      };
+      const fillLoadingShell = () => {
+        for (const mode of ["ps", "ads"]) {
+          const host = document.getElementById(`slides-${mode}`);
+          if (host) host.innerHTML = categories.map((category, index) => loadingCard(mode, category, index)).join("");
+        }
+      };
+      const status = document.getElementById("status");
+      const showFailure = (message) => {
+        const covers = [...document.querySelectorAll("[data-reveal-loading]")];
+        if (!covers.length) return;
+        covers.forEach((cover) => {
+          cover.disabled = false;
+          cover.removeAttribute("data-reveal-loading");
+          cover.setAttribute("data-retry-reveal", "");
+          const strong = cover.querySelector("strong");
+          if (strong) strong.textContent = "โหลดข้อมูลไม่สำเร็จ · แตะเพื่อลองใหม่";
+          cover.closest("[data-award-slide]")?.setAttribute("aria-busy", "false");
+        });
+        if (status && !status.classList.contains("error")) {
+          status.textContent = message || "โหลดข้อมูล Performance ไม่สำเร็จ";
+          status.classList.add("error");
+        }
+      };
+
+      fillLoadingShell();
+
+      if (status) {
+        const observer = new MutationObserver(() => {
+          if (status.classList.contains("error")) showFailure(status.textContent);
+        });
+        observer.observe(status, { attributes: true, childList: true, subtree: true });
+      }
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest("[data-retry-reveal]")) return;
+        event.preventDefault();
+        location.reload();
+      });
+      window.addEventListener("error", () => {
+        if (document.querySelector("[data-reveal-loading]")) showFailure("โหลดระบบ Performance Reveal ไม่สำเร็จ");
+      });
+      window.addEventListener("unhandledrejection", () => {
+        if (document.querySelector("[data-reveal-loading]")) showFailure("โหลดระบบ Performance Reveal ไม่สำเร็จ");
+      });
+      setTimeout(() => {
+        if (document.querySelector("[data-reveal-loading]")) showFailure("โหลดข้อมูล Performance นานเกินไป");
+      }, 14000);
+    })();
+  </script>
   <script type="module" src="/assets/performance-reveal-v2.js?v=1"></script>
 </body>
 </html>
