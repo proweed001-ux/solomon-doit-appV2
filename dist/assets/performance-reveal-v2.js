@@ -8,7 +8,7 @@ import {
   personCode,
   personName,
   snapshotLabel,
-} from "./performance-data-v1.js";
+} from "./performance-data-v1.js?v=2";
 
 const IMAGEKIT_PROFILE_URL = "https://ik.imagekit.io/AYAPS";
 const AUDIO = Object.freeze({
@@ -31,6 +31,7 @@ const categories = [
 
 const modeState = { active: "ps", index: { ps: 0, ads: 0 } };
 const raceTokens = new Map();
+const countdownTokens = new Map();
 const audioState = { tracks: new Map(), fireworksTimer: 0, context: null };
 let latest = null;
 let timeline = [];
@@ -65,20 +66,12 @@ function avatarDataUrl(seed) {
 
 function personImageUrl(code) {
   const clean = String(code || "").trim();
-  return /^[A-Z0-9_-]+$/i.test(clean)
-    ? `${IMAGEKIT_PROFILE_URL}/${encodeURIComponent(clean)}.webp`
-    : avatarDataUrl(clean);
+  return /^[A-Z0-9_-]+$/i.test(clean) ? `${IMAGEKIT_PROFILE_URL}/${encodeURIComponent(clean)}.webp` : avatarDataUrl(clean);
 }
 
 function safeImage(image, seed) {
   image.onerror = null;
   image.src = avatarDataUrl(seed);
-}
-
-function compareRows(a, b, key) {
-  return metricPercent(b, key) - metricPercent(a, key)
-    || metricActual(b, key) - metricActual(a, key)
-    || personCode(a, modeState.active).localeCompare(personCode(b, modeState.active), "en");
 }
 
 function topRows(rows, key, mode, limit = 5) {
@@ -92,6 +85,11 @@ function topRows(rows, key, mode, limit = 5) {
 
 function rowsFor(snapshot, mode) {
   return Array.isArray(snapshot?.[mode]) ? snapshot[mode] : [];
+}
+
+function cd3Basis(snapshot) {
+  const flag = snapshot?.meta?.cd4OlCombinedIntoDc3;
+  return flag === true ? "with-cd4" : flag === false ? "without-cd4" : "unknown";
 }
 
 function raceFrame(snapshot, mode, category) {
@@ -110,7 +108,12 @@ function raceFrame(snapshot, mode, category) {
 }
 
 function buildFrames(mode, category) {
-  const source = timeline.length ? timeline : [latest];
+  let source = timeline.length ? timeline : [latest];
+  if (category.key === "dc3") {
+    const basis = cd3Basis(latest);
+    source = basis === "unknown" ? [latest] : source.filter((snapshot) => cd3Basis(snapshot) === basis);
+    if (!source.includes(latest)) source.push(latest);
+  }
   return source.map((snapshot) => raceFrame(snapshot, mode, category));
 }
 
@@ -137,8 +140,19 @@ function slides(mode) {
   return [...document.querySelectorAll(`#stage-${mode} [data-award-slide]`)];
 }
 
+function cancelModeRaces(mode) {
+  slides(mode).forEach((card) => {
+    const raceId = card.dataset.race;
+    if (!raceId) return;
+    raceTokens.set(raceId, Symbol(raceId));
+    countdownTokens.set(raceId, Symbol(raceId));
+  });
+  stopTrack("race");
+}
+
 function showAward(mode, index) {
   stopAllAudio();
+  cancelModeRaces(mode);
   const all = slides(mode);
   if (!all.length) return;
   const safe = Math.max(0, Math.min(index, all.length - 1));
@@ -152,6 +166,7 @@ function showAward(mode, index) {
 }
 
 function switchMode(mode) {
+  if (modeState.active !== mode) cancelModeRaces(modeState.active);
   modeState.active = mode;
   document.querySelectorAll("[data-mode]").forEach((button) => button.classList.toggle("active", button.dataset.mode === mode));
   document.querySelectorAll(".mode-panel").forEach((panel) => panel.hidden = panel.dataset.panel !== mode);
@@ -245,18 +260,27 @@ function animateRace(container, frames, profiles, category, token) {
 
 async function startRace(raceId) {
   const container = byId(raceId);
+  if (!container) return;
   const card = container.closest(".race-card");
+  if (!card?.classList.contains("active") || card.closest(".mode-panel")?.hidden) return;
   const mode = raceId.split("-")[1];
   const key = raceId.split("-").slice(2).join("-");
   const category = categories.find((item) => item.key === key);
+  if (!category) return;
   const frames = buildFrames(mode, category);
   const latestRows = frames.at(-1)?.rows || [];
   const profiles = [...latestRows]
+    .filter((row) => row.value > 0)
     .sort((a, b) => b.value - a.value || b.actual - a.actual || a.code.localeCompare(b.code, "en"))
     .slice(0, 5)
     .sort((a, b) => a.name.localeCompare(b.name, "th"));
+  card.classList.remove("winner-ready");
+  container._winner = null;
+  container._category = null;
   if (!profiles.length) {
+    container.innerHTML = '<div class="race-empty">ไม่มีข้อมูลสำหรับการแข่งขันรางวัลนี้</div>';
     byId(`date-${raceId}`).textContent = "ไม่มีข้อมูลสำหรับการแข่งขัน";
+    stopTrack("race");
     return;
   }
   const finalistIds = new Set(profiles.map((row) => row.id));
@@ -278,6 +302,7 @@ async function startRace(raceId) {
   if (!completed || raceTokens.get(raceId) !== token) return;
   renderRace(container, filteredFrames.at(-1).rows, profiles, category, true);
   const winner = [...filteredFrames.at(-1).rows].sort((a, b) => b.value - a.value || b.actual - a.actual || a.code.localeCompare(b.code, "en"))[0];
+  if (!winner || winner.value <= 0) return;
   container._winner = winner;
   container._category = category;
   card.classList.add("winner-ready");
@@ -351,14 +376,26 @@ function playCountdownTone(isGo) {
 
 function countdown(cover, raceId) {
   if (!latest) return;
+  const mode = raceId.split("-")[1];
+  const key = raceId.split("-").slice(2).join("-");
+  if (!topRows(rowsFor(latest, mode), key, mode, 1).length) {
+    cover.disabled = true;
+    cover.innerHTML = '<span class="race-badge">ไม่มีข้อมูล</span><strong>รางวัลนี้ยังไม่มีผลการแข่งขัน</strong>';
+    byId(`date-${raceId}`).textContent = "ไม่มีข้อมูลสำหรับการแข่งขัน";
+    return;
+  }
+  const token = Symbol(raceId);
+  countdownTokens.set(raceId, token);
   cover.disabled = true;
   cover.innerHTML = '<span class="countdown">3</span>';
   const number = cover.querySelector(".countdown");
+  const valid = () => countdownTokens.get(raceId) === token && cover.isConnected && cover.closest(".race-card")?.classList.contains("active");
   playCountdownTone(false);
-  setTimeout(() => { number.textContent = "2"; playCountdownTone(false); }, COUNTDOWN_STEP_MS);
-  setTimeout(() => { number.textContent = "1"; playCountdownTone(false); }, COUNTDOWN_STEP_MS * 2);
-  setTimeout(() => { number.textContent = "GO!"; playCountdownTone(true); }, COUNTDOWN_STEP_MS * 3);
+  setTimeout(() => { if (valid()) { number.textContent = "2"; playCountdownTone(false); } }, COUNTDOWN_STEP_MS);
+  setTimeout(() => { if (valid()) { number.textContent = "1"; playCountdownTone(false); } }, COUNTDOWN_STEP_MS * 2);
+  setTimeout(() => { if (valid()) { number.textContent = "GO!"; playCountdownTone(true); } }, COUNTDOWN_STEP_MS * 3);
   setTimeout(() => {
+    if (!valid()) return;
     cover.classList.add("hidden");
     setTimeout(() => cover.remove(), TEST_MODE ? 10 : 450);
     startRace(raceId);
@@ -403,7 +440,7 @@ function showWinner(card) {
   const container = byId(card.dataset.race);
   const winner = container?._winner;
   const category = container?._category;
-  if (!winner || !category) return;
+  if (!winner || !category || winner.value <= 0) return;
   const overlay = winnerOverlay(card);
   const url = personImageUrl(winner.photoKey);
   const background = overlay.querySelector(".winner-photo-bg");
@@ -438,8 +475,11 @@ function syncFullscreen() {
 
 async function toggleFullscreen() {
   if (document.body.classList.contains("pseudo-fullscreen")) {
-    if (pseudoFullscreenHistoryPushed) history.back();
-    else document.body.classList.remove("pseudo-fullscreen");
+    if (pseudoFullscreenHistoryPushed) {
+      history.back();
+      return;
+    }
+    document.body.classList.remove("pseudo-fullscreen");
     syncFullscreen();
     return;
   }
@@ -481,7 +521,7 @@ async function bootstrap() {
       onProgress: ({ loaded, total }) => status.textContent = `ข้อมูลล่าสุด • ${snapshotLabel(latest)} · ประวัติ ${loaded}/${total}`,
     }).then((result) => {
       timeline = result.timeline;
-      status.textContent = `ข้อมูลล่าสุด • ${snapshotLabel(latest)} · ใช้การแข่งขัน ${timeline.length} ช่วง · จำไว้ ${result.stats.remembered} · โหลดใหม่ ${result.stats.downloaded}`;
+      status.textContent = `ข้อมูลล่าสุด • ${snapshotLabel(latest)} · ใช้การแข่งขัน ${timeline.length} ช่วง · cache สำรอง ${result.stats.remembered} · โหลดใหม่ ${result.stats.downloaded}`;
     }).catch((error) => {
       timeline = [latest];
       status.textContent = `ข้อมูลล่าสุด • ${snapshotLabel(latest)} · ประวัติโหลดไม่สำเร็จ (${error.message})`;
@@ -512,7 +552,7 @@ byId("presentation-prev").addEventListener("click", () => moveAward(modeState.ac
 byId("presentation-next").addEventListener("click", () => moveAward(modeState.active, 1, true));
 document.addEventListener("fullscreenchange", syncFullscreen);
 document.addEventListener("webkitfullscreenchange", syncFullscreen);
-document.addEventListener("visibilitychange", () => { if (document.hidden) stopAllAudio(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) { stopAllAudio(); cancelModeRaces(modeState.active); } });
 window.addEventListener("popstate", () => {
   if (document.body.classList.contains("pseudo-fullscreen")) {
     document.body.classList.remove("pseudo-fullscreen");
@@ -523,7 +563,15 @@ window.addEventListener("popstate", () => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     const visible = document.querySelector(".winner-reveal.visible");
-    if (visible) closeWinner(visible.closest(".race-card"));
+    if (visible) {
+      closeWinner(visible.closest(".race-card"));
+      return;
+    }
+    if (document.body.classList.contains("presentation-mode")) {
+      event.preventDefault();
+      toggleFullscreen();
+      return;
+    }
   }
   if (!document.body.classList.contains("presentation-mode")) return;
   if (event.key === "ArrowLeft") moveAward(modeState.active, -1, true);
