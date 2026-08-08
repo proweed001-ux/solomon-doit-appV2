@@ -1,0 +1,90 @@
+name: Build Admin DOIT Android APK
+
+on:
+  push:
+    branches:
+      - codex/android-admin-apk-wrapper
+    paths:
+      - "android-admin-wrapper/**"
+      - ".github/workflows/android-admin-apk.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "android-admin-wrapper/**"
+      - ".github/workflows/android-admin-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-admin-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Prepare supplied Admin DOIT icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          PARTS="android-admin-wrapper/app/src/main/icon/admin_doit_icon.part"
+          OUT="android-admin-wrapper/app/src/main/res/mipmap-xxxhdpi"
+          mkdir -p "$OUT"
+          cat "${PARTS}00" "${PARTS}01" "${PARTS}02" | base64 --decode > "$OUT/ic_launcher.jpg"
+          cp "$OUT/ic_launcher.jpg" "$OUT/ic_launcher_round.jpg"
+          test -s "$OUT/ic_launcher.jpg"
+          file "$OUT/ic_launcher.jpg" | grep -F 'JPEG image data'
+
+      - name: Apply verified source correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE="android-admin-wrapper/app/src/main/java/com/solomon/doitadmin/MainActivity.java"
+          sed -i 's/runOnUiThread(() -> saveDataUrl(dataUrl, fileName, mimeType))/runOnUiThread(() -> MainActivity.this.saveDataUrl(dataUrl, fileName, mimeType))/' "$FILE"
+          grep -F 'MainActivity.this.saveDataUrl' "$FILE"
+
+      - name: Verify Admin entry and LINE share support
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'https://solomon-doit-app-v2.vercel.app/admin-login.html' android-admin-wrapper/app/src/main/java/com/solomon/doitadmin/MainActivity.java
+          grep -F 'android.intent.action.SEND' android-admin-wrapper/app/src/main/AndroidManifest.xml
+          grep -F 'android.intent.action.SEND_MULTIPLE' android-admin-wrapper/app/src/main/AndroidManifest.xml
+          grep -F 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' android-admin-wrapper/app/src/main/AndroidManifest.xml
+
+      - name: Build installable debug APK
+        working-directory: android-admin-wrapper
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Prepare APK and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p android-admin-wrapper/output
+          cp android-admin-wrapper/app/build/outputs/apk/debug/app-debug.apk \
+             android-admin-wrapper/output/Admin-DOIT-v1.0.0.apk
+          sha256sum android-admin-wrapper/output/Admin-DOIT-v1.0.0.apk \
+             > android-admin-wrapper/output/Admin-DOIT-v1.0.0.apk.sha256
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Admin-DOIT-v1.0.0-APK
+          path: android-admin-wrapper/output/*
+          if-no-files-found: error
+          retention-days: 30
