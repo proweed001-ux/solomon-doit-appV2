@@ -56,6 +56,7 @@ function snapshot(day, factor = 1) {
       workdayNo: day,
       totalWorkdays: 24,
       daysLeft: 24 - day,
+      cd4OlCombinedIntoDc3: false,
     },
     ps,
     ads,
@@ -66,19 +67,16 @@ function snapshot(day, factor = 1) {
 
 function zeroCd(pack) {
   const copy = structuredClone(pack);
-  for (const row of [...copy.ps, ...copy.ads, copy.ds]) {
-    CD_KEYS.forEach((key) => { row[key] = { target: 0, actual: 0, index: 0 }; });
+  for (const item of [...copy.ps, ...copy.ads, copy.ds]) {
+    CD_KEYS.forEach((key) => { item[key] = { target: 0, actual: 0, index: 0 }; });
   }
   return copy;
 }
 
-function fullCdSource(pack) {
+function fullCdSource(pack, { cd4Ol = false } = {}) {
   const copy = structuredClone(pack);
-  copy.ps = copy.ps.map((item) => ({
-    psCode: item.ps,
-    adsCode: item.ads,
-    psName: item.name,
-    sellerReport: {
+  copy.ps = copy.ps.map((item) => {
+    const sellerReport = {
       "เป้าหมาย CD1 RJ SH RH JJ 70ML": item.dc1.target,
       "การกระจาย CD1 RJ SH RH JJ 70ML": item.dc1.actual,
       "Index CD1 RJ SH RH JJ 70ML": item.dc1.index,
@@ -91,17 +89,29 @@ function fullCdSource(pack) {
       "Target CD1+2+3": item.cd123.target,
       "การกระจาย CD1+2+3": item.cd123.actual,
       "Index CD1+2+3": item.cd123.index,
-    },
-  }));
+    };
+    if (cd4Ol) {
+      sellerReport["เป้าหมายCD4 OL"] = 20;
+      sellerReport["การกระจายCD4 OL"] = item.dc3.actual / 7;
+    }
+    return {
+      psCode: item.ps,
+      adsCode: item.ads,
+      psName: item.name,
+      sellerReport,
+    };
+  });
   return copy;
 }
 
-async function mockPerformance(page, currentDay = 18, { missingCd = false } = {}) {
+async function mockPerformance(page, currentDay = 18, { missingCd = false, cd4Ol = false } = {}) {
   const requests = [];
   page.on("request", (request) => requests.push(request.url()));
   const sourceLatest = snapshot(currentDay, 1);
-  const latest = missingCd ? zeroCd(sourceLatest) : sourceLatest;
-  const fullLatest = missingCd ? fullCdSource(sourceLatest) : sourceLatest;
+  const latestBase = structuredClone(sourceLatest);
+  if (cd4Ol) delete latestBase.meta.cd4OlCombinedIntoDc3;
+  const latest = missingCd ? zeroCd(latestBase) : latestBase;
+  const fullLatest = (missingCd || cd4Ol) ? fullCdSource(sourceLatest, { cd4Ol }) : sourceLatest;
   const historyDays = (currentDay >= 14
     ? [currentDay - 1, currentDay - 2, currentDay - 3, currentDay - 12, currentDay - 13]
     : Array.from({ length: Math.min(5, currentDay - 1) }, (_, index) => currentDay - index - 1))
@@ -122,11 +132,11 @@ async function mockPerformance(page, currentDay = 18, { missingCd = false } = {}
       await route.fulfill({ contentType: "application/json", body: JSON.stringify(latest) });
       return;
     }
-    if (path === "performance/active.json" && missingCd) {
+    if (path === "performance/active.json" && (missingCd || cd4Ol)) {
       await route.fulfill({ contentType: "application/json", body: JSON.stringify({ dataPath: "performance/live/latest-full.json" }) });
       return;
     }
-    if (path === "performance/live/latest-full.json" && missingCd) {
+    if (path === "performance/live/latest-full.json" && (missingCd || cd4Ol)) {
       await route.fulfill({ contentType: "application/json", body: JSON.stringify(fullLatest) });
       return;
     }
@@ -249,6 +259,39 @@ test("recovers missing CD metrics from the latest full Seller Report snapshot", 
   expect(requests.some((url) => url.endsWith("/performance/active.json"))).toBe(true);
   expect(requests.some((url) => url.endsWith("/performance/live/latest-full.json"))).toBe(true);
   expect(requests.some((url) => url.includes("performance-cd-adapter"))).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test("combines CD4 OL into CD3 only when the monthly Seller Report fields exist", async ({ page }) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+  const requests = await mockPerformance(page, 18, { cd4Ol: true });
+
+  await page.goto("/performance.html?mode=ds");
+  await page.locator('[data-metric-key="dc3"]').click();
+  await expect(page.locator('.metric-chip[data-metric-key="dc3"]')).toContainText("CD3 + CD4 OL");
+  await expect(page.locator(".metric-hero-values")).toContainText("420");
+  await expect(page.locator(".metric-hero-values")).toContainText("720");
+  await expect(page.locator(".metric-hero-stats")).toContainText("58.3%");
+  expect(requests.some((url) => url.endsWith("/performance/active.json"))).toBe(true);
+  expect(requests.some((url) => url.endsWith("/performance/live/latest-full.json"))).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("keeps CD3 unchanged when the month has no CD4 OL fields", async ({ page }) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+  const requests = await mockPerformance(page);
+
+  await page.goto("/performance.html?mode=ds");
+  await page.locator('[data-metric-key="dc3"]').click();
+  await expect(page.locator('.metric-chip[data-metric-key="dc3"]')).not.toContainText("CD4 OL");
+  await expect(page.locator(".metric-hero-values")).toContainText("368");
+  await expect(page.locator(".metric-hero-values")).toContainText("600");
+  await expect(page.locator(".metric-hero-stats")).toContainText("61.3%");
+  expect(requests.some((url) => url.endsWith("/performance/active.json"))).toBe(false);
   expect(errors).toEqual([]);
 });
 
