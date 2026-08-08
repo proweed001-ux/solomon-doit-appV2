@@ -3,6 +3,17 @@
   "outputDirectory": "dist",
   "installCommand": "echo skip install",
   "framework": null,
+  "headers": [
+    {
+      "source": "/assets/admin-performance-active-v2.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    }
+  ],
   "redirects": [
     {
       "source": "/admin-performance.html",
