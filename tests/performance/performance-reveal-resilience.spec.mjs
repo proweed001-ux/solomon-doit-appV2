@@ -30,6 +30,7 @@ function currentSnapshot() {
       workdayNo: 6,
       totalWorkdays: 24,
       daysLeft: 18,
+      cd4OlCombinedIntoDc3: false,
     },
     ps: [{ ps: "AYAPS001", ads: "AYAADS01", name: "PS 001", ...structuredClone(metrics) }],
     ads: [{ ads: "AYAADS01", name: "ADS 01", ...structuredClone(metrics) }],
