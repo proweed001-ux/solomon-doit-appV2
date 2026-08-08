@@ -253,13 +253,16 @@ function cd4Month(full) {
 }
 
 function snapshotIdentity(value) {
-  const meta = value?.meta || value || {};
-  return { reportKey: String(meta.reportKey || meta.currentReportKey || "").trim(), reportDate: String(meta.reportDate || "").trim() };
+  const meta = value?.meta || {};
+  return {
+    reportKey: String(meta.reportKey || meta.currentReportKey || value?.reportKey || value?.currentReportKey || "").trim(),
+    reportDate: String(meta.reportDate || value?.reportDate || "").trim(),
+  };
 }
 
 function snapshotVersion(value) {
-  const meta = value?.meta || value || {};
-  return String(meta.updatedAt || meta.generatedAt || meta.uploadedAt || "").trim();
+  const meta = value?.meta || {};
+  return String(meta.updatedAt || meta.generatedAt || meta.uploadedAt || value?.updatedAt || value?.generatedAt || value?.uploadedAt || "").trim();
 }
 
 function snapshotTime(value) {
