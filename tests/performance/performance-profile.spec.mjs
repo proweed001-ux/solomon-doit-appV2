@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const STORAGE = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/";
+const PIXEL = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
 
 function metric(target, actual, index = null) {
   return { target, actual, index: index ?? (target ? (actual / target) * 100 : actual) };
@@ -75,10 +76,11 @@ function fullSnapshot(data) {
     }))
   };
 }
-async function mock(page,{compact=pack(),full=null}={}) {
+async function mock(page,{compact=pack(),full=null,imageOk=false,currentDelay=0}={}) {
   await page.route(`${STORAGE}**`, async route => {
     const path = new URL(route.request().url()).pathname.split("/doit-files/")[1];
     if (path === "performance/current.min.json") {
+      if (currentDelay) await new Promise(resolve=>setTimeout(resolve,currentDelay));
       await route.fulfill({contentType:"application/json",body:JSON.stringify(compact)});
       return;
     }
@@ -96,8 +98,30 @@ async function mock(page,{compact=pack(),full=null}={}) {
     }
     await route.fulfill({status:404,contentType:"application/json",body:"{}"});
   });
-  await page.route("https://ik.imagekit.io/AYAPS/**", route => route.fulfill({status:404,body:""}));
+  await page.route("https://ik.imagekit.io/AYAPS/**", route => imageOk
+    ? route.fulfill({status:200,contentType:"image/png",body:PIXEL})
+    : route.fulfill({status:404,body:""}));
 }
+
+test("profile shell and requested photo path render before metric data returns", async ({ page }) => {
+  await mock(page,{currentDelay:900,imageOk:true});
+  await page.goto("/performance-profile.html?type=ps&code=AYAPS021");
+  await expect(page.locator(".profile-layout")).toBeVisible();
+  await expect(page.locator(".code")).toHaveText("AYAPS021");
+  await expect(page.locator(".sync-label")).toContainText("กำลังอัปเดตตัวเลข");
+  await expect(page.locator("[data-profile-photo]")).toHaveAttribute("src","https://ik.imagekit.io/AYAPS/AYAPS021.webp?updatedAt=1785290365097");
+  await expect(page.locator(".primary-card")).toContainText("Volume NIP");
+  await expect(page.locator(".identity-main h1")).toHaveText("สมชาย 21");
+});
+
+test("successful ImageKit photo is visible even when it loads immediately", async ({ page }) => {
+  await mock(page,{imageOk:true});
+  await page.goto("/performance-profile.html?type=ps&code=AYAPS021");
+  const photo = page.locator("[data-profile-photo]");
+  await expect(photo).toBeVisible();
+  await expect(photo).toHaveCSS("opacity","1");
+  await expect(page.locator(".photo-fallback")).toBeHidden();
+});
 
 test("PS profile sorts codes naturally and uses the code-based ImageKit photo path", async ({ page }) => {
   await mock(page);
@@ -133,13 +157,16 @@ test("ADS profiles sort by code and use AYAADS code photos", async ({ page }) =>
   await expect(page.locator(".rank-line")).toContainText("อันดับ ADS");
 });
 
-test("previous and next navigation follows the sorted PS code order", async ({ page }) => {
+test("previous and next profile navigation does not reload the document", async ({ page }) => {
   await mock(page);
+  let documents = 0;
+  page.on("request",request=>{if(request.resourceType()==="document"&&request.url().includes("performance-profile.html"))documents+=1});
   await page.goto("/performance-profile.html?type=ps&code=AYAPS011");
   await expect(page.locator(".code")).toHaveText("AYAPS011");
   await page.getByRole("button",{name:"โปรไฟล์ถัดไป"}).click();
   await expect(page).toHaveURL(/code=AYAPS021/);
   await expect(page.locator(".code")).toHaveText("AYAPS021");
+  expect(documents).toBe(1);
 });
 
 test("profile target planner keeps the Production workday formula", async ({ page }) => {
