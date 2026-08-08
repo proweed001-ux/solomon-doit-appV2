@@ -393,9 +393,7 @@ export async function enrichPerformancePack(pack) {
   if (!pack || !Array.isArray(pack.ps)) return pack;
   const needsCd = pack.ps.some((row) => CD_KEYS.some((key) => metricEmpty(row?.[key])));
   const needsCd4Check = typeof pack?.meta?.cd4OlCombinedIntoDc3 !== "boolean";
-  const needsNames = (pack.ads || []).some((row) => personName(row, "ads") === personCode(row, "ads"))
-    || (pack.ps || []).some((row) => String(row.ads || row.adsCode || "").trim() && !String(row.adsName || "").trim());
-  if (!needsCd && !needsCd4Check && !needsNames) return pack;
+  if (!needsCd && !needsCd4Check) return pack;
   try {
     const active = await getActiveManifest();
     const path = matchingFullPath(active, pack);
@@ -403,7 +401,7 @@ export async function enrichPerformancePack(pack) {
     const full = await fetchPerformanceJson(path, { timeoutMs: 12000 });
     if (!fullMatchesPack(pack, full)) return pack;
     enrichNames(pack, full);
-    if (needsCd || needsCd4Check) enrichCd(pack, full);
+    enrichCd(pack, full);
   } catch (error) {
     console.warn("[Performance enrichment]", error);
   }
