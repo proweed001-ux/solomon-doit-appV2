@@ -196,6 +196,31 @@ test("Board does not render stale session data before current.min finishes", asy
   await expect(page.locator(".metric-hero-values > div").first().locator("strong")).toHaveText("900");
 });
 
+test("Board recovers CD from a verified Full snapshot with root reportDate and separator variants", async ({ page }) => {
+  const current = pack([person("AYAPS001", { dc3:metric(100,70) })]);
+  delete current.meta.cd4OlCombinedIntoDc3;
+  const full = separatorFull(current);
+
+  await mockStorage(page, path => {
+    if (path === "performance/current.min.json") return current;
+    if (path === "performance/active.json") return {
+      reportDate:current.meta.reportDate,
+      reportKey:current.meta.reportKey,
+      updatedAt:"2026-08-08T12:01:00.000Z",
+      dataPath:"performance/live/full.json",
+    };
+    if (path === "performance/live/full.json") return full;
+    return null;
+  });
+
+  await page.goto("/performance.html?mode=ds");
+  await page.locator('[data-metric-key="dc3"]').click();
+  await expect(page.locator(".metric-hero h2")).toContainText("CD3 + CD4 OL");
+  await expect(page.locator(".metric-hero-values")).toContainText("80");
+  await expect(page.locator(".metric-hero-values")).toContainText("120");
+  await expect(page.locator(".metric-hero-stats")).toContainText("66.7%");
+});
+
 test("shared Performance CD enrichment accepts root reportDate and separator variants", async ({ page }) => {
   const current = pack([person("AYAPS001", { dc3:metric(100,70) })]);
   delete current.meta.cd4OlCombinedIntoDc3;
