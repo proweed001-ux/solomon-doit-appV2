@@ -22,8 +22,8 @@ assert.equal(incomplete.incomplete, true);
 const pack = hydratePerformancePack({
   meta: { reportDate: "2026-08-06" },
   ps: [
-    { ps: "PS1", ads: "ADS1", moq: { target: 0, actual: 80, index: 60 }, cd123: { target: 100, actual: 100 } },
-    { ps: "PS2", ads: "ADS1", moq: { target: 200, actual: 150 }, cd123: { target: 0, actual: 900 } },
+    { ps: "PS1", ads: "ADS1", moq: { target: 0, actual: 80, index: 60 }, cd123: { target: 100, actual: 100 }, gps: { target: 0, actual: 0, index: 0 } },
+    { ps: "PS2", ads: "ADS1", moq: { target: 200, actual: 150 }, cd123: { target: 0, actual: 900 }, gps: { target: 0, actual: 90, index: 90 } },
   ],
   ads: [{ ads: "ADS1" }],
 });
@@ -31,6 +31,9 @@ assert.equal(pack.ps[0].moq.target, 0, "Historical MOQ target must not be borrow
 assert.equal(pack.ads[0].cd123.target, 100);
 assert.equal(pack.ads[0].cd123.actual, 100, "CD123 actual without a target must be excluded from ADS total");
 assert.equal(pack.ds.cd123.actual, 100, "CD123 actual without a target must be excluded from DS total");
+assert.equal(pack.ads[0].gps.actual, 45, "GPS group actual must be the average percentage, not a sum");
+assert.equal(pack.ads[0].gps.index, 45, "GPS group index must include a real 0 percent row");
+assert.equal(pack.ds.gps.actual, 45, "DS GPS actual must remain the average percentage");
 
 const index = Array.from({ length: 12 }, (_, offset) => ({
   reportKey: `202608-WD${String(offset + 1).padStart(2, "0")}`,
@@ -88,5 +91,6 @@ assert.ok(admin.includes("labels:includeCd4Ol?{dc3:'CD3 + CD4 OL'}:{}"), "Min la
 assert.ok(admin.includes("function adsNameMap(data)"), "Min generator must preserve ADS names from the Tracking file");
 assert.ok(admin.includes("adsName:T(adsName)||T(row.adsName)||row.adsCode"), "PS compact rows must carry the ADS display name");
 assert.ok(admin.includes("adsName:name"), "ADS compact rows must carry the ADS display name");
+assert.ok(admin.includes("actual:key==='gps'?average:actual"), "Min generator must keep GPS group actual as an average percentage");
 
 console.log("Performance data ownership regression: PASS");
