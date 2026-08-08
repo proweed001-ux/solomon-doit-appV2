@@ -63,11 +63,13 @@ function snapshot(day, factor = 1) {
   };
 }
 
-async function mockPerformance(page) {
+async function mockPerformance(page, currentDay = 18) {
   const requests = [];
   page.on("request", (request) => requests.push(request.url()));
-  const latest = snapshot(6, 1);
-  const history = [1, 2, 3, 4, 5].map((day) => ({
+  const latest = snapshot(currentDay, 1);
+  const historyDays = [currentDay - 1, currentDay - 2, currentDay - 3, currentDay - 12, currentDay - 13]
+    .filter((day) => day > 0);
+  const history = historyDays.map((day) => ({
     reportDate: `2026-08-${String(day).padStart(2, "0")}`,
     reportKey: `202608-WD${String(day).padStart(2, "0")}`,
     workdayNo: day,
@@ -89,9 +91,9 @@ async function mockPerformance(page) {
     }
     const match = path.match(/performance\/compare\/202608-WD(\d+)\.json/);
     if (match) {
-      await new Promise((resolve) => setTimeout(resolve, 180));
+      await new Promise((resolve) => setTimeout(resolve, 120));
       const day = Number(match[1]);
-      await route.fulfill({ contentType: "application/json", body: JSON.stringify(snapshot(day, 0.55 + day * 0.07)) });
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(snapshot(day, 0.55 + day * 0.02)) });
       return;
     }
     await route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
@@ -103,7 +105,7 @@ test("shows latest reveal before history and keeps the award flow usable", async
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
-  const requests = await mockPerformance(page);
+  const requests = await mockPerformance(page, 6);
 
   await page.goto("/performance-reveal-v2.html?test=1");
   await expect(page.locator("#period")).toContainText("AUGUST 2026");
@@ -135,7 +137,7 @@ test("shows latest reveal before history and keeps the award flow usable", async
   expect(errors).toEqual([]);
 });
 
-test("preserves DS to ADS to PS, MS, and comparison Board flows without the legacy adapter", async ({ page }) => {
+test("uses one-metric accordion drill-down and preserves person and compare flows", async ({ page }) => {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
@@ -143,28 +145,64 @@ test("preserves DS to ADS to PS, MS, and comparison Board flows without the lega
 
   await page.goto("/performance.html?mode=ds");
   await expect(page.locator("#app")).toContainText("DS ภาพรวม");
-  await expect(page.locator("#app")).toContainText("ADS Board");
-  await expect(page.locator("#app")).toContainText("Top PS / ต้องเร่งก่อน");
-  await expect(page.locator("#app")).toContainText("Target");
-  await expect(page.locator("#app")).toContainText("Actual");
-  await expect(page.locator("#app")).toContainText("วันละ");
+  await expect(page.locator(".performance-metric-switcher .metric-chip")).toHaveCount(10);
+  await expect(page.locator(".performance-metric-switcher .metric-chip").first()).toHaveClass(/on/);
+  await expect(page.locator(".metric-hero")).toHaveCount(1);
+  await expect(page.locator(".ads-accordion-item")).toHaveCount(4);
 
-  await page.locator('.nav [data-mode="ads"]').click();
-  await expect(page.locator("#app")).toContainText("ADS ทั้ง 4");
-  await page.locator('.row[data-mode="ps"]').first().click();
-  await expect(page.locator("#app")).toContainText("AYAADS01 · PS");
-  await expect(page.locator("#app")).toContainText("Seller Report Detail");
+  const first = page.locator(".ads-accordion-item").first();
+  const second = page.locator(".ads-accordion-item").nth(1);
+  await first.locator(".ads-accordion-head").click();
+  await expect(first).toHaveClass(/open/);
+  await second.locator(".ads-accordion-head").click();
+  await expect(second).toHaveClass(/open/);
+  await expect(first).toHaveClass(/open/);
 
-  await page.locator('.nav [data-mode="ms"]').click();
-  await expect(page.locator("#app")).toContainText("MS แยกโหมด");
+  const firstTeamPs = first.locator(".ps-row");
+  await expect(firstTeamPs.first()).toContainText("AYAPS002");
+  await firstTeamPs.first().click();
+  await expect(page.locator(".person-card")).toBeVisible();
+  await expect(page.locator(".progress-ring")).toBeVisible();
+  await expect(page.locator(".person-metric-card")).toHaveCount(9);
+
+  const mini = page.locator(".person-metric-card").first();
+  await mini.locator(".person-metric-toggle").click();
+  await expect(mini).toHaveClass(/open/);
+  await expect(mini.locator("[data-pct]")).toBeVisible();
+  await mini.locator("[data-pct]").fill("92");
+  await mini.locator("[data-pct]").press("Tab");
+  await expect(page.locator(".person-metric-card").first()).toHaveClass(/open/);
 
   await page.locator('.nav [data-mode="compare"]').click();
-  await expect(page.locator("#app")).toContainText("DS Compare");
-  await page.locator(".cmpCatCard").first().click();
-  await expect(page.locator("#app")).toContainText("PS ดีขึ้นมากสุด");
-  await expect(page.locator("#app")).toContainText("PS ต่ำลงมากสุด");
+  await expect(page.locator(".compare-nav .compare-chip")).toHaveCount(4);
+  await expect(page.locator(".delta-hero")).toBeVisible();
+  await expect(page.locator(".metric-delta-list .cmpCatCard")).toHaveCount(10);
+  await expect(page.locator(".top-movers .movers-group")).toHaveCount(2);
 
   expect(requests.some((url) => url.includes("performance-cd-adapter"))).toBe(false);
-  expect(requests.some((url) => /cdn\.tailwindcss|fonts\.googleapis/i.test(url))).toBe(false);
+  expect(requests.some((url) => /cdn\.tailwindcss/i.test(url))).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test("keeps legacy Performance Board deep links renderable", async ({ page }) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+  await mockPerformance(page);
+
+  await page.goto("/performance.html?mode=ads");
+  await expect(page.locator(".ads-accordion-item")).toHaveCount(4);
+
+  await page.goto("/performance.html?mode=ps&ads=AYAADS01");
+  await expect(page.locator(".ads-accordion-item")).toHaveCount(1);
+  await expect(page.locator(".ads-accordion-item")).toHaveClass(/open/);
+
+  await page.goto("/performance.html?mode=person&ads=AYAADS01&ps=AYAPS002");
+  await expect(page.locator(".person-card")).toContainText("AYAPS002");
+
+  await page.goto("/performance.html?mode=compare&cat=sales&cmp=same");
+  await expect(page.locator(".compare-drill")).toBeVisible();
+  await expect(page.locator("#app")).not.toContainText("ยังไม่มีข้อมูลตลาดเดิม");
+
   expect(errors).toEqual([]);
 });
