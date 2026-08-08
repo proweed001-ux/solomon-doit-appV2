@@ -81,10 +81,20 @@ function cd3Metric(o,includeCd4Ol=false){
   const keys=cd4OlKeys(o),target=N(base.target)+(keys.target?N(o[keys.target]):0),actual=N(base.actual)+(keys.actual?N(o[keys.actual]):0);
   return{target,actual,index:target?actual/target*100:0};
 }
-function minRow(row,includeCd4Ol=false){
+function adsNameMap(data){
+  const names=new Map();
+  (data?.ads||[]).forEach(row=>{
+    const code=T(row?.adsCode||row?.ads||row?.code);
+    const name=T(row?.adsName||row?.name);
+    if(code)names.set(code,name||code);
+  });
+  return names;
+}
+function minRow(row,includeCd4Ol=false,adsName=''){
   const o=row.sellerReport||{};
   return{
     ads:row.adsCode,
+    adsName:T(adsName)||T(row.adsName)||row.adsCode,
     ps:row.psCode,
     name:row.psName,
     branch:row.branch,
@@ -144,9 +154,10 @@ function buildMin(data){
   const reportDate=data.reportDate||data.meta?.reportDate||'';
   const workbook=workbookMeta(reportDate);
   const includeCd4Ol=hasCd4OlMonth(data.ps||[]);
-  const ps=(data.ps||[]).map(row=>minRow(row,includeCd4Ol));
+  const names=adsNameMap(data);
+  const ps=(data.ps||[]).map(row=>minRow(row,includeCd4Ol,names.get(T(row.adsCode))||T(row.adsName)||T(row.adsCode)));
   const codes=[...new Set(ps.map(row=>row.ads).filter(Boolean))].sort();
-  const ads=codes.map(code=>({...sum(ps.filter(row=>row.ads===code),code,code),ads:code,ps:code}));
+  const ads=codes.map(code=>{const name=names.get(code)||code;return{...sum(ps.filter(row=>row.ads===code),code,name),ads:code,adsName:name,ps:code}});
   const ds=sum(ps,'DS','DS');
   const period=periodOf(data.source||'',reportDate,workbook);
   const workday=N(data.workdayNo||data.meta?.workdayNo)||workbook.workdayNo||new Date().getDate();
