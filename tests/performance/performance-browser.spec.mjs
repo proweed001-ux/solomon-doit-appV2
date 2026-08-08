@@ -133,7 +133,11 @@ async function mockPerformance(page, currentDay = 18, { missingCd = false, cd4Ol
       return;
     }
     if (path === "performance/active.json" && (missingCd || cd4Ol)) {
-      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ dataPath: "performance/live/latest-full.json" }) });
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({
+        reportDate: latest.meta.reportDate,
+        reportKey: latest.meta.reportKey,
+        dataPath: "performance/live/latest-full.json",
+      }) });
       return;
     }
     if (path === "performance/live/latest-full.json" && (missingCd || cd4Ol)) {
