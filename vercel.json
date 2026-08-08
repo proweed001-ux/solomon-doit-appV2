@@ -3,6 +3,53 @@
   "outputDirectory": "dist",
   "installCommand": "echo skip install",
   "framework": null,
+  "headers": [
+    {
+      "source": "/assets/admin-performance-active-v2.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/assets/performance-board-v4.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/assets/performance-profile-v1.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/assets/performance-reveal-v2.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/assets/performance-data-v1.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    }
+  ],
   "redirects": [
     {
       "source": "/admin-performance.html",

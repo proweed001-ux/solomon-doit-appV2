@@ -22,8 +22,8 @@ assert.equal(incomplete.incomplete, true);
 const pack = hydratePerformancePack({
   meta: { reportDate: "2026-08-06" },
   ps: [
-    { ps: "PS1", ads: "ADS1", moq: { target: 0, actual: 80, index: 60 }, cd123: { target: 100, actual: 100 } },
-    { ps: "PS2", ads: "ADS1", moq: { target: 200, actual: 150 }, cd123: { target: 0, actual: 900 } },
+    { ps: "PS1", ads: "ADS1", moq: { target: 0, actual: 80, index: 60 }, cd123: { target: 100, actual: 100 }, gps: { target: 0, actual: 0, index: 0 } },
+    { ps: "PS2", ads: "ADS1", moq: { target: 200, actual: 150 }, cd123: { target: 0, actual: 900 }, gps: { target: 0, actual: 90, index: 90 } },
   ],
   ads: [{ ads: "ADS1" }],
 });
@@ -31,6 +31,9 @@ assert.equal(pack.ps[0].moq.target, 0, "Historical MOQ target must not be borrow
 assert.equal(pack.ads[0].cd123.target, 100);
 assert.equal(pack.ads[0].cd123.actual, 100, "CD123 actual without a target must be excluded from ADS total");
 assert.equal(pack.ds.cd123.actual, 100, "CD123 actual without a target must be excluded from DS total");
+assert.equal(pack.ads[0].gps.actual, 45, "GPS group actual must be the average percentage, not a sum");
+assert.equal(pack.ads[0].gps.index, 45, "GPS group index must include a real 0 percent row");
+assert.equal(pack.ds.gps.actual, 45, "DS GPS actual must remain the average percentage");
 
 const index = Array.from({ length: 12 }, (_, offset) => ({
   reportKey: `202608-WD${String(offset + 1).padStart(2, "0")}`,
@@ -64,6 +67,8 @@ assert.ok(boardJs.includes("STORE='perf-v5'"), "Board cache must move away from 
 assert.ok(boardJs.includes("if(k==='cd123'&&target<=0)return"), "Board totals must exclude CD123 actual without target");
 assert.ok(boardJs.includes("a.cd123=aggregate(rows,'cd123')"), "Board ADS CD123 must be rebuilt from eligible PS rows");
 assert.ok(boardJs.includes("eligibleRows(rows,k)"), "Board CD123 rankings must exclude target-zero rows");
+assert.ok(boardJs.includes("function combineCd4OlIntoDc3(base,full)"), "Board must support current-month CD4 OL enrichment without a legacy adapter");
+assert.ok(boardJs.includes("dc3:'CD3 + CD4 OL'"), "Board must label CD3 when CD4 OL is combined");
 assert.ok(!revealHtml.includes("performance-cd-adapter"));
 assert.ok(!revealHtml.includes("cdn.tailwindcss.com"));
 assert.ok(!revealHtml.includes("fonts.googleapis.com"));
@@ -79,5 +84,13 @@ const admin = fs.readFileSync("dist/assets/admin-performance-active-v2.js", "utf
 assert.ok(admin.includes("function monthYear(value,reportDate='')"));
 assert.ok(admin.includes("if(key==='cd123'&&rowTarget<=0)return"));
 assert.ok(admin.includes("reportYear:workbook.reportYear||0"));
+assert.ok(admin.includes("function hasCd4OlMonth(rows)"), "Min generator must detect CD4 OL by monthly Seller Report fields");
+assert.ok(admin.includes("dc3:cd3Metric(o,includeCd4Ol)"), "Min generator must combine CD4 OL only into CD3");
+assert.ok(admin.includes("cd4OlCombinedIntoDc3:includeCd4Ol"), "Min metadata must record whether CD4 OL was combined");
+assert.ok(admin.includes("labels:includeCd4Ol?{dc3:'CD3 + CD4 OL'}:{}"), "Min labels must expose the conditional CD3 + CD4 OL state");
+assert.ok(admin.includes("function adsNameMap(data)"), "Min generator must preserve ADS names from the Tracking file");
+assert.ok(admin.includes("adsName:T(adsName)||T(row.adsName)||row.adsCode"), "PS compact rows must carry the ADS display name");
+assert.ok(admin.includes("adsName:name"), "ADS compact rows must carry the ADS display name");
+assert.ok(admin.includes("actual:key==='gps'?average:actual"), "Min generator must keep GPS group actual as an average percentage");
 
 console.log("Performance data ownership regression: PASS");

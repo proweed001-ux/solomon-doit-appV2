@@ -5,7 +5,7 @@ window.__ADMIN_PERFORMANCE_ACTIVE_V2__=true;
 const nativeFetch=window.fetch.bind(window);
 let lastPayload=null;
 const T=value=>String(value??'').trim();
-const K=value=>T(value).replace(/\s+/g,'').toLowerCase();
+const K=value=>T(value).replace(/[\s._\-–—/\\]+/g,'').toLowerCase();
 const N=value=>typeof value==='number'?(Number.isFinite(value)?value:0):(Number(T(value).replace(/,/g,'').replace(/%/g,'').replace(/[^0-9.\-]/g,''))||0);
 const P=value=>{const number=N(value);return number&&number<=1.5?number*100:number};
 const MKEYS=['sales','giv','moq','dc1','dc2','dc3','cd13','cd123','bills','gps','dgp'];
@@ -42,6 +42,12 @@ function periodOf(source,reportDate,workbook){
   const reportMatch=T(reportDate).match(/(20\d{2})-(\d{2})/);
   return reportMatch?reportMatch[1]+reportMatch[2]:new Date().toISOString().slice(0,7).replace('-','');
 }
+function pickKey(object,names,contains=[]){
+  const keys=Object.keys(object||{}),exact=names.map(K),parts=contains.map(K);
+  let key=keys.find(candidate=>exact.includes(K(candidate)));
+  if(!key)key=keys.find(candidate=>parts.some(part=>K(candidate).includes(part)));
+  return key||'';
+}
 function pick(object,names){
   const keys=Object.keys(object||{});
   for(const name of names){const key=keys.find(candidate=>K(candidate)===K(name));if(key)return object[key]}
@@ -63,10 +69,32 @@ function cd123Metric(o){
   const actual=N(pick(o,['การกระจาย CD1+2+3','การกระจาย CD1+CD2+CD3','การกระจาย CD123']));
   return{target,actual,index:target?actual/target*100:P(N(pick(o,['Index CD1+2+3','Index CD1+CD2+CD3','Index CD123'])))};
 }
-function minRow(row){
+function cd4OlKeys(o){
+  const target=pickKey(o,['เป้าหมาย CD4 OL','Target CD4 OL'],['เป้าหมายCD4OL','TARGETCD4OL']);
+  const actual=pickKey(o,['การกระจาย CD4 OL','Actual CD4 OL'],['การกระจายCD4OL','ACTUALCD4OL']);
+  return{target,actual,enabled:!!(target&&actual)};
+}
+function hasCd4OlMonth(rows){return(rows||[]).some(row=>cd4OlKeys(row?.sellerReport||{}).enabled)}
+function cd3Metric(o,includeCd4Ol=false){
+  const base=metric(o,['เป้าหมาย CD3 GL Blue2 Flexi'],['การกระจาย CD3 GL Blue2 Flexi'],['Index CD3 GL Blue2 Flexi']);
+  if(!includeCd4Ol)return base;
+  const keys=cd4OlKeys(o),target=N(base.target)+(keys.target?N(o[keys.target]):0),actual=N(base.actual)+(keys.actual?N(o[keys.actual]):0);
+  return{target,actual,index:target?actual/target*100:0};
+}
+function adsNameMap(data){
+  const names=new Map();
+  (data?.ads||[]).forEach(row=>{
+    const code=T(row?.adsCode||row?.ads||row?.code);
+    const name=T(row?.adsName||row?.name);
+    if(code)names.set(code,name||code);
+  });
+  return names;
+}
+function minRow(row,includeCd4Ol=false,adsName=''){
   const o=row.sellerReport||{};
   return{
     ads:row.adsCode,
+    adsName:T(adsName)||T(row.adsName)||row.adsCode,
     ps:row.psCode,
     name:row.psName,
     branch:row.branch,
@@ -76,7 +104,7 @@ function minRow(row){
     moq:moqMetric(o),
     dc1:metric(o,['เป้าหมาย CD1 RJ SH RH JJ 70ML'],['การกระจาย CD1 RJ SH RH JJ 70ML'],['Index CD1 RJ SH RH JJ 70ML']),
     dc2:metric(o,['เป้าหมาย CD2 DN FE SF 450ML'],['การกระจาย CD2 DN FE SF 450ML'],['Index CD2 DN FE SF 450ML']),
-    dc3:metric(o,['เป้าหมาย CD3 GL Blue2 Flexi'],['การกระจาย CD3 GL Blue2 Flexi'],['Index CD3 GL Blue2 Flexi']),
+    dc3:cd3Metric(o,includeCd4Ol),
     cd13:metric(o,['Target CD1+CD3'],['การกระจาย CD1+CD3'],['Index CD1+CD3']),
     cd123:cd123Metric(o),
     bills:metric(o,['เป้าหมายบิลซื้อทั้งหมด'],['จำนวนบิลซื้อทั้งหมด'],[]),
@@ -103,9 +131,11 @@ function aggregate(rows,key){
     target+=rowTarget;
     actual+=N(value.actual);
     const rowIndex=N(value.index);
-    if(rowIndex>0){indexTotal+=rowIndex;indexCount+=1}
+    if(value&&typeof value==='object'&&('target'in value||'actual'in value||'index'in value)){indexTotal+=rowIndex;indexCount+=1}
   });
-  return{target,actual,index:target?actual/target*100:(indexCount?indexTotal/indexCount:0)};
+  if(target>0)return{target,actual,index:actual/target*100};
+  const average=indexCount?indexTotal/indexCount:0;
+  return{target,actual:key==='gps'?average:actual,index:average};
 }
 function sum(rows,code,name){
   const result={code,name:name||code};
@@ -125,9 +155,11 @@ function ranks(rows){
 function buildMin(data){
   const reportDate=data.reportDate||data.meta?.reportDate||'';
   const workbook=workbookMeta(reportDate);
-  const ps=(data.ps||[]).map(minRow);
+  const includeCd4Ol=hasCd4OlMonth(data.ps||[]);
+  const names=adsNameMap(data);
+  const ps=(data.ps||[]).map(row=>minRow(row,includeCd4Ol,names.get(T(row.adsCode))||T(row.adsName)||T(row.adsCode)));
   const codes=[...new Set(ps.map(row=>row.ads).filter(Boolean))].sort();
-  const ads=codes.map(code=>({...sum(ps.filter(row=>row.ads===code),code,code),ads:code,ps:code}));
+  const ads=codes.map(code=>{const name=names.get(code)||code;return{...sum(ps.filter(row=>row.ads===code),code,name),ads:code,adsName:name,ps:code}});
   const ds=sum(ps,'DS','DS');
   const period=periodOf(data.source||'',reportDate,workbook);
   const workday=N(data.workdayNo||data.meta?.workdayNo)||workbook.workdayNo||new Date().getDate();
@@ -137,7 +169,8 @@ function buildMin(data){
   const comparePath='performance/compare/'+reportKey+'.json';
   [ds,...ads,...ps].forEach(row=>addPace(row,daysLeft));
   return{
-    meta:{schema:'performance-min-v5',source:data.source||'',updatedAt:new Date().toISOString(),reportDate,reportMonthText:workbook.reportMonthText||'',reportMonthNo:workbook.reportMonthNo||'',reportYear:workbook.reportYear||0,period,workdayNo:workday,totalWorkdays:total,daysLeft,reportKey,comparePath},
+    meta:{schema:'performance-min-v5',source:data.source||'',updatedAt:new Date().toISOString(),reportDate,reportMonthText:workbook.reportMonthText||'',reportMonthNo:workbook.reportMonthNo||'',reportYear:workbook.reportYear||0,period,workdayNo:workday,totalWorkdays:total,daysLeft,reportKey,comparePath,cd4OlCombinedIntoDc3:includeCd4Ol},
+    labels:includeCd4Ol?{dc3:'CD3 + CD4 OL'}:{},
     ds,ads,ps,ms:data.ms||[],rank:{ads:ranks(ads),ps:ranks(ps)}
   };
 }
