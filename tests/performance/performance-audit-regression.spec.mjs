@@ -41,7 +41,9 @@ function aggregate(rows, key) {
       indexCount += 1;
     }
   }
-  return { target, actual, index: target ? actual / target * 100 : (indexCount ? indexTotal / indexCount : 0) };
+  if (target) return { target, actual, index: actual / target * 100 };
+  const average = indexCount ? indexTotal / indexCount : 0;
+  return { target, actual: key === "gps" ? average : actual, index: average };
 }
 
 function pack(rows = [row("AYAPS001"), row("AYAPS002")], { day = 18, cd4Flag = false, updatedAt = "2026-08-08T12:00:00.000Z" } = {}) {
@@ -123,6 +125,7 @@ test("Board averages target-zero GPS including a real 0 percent PS", async ({ pa
   await storage(page, path => path === "performance/current.min.json" ? current : null);
   await page.goto("/performance.html?mode=ds");
   await page.locator('[data-metric-key="gps"]').click();
+  await expect(page.locator(".metric-hero-values")).toContainText("45");
   await expect(page.locator(".metric-hero-stats")).toContainText("45.0%");
 });
 
@@ -160,9 +163,13 @@ test("CD3 compare blocks a same-period legacy history snapshot with unknown form
 
 test("Compare sorts history and chooses the nearest previous report instead of array order", async ({ page }) => {
   const current = pack(undefined, { day:18 });
-  const old15 = pack(undefined, { day:15 });
-  const old16 = pack(undefined, { day:16 });
-  const old17 = pack(undefined, { day:17 });
+  const makeOld = (day, actual) => pack([
+    row("AYAPS001", { sales:metric(1000,actual) }),
+    row("AYAPS002", { sales:metric(1000,actual) }),
+  ], { day });
+  const old15 = makeOld(15,500);
+  const old16 = makeOld(16,600);
+  const old17 = makeOld(17,700);
   const map = new Map([[15,old15],[16,old16],[17,old17]]);
   await storage(page, path => {
     if (path === "performance/current.min.json") return current;
@@ -172,7 +179,8 @@ test("Compare sorts history and chooses the nearest previous report instead of a
     return null;
   });
   await page.goto("/performance.html?mode=compare&cat=sales");
-  await expect(page.locator(".board-head")).toContainText("202608-WD17");
+  await expect(page.locator(".delta-hero")).toContainText("ก่อนหน้า");
+  await expect(page.locator(".delta-hero")).toContainText("1,400");
 });
 
 test("Board refuses an unidentified active manifest instead of mixing a full snapshot", async ({ page }) => {
@@ -188,6 +196,21 @@ test("Board refuses an unidentified active manifest instead of mixing a full sna
   await page.goto("/performance.html?mode=ds");
   await expect(page.locator("#app")).toContainText("ไม่พบ full snapshot ที่ยืนยัน");
   expect(requests.some(url => url.endsWith("/performance/live/unidentified.json"))).toBe(false);
+});
+
+test("Board refuses a stale same-WD active manifest revision", async ({ page }) => {
+  const current = pack([row("AYAPS001", { dc1:metric(0,0,0) })], { updatedAt:"2026-08-08T12:00:00.000Z" });
+  delete current.meta.cd4OlCombinedIntoDc3;
+  const fullBase = pack([row("AYAPS001", { dc1:metric(100,95) })]);
+  const requests = await storage(page, path => {
+    if (path === "performance/current.min.json") return current;
+    if (path === "performance/active.json") return { reportDate:current.meta.reportDate, reportKey:current.meta.reportKey, updatedAt:"2026-08-08T11:00:00.000Z", dataPath:"performance/live/stale.json" };
+    if (path === "performance/live/stale.json") return fullFrom(fullBase);
+    return null;
+  });
+  await page.goto("/performance.html?mode=ds");
+  await expect(page.locator("#app")).toContainText("ไม่พบ full snapshot ที่ยืนยัน");
+  expect(requests.some(url => url.endsWith("/performance/live/stale.json"))).toBe(false);
 });
 
 test("Board still renders when sessionStorage quota write fails", async ({ page }) => {
@@ -210,8 +233,7 @@ test("Profile ignores a stale same-WD Board session revision", async ({ page }) 
   await images(page);
   await storage(page, path => path === "performance/current.min.json" ? current : null);
   await page.goto("/performance-profile.html?type=ps&code=AYAPS001");
-  await expect(page.locator(".primary-values")).toContainText("900");
-  await expect(page.locator(".primary-values")).not.toContainText("100\n");
+  await expect(page.locator(".primary-values > div").first().locator("strong")).toHaveText("900");
 });
 
 test("Profile rejects a full snapshot with a different reportKey even on the same date", async ({ page }) => {
@@ -221,7 +243,7 @@ test("Profile rejects a full snapshot with a different reportKey even on the sam
   await images(page);
   await storage(page, path => {
     if (path === "performance/current.min.json") return current;
-    if (path === "performance/active.json") return { reportDate:current.meta.reportDate, reportKey:current.meta.reportKey, dataPath:"performance/live/full.json" };
+    if (path === "performance/active.json") return { reportDate:current.meta.reportDate, reportKey:current.meta.reportKey, updatedAt:"2026-08-08T12:01:00.000Z", dataPath:"performance/live/full.json" };
     if (path === "performance/live/full.json") return full;
     return null;
   });
@@ -237,7 +259,7 @@ test("Profile validates CD4 OL even when compact CD values are already present",
   await images(page);
   await storage(page, path => {
     if (path === "performance/current.min.json") return current;
-    if (path === "performance/active.json") return { reportDate:current.meta.reportDate, reportKey:current.meta.reportKey, dataPath:"performance/live/full.json" };
+    if (path === "performance/active.json") return { reportDate:current.meta.reportDate, reportKey:current.meta.reportKey, updatedAt:"2026-08-08T12:01:00.000Z", dataPath:"performance/live/full.json" };
     if (path === "performance/live/full.json") return full;
     return null;
   });
@@ -266,6 +288,7 @@ test("Reveal does not create a winner when an award metric is zero for everyone"
   await images(page);
   await storage(page, path => {
     if (path === "performance/current.min.json") return current;
+    if (path === "performance/active.json") return { reportDate:current.meta.reportDate, reportKey:current.meta.reportKey, updatedAt:"2026-08-08T12:01:00.000Z", dataPath:"performance/current.min.json" };
     if (path === "performance/history-index.json") return [];
     return null;
   });
@@ -328,7 +351,7 @@ test("Reveal recovers current CD from the verified full snapshot before racing",
   await images(page);
   await storage(page, path => {
     if (path === "performance/current.min.json") return current;
-    if (path === "performance/active.json") return { reportDate:current.meta.reportDate, reportKey:current.meta.reportKey, dataPath:"performance/live/full.json" };
+    if (path === "performance/active.json") return { reportDate:current.meta.reportDate, reportKey:current.meta.reportKey, updatedAt:"2026-08-08T12:01:00.000Z", dataPath:"performance/live/full.json" };
     if (path === "performance/live/full.json") return full;
     if (path === "performance/history-index.json") return [];
     return null;
