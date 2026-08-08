@@ -64,6 +64,8 @@ assert.ok(boardJs.includes("STORE='perf-v5'"), "Board cache must move away from 
 assert.ok(boardJs.includes("if(k==='cd123'&&target<=0)return"), "Board totals must exclude CD123 actual without target");
 assert.ok(boardJs.includes("a.cd123=aggregate(rows,'cd123')"), "Board ADS CD123 must be rebuilt from eligible PS rows");
 assert.ok(boardJs.includes("eligibleRows(rows,k)"), "Board CD123 rankings must exclude target-zero rows");
+assert.ok(boardJs.includes("function combineCd4OlIntoDc3(base,full)"), "Board must support current-month CD4 OL enrichment without a legacy adapter");
+assert.ok(boardJs.includes("dc3:'CD3 + CD4 OL'"), "Board must label CD3 when CD4 OL is combined");
 assert.ok(!revealHtml.includes("performance-cd-adapter"));
 assert.ok(!revealHtml.includes("cdn.tailwindcss.com"));
 assert.ok(!revealHtml.includes("fonts.googleapis.com"));
@@ -79,5 +81,9 @@ const admin = fs.readFileSync("dist/assets/admin-performance-active-v2.js", "utf
 assert.ok(admin.includes("function monthYear(value,reportDate='')"));
 assert.ok(admin.includes("if(key==='cd123'&&rowTarget<=0)return"));
 assert.ok(admin.includes("reportYear:workbook.reportYear||0"));
+assert.ok(admin.includes("function hasCd4OlMonth(rows)"), "Min generator must detect CD4 OL by monthly Seller Report fields");
+assert.ok(admin.includes("dc3:cd3Metric(o,includeCd4Ol)"), "Min generator must combine CD4 OL only into CD3");
+assert.ok(admin.includes("cd4OlCombinedIntoDc3:includeCd4Ol"), "Min metadata must record whether CD4 OL was combined");
+assert.ok(admin.includes("labels:includeCd4Ol?{dc3:'CD3 + CD4 OL'}:{}"), "Min labels must expose the conditional CD3 + CD4 OL state");
 
 console.log("Performance data ownership regression: PASS");
