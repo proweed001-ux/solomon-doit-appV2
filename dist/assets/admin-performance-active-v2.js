@@ -131,7 +131,7 @@ function aggregate(rows,key){
     target+=rowTarget;
     actual+=N(value.actual);
     const rowIndex=N(value.index);
-    if(rowIndex>0){indexTotal+=rowIndex;indexCount+=1}
+    if(value&&typeof value==='object'&&('target'in value||'actual'in value||'index'in value)){indexTotal+=rowIndex;indexCount+=1}
   });
   return{target,actual,index:target?actual/target*100:(indexCount?indexTotal/indexCount:0)};
 }
