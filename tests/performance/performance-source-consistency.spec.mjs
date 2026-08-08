@@ -123,8 +123,10 @@ test("Reveal uses the exact verified Performance Board snapshot for CD competiti
   const card = await openCd1Award(page);
   await card.locator("[data-start-race]").click();
   await expect(card).toHaveClass(/winner-ready/);
-  await expect(card.locator(".race-percent")).toContainText("85.00%");
+  await expect(card.locator(".race-percent").first()).toHaveText("85.00%");
   await expect(card.locator(".race-row")).toHaveCount(2);
+  const firstBarHeight = await card.locator(".race-bar").first().evaluate(element => parseFloat(element.style.height));
+  expect(firstBarHeight).toBeGreaterThan(0);
 });
 
 test("Reveal rejects an older Performance Board session revision", async ({ page }) => {
