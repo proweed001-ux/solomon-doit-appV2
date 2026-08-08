@@ -67,7 +67,9 @@ async function mockPerformance(page, currentDay = 18) {
   const requests = [];
   page.on("request", (request) => requests.push(request.url()));
   const latest = snapshot(currentDay, 1);
-  const historyDays = [currentDay - 1, currentDay - 2, currentDay - 3, currentDay - 12, currentDay - 13]
+  const historyDays = (currentDay >= 14
+    ? [currentDay - 1, currentDay - 2, currentDay - 3, currentDay - 12, currentDay - 13]
+    : Array.from({ length: Math.min(5, currentDay - 1) }, (_, index) => currentDay - index - 1))
     .filter((day) => day > 0);
   const history = historyDays.map((day) => ({
     reportDate: `2026-08-${String(day).padStart(2, "0")}`,
