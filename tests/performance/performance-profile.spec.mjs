@@ -38,8 +38,8 @@ function pack() {
     ps("AYAPS011","AYAADS02","สมชาย 11",800),
   ];
   return {
-    meta:{reportDate:"2026-08-08",reportKey:"202608-WD08",workdayNo:8,totalWorkdays:24},
-    labels:{dc3:"CD3 + CD4 OL"},
+    meta:{reportDate:"2026-08-08",reportKey:"202608-WD06",workdayNo:6,totalWorkdays:24,daysLeft:18,cd4OlCombinedIntoDc3:false},
+    labels:{},
     ps: rows,
     ads:[
       ads("AYAADS02","หัวหน้าทีม 02",rows.filter(r=>r.ads==="AYAADS02")),
@@ -47,12 +47,51 @@ function pack() {
     ]
   };
 }
-async function mock(page) {
-  const data = pack();
+function fullSnapshot(data) {
+  return {
+    reportDate:data.meta.reportDate,
+    ads:[
+      {adsCode:"AYAADS01",adsName:"หัวหน้าทีม อยุธยา 01"},
+      {adsCode:"AYAADS02",adsName:"หัวหน้าทีม อยุธยา 02"},
+    ],
+    ps:data.ps.map(row=>({
+      psCode:row.ps,
+      adsCode:row.ads,
+      psName:row.name,
+      sellerReport:{
+        "เป้าหมาย CD1 RJ SH RH JJ 70ML":100,
+        "การกระจาย CD1 RJ SH RH JJ 70ML":85,
+        "Index CD1 RJ SH RH JJ 70ML":85,
+        "เป้าหมาย CD2 DN FE SF 450ML":100,
+        "การกระจาย CD2 DN FE SF 450ML":70,
+        "Index CD2 DN FE SF 450ML":70,
+        "เป้าหมาย CD3 GL Blue2 Flexi":100,
+        "การกระจาย CD3 GL Blue2 Flexi":65,
+        "Index CD3 GL Blue2 Flexi":65,
+        "Target CD1+2+3":300,
+        "การกระจาย CD1+2+3":220,
+        "Index CD1+2+3":73.333,
+      }
+    }))
+  };
+}
+async function mock(page,{compact=pack(),full=null}={}) {
   await page.route(`${STORAGE}**`, async route => {
     const path = new URL(route.request().url()).pathname.split("/doit-files/")[1];
     if (path === "performance/current.min.json") {
-      await route.fulfill({contentType:"application/json",body:JSON.stringify(data)});
+      await route.fulfill({contentType:"application/json",body:JSON.stringify(compact)});
+      return;
+    }
+    if (full && path === "performance/active.json") {
+      await route.fulfill({contentType:"application/json",body:JSON.stringify({
+        reportDate:compact.meta.reportDate,
+        reportKey:compact.meta.reportKey,
+        dataPath:"performance/live/current-full.json"
+      })});
+      return;
+    }
+    if (full && path === "performance/live/current-full.json") {
+      await route.fulfill({contentType:"application/json",body:JSON.stringify(full)});
       return;
     }
     await route.fulfill({status:404,contentType:"application/json",body:"{}"});
@@ -75,7 +114,8 @@ test("PS profile sorts codes naturally and uses the code-based ImageKit photo pa
     "https://ik.imagekit.io/AYAPS/AYAPS021.webp?updatedAt=1785290365097"
   );
   await expect(page.locator(".photo-fallback")).toBeVisible();
-  await expect(page.locator(".metrics-grid")).toContainText("CD3 + CD4 OL");
+  await expect(page.locator(".photo-fallback")).toContainText("ไม่มีรูป");
+  await expect(page.locator(".photo-fallback")).not.toContainText("21");
   await expect(page.locator(".metrics-grid")).toContainText("GPS");
 });
 
@@ -100,4 +140,42 @@ test("previous and next navigation follows the sorted PS code order", async ({ p
   await page.getByRole("button",{name:"โปรไฟล์ถัดไป"}).click();
   await expect(page).toHaveURL(/code=AYAPS021/);
   await expect(page.locator(".code")).toHaveText("AYAPS021");
+});
+
+test("profile target planner keeps the Production workday formula", async ({ page }) => {
+  await mock(page);
+  await page.goto("/performance-profile.html?type=ps&code=AYAPS021");
+  await expect(page.locator(".workday-card")).toContainText("18 วัน");
+  const primary = page.locator(".primary-card");
+  await primary.locator("summary").click();
+  const input = primary.locator('[data-pct-key="sales"]');
+  await input.fill("95");
+  await expect(primary.locator('[data-plan-result="sales"]')).toContainText("950");
+  await expect(primary.locator('[data-plan-result="sales"]')).toContainText("50");
+  await expect(primary.locator('[data-plan-result="sales"]')).toContainText("3 / วัน");
+  await input.blur();
+  await expect.poll(async()=>page.evaluate(()=>localStorage.getItem("perf-kpi-pct-v1:AYAPS021:sales"))).toBe("95");
+});
+
+test("profile recovers CD and ADS name from the matching full snapshot", async ({ page }) => {
+  const compact = pack();
+  compact.ads.forEach(a=>{a.name=a.ads; delete a.adsName});
+  compact.ps.forEach(row=>{
+    row.adsName="";
+    row.dc1=metric(0,0,0);
+    row.dc2=metric(0,0,0);
+    row.dc3=metric(0,0,0);
+    row.cd123=metric(0,0,0);
+  });
+  await mock(page,{compact,full:fullSnapshot(compact)});
+  await page.goto("/performance-profile.html?type=ps&code=AYAPS021");
+  await expect(page.locator(".team-block")).toContainText("หัวหน้าทีม อยุธยา 01");
+  const cards = page.locator(".metric-card");
+  const cd1 = cards.filter({hasText:"CD1"}).first();
+  await expect(cd1).toContainText("85.0%");
+  await expect(cd1).toContainText("Actual 85");
+  await expect(cd1).toContainText("Target 100");
+
+  await page.goto("/performance-profile.html?type=ads&code=AYAADS01");
+  await expect(page.locator(".identity-main h1")).toHaveText("หัวหน้าทีม อยุธยา 01");
 });
