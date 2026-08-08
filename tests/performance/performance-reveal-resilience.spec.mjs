@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 const STORAGE = "https://saodmeoilixfdqentofp.supabase.co/storage/v1/object/doit-files/";
+const TRANSPARENT_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+Xw4xAAAAAElFTkSuQmCC",
+  "base64",
+);
 
 function metric(target, actual) {
   return { target, actual, index: target ? (actual / target) * 100 : 0 };
@@ -35,6 +39,9 @@ function currentSnapshot() {
 
 async function routeRevealData(page, { delayMs = 0, failFirst = false } = {}) {
   let currentAttempts = 0;
+  await page.route("https://ik.imagekit.io/AYAPS/**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "image/png", body: TRANSPARENT_PNG });
+  });
   await page.route(`${STORAGE}**`, async (route) => {
     const path = new URL(route.request().url()).pathname.split("/doit-files/")[1];
     if (path === "performance/current.min.json") {
